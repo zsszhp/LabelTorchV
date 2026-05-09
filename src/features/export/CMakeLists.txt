@@ -16,3 +16,7 @@ target_link_libraries(labeltorch_export PUBLIC
     labeltorch_core
     Qt6::Quick
 )
+
+target_include_directories(labeltorch_export PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core/database
+)

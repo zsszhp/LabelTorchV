@@ -200,7 +200,7 @@ ApplicationWindow {
                     // 版本中心
                     Loader { source: "qrc:/LabelTorch/Model/qml/ModelPage.qml" }
                     // 导出中心
-                    Rectangle { color: "#1e1e2e"; Label { anchors.centerIn: parent; text: "导出中心 - 待实现"; color: "#6c7086"; font.pixelSize: 16 } }
+                    Loader { source: "qrc:/LabelTorch/Export/qml/ExportPage.qml" }
                 }
 
                 // 底部任务面板

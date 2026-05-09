@@ -27,6 +27,7 @@
 #include "ModelVersionModel.h"
 #include "InferenceService.h"
 #include "AssistedLabelService.h"
+#include "ExportService.h"
 #include "Database.h"
 
 int main(int argc, char *argv[])
@@ -66,6 +67,7 @@ int main(int argc, char *argv[])
     ModelVersionModel modelVersionModel;
     InferenceService inferenceService;
     AssistedLabelService assistedLabelService;
+    ExportService exportService;
 
     // 启动Python后端（如果可用）
     QString pythonExec = "F:/A/anaconda/envs/labeltorch/python.exe";
@@ -76,6 +78,7 @@ int main(int argc, char *argv[])
     projectService.setTaxonomyService(&taxonomyService);
     trainingService.setIpcClient(&ipcClient);
     inferenceService.setIpcClient(&ipcClient);
+    exportService.setIpcClient(&ipcClient);
 
     QQmlApplicationEngine engine;
 
@@ -101,6 +104,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("modelVersionModel", &modelVersionModel);
     engine.rootContext()->setContextProperty("inferenceService", &inferenceService);
     engine.rootContext()->setContextProperty("assistedLabelService", &assistedLabelService);
+    engine.rootContext()->setContextProperty("exportService", &exportService);
 
     // 加载主窗口
     const QUrl url(u"qrc:/LabelTorch/Shell/qml/Main.qml"_qs);

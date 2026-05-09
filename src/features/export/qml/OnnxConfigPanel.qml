@@ -1,5 +1,219 @@
-// OnnxConfigPanel.qml - ONNX配置面板
+// OnnxConfigPanel.qml - ONNX export options
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 
-Item { Label { anchors.centerIn: parent; text: "ONNX配置 - 待实现"; color: "#6c7086" } }
+Rectangle {
+    id: root
+    color: "#1e1e2e"
+    radius: 6
+    implicitHeight: layout.implicitHeight + 24
+
+    property alias opsetVersion: opsetSpin.value
+    property alias dynamicBatch: dynamicBatchSwitch.checked
+    property alias simplify: simplifySwitch.checked
+
+    ColumnLayout {
+        id: layout
+        anchors.fill: parent
+        anchors.margins: 12
+        spacing: 10
+
+        Label {
+            text: "ONNX Export Options"
+            color: "#89b4fa"
+            font.pixelSize: 14
+            font.bold: true
+        }
+
+        // Opset version
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 12
+
+            Label {
+                text: "Opset Version:"
+                color: "#cdd6f4"
+                font.pixelSize: 13
+                Layout.preferredWidth: 120
+            }
+
+            SpinBox {
+                id: opsetSpin
+                from: 7
+                to: 17
+                value: 13
+                editable: true
+                Layout.preferredWidth: 120
+
+                contentItem: Label {
+                    text: opsetSpin.textFromValue(opsetSpin.value, opsetSpin.locale)
+                    color: "#cdd6f4"
+                    font.pixelSize: 13
+                    font.family: "monospace"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                up.indicator: Rectangle {
+                    x: opsetSpin.mirrored ? 0 : parent.width - width
+                    height: parent.height / 2
+                    width: 32
+                    color: opsetSpin.up.pressed ? "#45475a" : "#313244"
+                    border.color: "#45475a"
+                    radius: 2
+
+                    Label {
+                        anchors.centerIn: parent
+                        text: "+"
+                        color: "#cdd6f4"
+                        font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                down.indicator: Rectangle {
+                    x: opsetSpin.mirrored ? 0 : parent.width - width
+                    y: parent.height / 2
+                    height: parent.height / 2
+                    width: 32
+                    color: opsetSpin.down.pressed ? "#45475a" : "#313244"
+                    border.color: "#45475a"
+                    radius: 2
+
+                    Label {
+                        anchors.centerIn: parent
+                        text: "-"
+                        color: "#cdd6f4"
+                        font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                background: Rectangle {
+                    color: "#313244"
+                    border.color: opsetSpin.activeFocus ? "#89b4fa" : "#45475a"
+                    radius: 4
+                }
+            }
+
+            Label {
+                text: "(7 - 17)"
+                color: "#6c7086"
+                font.pixelSize: 11
+            }
+        }
+
+        // Dynamic batch
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 12
+
+            Label {
+                text: "Dynamic Batch:"
+                color: "#cdd6f4"
+                font.pixelSize: 13
+                Layout.preferredWidth: 120
+            }
+
+            Switch {
+                id: dynamicBatchSwitch
+                checked: true
+
+                indicator: Rectangle {
+                    x: dynamicBatchSwitch.leftPadding
+                    y: parent.height / 2 - height / 2
+                    width: 40
+                    height: 22
+                    radius: 11
+                    color: dynamicBatchSwitch.checked ? "#89b4fa" : "#45475a"
+                    border.color: dynamicBatchSwitch.checked ? "#89b4fa" : "#585b70"
+
+                    Rectangle {
+                        x: dynamicBatchSwitch.checked ? parent.width - width - 3 : 3
+                        y: parent.height / 2 - height / 2
+                        width: 16
+                        height: 16
+                        radius: 8
+                        color: "#cdd6f4"
+
+                        Behavior on x {
+                            NumberAnimation { duration: 150 }
+                        }
+                    }
+                }
+
+                background: Rectangle {
+                    color: "transparent"
+                }
+            }
+
+            Label {
+                text: dynamicBatchSwitch.checked ? "Enabled" : "Disabled"
+                color: dynamicBatchSwitch.checked ? "#a6e3a1" : "#6c7086"
+                font.pixelSize: 12
+            }
+        }
+
+        // Simplify
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 12
+
+            Label {
+                text: "Simplify:"
+                color: "#cdd6f4"
+                font.pixelSize: 13
+                Layout.preferredWidth: 120
+            }
+
+            Switch {
+                id: simplifySwitch
+                checked: true
+
+                indicator: Rectangle {
+                    x: simplifySwitch.leftPadding
+                    y: parent.height / 2 - height / 2
+                    width: 40
+                    height: 22
+                    radius: 11
+                    color: simplifySwitch.checked ? "#89b4fa" : "#45475a"
+                    border.color: simplifySwitch.checked ? "#89b4fa" : "#585b70"
+
+                    Rectangle {
+                        x: simplifySwitch.checked ? parent.width - width - 3 : 3
+                        y: parent.height / 2 - height / 2
+                        width: 16
+                        height: 16
+                        radius: 8
+                        color: "#cdd6f4"
+
+                        Behavior on x {
+                            NumberAnimation { duration: 150 }
+                        }
+                    }
+                }
+
+                background: Rectangle {
+                    color: "transparent"
+                }
+            }
+
+            Label {
+                text: simplifySwitch.checked ? "Enabled" : "Disabled"
+                color: simplifySwitch.checked ? "#a6e3a1" : "#6c7086"
+                font.pixelSize: 12
+            }
+        }
+    }
+
+    function getConfigJson() {
+        return JSON.stringify({
+            "opset_version": opsetSpin.value,
+            "dynamic_batch": dynamicBatchSwitch.checked,
+            "simplify": simplifySwitch.checked
+        });
+    }
+}

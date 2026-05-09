@@ -139,3 +139,22 @@ target_include_directories(test_inference PRIVATE
     ${CMAKE_SOURCE_DIR}/src/core/ipc
 )
 add_test(NAME InferenceTest COMMAND test_inference)
+
+# 导出服务测试
+add_executable(test_export
+    test_export.cpp
+)
+target_link_libraries(test_export PRIVATE
+    labeltorch_core
+    labeltorch_export
+    labeltorch_model
+    Qt6::Test
+    Qt6::Sql
+)
+target_include_directories(test_export PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/features/export
+    ${CMAKE_SOURCE_DIR}/src/features/model
+    ${CMAKE_SOURCE_DIR}/src/core/database
+    ${CMAKE_SOURCE_DIR}/src/core/ipc
+)
+add_test(NAME ExportTest COMMAND test_export)
