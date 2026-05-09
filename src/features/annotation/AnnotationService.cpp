@@ -2,6 +2,7 @@
 #include "labelio/YoloTxtReader.h"
 #include "labelio/YoloTxtWriter.h"
 #include "geometry/AxisAlignedBox.h"
+#include "geometry/RotatedBox.h"
 #include "database/Database.h"
 #include "utils/Id.h"
 
@@ -21,6 +22,12 @@ QVariantList AnnotationService::loadAnnotations(const QString &labelPath)
 {
     QVariantList result;
 
+    if (m_shapeType == 1) {
+        // OBB mode
+        return loadOBBAnnotations(labelPath);
+    }
+
+    // HBB mode (default)
     QVector<AxisAlignedBox> boxes = YoloTxtReader::read(labelPath);
     result.reserve(boxes.size());
 
@@ -45,6 +52,12 @@ QVariantList AnnotationService::loadAnnotations(const QString &labelPath)
 bool AnnotationService::saveAnnotations(const QString &labelPath, const QString &datasetId,
                                         const QString &sampleId, const QVariantList &annotations)
 {
+    if (m_shapeType == 1) {
+        // OBB mode
+        return saveOBBAnnotations(labelPath, datasetId, sampleId, annotations);
+    }
+
+    // HBB mode (default)
     // Convert QVariantList -> QVector<AxisAlignedBox>
     QVector<AxisAlignedBox> boxes;
     boxes.reserve(annotations.size());
@@ -84,6 +97,80 @@ bool AnnotationService::saveAnnotations(const QString &labelPath, const QString 
     return true;
 }
 
+QVariantList AnnotationService::loadOBBAnnotations(const QString &labelPath)
+{
+    QVariantList result;
+
+    QVector<RotatedBox> boxes = YoloTxtReader::readOBB(labelPath);
+    result.reserve(boxes.size());
+
+    for (const RotatedBox &box : boxes) {
+        QVariantMap m;
+        m[QStringLiteral("id")]          = box.id;
+        m[QStringLiteral("classIndex")]  = box.classIndex;
+        m[QStringLiteral("className")]   = box.className;
+        m[QStringLiteral("cx")]          = box.cx;
+        m[QStringLiteral("cy")]          = box.cy;
+        m[QStringLiteral("w")]           = box.w;
+        m[QStringLiteral("h")]           = box.h;
+        m[QStringLiteral("angle")]       = box.angle;
+        m[QStringLiteral("confidence")]  = box.confidence;
+        m[QStringLiteral("sourceType")]  = box.sourceType;
+        m[QStringLiteral("isConfirmed")] = box.isConfirmed;
+        result.append(m);
+    }
+
+    return result;
+}
+
+bool AnnotationService::saveOBBAnnotations(const QString &labelPath, const QString &datasetId,
+                                            const QString &sampleId, const QVariantList &annotations)
+{
+    // Convert QVariantList -> QVector<RotatedBox>
+    QVector<RotatedBox> boxes;
+    boxes.reserve(annotations.size());
+
+    for (const QVariant &item : annotations) {
+        QVariantMap m = item.toMap();
+        RotatedBox box;
+        box.id          = m[QStringLiteral("id")].toString();
+        box.classIndex  = m[QStringLiteral("classIndex")].toInt();
+        box.className   = m[QStringLiteral("className")].toString();
+        box.cx          = static_cast<float>(m[QStringLiteral("cx")].toDouble());
+        box.cy          = static_cast<float>(m[QStringLiteral("cy")].toDouble());
+        box.w           = static_cast<float>(m[QStringLiteral("w")].toDouble());
+        box.h           = static_cast<float>(m[QStringLiteral("h")].toDouble());
+        box.angle       = static_cast<float>(m[QStringLiteral("angle")].toDouble());
+        box.confidence  = static_cast<float>(m[QStringLiteral("confidence")].toDouble());
+        box.sourceType  = m[QStringLiteral("sourceType")].toString();
+        box.isConfirmed = m[QStringLiteral("isConfirmed")].toBool();
+        boxes.append(box);
+    }
+
+    // Write to file atomically in OBB format
+    if (!YoloTxtWriter::writeOBB(labelPath, boxes)) {
+        qWarning() << "AnnotationService: Failed to write OBB annotations to:" << labelPath;
+        return false;
+    }
+
+    // Record a revision
+    QString revId = createRevision(datasetId, sampleId,
+                                   QStringLiteral("manual"),
+                                   QVariantList(),
+                                   annotations);
+    if (revId.isEmpty()) {
+        qWarning() << "AnnotationService: OBB file saved but revision record failed for sample:" << sampleId;
+    }
+
+    return true;
+}
+
+void AnnotationService::setShapeType(int shapeType)
+{
+    m_shapeType = shapeType;
+    qDebug() << "AnnotationService: shape type set to" << (shapeType == 1 ? "OBB" : "HBB");
+}
+
 QString AnnotationService::createRevision(const QString &datasetId, const QString &sampleId,
                                           const QString &sourceType,
                                           const QVariantList &beforeSnapshot,
@@ -103,6 +190,7 @@ QString AnnotationService::createRevision(const QString &datasetId, const QStrin
         obj[QStringLiteral("cy")]          = m[QStringLiteral("cy")].toDouble();
         obj[QStringLiteral("w")]           = m[QStringLiteral("w")].toDouble();
         obj[QStringLiteral("h")]           = m[QStringLiteral("h")].toDouble();
+        obj[QStringLiteral("angle")]       = m[QStringLiteral("angle")].toDouble();
         obj[QStringLiteral("confidence")]  = m[QStringLiteral("confidence")].toDouble();
         obj[QStringLiteral("sourceType")]  = m[QStringLiteral("sourceType")].toString();
         obj[QStringLiteral("isConfirmed")] = m[QStringLiteral("isConfirmed")].toBool();
@@ -122,6 +210,7 @@ QString AnnotationService::createRevision(const QString &datasetId, const QStrin
         obj[QStringLiteral("cy")]          = m[QStringLiteral("cy")].toDouble();
         obj[QStringLiteral("w")]           = m[QStringLiteral("w")].toDouble();
         obj[QStringLiteral("h")]           = m[QStringLiteral("h")].toDouble();
+        obj[QStringLiteral("angle")]       = m[QStringLiteral("angle")].toDouble();
         obj[QStringLiteral("confidence")]  = m[QStringLiteral("confidence")].toDouble();
         obj[QStringLiteral("sourceType")]  = m[QStringLiteral("sourceType")].toString();
         obj[QStringLiteral("isConfirmed")] = m[QStringLiteral("isConfirmed")].toBool();

@@ -12,9 +12,10 @@ struct AxisAlignedBox;
 /**
  * @brief QAbstractListModel for the current image's annotations.
  *
- * Each row represents one AxisAlignedBox annotation with roles for all
- * annotation properties. Provides QML-invokable methods for loading,
- * adding, removing, updating, and exporting annotations.
+ * Each row represents one annotation with roles for all annotation properties.
+ * Supports both HBB and OBB annotations (OBB includes angle role).
+ * Provides QML-invokable methods for loading, adding, removing, updating,
+ * and exporting annotations.
  */
 class AnnotationModel : public QAbstractListModel
 {
@@ -31,6 +32,7 @@ public:
         CyRole,
         WRole,
         HRole,
+        AngleRole,          // OBB rotation angle in degrees
         ConfidenceRole,
         SourceTypeRole,
         IsConfirmedRole,
@@ -53,8 +55,11 @@ public:
     Q_INVOKABLE void loadFromLabel(const QString &labelPath);
     Q_INVOKABLE void addAnnotation(int classIndex, const QString &className,
                                    float cx, float cy, float w, float h);
+    Q_INVOKABLE void addOBBAnnotation(int classIndex, const QString &className,
+                                       float cx, float cy, float w, float h, float angle);
     Q_INVOKABLE void removeAnnotation(int row);
     Q_INVOKABLE void updateGeometry(int row, float cx, float cy, float w, float h);
+    Q_INVOKABLE void updateOBBGeometry(int row, float cx, float cy, float w, float h, float angle);
     Q_INVOKABLE void setClassIndex(int row, int classIndex, const QString &className);
     Q_INVOKABLE void setSelected(int row, bool selected);
     Q_INVOKABLE QVariantList toVariantList() const;
@@ -71,6 +76,7 @@ private:
         float   cy          = 0.0f;
         float   w           = 0.0f;
         float   h           = 0.0f;
+        float   angle       = 0.0f;   // OBB rotation in degrees (0 for HBB)
         float   confidence  = 0.0f;
         QString sourceType  = QStringLiteral("manual");
         bool    isConfirmed = true;

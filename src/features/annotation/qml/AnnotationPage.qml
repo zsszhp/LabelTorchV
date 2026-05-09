@@ -6,6 +6,9 @@ import QtQuick.Layouts
 Item {
     id: root
 
+    // Current shape mode: 0 = HBB, 1 = OBB
+    property int shapeMode: 0
+
     RowLayout {
         anchors.fill: parent
         spacing: 0
@@ -113,39 +116,87 @@ Item {
                         var cy = annotationModel.data(idx, 260)  // CyRole
                         var w = annotationModel.data(idx, 261)   // WRole
                         var h = annotationModel.data(idx, 262)   // HRole
+                        var annAngle = annotationModel.data(idx, 263) // AngleRole
                         var classIdx = annotationModel.data(idx, 256)  // ClassIndexRole
                         var className = annotationModel.data(idx, 257) // ClassNameRole
                         var selected = annotationModel.data(idx, 264)  // IsSelectedRole
 
                         if (cx === undefined || cy === undefined) continue
 
-                        var x1 = canvasController.imageToCanvasX(cx - w / 2)
-                        var y1 = canvasController.imageToCanvasY(cy - h / 2)
-                        var x2 = canvasController.imageToCanvasX(cx + w / 2)
-                        var y2 = canvasController.imageToCanvasY(cy + h / 2)
-
                         var color = colors[classIdx % colors.length]
 
-                        // Fill
-                        ctx.globalAlpha = 0.15
-                        ctx.fillStyle = color
-                        ctx.fillRect(x1, y1, x2 - x1, y2 - y1)
+                        // Center in canvas coordinates
+                        var canvasCx = canvasController.imageToCanvasX(cx)
+                        var canvasCy = canvasController.imageToCanvasY(cy)
+                        var canvasHalfW = (canvasController.imageToCanvasX(cx + w / 2) - canvasController.imageToCanvasX(cx - w / 2)) / 2
+                        var canvasHalfH = (canvasController.imageToCanvasY(cy + h / 2) - canvasController.imageToCanvasY(cy - h / 2)) / 2
 
-                        // Stroke
-                        ctx.globalAlpha = selected ? 1.0 : 0.8
-                        ctx.strokeStyle = color
-                        ctx.lineWidth = selected ? 3 : 2
-                        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
+                        if (annAngle !== undefined && annAngle !== 0 && shapeMode === 1) {
+                            // OBB mode: draw rotated rectangle
+                            var rad = annAngle * Math.PI / 180.0
+                            ctx.save()
+                            ctx.translate(canvasCx, canvasCy)
+                            ctx.rotate(rad)
 
-                        // Label
+                            // Fill
+                            ctx.globalAlpha = 0.15
+                            ctx.fillStyle = color
+                            ctx.fillRect(-canvasHalfW, -canvasHalfH, canvasHalfW * 2, canvasHalfH * 2)
+
+                            // Stroke
+                            ctx.globalAlpha = selected ? 1.0 : 0.8
+                            ctx.strokeStyle = color
+                            ctx.lineWidth = selected ? 3 : 2
+                            ctx.strokeRect(-canvasHalfW, -canvasHalfH, canvasHalfW * 2, canvasHalfH * 2)
+
+                            // Rotation indicator line
+                            ctx.globalAlpha = 0.5
+                            ctx.strokeStyle = "#cdd6f4"
+                            ctx.lineWidth = 1
+                            ctx.beginPath()
+                            ctx.moveTo(0, 0)
+                            ctx.lineTo(canvasHalfW, 0)
+                            ctx.stroke()
+
+                            ctx.restore()
+                        } else {
+                            // HBB mode: draw axis-aligned rectangle
+                            var x1 = canvasController.imageToCanvasX(cx - w / 2)
+                            var y1 = canvasController.imageToCanvasY(cy - h / 2)
+                            var x2 = canvasController.imageToCanvasX(cx + w / 2)
+                            var y2 = canvasController.imageToCanvasY(cy + h / 2)
+
+                            // Fill
+                            ctx.globalAlpha = 0.15
+                            ctx.fillStyle = color
+                            ctx.fillRect(x1, y1, x2 - x1, y2 - y1)
+
+                            // Stroke
+                            ctx.globalAlpha = selected ? 1.0 : 0.8
+                            ctx.strokeStyle = color
+                            ctx.lineWidth = selected ? 3 : 2
+                            ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
+                        }
+
+                        // Label (always drawn at the top of the annotation)
+                        var labelX, labelY
+                        if (annAngle !== undefined && annAngle !== 0 && shapeMode === 1) {
+                            // For OBB, place label at the rotated top-left corner area
+                            labelX = canvasCx - canvasHalfW * Math.cos(annAngle * Math.PI / 180) - 4
+                            labelY = canvasCy - canvasHalfW * Math.sin(annAngle * Math.PI / 180) - 4
+                        } else {
+                            labelX = canvasController.imageToCanvasX(cx - w / 2)
+                            labelY = canvasController.imageToCanvasY(cy - h / 2) - 18
+                        }
+
                         ctx.globalAlpha = 1.0
                         ctx.fillStyle = color
                         ctx.font = "bold 11px sans-serif"
                         var label = (className || ("class_" + classIdx))
                         var textW = ctx.measureText(label).width + 8
-                        ctx.fillRect(x1, y1 - 18, textW, 18)
+                        ctx.fillRect(labelX, labelY, textW, 18)
                         ctx.fillStyle = "#1e1e2e"
-                        ctx.fillText(label, x1 + 4, y1 - 5)
+                        ctx.fillText(label, labelX + 4, labelY + 13)
                     }
 
                     // Draw current drawing rect
@@ -226,7 +277,11 @@ Item {
                             var h = Math.abs(imgY2 - imgY1)
 
                             if (w > 0.001 && h > 0.001 && cx >= 0 && cy >= 0 && cx <= 1 && cy <= 1) {
-                                annotationModel.addAnnotation(0, "class_0", cx, cy, w, h)
+                                if (shapeMode === 1) {
+                                    annotationModel.addOBBAnnotation(0, "class_0", cx, cy, w, h, 0.0)
+                                } else {
+                                    annotationModel.addAnnotation(0, "class_0", cx, cy, w, h)
+                                }
                                 canvasController.markDirty()
                             }
                         }
@@ -253,6 +308,72 @@ Item {
                 anchors.right: parent.right
                 anchors.margins: 8
                 spacing: 4
+
+                // HBB/OBB mode switch
+                RowLayout {
+                    spacing: 0
+
+                    Button {
+                        text: "HBB"
+                        font.pixelSize: 11
+                        highlighted: shapeMode === 0
+                        flat: !highlighted
+                        onClicked: {
+                            shapeMode = 0
+                            annotationService.setShapeType(0)
+                        }
+
+                        background: Rectangle {
+                            color: parent.highlighted ? "#89b4fa" : "#313244"
+                            radius: 3
+
+                            Rectangle {
+                                anchors.right: parent.right
+                                width: obbBtn.visible ? 0 : parent.radius
+                                color: parent.color
+                            }
+                        }
+
+                        contentItem: Label {
+                            text: parent.text
+                            font.pixelSize: 11
+                            color: parent.highlighted ? "#1e1e2e" : "#cdd6f4"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
+
+                    Button {
+                        id: obbBtn
+                        text: "OBB"
+                        font.pixelSize: 11
+                        highlighted: shapeMode === 1
+                        flat: !highlighted
+                        onClicked: {
+                            shapeMode = 1
+                            annotationService.setShapeType(1)
+                        }
+
+                        background: Rectangle {
+                            color: parent.highlighted ? "#89b4fa" : "#313244"
+                            radius: 3
+
+                            Rectangle {
+                                anchors.left: parent.left
+                                width: hbbBtn.visible ? 0 : parent.radius
+                                color: parent.color
+                            }
+                        }
+
+                        contentItem: Label {
+                            text: parent.text
+                            font.pixelSize: 11
+                            color: parent.highlighted ? "#1e1e2e" : "#cdd6f4"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
+                }
 
                 Button {
                     text: canvasController.drawMode === "draw" ? "绘制中" : "选择"
@@ -289,8 +410,91 @@ Item {
                 }
             }
 
+            // OBB rotation control (only visible in OBB mode when an annotation is selected)
+            Rectangle {
+                id: rotationPanel
+                visible: shapeMode === 1 && hasSelectedAnnotation()
+                anchors.bottom: statusBar.top
+                anchors.right: parent.right
+                anchors.margins: 8
+                width: 200
+                height: 44
+                color: "#181825"
+                radius: 4
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 6
+
+                    Label {
+                        text: "旋转"
+                        font.pixelSize: 11
+                        color: "#cdd6f4"
+                    }
+
+                    Slider {
+                        id: angleSlider
+                        Layout.fillWidth: true
+                        from: 0
+                        to: 360
+                        stepSize: 1
+
+                        onValueChanged: {
+                            // Update the angle of the selected annotation
+                            for (var i = 0; i < annotationModel.rowCount(); i++) {
+                                var idx = annotationModel.index(i, 0)
+                                if (annotationModel.data(idx, 264)) { // IsSelectedRole
+                                    var currentCx = annotationModel.data(idx, 259)
+                                    var currentCy = annotationModel.data(idx, 260)
+                                    var currentW = annotationModel.data(idx, 261)
+                                    var currentH = annotationModel.data(idx, 262)
+                                    annotationModel.updateOBBGeometry(i, currentCx, currentCy, currentW, currentH, angleSlider.value)
+                                    canvasController.markDirty()
+                                    annotationCanvas.requestPaint()
+                                    break
+                                }
+                            }
+                        }
+
+                        background: Rectangle {
+                            x: angleSlider.leftPadding
+                            y: angleSlider.topPadding + angleSlider.availableHeight / 2 - height / 2
+                            width: angleSlider.availableWidth
+                            height: 4
+                            radius: 2
+                            color: "#313244"
+
+                            Rectangle {
+                                width: angleSlider.visualPosition * parent.width
+                                height: parent.height
+                                color: "#89b4fa"
+                                radius: 2
+                            }
+                        }
+
+                        handle: Rectangle {
+                            x: angleSlider.leftPadding + angleSlider.visualPosition * (angleSlider.availableWidth - width)
+                            y: angleSlider.topPadding + angleSlider.availableHeight / 2 - height / 2
+                            width: 14
+                            height: 14
+                            radius: 7
+                            color: angleSlider.pressed ? "#b4befe" : "#89b4fa"
+                        }
+                    }
+
+                    Label {
+                        text: Math.round(angleSlider.value) + "°"
+                        font.pixelSize: 11
+                        color: "#89b4fa"
+                        Layout.preferredWidth: 36
+                    }
+                }
+            }
+
             // Status bar
             Rectangle {
+                id: statusBar
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -304,6 +508,12 @@ Item {
                     Label {
                         text: canvasController.dirty ? "未保存" : "已保存"
                         color: canvasController.dirty ? "#f38ba8" : "#a6e3a1"
+                        font.pixelSize: 11
+                    }
+
+                    Label {
+                        text: shapeMode === 1 ? "OBB" : "HBB"
+                        color: "#89b4fa"
                         font.pixelSize: 11
                     }
 
@@ -406,6 +616,16 @@ Item {
         }
     }
 
+    function hasSelectedAnnotation() {
+        for (var i = 0; i < annotationModel.rowCount(); i++) {
+            var idx = annotationModel.index(i, 0)
+            if (annotationModel.data(idx, 264)) { // IsSelectedRole
+                return true
+            }
+        }
+        return false
+    }
+
     function selectAnnotationAt(imgX, imgY) {
         var found = false
         for (var i = annotationModel.rowCount() - 1; i >= 0; i--) {
@@ -414,16 +634,39 @@ Item {
             var cy = annotationModel.data(idx, 260)
             var w = annotationModel.data(idx, 261)
             var h = annotationModel.data(idx, 262)
+            var annAngle = annotationModel.data(idx, 263) // AngleRole
 
-            var left = cx - w / 2
-            var right = cx + w / 2
-            var top = cy - h / 2
-            var bottom = cy + h / 2
+            if (shapeMode === 1 && annAngle !== undefined && annAngle !== 0) {
+                // OBB hit test: transform point to local coordinates
+                var dx = imgX - cx
+                var dy = imgY - cy
+                var rad = -annAngle * Math.PI / 180.0
+                var localX = dx * Math.cos(rad) - dy * Math.sin(rad)
+                var localY = dx * Math.sin(rad) + dy * Math.cos(rad)
+                var hw = w / 2
+                var hh = h / 2
 
-            if (imgX >= left && imgX <= right && imgY >= top && imgY <= bottom) {
-                annotationModel.setSelected(i, !annotationModel.data(idx, 264))
-                found = true
-                break
+                if (localX >= -hw && localX <= hw && localY >= -hh && localY <= hh) {
+                    annotationModel.setSelected(i, !annotationModel.data(idx, 264))
+
+                    // Update angle slider to this annotation's angle
+                    angleSlider.value = annAngle
+
+                    found = true
+                    break
+                }
+            } else {
+                // HBB hit test
+                var left = cx - w / 2
+                var right = cx + w / 2
+                var top = cy - h / 2
+                var bottom = cy + h / 2
+
+                if (imgX >= left && imgX <= right && imgY >= top && imgY <= bottom) {
+                    annotationModel.setSelected(i, !annotationModel.data(idx, 264))
+                    found = true
+                    break
+                }
             }
         }
         if (!found) {

@@ -31,6 +31,7 @@ QVariant AnnotationModel::data(const QModelIndex &index, int role) const
     case CyRole:          return ann.cy;
     case WRole:           return ann.w;
     case HRole:           return ann.h;
+    case AngleRole:       return ann.angle;
     case ConfidenceRole:  return ann.confidence;
     case SourceTypeRole:  return ann.sourceType;
     case IsConfirmedRole: return ann.isConfirmed;
@@ -53,6 +54,7 @@ bool AnnotationModel::setData(const QModelIndex &index, const QVariant &value, i
     case CyRole:          ann.cy          = value.toFloat();  break;
     case WRole:           ann.w           = value.toFloat();  break;
     case HRole:           ann.h           = value.toFloat();  break;
+    case AngleRole:       ann.angle       = value.toFloat();  break;
     case ConfidenceRole:  ann.confidence  = value.toFloat();  break;
     case SourceTypeRole:  ann.sourceType  = value.toString(); break;
     case IsConfirmedRole: ann.isConfirmed = value.toBool();   break;
@@ -74,6 +76,7 @@ QHash<int, QByteArray> AnnotationModel::roleNames() const
         {CyRole,          "cy"},
         {WRole,           "w"},
         {HRole,           "h"},
+        {AngleRole,       "angle"},
         {ConfidenceRole,  "confidence"},
         {SourceTypeRole,  "sourceType"},
         {IsConfirmedRole, "isConfirmed"},
@@ -105,6 +108,7 @@ void AnnotationModel::loadFromLabel(const QString &labelPath)
         entry.cy          = static_cast<float>(m[QStringLiteral("cy")].toDouble());
         entry.w           = static_cast<float>(m[QStringLiteral("w")].toDouble());
         entry.h           = static_cast<float>(m[QStringLiteral("h")].toDouble());
+        entry.angle       = static_cast<float>(m[QStringLiteral("angle")].toDouble());
         entry.confidence  = static_cast<float>(m[QStringLiteral("confidence")].toDouble());
         entry.sourceType  = m[QStringLiteral("sourceType")].toString();
         entry.isConfirmed = m[QStringLiteral("isConfirmed")].toBool();
@@ -122,6 +126,12 @@ void AnnotationModel::loadFromLabel(const QString &labelPath)
 void AnnotationModel::addAnnotation(int classIndex, const QString &className,
                                     float cx, float cy, float w, float h)
 {
+    addOBBAnnotation(classIndex, className, cx, cy, w, h, 0.0f);
+}
+
+void AnnotationModel::addOBBAnnotation(int classIndex, const QString &className,
+                                        float cx, float cy, float w, float h, float angle)
+{
     int newRow = m_annotations.size();
     beginInsertRows(QModelIndex(), newRow, newRow);
 
@@ -133,6 +143,7 @@ void AnnotationModel::addAnnotation(int classIndex, const QString &className,
     entry.cy          = cy;
     entry.w           = w;
     entry.h           = h;
+    entry.angle       = angle;
     entry.confidence  = 0.0f;
     entry.sourceType  = QStringLiteral("manual");
     entry.isConfirmed = false;
@@ -165,6 +176,21 @@ void AnnotationModel::updateGeometry(int row, float cx, float cy, float w, float
     ann.cy = cy;
     ann.w  = w;
     ann.h  = h;
+
+    emitDataChanged(row);
+}
+
+void AnnotationModel::updateOBBGeometry(int row, float cx, float cy, float w, float h, float angle)
+{
+    if (row < 0 || row >= m_annotations.size())
+        return;
+
+    AnnotationEntry &ann = m_annotations[row];
+    ann.cx    = cx;
+    ann.cy    = cy;
+    ann.w     = w;
+    ann.h     = h;
+    ann.angle = angle;
 
     emitDataChanged(row);
 }
@@ -210,6 +236,7 @@ QVariantList AnnotationModel::toVariantList() const
         m[QStringLiteral("cy")]          = ann.cy;
         m[QStringLiteral("w")]           = ann.w;
         m[QStringLiteral("h")]           = ann.h;
+        m[QStringLiteral("angle")]       = ann.angle;
         m[QStringLiteral("confidence")]  = ann.confidence;
         m[QStringLiteral("sourceType")]  = ann.sourceType;
         m[QStringLiteral("isConfirmed")] = ann.isConfirmed;

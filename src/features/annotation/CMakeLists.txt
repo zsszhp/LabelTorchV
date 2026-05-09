@@ -13,6 +13,7 @@ qt_add_qml_module(labeltorch_annotation
         geometry/Geometry.h
         geometry/AxisAlignedBox.h
         geometry/RotatedBox.h
+        geometry/RotatedBox.cpp
         geometry/Polygon.h
         canvas/CanvasController.h
         canvas/CanvasController.cpp
