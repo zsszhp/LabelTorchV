@@ -64,6 +64,7 @@ int main(int argc, char *argv[])
 
     // 注入依赖
     projectService.setTaxonomyService(&taxonomyService);
+    trainingService.setIpcClient(&ipcClient);
 
     QQmlApplicationEngine engine;
 

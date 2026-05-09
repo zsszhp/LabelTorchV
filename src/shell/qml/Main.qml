@@ -196,7 +196,7 @@ ApplicationWindow {
                     // 标注工作台
                     Loader { source: "qrc:/LabelTorch/Annotation/qml/AnnotationPage.qml" }
                     // 训练工作台
-                    Loader { source: "qrc:/LabelTorch/Training/qml/SnapshotPage.qml" }
+                    Loader { source: "qrc:/LabelTorch/Training/qml/TrainingPage.qml" }
                     // 版本中心
                     Rectangle { color: "#1e1e2e"; Label { anchors.centerIn: parent; text: "版本中心 - 待实现"; color: "#6c7086"; font.pixelSize: 16 } }
                     // 导出中心
