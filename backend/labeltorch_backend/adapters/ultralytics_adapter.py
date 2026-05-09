@@ -66,6 +66,8 @@ class UltralyticsAdapter(TrainingAdapter):
         device = config.get("device", "cpu")
         patience = config.get("patience", 50)
         resume = config.get("resume", False)
+        amp = config.get("amp", True)
+        workers = config.get("workers", 8)
         pretrained = config.get("pretrained", config.get("pretrained_weights", None))
 
         self._status = "running"
@@ -106,6 +108,8 @@ class UltralyticsAdapter(TrainingAdapter):
                     device=device,
                     patience=patience,
                     resume=resume,
+                    amp=amp,
+                    workers=workers,
                     verbose=True,
                 )
             )

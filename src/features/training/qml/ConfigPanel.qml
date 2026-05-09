@@ -16,6 +16,7 @@ Rectangle {
     property alias patience: patienceSpin.value
     property alias workers: workersSpin.value
     property alias amp: ampSwitch.checked
+    property alias resume: resumeSwitch.checked
     property alias device: deviceCombo.currentText
     property alias modelFamily: modelFamilyCombo.currentText
     property alias trainingType: trainingTypeCombo.currentIndex
@@ -29,6 +30,7 @@ Rectangle {
             "patience": patienceSpin.value,
             "workers": workersSpin.value,
             "amp": ampSwitch.checked,
+            "resume": resumeSwitch.checked,
             "device": deviceCombo.currentText,
             "model_family": modelFamilyCombo.currentText,
             "training_type": ["from_scratch", "pretrained", "incremental"][trainingTypeCombo.currentIndex]
@@ -597,6 +599,43 @@ Rectangle {
 
                     Rectangle {
                         x: ampSwitch.checked ? parent.width - width - 2 : 2
+                        y: parent.height / 2 - height / 2
+                        implicitWidth: 16
+                        implicitHeight: 16
+                        radius: 8
+                        color: "#cdd6f4"
+                    }
+                }
+            }
+        }
+
+        // Resume toggle
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            Label {
+                text: "Resume:"
+                color: "#cdd6f4"
+                font.pixelSize: 13
+                Layout.preferredWidth: 80
+            }
+
+            Switch {
+                id: resumeSwitch
+                checked: false
+                Layout.fillWidth: true
+
+                indicator: Rectangle {
+                    x: resumeSwitch.leftPadding
+                    y: parent.height / 2 - height / 2
+                    implicitWidth: 40
+                    implicitHeight: 20
+                    radius: 10
+                    color: resumeSwitch.checked ? "#89b4fa" : "#45475a"
+
+                    Rectangle {
+                        x: resumeSwitch.checked ? parent.width - width - 2 : 2
                         y: parent.height / 2 - height / 2
                         implicitWidth: 16
                         implicitHeight: 16

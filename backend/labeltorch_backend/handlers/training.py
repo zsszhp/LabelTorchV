@@ -3,11 +3,24 @@
 """
 import asyncio
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
 # 活跃训练任务
 _active_tasks = {}
+
+
+async def handle_check_resume(payload: dict) -> dict:
+    """检测是否存在可续训的checkpoint"""
+    run_dir = payload.get("run_dir", "")
+    if not run_dir:
+        return {"resumable": False, "reason": "no_run_dir"}
+
+    last_pt = os.path.join(run_dir, "weights", "last.pt")
+    if os.path.isfile(last_pt):
+        return {"resumable": True, "checkpoint": last_pt}
+    return {"resumable": False, "reason": "no_checkpoint"}
 
 
 async def handle_start(payload: dict) -> dict:
