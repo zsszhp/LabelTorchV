@@ -19,4 +19,5 @@ qt_add_qml_module(labeltorch_project
 target_link_libraries(labeltorch_project PUBLIC
     labeltorch_core
     Qt6::Quick
+    Qt6::QuickDialogs2
 )

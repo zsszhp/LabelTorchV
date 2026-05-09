@@ -3,8 +3,14 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QIcon>
+#include <QStandardPaths>
+#include <QDir>
 
 #include "AppController.h"
+#include "ProjectService.h"
+#include "ProjectModel.h"
+#include "TaxonomyService.h"
+#include "Database.h"
 
 int main(int argc, char *argv[])
 {
@@ -15,12 +21,25 @@ int main(int argc, char *argv[])
 
     QQuickStyle::setStyle("Basic");
 
+    // 初始化数据库（应用级，存储在AppData）
+    QString dbPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(dbPath);
+    Database::instance().open(dbPath + "/labeltorch.db");
+    Database::instance().initializeSchema();
+
+    // 初始化服务
     AppController controller;
+    ProjectService projectService;
+    ProjectModel projectModel;
+    TaxonomyService taxonomyService;
 
     QQmlApplicationEngine engine;
 
-    // 注册控制器到QML上下文
+    // 注册服务到QML上下文
     engine.rootContext()->setContextProperty("appController", &controller);
+    engine.rootContext()->setContextProperty("projectService", &projectService);
+    engine.rootContext()->setContextProperty("projectModel", &projectModel);
+    engine.rootContext()->setContextProperty("taxonomyService", &taxonomyService);
 
     // 加载主窗口
     const QUrl url(u"qrc:/LabelTorch/Shell/qml/Main.qml"_qs);
