@@ -17,6 +17,7 @@
 #include "AnnotationService.h"
 #include "AnnotationModel.h"
 #include "canvas/CanvasController.h"
+#include "ipc/IpcClient.h"
 #include "Database.h"
 
 int main(int argc, char *argv[])
@@ -46,6 +47,12 @@ int main(int argc, char *argv[])
     AnnotationService annotationService;
     AnnotationModel annotationModel;
     CanvasController canvasController;
+    IpcClient ipcClient;
+
+    // 启动Python后端（如果可用）
+    QString pythonExec = "F:/A/anaconda/envs/labeltorch/python.exe";
+    QString serverScript = "F:/project/my/LabelTorchV/backend/labeltorch_backend/__main__.py";
+    ipcClient.startBackend(pythonExec, serverScript);
 
     // 注入依赖
     projectService.setTaxonomyService(&taxonomyService);
@@ -64,6 +71,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("annotationService", &annotationService);
     engine.rootContext()->setContextProperty("annotationModel", &annotationModel);
     engine.rootContext()->setContextProperty("canvasController", &canvasController);
+    engine.rootContext()->setContextProperty("ipcClient", &ipcClient);
 
     // 加载主窗口
     const QUrl url(u"qrc:/LabelTorch/Shell/qml/Main.qml"_qs);
