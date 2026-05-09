@@ -1,0 +1,45 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "msvc2022-debug",
+            "displayName": "MSVC 2022 Debug",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/msvc2022-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_PREFIX_PATH": "F:/A/QT/6.11.0/msvc2022_64",
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe"
+            },
+            "environment": {
+                "VSCMD_ARG_TGT_ARCH": "x64"
+            }
+        },
+        {
+            "name": "msvc2022-release",
+            "displayName": "MSVC 2022 Release",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/msvc2022-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_PREFIX_PATH": "F:/A/QT/6.11.0/msvc2022_64",
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe"
+            },
+            "environment": {
+                "VSCMD_ARG_TGT_ARCH": "x64"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "msvc2022-debug",
+            "configurePreset": "msvc2022-debug"
+        },
+        {
+            "name": "msvc2022-release",
+            "configurePreset": "msvc2022-release"
+        }
+    ]
+}

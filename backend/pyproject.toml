@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "labeltorch-backend"
+version = "0.1.0"
+description = "LabelTorch Python training backend"
+requires-python = ">=3.11"
+
+[project.scripts]
+labeltorch-backend = "labeltorch_backend.server:main"
