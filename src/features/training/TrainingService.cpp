@@ -266,3 +266,10 @@ bool TrainingService::updateRunStatus(const QString &runId, const QString &statu
     emit runStatusChanged(runId, status);
     return true;
 }
+
+QStringList TrainingService::listAdapters()
+{
+    QStringList result;
+    result << QStringLiteral("ultralytics");
+    return result;
+}

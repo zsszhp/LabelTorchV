@@ -177,6 +177,83 @@ Item {
                     }
                 }
 
+                // Adapter selector
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Label {
+                        text: "Adapter:"
+                        color: "#cdd6f4"
+                        font.pixelSize: 13
+                        Layout.preferredWidth: 72
+                    }
+
+                    ComboBox {
+                        id: adapterCombo
+                        Layout.fillWidth: true
+                        model: trainingService.listAdapters()
+                        currentIndex: {
+                            var adapters = trainingService.listAdapters()
+                            var idx = adapters.indexOf("ultralytics")
+                            return idx >= 0 ? idx : 0
+                        }
+
+                        contentItem: Label {
+                            text: adapterCombo.displayText
+                            color: "#cdd6f4"
+                            font.pixelSize: 13
+                            verticalAlignment: Text.AlignVCenter
+                            leftPadding: 8
+                        }
+
+                        background: Rectangle {
+                            color: "#313244"
+                            radius: 4
+                            border.color: adapterCombo.activeFocus ? "#89b4fa" : "#45475a"
+                            border.width: 1
+                        }
+
+                        popup: Popup {
+                            y: adapterCombo.height
+                            width: adapterCombo.width
+                            implicitHeight: contentItem.implicitHeight
+                            padding: 1
+
+                            contentItem: ListView {
+                                clip: true
+                                implicitHeight: contentHeight
+                                model: adapterCombo.popup.visible ? adapterCombo.delegateModel : null
+                                currentIndex: adapterCombo.highlightedIndex
+                            }
+
+                            background: Rectangle {
+                                color: "#1e1e2e"
+                                border.color: "#45475a"
+                                radius: 4
+                            }
+                        }
+
+                        delegate: ItemDelegate {
+                            width: adapterCombo.width
+                            contentItem: Label {
+                                text: modelData
+                                color: highlighted ? "#89b4fa" : "#cdd6f4"
+                                font.pixelSize: 13
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            highlighted: adapterCombo.highlightedIndex === index
+                            background: Rectangle {
+                                color: highlighted ? "#313244" : "#1e1e2e"
+                            }
+                        }
+
+                        onActivated: {
+                            configPanel.adapter = adapterCombo.currentText
+                        }
+                    }
+                }
+
                 // Config panel
                 ConfigPanel {
                     id: configPanel

@@ -21,9 +21,11 @@ Rectangle {
     property alias modelFamily: modelFamilyCombo.currentText
     property alias trainingType: trainingTypeCombo.currentIndex
     property alias parentVersionId: parentVersionCombo.currentValue
+    property string adapter: "ultralytics"
 
     function getConfigJson() {
         var config = {
+            "adapter": adapter,
             "img_size": imgSizeSpin.value,
             "batch": batchSpin.value,
             "epochs": epochsSpin.value,

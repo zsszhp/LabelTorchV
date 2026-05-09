@@ -25,12 +25,19 @@ async def handle_check_resume(payload: dict) -> dict:
 
 async def handle_start(payload: dict) -> dict:
     """启动训练任务"""
-    from ..adapters.ultralytics_adapter import UltralyticsAdapter
+    from ..adapters.registry import TrainingAdapterRegistry, register_builtin_adapters
+
+    register_builtin_adapters()  # Ensure built-ins are registered
 
     task_id = payload.get("task_id", "unknown")
     config = payload.get("config", {})
+    adapter_name = config.get("adapter", "ultralytics")
 
-    adapter = UltralyticsAdapter()
+    adapter_class = TrainingAdapterRegistry.get(adapter_name)
+    if adapter_class is None:
+        return {"task_id": task_id, "status": "error", "error": f"Unknown adapter: {adapter_name}. Available: {TrainingAdapterRegistry.list_adapters()}"}
+
+    adapter = adapter_class()
     _active_tasks[task_id] = adapter
 
     # 异步启动训练
@@ -67,3 +74,10 @@ async def handle_status(payload: dict) -> dict:
     if adapter:
         return adapter.get_status()
     return {"task_id": task_id, "status": "not_found"}
+
+
+async def handle_list_adapters(payload: dict) -> dict:
+    """列出所有已注册的训练适配器"""
+    from ..adapters.registry import TrainingAdapterRegistry, register_builtin_adapters
+    register_builtin_adapters()
+    return {"adapters": TrainingAdapterRegistry.list_adapters()}

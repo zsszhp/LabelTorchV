@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QVariantList>
 #include <QVariantMap>
 
@@ -70,6 +71,12 @@ public:
      * @return true on success, false on failure.
      */
     Q_INVOKABLE bool updateRunStatus(const QString &runId, const QString &status);
+
+    /**
+     * @brief List available training adapters from the backend.
+     * @return QStringList of adapter names.
+     */
+    Q_INVOKABLE QStringList listAdapters();
 
 signals:
     /**

@@ -23,6 +23,7 @@ class IpcServer:
             "train.start": training.handle_start,
             "train.stop": training.handle_stop,
             "train.status": training.handle_status,
+            "train.list_adapters": training.handle_list_adapters,
             "inference.run": inference.handle_run,
             "export.run": export.handle_run,
             "artifact.verify": export.handle_verify,
