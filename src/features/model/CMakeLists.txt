@@ -7,6 +7,7 @@ qt_add_qml_module(labeltorch_model
     QML_FILES
         qml/ModelPage.qml
         qml/MetricChart.qml
+        qml/ComparePage.qml
     SOURCES
         ModelRegistry.h
         ModelRegistry.cpp

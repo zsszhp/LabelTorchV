@@ -93,6 +93,94 @@ QVariantList MetricService::getMetricHistory(const QString &runId)
     return result;
 }
 
+QVariantList MetricService::compareMultipleVersions(const QVariantList &versionIds)
+{
+    QVariantList result;
+
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return result;
+
+    for (const QVariant &vid : versionIds) {
+        QString versionId = vid.toString();
+        if (versionId.isEmpty()) continue;
+
+        QVariantMap entry;
+        entry["versionId"] = versionId;
+
+        // Get metrics for this version
+        QVariantMap metrics = getMetrics(versionId);
+        entry["metrics"] = metrics;
+
+        // Get snapshot_id and parent_version_id via join with training_runs
+        QSqlQuery query(db);
+        query.prepare(
+            "SELECT tr.snapshot_id, mv.parent_model_version_id "
+            "FROM model_versions mv "
+            "JOIN training_runs tr ON mv.run_id = tr.id "
+            "WHERE mv.id = ?"
+        );
+        query.addBindValue(versionId);
+
+        if (query.exec() && query.next()) {
+            entry["snapshotId"] = query.value(0).toString();
+            entry["parentVersionId"] = query.value(1).toString();
+        } else {
+            entry["snapshotId"] = "";
+            entry["parentVersionId"] = "";
+        }
+
+        result.append(entry);
+    }
+
+    return result;
+}
+
+QVariantList MetricService::getVersionsBySnapshot(const QString &snapshotId)
+{
+    QVariantList result;
+
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return result;
+
+    QSqlQuery query(db);
+    query.prepare(
+        "SELECT mv.id, mv.run_id, mv.parent_model_version_id, "
+        "mv.best_weight_path, mv.last_weight_path, "
+        "mv.metrics_snapshot_json, mv.created_at, "
+        "tr.snapshot_id "
+        "FROM model_versions mv "
+        "JOIN training_runs tr ON mv.run_id = tr.id "
+        "WHERE tr.snapshot_id = ? "
+        "ORDER BY mv.created_at DESC"
+    );
+    query.addBindValue(snapshotId);
+
+    if (!query.exec()) {
+        qWarning() << "Failed to get versions by snapshot:" << query.lastError().text();
+        return result;
+    }
+
+    while (query.next()) {
+        QVariantMap version;
+        version["versionId"] = query.value(0).toString();
+        version["runId"] = query.value(1).toString();
+        version["parentVersionId"] = query.value(2).toString();
+        version["bestWeightPath"] = query.value(3).toString();
+        version["lastWeightPath"] = query.value(4).toString();
+        version["metricsJson"] = query.value(5).toString();
+        version["createdAt"] = query.value(6).toString();
+        version["snapshotId"] = query.value(7).toString();
+
+        // Also include parsed metrics
+        QVariantMap metrics = getMetrics(version["versionId"].toString());
+        version["metrics"] = metrics;
+
+        result.append(version);
+    }
+
+    return result;
+}
+
 QVariantMap MetricService::compareVersions(const QString &versionId1, const QString &versionId2)
 {
     QVariantMap result;

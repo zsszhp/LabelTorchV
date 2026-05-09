@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QVariantList>
 #include <QVariantMap>
 
 class MetricService : public QObject
@@ -29,6 +30,23 @@ public:
      * Returns QVariantMap with side-by-side comparison.
      */
     Q_INVOKABLE QVariantMap compareVersions(const QString &versionId1, const QString &versionId2);
+
+    /**
+     * @brief Compare multiple versions side-by-side.
+     * Returns QVariantList where each item is a QVariantMap containing:
+     *   - versionId: the version ID
+     *   - metrics: the parsed metrics map for that version
+     *   - snapshotId: the snapshot_id from the training run (horizontal comparison)
+     *   - parentVersionId: the parent version ID (vertical/incremental chain comparison)
+     */
+    Q_INVOKABLE QVariantList compareMultipleVersions(const QVariantList &versionIds);
+
+    /**
+     * @brief Get all model versions whose training run used the given snapshot.
+     * Enables horizontal comparison (same dataset snapshot, different configs/epochs).
+     * Returns QVariantList of QVariantMap with version details + snapshotId.
+     */
+    Q_INVOKABLE QVariantList getVersionsBySnapshot(const QString &snapshotId);
 };
 
 #endif // METRICSERVICE_H
