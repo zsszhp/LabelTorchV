@@ -37,7 +37,10 @@ QVariantMap MetricService::getMetrics(const QString &versionId)
 
     QJsonObject obj = doc.object();
 
-    // Extract key metrics if available
+    // Extract key metrics if available.
+    // For OBB models, Ultralytics reports metrics like "mAP50(OBB)" and "mAP50-95(OBB)".
+    // These are handled automatically by the key iteration below (obj.keys()) since
+    // class mapping only affects class IDs, not metric key names.
     const QStringList keyMetrics = {
         "mAP50", "mAP50-95", "precision", "recall", "fitness",
         "map50", "map50-95", "map", "Precision", "Recall", "Fitness"

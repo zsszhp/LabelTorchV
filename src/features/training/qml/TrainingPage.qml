@@ -150,6 +150,18 @@ Item {
                     Layout.fillHeight: true
                 }
 
+                // OBB task type indicator
+                Label {
+                    id: taskTypeIndicator
+                    Layout.fillWidth: true
+                    visible: configPanel.modelFamily === "yolov8_obb"
+                    text: "[OBB] Oriented Bounding Box training mode"
+                    color: "#f9e2af"
+                    font.pixelSize: 11
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                }
+
                 // Action buttons
                 RowLayout {
                     Layout.fillWidth: true

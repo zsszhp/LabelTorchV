@@ -91,6 +91,10 @@ private:
      * Reads the file, replaces the class_id on each line according to indexRemap,
      * and writes the file back. Also collects statistics.
      *
+     * Supports both HBB (5 values: class_id cx cy w h) and OBB (9 values:
+     * class_id x1 y1 x2 y2 x3 y3 x4 y4) label formats, since class mapping
+     * only affects the class_id (first field), not the geometry.
+     *
      * @param filePath Absolute path to the label file.
      * @param indexRemap Map from old class index to new class index.
      * @param affectedCount Output: number of lines where class_id changed.

@@ -195,6 +195,47 @@ bool ImportScanner::parseLabelFile(const QString &filePath, QSet<int> &classIds,
     return allValid;
 }
 
+QVariantMap ImportScanner::validateOBBLine(const QString &line)
+{
+    QVariantMap result;
+    result["valid"] = false;
+    result["error"] = QString();
+    result["classId"] = -1;
+
+    if (line.isEmpty()) {
+        result["error"] = QStringLiteral("Empty line");
+        return result;
+    }
+
+    QStringList parts = line.split(QChar(' '), Qt::SkipEmptyParts);
+    if (parts.size() != 9) {
+        result["error"] = QStringLiteral("Expected 9 values (OBB), got %1").arg(parts.size());
+        return result;
+    }
+
+    // Parse class_id (must be non-negative integer)
+    bool ok = false;
+    int classId = parts[0].toInt(&ok);
+    if (!ok || classId < 0) {
+        result["error"] = QStringLiteral("Invalid class_id '%1'").arg(parts[0]);
+        return result;
+    }
+
+    // Parse x1 y1 x2 y2 x3 y3 x4 y4 (must be floats in [0, 1])
+    for (int i = 1; i < 9; ++i) {
+        bool convOk = false;
+        double val = parts[i].toDouble(&convOk);
+        if (!convOk || val < 0.0 || val > 1.0) {
+            result["error"] = QStringLiteral("Coordinate '%1' out of range [0,1]").arg(parts[i]);
+            return result;
+        }
+    }
+
+    result["valid"] = true;
+    result["classId"] = classId;
+    return result;
+}
+
 bool ImportScanner::isImageFile(const QString &fileName)
 {
     QString ext = QFileInfo(fileName).suffix().toLower();

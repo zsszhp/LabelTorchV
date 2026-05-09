@@ -28,6 +28,17 @@ public:
      */
     Q_INVOKABLE QVariantMap scan(const QString &imageDir, const QString &labelDir);
 
+    /**
+     * @brief Validate a single OBB label line (9 values: class_id x1 y1 x2 y2 x3 y3 x4 y4).
+     *
+     * Splits on whitespace, expects exactly 9 parts.
+     * First part must be a non-negative integer. Parts 1-8 must be valid floats in [0,1].
+     *
+     * @param line A trimmed label line string.
+     * @return QVariantMap with "valid" (bool), "error" (string), "classId" (int).
+     */
+    static QVariantMap validateOBBLine(const QString &line);
+
 signals:
     void scanProgress(int current, int total);
     void scanCompleted();

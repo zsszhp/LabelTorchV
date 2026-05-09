@@ -10,6 +10,8 @@
 #include <QRandomGenerator>
 #include <algorithm>
 #include <QDateTime>
+#include <QFile>
+#include <QTextStream>
 
 SnapshotService::SnapshotService(QObject *parent) : QObject(parent) {}
 
@@ -277,4 +279,72 @@ bool SnapshotService::isImmutable(const QString &snapshotId)
     query.addBindValue(snapshotId);
 
     return query.exec() && query.next() && query.value(0).toInt() > 0;
+}
+
+bool SnapshotService::isOBBDataset(const QString &datasetId)
+{
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return false;
+
+    if (datasetId.isEmpty()) {
+        qWarning() << "SnapshotService::isOBBDataset: datasetId is empty";
+        return false;
+    }
+
+    // Query label paths for this dataset
+    QSqlQuery query(db);
+    query.prepare("SELECT label_path FROM dataset_samples WHERE dataset_id = ? "
+                  "AND label_path IS NOT NULL AND validation_status = 'valid' LIMIT 5");
+    query.addBindValue(datasetId);
+
+    if (!query.exec()) {
+        qWarning() << "SnapshotService::isOBBDataset: query failed:" << query.lastError().text();
+        return false;
+    }
+
+    int obbCount = 0;
+    int hbbCount = 0;
+    int checkedFiles = 0;
+
+    while (query.next()) {
+        QString labelPath = query.value(0).toString();
+        if (labelPath.isEmpty()) continue;
+
+        QFile file(labelPath);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            continue;
+        }
+
+        QTextStream in(&file);
+        // Check the first non-empty line
+        while (!in.atEnd()) {
+            QString line = in.readLine().trimmed();
+            if (line.isEmpty()) continue;
+
+            QStringList parts = line.split(QChar(' '), Qt::SkipEmptyParts);
+            if (parts.size() == 9) {
+                obbCount++;
+            } else if (parts.size() == 5) {
+                hbbCount++;
+            }
+            break;
+        }
+
+        file.close();
+        checkedFiles++;
+    }
+
+    if (checkedFiles == 0) {
+        qDebug() << "SnapshotService::isOBBDataset: no valid label files found for dataset" << datasetId;
+        return false;
+    }
+
+    // If any files have OBB format lines, consider it an OBB dataset
+    bool isOBB = obbCount > 0 && obbCount >= hbbCount;
+
+    qDebug() << "SnapshotService::isOBBDataset: dataset" << datasetId
+             << "obbCount:" << obbCount << "hbbCount:" << hbbCount
+             << "result:" << isOBB;
+
+    return isOBB;
 }

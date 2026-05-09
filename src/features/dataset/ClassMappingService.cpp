@@ -521,8 +521,8 @@ bool ClassMappingService::remapLabelFile(const QString &filePath, const QMap<int
         }
 
         QStringList parts = trimmed.split(QChar(' '), Qt::SkipEmptyParts);
-        if (parts.size() != 5) {
-            // Not a valid YOLO label line; keep as-is
+        if (parts.size() != 5 && parts.size() != 9) {
+            // Not a valid YOLO label line (HBB=5 or OBB=9); keep as-is
             outputLines.append(line);
             continue;
         }

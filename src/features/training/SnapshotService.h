@@ -69,6 +69,18 @@ public:
      * @return true if snapshot exists and is immutable.
      */
     Q_INVOKABLE bool isImmutable(const QString &snapshotId);
+
+    /**
+     * @brief Detect if a dataset uses OBB format labels.
+     *
+     * Checks the first few label files for 9-column format (OBB)
+     * vs 5-column format (HBB). Reads the first non-empty line of each
+     * file and counts whitespace-separated tokens.
+     *
+     * @param datasetId The dataset ID.
+     * @return true if the dataset uses OBB format, false if HBB or undetermined.
+     */
+    Q_INVOKABLE bool isOBBDataset(const QString &datasetId);
 };
 
 #endif // SNAPSHOTSERVICE_H
