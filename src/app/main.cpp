@@ -14,6 +14,9 @@
 #include "DatasetService.h"
 #include "DatasetModel.h"
 #include "ClassMappingService.h"
+#include "AnnotationService.h"
+#include "AnnotationModel.h"
+#include "canvas/CanvasController.h"
 #include "Database.h"
 
 int main(int argc, char *argv[])
@@ -40,6 +43,9 @@ int main(int argc, char *argv[])
     DatasetService datasetService;
     DatasetModel datasetModel;
     ClassMappingService classMappingService;
+    AnnotationService annotationService;
+    AnnotationModel annotationModel;
+    CanvasController canvasController;
 
     // 注入依赖
     projectService.setTaxonomyService(&taxonomyService);
@@ -55,6 +61,9 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("datasetService", &datasetService);
     engine.rootContext()->setContextProperty("datasetModel", &datasetModel);
     engine.rootContext()->setContextProperty("classMappingService", &classMappingService);
+    engine.rootContext()->setContextProperty("annotationService", &annotationService);
+    engine.rootContext()->setContextProperty("annotationModel", &annotationModel);
+    engine.rootContext()->setContextProperty("canvasController", &canvasController);
 
     // 加载主窗口
     const QUrl url(u"qrc:/LabelTorch/Shell/qml/Main.qml"_qs);

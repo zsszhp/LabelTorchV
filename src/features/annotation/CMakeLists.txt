@@ -18,6 +18,7 @@ qt_add_qml_module(labeltorch_annotation
         canvas/CanvasController.cpp
         canvas/RenderLayer.h
         canvas/InteractionManager.h
+        canvas/InteractionManager.cpp
         labelio/YoloTxtReader.h
         labelio/YoloTxtReader.cpp
         labelio/YoloTxtWriter.h
@@ -31,4 +32,5 @@ qt_add_qml_module(labeltorch_annotation
 target_link_libraries(labeltorch_annotation PUBLIC
     labeltorch_core
     Qt6::Quick
+    Qt6::Sql
 )

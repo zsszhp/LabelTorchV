@@ -24,6 +24,8 @@ target_link_libraries(labeltorch PRIVATE
 target_include_directories(labeltorch PRIVATE
     ${CMAKE_SOURCE_DIR}/src/features/project
     ${CMAKE_SOURCE_DIR}/src/features/dataset
+    ${CMAKE_SOURCE_DIR}/src/features/annotation
+    ${CMAKE_SOURCE_DIR}/src/features/annotation/canvas
     ${CMAKE_SOURCE_DIR}/src/core/database
     ${CMAKE_SOURCE_DIR}/src/core/utils
 )
