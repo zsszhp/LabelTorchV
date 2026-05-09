@@ -14,24 +14,21 @@ void AppController::setCurrentPage(const QString &page)
     }
 }
 
-void AppController::createProject(const QString &name, const QString &path)
+void AppController::openProject(const QString &projectId, const QString &projectName)
 {
-    Q_UNUSED(name)
-    Q_UNUSED(path)
-    // TODO: 实现项目创建逻辑（Task 3）
-    qDebug() << "Create project:" << name << path;
-}
-
-void AppController::openProject(const QString &path)
-{
-    if (m_currentProject != path) {
-        m_currentProject = path;
-        emit currentProjectChanged();
+    if (m_currentProjectId != projectId) {
+        m_currentProjectId = projectId;
+        m_currentProjectName = projectName;
+        emit currentProjectIdChanged();
+        emit currentProjectNameChanged();
+        qDebug() << "Project opened:" << projectId << projectName;
     }
 }
 
 void AppController::closeProject()
 {
-    m_currentProject.clear();
-    emit currentProjectChanged();
+    m_currentProjectId.clear();
+    m_currentProjectName.clear();
+    emit currentProjectIdChanged();
+    emit currentProjectNameChanged();
 }

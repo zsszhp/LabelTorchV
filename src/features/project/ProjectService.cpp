@@ -1,4 +1,5 @@
 #include "ProjectService.h"
+#include "TaxonomyService.h"
 #include "database/Database.h"
 #include "filesystem/ProjectFs.h"
 #include "utils/Id.h"
@@ -23,6 +24,11 @@ QString ProjectService::createProject(const QString &name, const QString &rootPa
     if (!query.exec()) {
         qWarning() << "Failed to create project:" << query.lastError().text();
         return {};
+    }
+
+    // 为项目创建默认类别体系
+    if (m_taxonomyService) {
+        m_taxonomyService->createTaxonomy(projectId, "默认类别体系", {});
     }
 
     qDebug() << "Project created:" << projectId << name;
@@ -56,7 +62,39 @@ bool ProjectService::deleteProject(const QString &projectId)
 
 bool ProjectService::openProject(const QString &projectId)
 {
-    Q_UNUSED(projectId)
-    // TODO: 加载项目数据到内存
-    return true;
+    QSqlQuery query(Database::instance().database());
+    query.prepare("SELECT id FROM projects WHERE id = ?");
+    query.addBindValue(projectId);
+    if (query.exec() && query.next()) {
+        m_currentProjectId = projectId;
+        emit currentProjectChanged();
+        return true;
+    }
+    return false;
+}
+
+void ProjectService::closeProject()
+{
+    m_currentProjectId.clear();
+    emit currentProjectChanged();
+}
+
+QVariantMap ProjectService::getCurrentProject() const
+{
+    if (m_currentProjectId.isEmpty()) return {};
+
+    QSqlQuery query(Database::instance().database());
+    query.prepare("SELECT id, name, root_path, default_device, default_model_family, created_at FROM projects WHERE id = ?");
+    query.addBindValue(m_currentProjectId);
+    if (query.exec() && query.next()) {
+        QVariantMap p;
+        p["id"] = query.value(0);
+        p["name"] = query.value(1);
+        p["rootPath"] = query.value(2);
+        p["defaultDevice"] = query.value(3);
+        p["defaultModelFamily"] = query.value(4);
+        p["createdAt"] = query.value(5);
+        return p;
+    }
+    return {};
 }

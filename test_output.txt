@@ -1,0 +1,22 @@
+********* Start testing of TestTaxonomy *********
+Config: Using QtTest library 6.11.0, Qt 6.11.0 (x86_64-little_endian-llp64 shared (dynamic) debug build; by MSVC 2022), windows 11
+QDEBUG : TestTaxonomy::initTestCase() Database opened: ":memory:"
+QDEBUG : TestTaxonomy::initTestCase() Current schema version: 0
+QDEBUG : TestTaxonomy::initTestCase() Schema initialized successfully
+QDEBUG : TestTaxonomy::initTestCase() Project directories created: "/tmp/test"
+QDEBUG : TestTaxonomy::initTestCase() Taxonomy created: "95cffc24-9968-4c72-9e2f-dd096a68c854" "默认类别体系" with 0 classes
+QDEBUG : TestTaxonomy::initTestCase() Project created: "84c4856a-f02f-4359-9971-ffe1c8859f57" "TestProject"
+PASS   : TestTaxonomy::initTestCase()
+QDEBUG : TestTaxonomy::testCreateTaxonomy() Taxonomy created: "121047fd-49be-4de9-8d9e-5bafec730a79" "Test Taxonomy" with 3 classes
+PASS   : TestTaxonomy::testCreateTaxonomy()
+PASS   : TestTaxonomy::testAddClass()
+PASS   : TestTaxonomy::testRemoveClass()
+PASS   : TestTaxonomy::testRenameClass()
+PASS   : TestTaxonomy::testReorderClasses()
+PASS   : TestTaxonomy::testTaxonomyVersion()
+QDEBUG : TestTaxonomy::testDeleteTaxonomy() Taxonomy created: "f3bad960-f27a-4dff-b4c3-0a3312fc6d95" "To Delete" with 0 classes
+PASS   : TestTaxonomy::testDeleteTaxonomy()
+QDEBUG : TestTaxonomy::cleanupTestCase() Database closed: ":memory:"
+PASS   : TestTaxonomy::cleanupTestCase()
+Totals: 9 passed, 0 failed, 0 skipped, 0 blacklisted, 19ms
+********* Finished testing of TestTaxonomy *********

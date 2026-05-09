@@ -4,16 +4,13 @@
 #include <QObject>
 #include <QString>
 
-/**
- * @brief 全局应用控制器
- *
- * 管理应用级状态：当前项目、导航页面、Python后端状态等
- */
 class AppController : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString currentPage READ currentPage WRITE setCurrentPage NOTIFY currentPageChanged)
-    Q_PROPERTY(QString currentProject READ currentProject NOTIFY currentProjectChanged)
+    Q_PROPERTY(QString currentProjectId READ currentProjectId NOTIFY currentProjectIdChanged)
+    Q_PROPERTY(QString currentProjectName READ currentProjectName NOTIFY currentProjectNameChanged)
+    Q_PROPERTY(bool projectOpen READ projectOpen NOTIFY currentProjectIdChanged)
     Q_PROPERTY(bool pythonBackendReady READ pythonBackendReady NOTIFY pythonBackendReadyChanged)
 
 public:
@@ -22,22 +19,25 @@ public:
     QString currentPage() const { return m_currentPage; }
     void setCurrentPage(const QString &page);
 
-    QString currentProject() const { return m_currentProject; }
+    QString currentProjectId() const { return m_currentProjectId; }
+    QString currentProjectName() const { return m_currentProjectName; }
+    bool projectOpen() const { return !m_currentProjectId.isEmpty(); }
 
     bool pythonBackendReady() const { return m_pythonBackendReady; }
 
-    Q_INVOKABLE void createProject(const QString &name, const QString &path);
-    Q_INVOKABLE void openProject(const QString &path);
+    Q_INVOKABLE void openProject(const QString &projectId, const QString &projectName);
     Q_INVOKABLE void closeProject();
 
 signals:
     void currentPageChanged();
-    void currentProjectChanged();
+    void currentProjectIdChanged();
+    void currentProjectNameChanged();
     void pythonBackendReadyChanged();
 
 private:
     QString m_currentPage = "project";
-    QString m_currentProject;
+    QString m_currentProjectId;
+    QString m_currentProjectName;
     bool m_pythonBackendReady = false;
 };
 

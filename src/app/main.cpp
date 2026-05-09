@@ -10,6 +10,7 @@
 #include "ProjectService.h"
 #include "ProjectModel.h"
 #include "TaxonomyService.h"
+#include "TaxonomyModel.h"
 #include "Database.h"
 
 int main(int argc, char *argv[])
@@ -32,6 +33,10 @@ int main(int argc, char *argv[])
     ProjectService projectService;
     ProjectModel projectModel;
     TaxonomyService taxonomyService;
+    TaxonomyModel taxonomyModel;
+
+    // 注入依赖
+    projectService.setTaxonomyService(&taxonomyService);
 
     QQmlApplicationEngine engine;
 
@@ -40,6 +45,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("projectService", &projectService);
     engine.rootContext()->setContextProperty("projectModel", &projectModel);
     engine.rootContext()->setContextProperty("taxonomyService", &taxonomyService);
+    engine.rootContext()->setContextProperty("taxonomyModel", &taxonomyModel);
 
     // 加载主窗口
     const QUrl url(u"qrc:/LabelTorch/Shell/qml/Main.qml"_qs);

@@ -51,8 +51,10 @@ Item {
             delegate: Rectangle {
                 width: ListView.view.width
                 height: 64
-                color: "#313244"
+                color: mouseArea.containsMouse ? "#313244" : "#313244"
                 radius: 8
+                border.color: appController.currentProjectId === model.projectId ? "#89b4fa" : "transparent"
+                border.width: appController.currentProjectId === model.projectId ? 2 : 0
 
                 RowLayout {
                     anchors.fill: parent
@@ -68,17 +70,32 @@ Item {
                     Label { text: model.createdAt; color: "#6c7086"; font.pixelSize: 11 }
 
                     Button {
-                        text: "打开"
+                        text: appController.currentProjectId === model.projectId ? "已打开" : "打开"
+                        enabled: appController.currentProjectId !== model.projectId
                         onClicked: {
-                            appController.openProject(model.path)
-                            appController.currentPage = "dataset"
+                            projectService.openProject(model.projectId)
+                            appController.openProject(model.projectId, model.name)
+                            // 加载该项目对应的类别体系
+                            var taxonomies = taxonomyService.listTaxonomies(model.projectId)
+                            if (taxonomies.length > 0) {
+                                taxonomyModel.taxonomyId = taxonomies[0].id
+                            }
                         }
                     }
 
                     Button {
                         text: "删除"
-                        onClicked: projectService.deleteProject(model.projectId)
+                        onClicked: {
+                            projectService.deleteProject(model.projectId)
+                            projectModel.refresh()
+                        }
                     }
+                }
+
+                MouseArea {
+                    id: mouseArea
+                    anchors.fill: parent
+                    hoverEnabled: true
                 }
             }
         }
@@ -96,20 +113,24 @@ Item {
             width: parent.width
             spacing: 12
 
-            Label { text: "项目名称" }
+            Label { text: "项目名称"; color: "#cdd6f4" }
             TextField {
                 id: projectNameField
                 Layout.fillWidth: true
                 placeholderText: "输入项目名称"
+                color: "#cdd6f4"
+                background: Rectangle { color: "#313244"; radius: 4; border.color: projectNameField.activeFocus ? "#89b4fa" : "#45475a"; border.width: 1 }
             }
 
-            Label { text: "项目路径" }
+            Label { text: "项目路径"; color: "#cdd6f4" }
             RowLayout {
                 Layout.fillWidth: true
                 TextField {
                     id: projectPathField
                     Layout.fillWidth: true
                     placeholderText: "选择项目目录"
+                    color: "#cdd6f4"
+                    background: Rectangle { color: "#313244"; radius: 4; border.color: projectPathField.activeFocus ? "#89b4fa" : "#45475a"; border.width: 1 }
                 }
                 Button {
                     text: "浏览"
@@ -121,8 +142,16 @@ Item {
         standardButtons: Dialog.Ok | Dialog.Cancel
         onAccepted: {
             if (projectNameField.text && projectPathField.text) {
-                projectService.createProject(projectNameField.text, projectPathField.text)
+                var pid = projectService.createProject(projectNameField.text, projectPathField.text)
                 projectModel.refresh()
+                if (pid) {
+                    projectService.openProject(pid)
+                    appController.openProject(pid, projectNameField.text)
+                    var taxonomies = taxonomyService.listTaxonomies(pid)
+                    if (taxonomies.length > 0) {
+                        taxonomyModel.taxonomyId = taxonomies[0].id
+                    }
+                }
                 projectNameField.clear()
                 projectPathField.clear()
             }

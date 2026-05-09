@@ -47,3 +47,21 @@ target_link_libraries(test_ipc PRIVATE
     Qt6::Test
 )
 add_test(NAME IpcTest COMMAND test_ipc)
+
+# 类别体系测试
+add_executable(test_taxonomy
+    test_taxonomy.cpp
+)
+target_link_libraries(test_taxonomy PRIVATE
+    labeltorch_core
+    labeltorch_project
+    Qt6::Test
+    Qt6::Sql
+)
+target_include_directories(test_taxonomy PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/features/project
+    ${CMAKE_SOURCE_DIR}/src/core/database
+    ${CMAKE_SOURCE_DIR}/src/core/filesystem
+    ${CMAKE_SOURCE_DIR}/src/core/utils
+)
+add_test(NAME TaxonomyTest COMMAND test_taxonomy)

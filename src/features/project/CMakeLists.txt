@@ -7,6 +7,7 @@ qt_add_qml_module(labeltorch_project
     QML_FILES
         qml/ProjectPage.qml
         qml/ProjectCard.qml
+        qml/TaxonomyPage.qml
     SOURCES
         ProjectService.h
         ProjectService.cpp
@@ -14,6 +15,8 @@ qt_add_qml_module(labeltorch_project
         TaxonomyService.cpp
         ProjectModel.h
         ProjectModel.cpp
+        TaxonomyModel.h
+        TaxonomyModel.cpp
 )
 
 target_link_libraries(labeltorch_project PUBLIC
