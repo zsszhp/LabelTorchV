@@ -14,6 +14,8 @@ Item {
     property var batchStats: ({"total":0,"confirmed":0,"rejected":0,"pending":0,"edited":0})
     property var lowConfSamples: []
     property var confidenceStats: ({"totalCandidates":0,"lowConfCount":0,"highConfCount":0,"averageConfidence":0,"threshold":0.3})
+    property var hardCaseQueue: []
+    property bool showHardCaseQueue: false
 
     onCurrentDatasetIdChanged: {
         selectedBatchId = ""
@@ -59,6 +61,11 @@ Item {
         for (var i = 0; i < lowConfSamples.length; i++) {
             lowConfListModel.append(lowConfSamples[i])
         }
+    }
+
+    function loadHardCaseQueue() {
+        if (selectedBatchId === "" || currentDatasetId === "") return
+        hardCaseQueue = assistedLabelService.getHardCaseQueue(selectedBatchId, currentDatasetId, lowConfThresholdSpin.realValue)
     }
 
     ListModel {
@@ -567,6 +574,96 @@ Item {
                     font.pixelSize: 10
                     font.family: "monospace"
                     wrapMode: Text.WordWrap
+                }
+
+                // Separator
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: "#313244"
+                }
+
+                // Hard-Case Review section
+                Label {
+                    text: "Hard-Case Review"
+                    color: "#cba6f7"
+                    font.pixelSize: 14
+                    font.bold: true
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Button {
+                        id: hardCaseQueueBtn
+                        text: "Hard-Case Queue"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 32
+                        enabled: selectedBatchId !== ""
+
+                        background: Rectangle {
+                            color: parent.enabled ? (parent.pressed ? "#b07ce0" : "#cba6f7") : "#45475a"
+                            radius: 6
+                        }
+
+                        contentItem: Label {
+                            text: parent.text + (hardCaseQueue.length > 0 ? " (" + hardCaseQueue.length + ")" : "")
+                            color: parent.enabled ? "#1e1e2e" : "#6c7086"
+                            font.pixelSize: 12
+                            font.bold: true
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        onClicked: {
+                            loadHardCaseQueue()
+                            showHardCaseQueue = !showHardCaseQueue
+                        }
+                    }
+                }
+
+                // Hard-case queue warning banner for false negatives
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 28
+                    radius: 4
+                    visible: {
+                        if (hardCaseQueue.length === 0) return false
+                        for (var i = 0; i < hardCaseQueue.length; i++) {
+                            if (hardCaseQueue[i].reason === "false_negative") return true
+                        }
+                        return false
+                    }
+                    color: "#f9e2af15"
+                    border.color: "#f9e2af"
+                    border.width: 1
+
+                    Label {
+                        anchors.centerIn: parent
+                        text: "! False negatives detected - immediate review recommended"
+                        color: "#f9e2af"
+                        font.pixelSize: 11
+                        font.bold: true
+                    }
+                }
+
+                // Hard-case queue loader
+                Loader {
+                    id: hardCaseQueueLoader
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: showHardCaseQueue ? 280 : 0
+                    visible: showHardCaseQueue
+                    active: showHardCaseQueue
+
+                    source: "HardCaseQueue.qml"
+                    onLoaded: {
+                        if (item) {
+                            item.batchId = Qt.binding(function() { return selectedBatchId })
+                            item.datasetId = Qt.binding(function() { return currentDatasetId })
+                            item.lowConfThreshold = Qt.binding(function() { return lowConfThresholdSpin.realValue })
+                        }
+                    }
                 }
 
                 // Separator

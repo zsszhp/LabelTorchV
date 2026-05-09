@@ -97,6 +97,47 @@ public:
      */
     Q_INVOKABLE QVariantMap getConfidenceStats(const QString &batchId, float threshold = 0.3f);
 
+    /**
+     * @brief Get false positive candidates (rejected by user review).
+     *
+     * Returns candidates from the batch whose state is "rejected".
+     * Each map contains: candidateIndex, className, classIndex, confidence,
+     * cx, cy, w, h, state, sampleId (if present).
+     *
+     * @param batchId The batch ID.
+     * @return QVariantList of rejected candidate maps.
+     */
+    Q_INVOKABLE QVariantList getFalsePositives(const QString &batchId);
+
+    /**
+     * @brief Get samples with no detections (potential false negatives).
+     *
+     * Samples that exist in the dataset but had no inference candidates.
+     * Compares all sample IDs in dataset_samples for the given dataset
+     * against sample IDs referenced in the batch's candidate snapshot.
+     * If candidates contain a "sampleId" field or the snapshot has a
+     * "processedSamples" array, those sample IDs are subtracted.
+     *
+     * @param batchId The batch ID.
+     * @param datasetId The dataset ID to check for missed samples.
+     * @return QVariantList of sample ID strings.
+     */
+    Q_INVOKABLE QVariantList getFalseNegatives(const QString &batchId, const QString &datasetId);
+
+    /**
+     * @brief Get the hard-case queue sorted by priority.
+     *
+     * Combines low-confidence, false-positive, and false-negative samples.
+     * Returns QVariantList of QVariantMap with: sampleId, reason, priority, confidence.
+     * Priority: false_negative (3, highest) > low_confidence (2) > false_positive (1, lowest).
+     *
+     * @param batchId The batch ID.
+     * @param datasetId The dataset ID for false-negative detection.
+     * @param lowConfThreshold Confidence threshold for low-confidence samples (default 0.3).
+     * @return QVariantList of hard-case maps sorted by priority (highest first).
+     */
+    Q_INVOKABLE QVariantList getHardCaseQueue(const QString &batchId, const QString &datasetId, float lowConfThreshold = 0.3f);
+
 private:
     /**
      * @brief Read and parse the candidate_snapshot_json for a batch.

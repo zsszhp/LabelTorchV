@@ -8,6 +8,7 @@ qt_add_qml_module(labeltorch_inference
         qml/AssistedLabelPanel.qml
         qml/ReviewDialog.qml
         qml/LowConfQueue.qml
+        qml/HardCaseQueue.qml
     SOURCES
         InferenceService.h
         InferenceService.cpp
