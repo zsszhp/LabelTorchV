@@ -1,32 +1,33 @@
 #ifndef ROTATEDBOX_H
 #define ROTATEDBOX_H
 
-#include "AxisAlignedBox.h"
+#include "Geometry.h"
 
-class RotatedBox
-{
-public:
-    RotatedBox();
-    RotatedBox(double x, double y, double w, double h, double angle);
+#include <QString>
 
-    double x() const;
-    double y() const;
-    double w() const;
-    double h() const;
-    double angle() const;
+/**
+ * @brief Oriented Bounding Box (OBB) annotation - stub for Phase 3.
+ *
+ * Geometry: YOLO OBB format (cx, cy, w, h, angle) with angle in degrees.
+ * Spatial-query methods will be implemented in Phase 3.
+ */
+struct RotatedBox {
+    // --- Annotation metadata (mirrors Annotation) ---
+    QString id;
+    int     classIndex  = -1;
+    QString className;
+    float   confidence  = 0.0f;
+    QString sourceType  = QStringLiteral("manual");
+    bool    isConfirmed = true;
+    bool    isSelected  = false;
+    int     zIndex      = 0;
 
-    void setX(double x);
-    void setY(double y);
-    void setW(double w);
-    void setH(double h);
-    void setAngle(double angle);
-
-private:
-    double m_x = 0.0;
-    double m_y = 0.0;
-    double m_w = 0.0;
-    double m_h = 0.0;
-    double m_angle = 0.0;
+    // --- Geometry: normalized coordinates [0,1] + rotation ---
+    float cx    = 0.0f;
+    float cy    = 0.0f;
+    float w     = 0.0f;
+    float h     = 0.0f;
+    float angle = 0.0f;   // rotation in degrees
 };
 
-#endif
+#endif // ROTATEDBOX_H

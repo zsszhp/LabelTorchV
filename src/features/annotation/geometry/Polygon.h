@@ -1,21 +1,30 @@
 #ifndef POLYGON_H
 #define POLYGON_H
 
+#include "Geometry.h"
+
+#include <QString>
 #include <QVector>
 #include <QPointF>
 
-class Polygon
-{
-public:
-    Polygon();
-    explicit Polygon(const QVector<QPointF> &points);
+/**
+ * @brief Arbitrary polygon annotation - stub for a later phase.
+ *
+ * Geometry: ordered list of vertices in normalized coordinates.
+ */
+struct Polygon {
+    // --- Annotation metadata (mirrors Annotation) ---
+    QString id;
+    int     classIndex  = -1;
+    QString className;
+    float   confidence  = 0.0f;
+    QString sourceType  = QStringLiteral("manual");
+    bool    isConfirmed = true;
+    bool    isSelected  = false;
+    int     zIndex      = 0;
 
-    QVector<QPointF> points() const;
-    void setPoints(const QVector<QPointF> &points);
-    void appendPoint(const QPointF &point);
-
-private:
-    QVector<QPointF> m_points;
+    // --- Geometry: normalized point list ---
+    QVector<QPointF> points;
 };
 
-#endif
+#endif // POLYGON_H
