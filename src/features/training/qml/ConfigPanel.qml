@@ -18,9 +18,11 @@ Rectangle {
     property alias amp: ampSwitch.checked
     property alias device: deviceCombo.currentText
     property alias modelFamily: modelFamilyCombo.currentText
+    property alias trainingType: trainingTypeCombo.currentIndex
+    property alias parentVersionId: parentVersionCombo.currentValue
 
     function getConfigJson() {
-        return JSON.stringify({
+        var config = {
             "img_size": imgSizeSpin.value,
             "batch": batchSpin.value,
             "epochs": epochsSpin.value,
@@ -28,8 +30,13 @@ Rectangle {
             "workers": workersSpin.value,
             "amp": ampSwitch.checked,
             "device": deviceCombo.currentText,
-            "model_family": modelFamilyCombo.currentText
-        })
+            "model_family": modelFamilyCombo.currentText,
+            "training_type": ["from_scratch", "pretrained", "incremental"][trainingTypeCombo.currentIndex]
+        }
+        if (trainingTypeCombo.currentIndex === 2 && parentVersionCombo.currentValue) {
+            config["parent_model_version_id"] = parentVersionCombo.currentValue
+        }
+        return JSON.stringify(config)
     }
 
     ColumnLayout {
@@ -107,6 +114,150 @@ Rectangle {
                         verticalAlignment: Text.AlignVCenter
                     }
                     highlighted: modelFamilyCombo.highlightedIndex === index
+                    background: Rectangle {
+                        color: highlighted ? "#313244" : "#1e1e2e"
+                    }
+                }
+            }
+        }
+
+        // Training type selector
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            Label {
+                text: "Type:"
+                color: "#cdd6f4"
+                font.pixelSize: 13
+                Layout.preferredWidth: 80
+            }
+
+            ComboBox {
+                id: trainingTypeCombo
+                model: ["From Scratch", "Pretrained", "Incremental"]
+                currentIndex: 0
+                Layout.fillWidth: true
+
+                contentItem: Label {
+                    text: trainingTypeCombo.displayText
+                    color: "#cdd6f4"
+                    font.pixelSize: 13
+                    verticalAlignment: Text.AlignVCenter
+                    leftPadding: 8
+                }
+
+                background: Rectangle {
+                    color: "#313244"
+                    radius: 4
+                    border.color: trainingTypeCombo.activeFocus ? "#89b4fa" : "#45475a"
+                    border.width: 1
+                }
+
+                popup: Popup {
+                    y: trainingTypeCombo.height
+                    width: trainingTypeCombo.width
+                    implicitHeight: contentItem.implicitHeight
+                    padding: 1
+
+                    contentItem: ListView {
+                        clip: true
+                        implicitHeight: contentHeight
+                        model: trainingTypeCombo.popup.visible ? trainingTypeCombo.delegateModel : null
+                        currentIndex: trainingTypeCombo.highlightedIndex
+                    }
+
+                    background: Rectangle {
+                        color: "#1e1e2e"
+                        border.color: "#45475a"
+                        radius: 4
+                    }
+                }
+
+                delegate: ItemDelegate {
+                    width: trainingTypeCombo.width
+                    contentItem: Label {
+                        text: modelData
+                        color: highlighted ? "#89b4fa" : "#cdd6f4"
+                        font.pixelSize: 13
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    highlighted: trainingTypeCombo.highlightedIndex === index
+                    background: Rectangle {
+                        color: highlighted ? "#313244" : "#1e1e2e"
+                    }
+                }
+            }
+        }
+
+        // Parent model version selector (for incremental training)
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+            visible: trainingTypeCombo.currentIndex === 2
+
+            Label {
+                text: "Parent:"
+                color: "#cdd6f4"
+                font.pixelSize: 13
+                Layout.preferredWidth: 80
+            }
+
+            ComboBox {
+                id: parentVersionCombo
+                model: modelVersionModel
+                textRole: "versionId"
+                valueRole: "versionId"
+                Layout.fillWidth: true
+
+                contentItem: Label {
+                    text: parentVersionCombo.currentIndex >= 0 ?
+                        parentVersionCombo.currentValue.substring(0, 8) + "..." :
+                        "Select parent version"
+                    color: "#cdd6f4"
+                    font.pixelSize: 13
+                    font.family: "monospace"
+                    verticalAlignment: Text.AlignVCenter
+                    leftPadding: 8
+                }
+
+                background: Rectangle {
+                    color: "#313244"
+                    radius: 4
+                    border.color: parentVersionCombo.activeFocus ? "#89b4fa" : "#45475a"
+                    border.width: 1
+                }
+
+                popup: Popup {
+                    y: parentVersionCombo.height
+                    width: parentVersionCombo.width
+                    implicitHeight: Math.min(contentItem.implicitHeight, 300)
+                    padding: 1
+
+                    contentItem: ListView {
+                        clip: true
+                        implicitHeight: contentHeight
+                        model: parentVersionCombo.popup.visible ? parentVersionCombo.delegateModel : null
+                        currentIndex: parentVersionCombo.highlightedIndex
+                    }
+
+                    background: Rectangle {
+                        color: "#1e1e2e"
+                        border.color: "#45475a"
+                        radius: 4
+                    }
+                }
+
+                delegate: ItemDelegate {
+                    width: parentVersionCombo.width
+                    contentItem: Label {
+                        text: model.versionId.substring(0, 8) + "... (" + model.bestWeight + ")"
+                        color: highlighted ? "#89b4fa" : "#cdd6f4"
+                        font.pixelSize: 12
+                        font.family: "monospace"
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    highlighted: parentVersionCombo.highlightedIndex === index
                     background: Rectangle {
                         color: highlighted ? "#313244" : "#1e1e2e"
                     }

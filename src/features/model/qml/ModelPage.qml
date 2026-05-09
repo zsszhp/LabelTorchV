@@ -413,6 +413,67 @@ Item {
                     }
                 }
 
+                // Lineage chain visualization
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: lineageContent.height + 16
+                    visible: selectedVersionId !== ""
+                    color: "#11111b"
+                    radius: 6
+
+                    ColumnLayout {
+                        id: lineageContent
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 8
+                        spacing: 4
+
+                        Label {
+                            text: "Version Lineage"
+                            color: "#89b4fa"
+                            font.pixelSize: 12
+                            font.bold: true
+                        }
+
+                        Label {
+                            id: lineageLabel
+                            color: "#a6adc8"
+                            font.pixelSize: 11
+                            font.family: "monospace"
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+
+                            text: {
+                                if (!selectedVersion) return ""
+                                var chain = []
+                                var current = selectedVersion
+                                var depth = 0
+                                while (current && depth < 10) {
+                                    var tag = ""
+                                    if (current.metricsJson) {
+                                        try {
+                                            var m = JSON.parse(current.metricsJson)
+                                            if (m.tags && m.tags.length > 0) {
+                                                tag = " [" + m.tags.join(",") + "]"
+                                            }
+                                        } catch(e) {}
+                                    }
+                                    chain.push(current.versionId.substring(0, 8) + tag)
+                                    if (current.parentVersionId && current.parentVersionId !== "") {
+                                        current = modelRegistry.getModelVersion(current.parentVersionId)
+                                    } else {
+                                        break
+                                    }
+                                    depth++
+                                }
+                                if (chain.length <= 1) return "No parent (root version)"
+                                return chain.reverse().join(" -> ")
+                            }
+                        }
+                    }
+                }
+
                 // Metrics display
                 MetricChart {
                     id: metricChart
