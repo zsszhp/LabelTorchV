@@ -120,3 +120,22 @@ target_include_directories(test_model PRIVATE
     ${CMAKE_SOURCE_DIR}/src/core/database
 )
 add_test(NAME ModelTest COMMAND test_model)
+
+# 推理/辅助标注服务测试
+add_executable(test_inference
+    test_inference.cpp
+)
+target_link_libraries(test_inference PRIVATE
+    labeltorch_core
+    labeltorch_inference
+    labeltorch_model
+    Qt6::Test
+    Qt6::Sql
+)
+target_include_directories(test_inference PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/features/inference
+    ${CMAKE_SOURCE_DIR}/src/features/model
+    ${CMAKE_SOURCE_DIR}/src/core/database
+    ${CMAKE_SOURCE_DIR}/src/core/ipc
+)
+add_test(NAME InferenceTest COMMAND test_inference)
