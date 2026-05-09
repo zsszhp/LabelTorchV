@@ -16,4 +16,5 @@ qt_standard_project_setup(REQUIRES 6.5)
 
 # 子模块
 add_subdirectory(src)
+enable_testing()
 add_subdirectory(tests)

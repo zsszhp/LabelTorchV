@@ -71,3 +71,19 @@ target_include_directories(test_taxonomy PRIVATE
     ${CMAKE_SOURCE_DIR}/src/core/utils
 )
 add_test(NAME TaxonomyTest COMMAND test_taxonomy)
+
+# 快照测试
+add_executable(test_snapshot
+    test_snapshot.cpp
+)
+target_link_libraries(test_snapshot PRIVATE
+    labeltorch_core
+    labeltorch_training
+    Qt6::Test
+    Qt6::Sql
+)
+target_include_directories(test_snapshot PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/features/training
+    ${CMAKE_SOURCE_DIR}/src/core/database
+)
+add_test(NAME SnapshotTest COMMAND test_snapshot)

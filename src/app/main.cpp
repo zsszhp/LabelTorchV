@@ -18,6 +18,10 @@
 #include "AnnotationModel.h"
 #include "canvas/CanvasController.h"
 #include "ipc/IpcClient.h"
+#include "SnapshotService.h"
+#include "SnapshotModel.h"
+#include "TrainingService.h"
+#include "TrainingModel.h"
 #include "Database.h"
 
 int main(int argc, char *argv[])
@@ -48,6 +52,10 @@ int main(int argc, char *argv[])
     AnnotationModel annotationModel;
     CanvasController canvasController;
     IpcClient ipcClient;
+    SnapshotService snapshotService;
+    SnapshotModel snapshotModel;
+    TrainingService trainingService;
+    TrainingModel trainingModel;
 
     // 启动Python后端（如果可用）
     QString pythonExec = "F:/A/anaconda/envs/labeltorch/python.exe";
@@ -72,6 +80,10 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("annotationModel", &annotationModel);
     engine.rootContext()->setContextProperty("canvasController", &canvasController);
     engine.rootContext()->setContextProperty("ipcClient", &ipcClient);
+    engine.rootContext()->setContextProperty("snapshotService", &snapshotService);
+    engine.rootContext()->setContextProperty("snapshotModel", &snapshotModel);
+    engine.rootContext()->setContextProperty("trainingService", &trainingService);
+    engine.rootContext()->setContextProperty("trainingModel", &trainingModel);
 
     // 加载主窗口
     const QUrl url(u"qrc:/LabelTorch/Shell/qml/Main.qml"_qs);

@@ -8,11 +8,14 @@ qt_add_qml_module(labeltorch_training
         qml/TrainingPage.qml
         qml/ConfigPanel.qml
         qml/LogView.qml
+        qml/SnapshotPage.qml
     SOURCES
         TrainingService.h
         TrainingService.cpp
         SnapshotService.h
         SnapshotService.cpp
+        SnapshotModel.h
+        SnapshotModel.cpp
         TrainingModel.h
         TrainingModel.cpp
 )
@@ -20,4 +23,8 @@ qt_add_qml_module(labeltorch_training
 target_link_libraries(labeltorch_training PUBLIC
     labeltorch_core
     Qt6::Quick
+)
+
+target_include_directories(labeltorch_training PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core/database
 )
