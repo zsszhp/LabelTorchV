@@ -8,6 +8,9 @@
 reference/*/
 !reference/README.md
 
+# Test output files
+test_output*.txt
+
 # CMake build output
 **/CMakeFiles/
 **/CMakeCache.txt
