@@ -52,6 +52,37 @@ public:
      */
     Q_INVOKABLE bool deleteDataset(const QString &datasetId);
 
+    /**
+     * @brief Get sample statistics for a dataset.
+     * Returns QVariantMap with:
+     * - "totalSamples": total count
+     * - "validSamples": count with validation_status='valid'
+     * - "invalidSamples": count with validation_status != 'valid'
+     * - "labeledSamples": count with non-null label_path
+     * - "unlabeledSamples": count with null label_path
+     * - "classDistribution": QVariantMap of class_id -> count
+     * - "annotationDensity": QVariantMap with min/max/avg/median annotations per sample
+     */
+    Q_INVOKABLE QVariantMap getSampleStats(const QString &datasetId);
+
+    /**
+     * @brief Detect anomalies in the dataset.
+     * Returns QVariantMap with:
+     * - "emptyLabels": QVariantList of sample IDs with empty label files
+     * - "classErrors": QVariantList of sample IDs with class_id outside valid range
+     * - "sizeAnomalies": QVariantList of sample IDs with unusual image dimensions (optional, may be empty if width/height not populated)
+     * - "duplicateImages": QVariantList of sample IDs with duplicate hash values
+     * - "totalAnomalies": total count of all anomaly items
+     */
+    Q_INVOKABLE QVariantMap detectAnomalies(const QString &datasetId);
+
+    /**
+     * @brief Get class distribution for a dataset.
+     * Returns QVariantList of QVariantMap entries, each with "classId" and "count".
+     * Ordered by count descending.
+     */
+    Q_INVOKABLE QVariantList getClassDistribution(const QString &datasetId);
+
 private:
     bool updateImportStatus(const QString &datasetId, const QString &status);
     bool insertSamples(const QString &datasetId, const QVariantList &samples);
