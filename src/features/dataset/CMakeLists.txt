@@ -22,4 +22,6 @@ qt_add_qml_module(labeltorch_dataset
 target_link_libraries(labeltorch_dataset PUBLIC
     labeltorch_core
     Qt6::Quick
+    Qt6::QuickDialogs2
+    Qt6::Sql
 )

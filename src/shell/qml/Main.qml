@@ -192,7 +192,7 @@ ApplicationWindow {
                     // 类别体系页
                     Loader { source: "qrc:/LabelTorch/Project/qml/TaxonomyPage.qml" }
                     // 数据导入页
-                    Rectangle { color: "#1e1e2e"; Label { anchors.centerIn: parent; text: "数据导入 - 待实现"; color: "#6c7086"; font.pixelSize: 16 } }
+                    Loader { source: "qrc:/LabelTorch/Dataset/qml/ImportPage.qml" }
                     // 标注工作台
                     Rectangle { color: "#1e1e2e"; Label { anchors.centerIn: parent; text: "标注工作台 - 待实现"; color: "#6c7086"; font.pixelSize: 16 } }
                     // 训练工作台

@@ -11,6 +11,8 @@
 #include "ProjectModel.h"
 #include "TaxonomyService.h"
 #include "TaxonomyModel.h"
+#include "DatasetService.h"
+#include "DatasetModel.h"
 #include "Database.h"
 
 int main(int argc, char *argv[])
@@ -34,6 +36,8 @@ int main(int argc, char *argv[])
     ProjectModel projectModel;
     TaxonomyService taxonomyService;
     TaxonomyModel taxonomyModel;
+    DatasetService datasetService;
+    DatasetModel datasetModel;
 
     // 注入依赖
     projectService.setTaxonomyService(&taxonomyService);
@@ -46,6 +50,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("projectModel", &projectModel);
     engine.rootContext()->setContextProperty("taxonomyService", &taxonomyService);
     engine.rootContext()->setContextProperty("taxonomyModel", &taxonomyModel);
+    engine.rootContext()->setContextProperty("datasetService", &datasetService);
+    engine.rootContext()->setContextProperty("datasetModel", &datasetModel);
 
     // 加载主窗口
     const QUrl url(u"qrc:/LabelTorch/Shell/qml/Main.qml"_qs);
