@@ -7,6 +7,7 @@ qt_add_qml_module(labeltorch_inference
     QML_FILES
         qml/AssistedLabelPanel.qml
         qml/ReviewDialog.qml
+        qml/LowConfQueue.qml
     SOURCES
         InferenceService.h
         InferenceService.cpp

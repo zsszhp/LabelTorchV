@@ -156,6 +156,72 @@ QVariantMap AssistedLabelService::getBatchStats(const QString &batchId)
     return result;
 }
 
+QVariantList AssistedLabelService::getLowConfidenceSamples(const QString &batchId, float threshold)
+{
+    QVariantList result;
+    QJsonObject snapshotObj;
+
+    if (!readSnapshot(batchId, snapshotObj)) return result;
+
+    QJsonArray candidates = snapshotObj.value("candidates").toArray();
+    for (int i = 0; i < candidates.size(); ++i) {
+        QJsonObject obj = candidates[i].toObject();
+        double conf = obj.value("confidence").toDouble();
+        if (conf < threshold) {
+            QVariantMap candidate;
+            candidate["candidateIndex"] = i;
+            candidate["className"] = obj.value("className").toString();
+            candidate["classIndex"] = obj.value("classIndex").toInt();
+            candidate["cx"] = obj.value("cx").toDouble();
+            candidate["cy"] = obj.value("cy").toDouble();
+            candidate["w"] = obj.value("w").toDouble();
+            candidate["h"] = obj.value("h").toDouble();
+            candidate["confidence"] = conf;
+            candidate["state"] = obj.value("state").toString("pending");
+            result.append(candidate);
+        }
+    }
+
+    return result;
+}
+
+QVariantMap AssistedLabelService::getConfidenceStats(const QString &batchId, float threshold)
+{
+    QVariantMap result;
+    result["totalCandidates"] = 0;
+    result["lowConfCount"] = 0;
+    result["highConfCount"] = 0;
+    result["averageConfidence"] = 0.0;
+    result["threshold"] = static_cast<double>(threshold);
+
+    QJsonObject snapshotObj;
+    if (!readSnapshot(batchId, snapshotObj)) return result;
+
+    QJsonArray candidates = snapshotObj.value("candidates").toArray();
+    int total = candidates.size();
+    int lowConf = 0;
+    int highConf = 0;
+    double confSum = 0.0;
+
+    for (const auto &cand : candidates) {
+        double conf = cand.toObject().value("confidence").toDouble();
+        confSum += conf;
+        if (conf < threshold) {
+            ++lowConf;
+        } else {
+            ++highConf;
+        }
+    }
+
+    result["totalCandidates"] = total;
+    result["lowConfCount"] = lowConf;
+    result["highConfCount"] = highConf;
+    result["averageConfidence"] = total > 0 ? confSum / total : 0.0;
+    result["threshold"] = static_cast<double>(threshold);
+
+    return result;
+}
+
 bool AssistedLabelService::readSnapshot(const QString &batchId, QJsonObject &snapshotObj)
 {
     auto db = Database::instance().database();

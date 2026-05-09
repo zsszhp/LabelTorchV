@@ -74,6 +74,29 @@ public:
      */
     Q_INVOKABLE QVariantMap getBatchStats(const QString &batchId);
 
+    /**
+     * @brief Collect low-confidence samples from an inference batch.
+     *
+     * Returns a list of candidate maps where confidence < threshold.
+     * Each map contains: candidateIndex, className, classIndex, confidence,
+     * cx, cy, w, h, state.
+     *
+     * @param batchId The inference batch ID.
+     * @param threshold Confidence threshold (default 0.3).
+     * @return QVariantList of candidate maps with low confidence.
+     */
+    Q_INVOKABLE QVariantList getLowConfidenceSamples(const QString &batchId, float threshold = 0.3f);
+
+    /**
+     * @brief Get statistics about confidence distribution in a batch.
+     *
+     * @param batchId The batch ID.
+     * @param threshold Confidence threshold (default 0.3).
+     * @return QVariantMap with: totalCandidates, lowConfCount, highConfCount,
+     *         averageConfidence, threshold.
+     */
+    Q_INVOKABLE QVariantMap getConfidenceStats(const QString &batchId, float threshold = 0.3f);
+
 private:
     /**
      * @brief Read and parse the candidate_snapshot_json for a batch.

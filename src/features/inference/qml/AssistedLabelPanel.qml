@@ -12,6 +12,8 @@ Item {
     property var selectedBatch: null
     property var candidates: []
     property var batchStats: ({"total":0,"confirmed":0,"rejected":0,"pending":0,"edited":0})
+    property var lowConfSamples: []
+    property var confidenceStats: ({"totalCandidates":0,"lowConfCount":0,"highConfCount":0,"averageConfidence":0,"threshold":0.3})
 
     onCurrentDatasetIdChanged: {
         selectedBatchId = ""
@@ -49,12 +51,26 @@ Item {
         }
     }
 
+    function collectLowConfidence() {
+        if (selectedBatchId === "") return
+        lowConfSamples = assistedLabelService.getLowConfidenceSamples(selectedBatchId, lowConfThresholdSpin.value)
+        confidenceStats = assistedLabelService.getConfidenceStats(selectedBatchId, lowConfThresholdSpin.value)
+        lowConfListModel.clear()
+        for (var i = 0; i < lowConfSamples.length; i++) {
+            lowConfListModel.append(lowConfSamples[i])
+        }
+    }
+
     ListModel {
         id: batchListModel
     }
 
     ListModel {
         id: candidateListModel
+    }
+
+    ListModel {
+        id: lowConfListModel
     }
 
     RowLayout {
@@ -386,6 +402,170 @@ Item {
                     text: ""
                     color: "#a6e3a1"
                     font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                }
+
+                // Separator
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: "#313244"
+                }
+
+                // Low-Confidence Feedback Loop section
+                Label {
+                    text: "Low-Confidence Feedback"
+                    color: "#f9e2af"
+                    font.pixelSize: 14
+                    font.bold: true
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Label {
+                        text: "Threshold:"
+                        color: "#cdd6f4"
+                        font.pixelSize: 12
+                    }
+
+                    SpinBox {
+                        id: lowConfThresholdSpin
+                        from: 0
+                        to: 100
+                        value: 30
+                        stepSize: 5
+                        editable: true
+
+                        property real realValue: value / 100.0
+
+                        validator: DoubleValidator {
+                            bottom: 0.0
+                            top: 1.0
+                            decimals: 2
+                        }
+
+                        textFromValue: function(value) {
+                            return (value / 100.0).toFixed(2)
+                        }
+
+                        valueFromText: function(text) {
+                            return Math.round(parseFloat(text) * 100)
+                        }
+
+                        background: Rectangle {
+                            color: "#313244"
+                            radius: 4
+                            border.color: lowConfThresholdSpin.activeFocus ? "#f9e2af" : "#45475a"
+                            border.width: 1
+                        }
+
+                        contentItem: Label {
+                            text: lowConfThresholdSpin.textFromValue(lowConfThresholdSpin.value)
+                            color: "#cdd6f4"
+                            font.pixelSize: 13
+                            font.family: "monospace"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        up.indicator: Rectangle {
+                            x: parent.width - width
+                            height: parent.height / 2
+                            width: 28
+                            color: lowConfThresholdSpin.up.pressed ? "#45475a" : "#313244"
+                            border.color: "#45475a"
+                            border.width: 1
+
+                            Label {
+                                anchors.centerIn: parent
+                                text: "+"
+                                color: "#cdd6f4"
+                                font.pixelSize: 14
+                                font.bold: true
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+
+                        down.indicator: Rectangle {
+                            x: parent.width - width
+                            y: parent.height / 2
+                            height: parent.height / 2
+                            width: 28
+                            color: lowConfThresholdSpin.down.pressed ? "#45475a" : "#313244"
+                            border.color: "#45475a"
+                            border.width: 1
+
+                            Label {
+                                anchors.centerIn: parent
+                                text: "-"
+                                color: "#cdd6f4"
+                                font.pixelSize: 14
+                                font.bold: true
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+                    }
+
+                    Button {
+                        id: collectLowConfBtn
+                        text: "Collect Low-Conf"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 32
+                        enabled: selectedBatchId !== ""
+
+                        background: Rectangle {
+                            color: parent.enabled ? (parent.pressed ? "#e0cb85" : "#f9e2af") : "#45475a"
+                            radius: 6
+                        }
+
+                        contentItem: Label {
+                            text: parent.text
+                            color: parent.enabled ? "#1e1e2e" : "#6c7086"
+                            font.pixelSize: 12
+                            font.bold: true
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        onClicked: collectLowConfidence()
+                    }
+                }
+
+                // Low-confidence count summary
+                Label {
+                    id: lowConfSummary
+                    Layout.fillWidth: true
+                    visible: confidenceStats.totalCandidates > 0
+                    text: "Low-conf: " + confidenceStats.lowConfCount + " / " + confidenceStats.totalCandidates +
+                          "  |  Avg conf: " + parseFloat(confidenceStats.averageConfidence).toFixed(3) +
+                          "  |  Threshold: " + parseFloat(confidenceStats.threshold).toFixed(2)
+                    color: confidenceStats.lowConfCount > 0 ? "#f9e2af" : "#a6e3a1"
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+
+                // Low-confidence sample ID list (truncated)
+                Label {
+                    id: lowConfIdList
+                    Layout.fillWidth: true
+                    visible: lowConfListModel.count > 0
+                    text: {
+                        var ids = []
+                        var maxShow = Math.min(lowConfListModel.count, 5)
+                        for (var i = 0; i < maxShow; i++) {
+                            var idx = lowConfListModel.get(i).candidateIndex
+                            ids.push("#" + idx)
+                        }
+                        var suffix = lowConfListModel.count > 5 ? " ..." : ""
+                        return "Candidates: " + ids.join(", ") + suffix
+                    }
+                    color: "#6c7086"
+                    font.pixelSize: 10
+                    font.family: "monospace"
                     wrapMode: Text.WordWrap
                 }
 
