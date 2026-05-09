@@ -9,6 +9,16 @@ Item {
     // Current shape mode: 0 = HBB, 1 = OBB
     property int shapeMode: 0
 
+    // Annotation mode: "detect", "obb", "classify", or "anomaly"
+    property string annotationMode: "detect"
+
+    // Classification state
+    property int selectedClassId: -1
+    property var selectedMultiClassIds: []
+
+    // Anomaly detection state
+    property bool isAnomalous: false
+
     RowLayout {
         anchors.fill: parent
         spacing: 0
@@ -62,7 +72,20 @@ Item {
 
                         onClicked: {
                             // Load this sample's annotations
-                            annotationModel.loadFromLabel(modelData.labelPath || "")
+                            if (annotationMode === "classify") {
+                                var clsLabels = annotationService.loadClassificationLabels(modelData.labelPath || "")
+                                if (clsLabels.labelType === "multi") {
+                                    selectedMultiClassIds = clsLabels.classIds || []
+                                } else {
+                                    selectedClassId = clsLabels.classId !== undefined ? clsLabels.classId : -1
+                                    selectedMultiClassIds = []
+                                }
+                            } else if (annotationMode === "anomaly") {
+                                var anomalyLabels = annotationService.loadAnomalyLabels(modelData.labelPath || "")
+                                isAnomalous = anomalyLabels.isAnomalous || false
+                            } else {
+                                annotationModel.loadFromLabel(modelData.labelPath || "")
+                            }
                             canvasController.loadImage(modelData.imagePath || "", modelData.labelPath || "")
                         }
                     }
@@ -96,19 +119,94 @@ Item {
                         return
                     }
 
+                    // Anomaly detection mode: show anomaly label overlay
+                    if (annotationMode === "anomaly") {
+                        // Draw image border
+                        var imgW = canvasController.imageToCanvasX(1.0) - canvasController.imageToCanvasX(0)
+                        var imgH = canvasController.imageToCanvasY(1.0) - canvasController.imageToCanvasY(0)
+                        var imgX = canvasController.imageToCanvasX(0)
+                        var imgY = canvasController.imageToCanvasY(0)
+
+                        // Draw image area border with anomaly-coded color
+                        ctx.strokeStyle = isAnomalous ? "#f38ba8" : "#a6e3a1"
+                        ctx.lineWidth = 3
+                        ctx.strokeRect(imgX, imgY, imgW, imgH)
+
+                        // Show anomaly label at center
+                        var labelText = isAnomalous ? "ANOMALOUS" : "NORMAL"
+                        var labelColor = isAnomalous ? "#f38ba8" : "#a6e3a1"
+
+                        ctx.globalAlpha = 0.15
+                        ctx.fillStyle = labelColor
+                        ctx.fillRect(imgX, imgY, imgW, imgH)
+
+                        ctx.globalAlpha = 1.0
+                        ctx.fillStyle = labelColor
+                        ctx.font = "bold 24px sans-serif"
+                        ctx.textAlign = "center"
+                        ctx.fillText(labelText, imgX + imgW / 2, imgY + imgH / 2)
+
+                        return
+                    }
+
+                    // Classification mode: show class label overlay
+                    if (annotationMode === "classify") {
+                        // Draw image border
+                        var imgW = canvasController.imageToCanvasX(1.0) - canvasController.imageToCanvasX(0)
+                        var imgH = canvasController.imageToCanvasY(1.0) - canvasController.imageToCanvasY(0)
+                        var imgX = canvasController.imageToCanvasX(0)
+                        var imgY = canvasController.imageToCanvasY(0)
+
+                        ctx.strokeStyle = "#45475a"
+                        ctx.lineWidth = 1
+                        ctx.strokeRect(imgX, imgY, imgW, imgH)
+
+                        // Show classification label at center
+                        var colors = ["#f38ba8", "#a6e3a1", "#89b4fa", "#f9e2af", "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"]
+                        var labelText = ""
+
+                        if (classificationMultiCheck.checked) {
+                            // Multi-label mode
+                            if (selectedMultiClassIds.length > 0) {
+                                var names = []
+                                for (var mi = 0; mi < selectedMultiClassIds.length; mi++) {
+                                    names.push("class_" + selectedMultiClassIds[mi])
+                                }
+                                labelText = names.join(", ")
+                            } else {
+                                labelText = "未分类"
+                            }
+                        } else {
+                            // Single-label mode
+                            if (selectedClassId >= 0) {
+                                labelText = "class_" + selectedClassId
+                            } else {
+                                labelText = "未分类"
+                            }
+                        }
+
+                        ctx.globalAlpha = 1.0
+                        ctx.fillStyle = "#89b4fa"
+                        ctx.font = "bold 18px sans-serif"
+                        ctx.textAlign = "center"
+                        ctx.fillText(labelText, imgX + imgW / 2, imgY + imgH / 2)
+
+                        return
+                    }
+
                     // Draw image area
-                    var imgW = canvasController.imageToCanvasX(1.0) - canvasController.imageToCanvasX(0)
-                    var imgH = canvasController.imageToCanvasY(1.0) - canvasController.imageToCanvasY(0)
-                    var imgX = canvasController.imageToCanvasX(0)
-                    var imgY = canvasController.imageToCanvasY(0)
+                    var imgW2 = canvasController.imageToCanvasX(1.0) - canvasController.imageToCanvasX(0)
+                    var imgH2 = canvasController.imageToCanvasY(1.0) - canvasController.imageToCanvasY(0)
+                    var imgX2 = canvasController.imageToCanvasX(0)
+                    var imgY2 = canvasController.imageToCanvasY(0)
 
                     // Image border
                     ctx.strokeStyle = "#45475a"
                     ctx.lineWidth = 1
-                    ctx.strokeRect(imgX, imgY, imgW, imgH)
+                    ctx.strokeRect(imgX2, imgY2, imgW2, imgH2)
 
                     // Draw annotations
-                    var colors = ["#f38ba8", "#a6e3a1", "#89b4fa", "#f9e2af", "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"]
+                    var colors2 = ["#f38ba8", "#a6e3a1", "#89b4fa", "#f9e2af", "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"]
 
                     for (var i = 0; i < annotationModel.rowCount(); i++) {
                         var idx = annotationModel.index(i, 0)
@@ -123,7 +221,7 @@ Item {
 
                         if (cx === undefined || cy === undefined) continue
 
-                        var color = colors[classIdx % colors.length]
+                        var color = colors2[classIdx % colors2.length]
 
                         // Center in canvas coordinates
                         var canvasCx = canvasController.imageToCanvasX(cx)
@@ -236,6 +334,10 @@ Item {
                     }
 
                     onPressed: function(mouse) {
+                        if (annotationMode === "classify" || annotationMode === "anomaly") {
+                            // No drawing in classification or anomaly mode
+                            return
+                        }
                         if (canvasController.drawMode === "draw" && mouse.button === Qt.LeftButton) {
                             isDrawing = true
                             startImgX = mouse.x
@@ -309,16 +411,17 @@ Item {
                 anchors.margins: 8
                 spacing: 4
 
-                // HBB/OBB mode switch
+                // HBB/OBB/CLS/AD mode switch
                 RowLayout {
                     spacing: 0
 
                     Button {
                         text: "HBB"
                         font.pixelSize: 11
-                        highlighted: shapeMode === 0
+                        highlighted: annotationMode === "detect" && shapeMode === 0
                         flat: !highlighted
                         onClicked: {
+                            annotationMode = "detect"
                             shapeMode = 0
                             annotationService.setShapeType(0)
                         }
@@ -326,12 +429,6 @@ Item {
                         background: Rectangle {
                             color: parent.highlighted ? "#89b4fa" : "#313244"
                             radius: 3
-
-                            Rectangle {
-                                anchors.right: parent.right
-                                width: obbBtn.visible ? 0 : parent.radius
-                                color: parent.color
-                            }
                         }
 
                         contentItem: Label {
@@ -344,12 +441,12 @@ Item {
                     }
 
                     Button {
-                        id: obbBtn
                         text: "OBB"
                         font.pixelSize: 11
-                        highlighted: shapeMode === 1
+                        highlighted: annotationMode === "detect" && shapeMode === 1
                         flat: !highlighted
                         onClicked: {
+                            annotationMode = "detect"
                             shapeMode = 1
                             annotationService.setShapeType(1)
                         }
@@ -357,12 +454,52 @@ Item {
                         background: Rectangle {
                             color: parent.highlighted ? "#89b4fa" : "#313244"
                             radius: 3
+                        }
 
-                            Rectangle {
-                                anchors.left: parent.left
-                                width: hbbBtn.visible ? 0 : parent.radius
-                                color: parent.color
-                            }
+                        contentItem: Label {
+                            text: parent.text
+                            font.pixelSize: 11
+                            color: parent.highlighted ? "#1e1e2e" : "#cdd6f4"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
+
+                    Button {
+                        text: "CLS"
+                        font.pixelSize: 11
+                        highlighted: annotationMode === "classify"
+                        flat: !highlighted
+                        onClicked: {
+                            annotationMode = "classify"
+                        }
+
+                        background: Rectangle {
+                            color: parent.highlighted ? "#89b4fa" : "#313244"
+                            radius: 3
+                        }
+
+                        contentItem: Label {
+                            text: parent.text
+                            font.pixelSize: 11
+                            color: parent.highlighted ? "#1e1e2e" : "#cdd6f4"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
+
+                    Button {
+                        text: "AD"
+                        font.pixelSize: 11
+                        highlighted: annotationMode === "anomaly"
+                        flat: !highlighted
+                        onClicked: {
+                            annotationMode = "anomaly"
+                        }
+
+                        background: Rectangle {
+                            color: parent.highlighted ? "#89b4fa" : "#313244"
+                            radius: 3
                         }
 
                         contentItem: Label {
@@ -378,6 +515,7 @@ Item {
                 Button {
                     text: canvasController.drawMode === "draw" ? "绘制中" : "选择"
                     highlighted: canvasController.drawMode === "draw"
+                    visible: annotationMode !== "classify" && annotationMode !== "anomaly"
                     onClicked: canvasController.drawMode = canvasController.drawMode === "draw" ? "select" : "draw"
                 }
 
@@ -391,8 +529,9 @@ Item {
 
                 Button {
                     text: "保存"
-                    enabled: canvasController.dirty
                     highlighted: true
+                    visible: annotationMode !== "classify" && annotationMode !== "anomaly"
+                    enabled: canvasController.dirty
                     onClicked: {
                         annotationService.saveAnnotations(
                             canvasController.currentLabelPath,
@@ -410,10 +549,311 @@ Item {
                 }
             }
 
+            // Classification panel (only visible in classify mode)
+            Rectangle {
+                id: classificationPanel
+                visible: annotationMode === "classify"
+                anchors.bottom: statusBar.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 8
+                height: classificationLayout.implicitHeight + 16
+                color: "#181825"
+                radius: 6
+
+                ColumnLayout {
+                    id: classificationLayout
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 6
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Label {
+                            text: "分类模式"
+                            font.pixelSize: 13
+                            font.bold: true
+                            color: "#89b4fa"
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        CheckBox {
+                            id: classificationMultiCheck
+                            text: "多标签"
+                            font.pixelSize: 12
+                            checked: false
+
+                            contentItem: Label {
+                                text: classificationMultiCheck.text
+                                font.pixelSize: 12
+                                color: classificationMultiCheck.checked ? "#89b4fa" : "#cdd6f4"
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: classificationMultiCheck.indicator.width + 6
+                            }
+
+                            indicator: Rectangle {
+                                x: classificationMultiCheck.leftPadding
+                                y: parent.height / 2 - height / 2
+                                width: 16
+                                height: 16
+                                radius: 3
+                                color: classificationMultiCheck.checked ? "#89b4fa" : "#313244"
+                                border.color: classificationMultiCheck.checked ? "#89b4fa" : "#45475a"
+
+                                Label {
+                                    anchors.centerIn: parent
+                                    text: classificationMultiCheck.checked ? "\u2713" : ""
+                                    color: "#1e1e2e"
+                                    font.pixelSize: 11
+                                }
+                            }
+
+                            onCheckedChanged: {
+                                if (!checked) {
+                                    selectedMultiClassIds = []
+                                } else {
+                                    selectedClassId = -1
+                                }
+                                annotationCanvas.requestPaint()
+                            }
+                        }
+
+                        Button {
+                            text: "保存分类"
+                            highlighted: true
+                            enabled: classificationMultiCheck.checked ? selectedMultiClassIds.length > 0 : selectedClassId >= 0
+
+                            background: Rectangle {
+                                color: parent.enabled ? (parent.highlighted ? "#89b4fa" : "#313244") : "#1e1e2e"
+                                radius: 4
+                            }
+
+                            contentItem: Label {
+                                text: parent.text
+                                font.pixelSize: 12
+                                color: parent.enabled ? (parent.highlighted ? "#1e1e2e" : "#cdd6f4") : "#585b70"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            onClicked: {
+                                var labels = {}
+                                if (classificationMultiCheck.checked) {
+                                    labels.labelType = "multi"
+                                    labels.classIds = selectedMultiClassIds
+                                } else {
+                                    labels.labelType = "single"
+                                    labels.classId = selectedClassId
+                                }
+                                annotationService.saveClassificationLabels(
+                                    canvasController.currentLabelPath,
+                                    "", "",
+                                    labels
+                                )
+                            }
+                        }
+                    }
+
+                    // Class selector grid
+                    GridView {
+                        id: classGrid
+                        Layout.fillWidth: true
+                        implicitHeight: Math.min(cellHeight * Math.ceil(taxonomyModel.rowCount / Math.max(1, Math.floor(width / cellWidth))), 200)
+                        cellWidth: 90
+                        cellHeight: 36
+                        clip: true
+                        model: taxonomyModel
+
+                        delegate: Item {
+                            width: classGrid.cellWidth
+                            height: classGrid.cellHeight
+
+                            Button {
+                                anchors.fill: parent
+                                anchors.margins: 2
+
+                                property bool isThisSelected: classificationMultiCheck.checked
+                                    ? selectedMultiClassIds.indexOf(model.classIndex) >= 0
+                                    : selectedClassId === model.classIndex
+
+                                background: Rectangle {
+                                    color: parent.isThisSelected
+                                        ? ["#f38ba8", "#a6e3a1", "#89b4fa", "#f9e2af", "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"][model.classIndex % 10]
+                                        : "#313244"
+                                    radius: 4
+                                    border.color: parent.isThisSelected
+                                        ? ["#f38ba8", "#a6e3a1", "#89b4fa", "#f9e2af", "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"][model.classIndex % 10]
+                                        : "#45475a"
+                                    border.width: parent.isThisSelected ? 2 : 1
+                                }
+
+                                contentItem: Label {
+                                    text: model.className || ("class_" + model.classIndex)
+                                    font.pixelSize: 11
+                                    color: parent.isThisSelected ? "#1e1e2e" : "#cdd6f4"
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                }
+
+                                onClicked: {
+                                    if (classificationMultiCheck.checked) {
+                                        // Multi-label toggle
+                                        var idx = selectedMultiClassIds.indexOf(model.classIndex)
+                                        var newIds = selectedMultiClassIds.slice()
+                                        if (idx >= 0) {
+                                            newIds.splice(idx, 1)
+                                        } else {
+                                            newIds.push(model.classIndex)
+                                        }
+                                        selectedMultiClassIds = newIds
+                                    } else {
+                                        // Single-label: select this class
+                                        selectedClassId = model.classIndex
+                                    }
+                                    annotationCanvas.requestPaint()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Anomaly detection panel (only visible in anomaly mode)
+            Rectangle {
+                id: anomalyPanel
+                visible: annotationMode === "anomaly"
+                anchors.bottom: statusBar.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 8
+                height: anomalyLayout.implicitHeight + 16
+                color: "#181825"
+                radius: 6
+
+                ColumnLayout {
+                    id: anomalyLayout
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 8
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 12
+
+                        Label {
+                            text: "异常检测模式"
+                            font.pixelSize: 13
+                            font.bold: true
+                            color: "#89b4fa"
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        // Normal button
+                        Button {
+                            id: normalBtn
+                            text: "Normal"
+                            font.pixelSize: 14
+                            font.bold: true
+                            highlighted: !isAnomalous
+                            Layout.preferredWidth: 120
+                            Layout.preferredHeight: 44
+
+                            background: Rectangle {
+                                color: !isAnomalous ? "#a6e3a1" : "#313244"
+                                radius: 6
+                                border.color: !isAnomalous ? "#a6e3a1" : "#45475a"
+                                border.width: !isAnomalous ? 2 : 1
+                            }
+
+                            contentItem: Label {
+                                text: parent.text
+                                font.pixelSize: 14
+                                font.bold: true
+                                color: !isAnomalous ? "#1e1e2e" : "#cdd6f4"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            onClicked: {
+                                isAnomalous = false
+                                annotationCanvas.requestPaint()
+                            }
+                        }
+
+                        // Anomalous button
+                        Button {
+                            id: anomalousBtn
+                            text: "Anomalous"
+                            font.pixelSize: 14
+                            font.bold: true
+                            highlighted: isAnomalous
+                            Layout.preferredWidth: 120
+                            Layout.preferredHeight: 44
+
+                            background: Rectangle {
+                                color: isAnomalous ? "#f38ba8" : "#313244"
+                                radius: 6
+                                border.color: isAnomalous ? "#f38ba8" : "#45475a"
+                                border.width: isAnomalous ? 2 : 1
+                            }
+
+                            contentItem: Label {
+                                text: parent.text
+                                font.pixelSize: 14
+                                font.bold: true
+                                color: isAnomalous ? "#1e1e2e" : "#cdd6f4"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            onClicked: {
+                                isAnomalous = true
+                                annotationCanvas.requestPaint()
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        // Save button
+                        Button {
+                            text: "保存"
+                            highlighted: true
+                            Layout.preferredHeight: 36
+
+                            background: Rectangle {
+                                color: parent.highlighted ? "#89b4fa" : "#313244"
+                                radius: 4
+                            }
+
+                            contentItem: Label {
+                                text: parent.text
+                                font.pixelSize: 12
+                                color: parent.highlighted ? "#1e1e2e" : "#cdd6f4"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            onClicked: {
+                                annotationService.saveAnomalyLabels(
+                                    canvasController.currentLabelPath,
+                                    "", "",
+                                    isAnomalous
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // OBB rotation control (only visible in OBB mode when an annotation is selected)
             Rectangle {
                 id: rotationPanel
-                visible: shapeMode === 1 && hasSelectedAnnotation()
+                visible: annotationMode === "detect" && shapeMode === 1 && hasSelectedAnnotation()
                 anchors.bottom: statusBar.top
                 anchors.right: parent.right
                 anchors.margins: 8
@@ -484,7 +924,7 @@ Item {
                     }
 
                     Label {
-                        text: Math.round(angleSlider.value) + "°"
+                        text: Math.round(angleSlider.value) + "\u00B0"
                         font.pixelSize: 11
                         color: "#89b4fa"
                         Layout.preferredWidth: 36
@@ -512,7 +952,7 @@ Item {
                     }
 
                     Label {
-                        text: shapeMode === 1 ? "OBB" : "HBB"
+                        text: annotationMode === "classify" ? "CLS" : (annotationMode === "anomaly" ? "AD" : (shapeMode === 1 ? "OBB" : "HBB"))
                         color: "#89b4fa"
                         font.pixelSize: 11
                     }
@@ -520,7 +960,11 @@ Item {
                     Item { Layout.fillWidth: true }
 
                     Label {
-                        text: annotationModel.count + " 个标注"
+                        text: annotationMode === "classify"
+                            ? (classificationMultiCheck.checked ? selectedMultiClassIds.length + " 个类别" : (selectedClassId >= 0 ? "class_" + selectedClassId : "未分类"))
+                            : (annotationMode === "anomaly"
+                               ? (isAnomalous ? "异常" : "正常")
+                               : (annotationModel.count + " 个标注"))
                         color: "#6c7086"
                         font.pixelSize: 11
                     }
@@ -580,7 +1024,23 @@ Item {
                         background: Rectangle { color: parent.hovered ? "#313244" : "transparent" }
 
                         onClicked: {
-                            // Set current class for drawing
+                            // In classification mode, clicking a class assigns it
+                            if (annotationMode === "classify") {
+                                if (classificationMultiCheck.checked) {
+                                    var idx = selectedMultiClassIds.indexOf(model.classIndex)
+                                    var newIds = selectedMultiClassIds.slice()
+                                    if (idx >= 0) {
+                                        newIds.splice(idx, 1)
+                                    } else {
+                                        newIds.push(model.classIndex)
+                                    }
+                                    selectedMultiClassIds = newIds
+                                } else {
+                                    selectedClassId = model.classIndex
+                                }
+                                annotationCanvas.requestPaint()
+                            }
+                            // In detect mode, set current class for drawing
                         }
                     }
                 }
@@ -589,7 +1049,7 @@ Item {
                     Layout.fillWidth: true
                     text: "删除选中"
                     font.pixelSize: 12
-                    visible: annotationModel.count > 0
+                    visible: annotationMode !== "classify" && annotationMode !== "anomaly" && annotationModel.count > 0
 
                     contentItem: Label {
                         text: parent.text
@@ -691,7 +1151,11 @@ Item {
     // Keyboard shortcuts
     Shortcut {
         sequence: "W"
-        onActivated: canvasController.drawMode = "draw"
+        onActivated: {
+            if (annotationMode !== "classify" && annotationMode !== "anomaly") {
+                canvasController.drawMode = "draw"
+            }
+        }
     }
     Shortcut {
         sequence: "Escape"
@@ -700,26 +1164,52 @@ Item {
     Shortcut {
         sequence: "Delete"
         onActivated: {
-            for (var i = annotationModel.rowCount() - 1; i >= 0; i--) {
-                var idx = annotationModel.index(i, 0)
-                if (annotationModel.data(idx, 264)) {
-                    annotationModel.removeAnnotation(i)
-                    canvasController.markDirty()
+            if (annotationMode !== "classify" && annotationMode !== "anomaly") {
+                for (var i = annotationModel.rowCount() - 1; i >= 0; i--) {
+                    var idx = annotationModel.index(i, 0)
+                    if (annotationModel.data(idx, 264)) {
+                        annotationModel.removeAnnotation(i)
+                        canvasController.markDirty()
+                    }
                 }
+                annotationCanvas.requestPaint()
             }
-            annotationCanvas.requestPaint()
         }
     }
     Shortcut {
         sequence: "Ctrl+S"
         onActivated: {
-            if (canvasController.dirty) {
-                annotationService.saveAnnotations(
+            if (annotationMode === "classify") {
+                if (classificationMultiCheck.checked ? selectedMultiClassIds.length > 0 : selectedClassId >= 0) {
+                    var labels = {}
+                    if (classificationMultiCheck.checked) {
+                        labels.labelType = "multi"
+                        labels.classIds = selectedMultiClassIds
+                    } else {
+                        labels.labelType = "single"
+                        labels.classId = selectedClassId
+                    }
+                    annotationService.saveClassificationLabels(
+                        canvasController.currentLabelPath,
+                        "", "",
+                        labels
+                    )
+                }
+            } else if (annotationMode === "anomaly") {
+                annotationService.saveAnomalyLabels(
                     canvasController.currentLabelPath,
                     "", "",
-                    annotationModel.toVariantList()
+                    isAnomalous
                 )
-                canvasController.clearDirty()
+            } else {
+                if (canvasController.dirty) {
+                    annotationService.saveAnnotations(
+                        canvasController.currentLabelPath,
+                        "", "",
+                        annotationModel.toVariantList()
+                    )
+                    canvasController.clearDirty()
+                }
             }
         }
     }

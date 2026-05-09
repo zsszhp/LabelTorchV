@@ -12,8 +12,11 @@
  * Reads/writes YOLO txt label files via YoloTxtReader/YoloTxtWriter,
  * and records annotation_revisions in the database for undo/audit.
  *
- * Supports both HBB (horizontal bounding box) and OBB (oriented bounding box)
- * formats, with the shape type controlled by setShapeType().
+ * Supports HBB (horizontal bounding box), OBB (oriented bounding box),
+ * classification (single-label and multi-label), and anomaly detection formats.
+ * The shape type for detection is controlled by setShapeType();
+ * classification uses loadClassificationLabels/saveClassificationLabels;
+ * anomaly detection uses loadAnomalyLabels/saveAnomalyLabels.
  */
 class AnnotationService : public QObject
 {
@@ -78,6 +81,71 @@ public:
      */
     Q_INVOKABLE bool saveOBBAnnotations(const QString &labelPath, const QString &datasetId,
                                          const QString &sampleId, const QVariantList &annotations);
+
+    /**
+     * @brief Load classification labels for a sample.
+     *
+     * Reads a classification label file and returns a QVariantMap with:
+     *   - labelType: "single" or "multi"
+     *   - For single-label: classId (int), className (string)
+     *   - For multi-label: classIds (QVariantList of int), classNames (QVariantList of string)
+     *
+     * Single-label files contain one line with a single integer class_id.
+     * Multi-label files contain one line with space-separated class_ids.
+     *
+     * @param labelPath  Absolute path to the .txt label file.
+     * @return QVariantMap with classification label data.
+     */
+    Q_INVOKABLE QVariantMap loadClassificationLabels(const QString &labelPath);
+
+    /**
+     * @brief Save classification labels for a sample and record a revision.
+     *
+     * For single-label: writes "class_id" to txt file.
+     * For multi-label: writes "class_id1 class_id2 ..." to txt file.
+     * Uses the same atomic write + revision pattern as saveAnnotations.
+     *
+     * @param labelPath    Destination file path.
+     * @param datasetId    Dataset ID for the revision record.
+     * @param sampleId     Sample ID for the revision record.
+     * @param labels       QVariantMap with keys:
+     *                     - labelType: "single" or "multi"
+     *                     - For single-label: classId (int)
+     *                     - For multi-label: classIds (QVariantList of int)
+     * @return true on success, false on any I/O or database error.
+     */
+    Q_INVOKABLE bool saveClassificationLabels(const QString &labelPath, const QString &datasetId,
+                                               const QString &sampleId, const QVariantMap &labels);
+
+    /**
+     * @brief Load anomaly labels for a sample.
+     *
+     * Reads an anomaly label file and returns a QVariantMap with:
+     *   - isAnomalous (bool): true if the sample is anomalous, false if normal
+     *   - anomalyType (string, optional): type of anomaly if specified
+     *
+     * Label file format: single line with "0" (normal) or "1" (anomalous).
+     * A second token on the line is treated as the anomaly type.
+     *
+     * @param labelPath  Absolute path to the .txt label file.
+     * @return QVariantMap with anomaly label data.
+     */
+    Q_INVOKABLE QVariantMap loadAnomalyLabels(const QString &labelPath);
+
+    /**
+     * @brief Save anomaly labels for a sample and record a revision.
+     *
+     * Label format: single line with "0" (normal) or "1" (anomalous).
+     * Uses the same atomic write + revision pattern as saveAnnotations.
+     *
+     * @param labelPath     Destination file path.
+     * @param datasetId     Dataset ID for the revision record.
+     * @param sampleId      Sample ID for the revision record.
+     * @param isAnomalous   Whether the sample is anomalous.
+     * @return true on success, false on any I/O or database error.
+     */
+    Q_INVOKABLE bool saveAnomalyLabels(const QString &labelPath, const QString &datasetId,
+                                        const QString &sampleId, bool isAnomalous);
 
     /**
      * @brief Set the current shape type for annotation operations.

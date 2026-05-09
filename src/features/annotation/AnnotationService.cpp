@@ -12,6 +12,10 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QDebug>
+#include <QFile>
+#include <QTextStream>
+#include <QFileInfo>
+#include <QDir>
 
 AnnotationService::AnnotationService(QObject *parent)
     : QObject(parent)
@@ -160,6 +164,272 @@ bool AnnotationService::saveOBBAnnotations(const QString &labelPath, const QStri
                                    annotations);
     if (revId.isEmpty()) {
         qWarning() << "AnnotationService: OBB file saved but revision record failed for sample:" << sampleId;
+    }
+
+    return true;
+}
+
+QVariantMap AnnotationService::loadClassificationLabels(const QString &labelPath)
+{
+    QVariantMap result;
+
+    QFile file(labelPath);
+    if (!file.exists()) {
+        result[QStringLiteral("labelType")] = QStringLiteral("single");
+        result[QStringLiteral("classId")] = -1;
+        result[QStringLiteral("className")] = QString();
+        return result;
+    }
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "AnnotationService: Failed to open classification label file:" << labelPath;
+        result[QStringLiteral("labelType")] = QStringLiteral("single");
+        result[QStringLiteral("classId")] = -1;
+        result[QStringLiteral("className")] = QString();
+        return result;
+    }
+
+    QTextStream in(&file);
+    QString line = in.readLine().trimmed();
+    file.close();
+
+    if (line.isEmpty()) {
+        result[QStringLiteral("labelType")] = QStringLiteral("single");
+        result[QStringLiteral("classId")] = -1;
+        result[QStringLiteral("className")] = QString();
+        return result;
+    }
+
+    QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+
+    if (parts.size() == 1) {
+        // Single-label classification
+        bool ok = false;
+        int classId = parts[0].toInt(&ok);
+        if (!ok) {
+            qWarning() << "AnnotationService: Invalid class_id in classification label file:" << labelPath;
+            classId = -1;
+        }
+        result[QStringLiteral("labelType")] = QStringLiteral("single");
+        result[QStringLiteral("classId")] = classId;
+        result[QStringLiteral("className")] = QString();
+    } else {
+        // Multi-label classification
+        QVariantList classIds;
+        QVariantList classNames;
+        for (const QString &part : parts) {
+            bool ok = false;
+            int classId = part.toInt(&ok);
+            if (ok) {
+                classIds.append(classId);
+                classNames.append(QString());
+            }
+        }
+        result[QStringLiteral("labelType")] = QStringLiteral("multi");
+        result[QStringLiteral("classIds")] = classIds;
+        result[QStringLiteral("classNames")] = classNames;
+    }
+
+    return result;
+}
+
+bool AnnotationService::saveClassificationLabels(const QString &labelPath, const QString &datasetId,
+                                                  const QString &sampleId, const QVariantMap &labels)
+{
+    QString labelType = labels[QStringLiteral("labelType")].toString();
+    QString content;
+
+    if (labelType == QLatin1String("multi")) {
+        // Multi-label: space-separated class_ids
+        QVariantList classIds = labels[QStringLiteral("classIds")].toList();
+        QStringList idStrings;
+        for (const QVariant &id : classIds) {
+            idStrings.append(QString::number(id.toInt()));
+        }
+        content = idStrings.join(QLatin1Char(' '));
+    } else {
+        // Single-label: single class_id
+        int classId = labels[QStringLiteral("classId")].toInt();
+        content = QString::number(classId);
+    }
+
+    // --- Atomic write: temp file + rename (same pattern as YoloTxtWriter) ---
+    QFileInfo fi(labelPath);
+    QDir dir = fi.absoluteDir();
+    if (!dir.exists()) {
+        if (!dir.mkpath(QLatin1String("."))) {
+            qWarning() << "AnnotationService: cannot create directory for classification label:" << dir.absolutePath();
+            return false;
+        }
+    }
+
+    const QString tempPath = labelPath + QStringLiteral(".tmp");
+    {
+        QFile tempFile(tempPath);
+        if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+            qWarning() << "AnnotationService: cannot open temp file for classification label:" << tempPath;
+            return false;
+        }
+
+        QTextStream out(&tempFile);
+        out << content << QLatin1Char('\n');
+        out.flush();
+        if (!tempFile.flush()) {
+            qWarning() << "AnnotationService: flush failed for classification temp file:" << tempPath;
+            QFile::remove(tempPath);
+            return false;
+        }
+    }
+
+    if (QFile::exists(labelPath)) {
+        if (!QFile::remove(labelPath)) {
+            qWarning() << "AnnotationService: cannot remove existing classification label file:" << labelPath;
+            QFile::remove(tempPath);
+            return false;
+        }
+    }
+
+    if (!QFile::rename(tempPath, labelPath)) {
+        qWarning() << "AnnotationService: cannot rename temp file to classification label:" << labelPath;
+        QFile::remove(tempPath);
+        return false;
+    }
+
+    // Record a revision
+    QVariantList afterSnapshot;
+    QVariantMap revEntry;
+    revEntry[QStringLiteral("labelType")] = labelType;
+    if (labelType == QLatin1String("multi")) {
+        revEntry[QStringLiteral("classIds")] = labels[QStringLiteral("classIds")];
+    } else {
+        revEntry[QStringLiteral("classId")] = labels[QStringLiteral("classId")];
+    }
+    afterSnapshot.append(revEntry);
+
+    QString revId = createRevision(datasetId, sampleId,
+                                   QStringLiteral("manual"),
+                                   QVariantList(),
+                                   afterSnapshot);
+    if (revId.isEmpty()) {
+        qWarning() << "AnnotationService: Classification label saved but revision record failed for sample:" << sampleId;
+    }
+
+    return true;
+}
+
+QVariantMap AnnotationService::loadAnomalyLabels(const QString &labelPath)
+{
+    QVariantMap result;
+
+    QFile file(labelPath);
+    if (!file.exists()) {
+        result[QStringLiteral("isAnomalous")] = false;
+        result[QStringLiteral("anomalyType")] = QString();
+        return result;
+    }
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "AnnotationService: Failed to open anomaly label file:" << labelPath;
+        result[QStringLiteral("isAnomalous")] = false;
+        result[QStringLiteral("anomalyType")] = QString();
+        return result;
+    }
+
+    QTextStream in(&file);
+    QString line = in.readLine().trimmed();
+    file.close();
+
+    if (line.isEmpty()) {
+        result[QStringLiteral("isAnomalous")] = false;
+        result[QStringLiteral("anomalyType")] = QString();
+        return result;
+    }
+
+    QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+
+    // First token: "0" (normal) or "1" (anomalous)
+    bool ok = false;
+    int labelValue = parts[0].toInt(&ok);
+    if (!ok) {
+        qWarning() << "AnnotationService: Invalid anomaly label in file:" << labelPath;
+        result[QStringLiteral("isAnomalous")] = false;
+        result[QStringLiteral("anomalyType")] = QString();
+        return result;
+    }
+
+    result[QStringLiteral("isAnomalous")] = (labelValue == 1);
+
+    // Second token (optional): anomaly type
+    if (parts.size() > 1) {
+        result[QStringLiteral("anomalyType")] = parts[1];
+    } else {
+        result[QStringLiteral("anomalyType")] = QString();
+    }
+
+    return result;
+}
+
+bool AnnotationService::saveAnomalyLabels(const QString &labelPath, const QString &datasetId,
+                                           const QString &sampleId, bool isAnomalous)
+{
+    // Content: "0" for normal, "1" for anomalous
+    QString content = isAnomalous ? QStringLiteral("1") : QStringLiteral("0");
+
+    // --- Atomic write: temp file + rename (same pattern as saveClassificationLabels) ---
+    QFileInfo fi(labelPath);
+    QDir dir = fi.absoluteDir();
+    if (!dir.exists()) {
+        if (!dir.mkpath(QLatin1String("."))) {
+            qWarning() << "AnnotationService: cannot create directory for anomaly label:" << dir.absolutePath();
+            return false;
+        }
+    }
+
+    const QString tempPath = labelPath + QStringLiteral(".tmp");
+    {
+        QFile tempFile(tempPath);
+        if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+            qWarning() << "AnnotationService: cannot open temp file for anomaly label:" << tempPath;
+            return false;
+        }
+
+        QTextStream out(&tempFile);
+        out << content << QLatin1Char('\n');
+        out.flush();
+        if (!tempFile.flush()) {
+            qWarning() << "AnnotationService: flush failed for anomaly temp file:" << tempPath;
+            QFile::remove(tempPath);
+            return false;
+        }
+    }
+
+    if (QFile::exists(labelPath)) {
+        if (!QFile::remove(labelPath)) {
+            qWarning() << "AnnotationService: cannot remove existing anomaly label file:" << labelPath;
+            QFile::remove(tempPath);
+            return false;
+        }
+    }
+
+    if (!QFile::rename(tempPath, labelPath)) {
+        qWarning() << "AnnotationService: cannot rename temp file to anomaly label:" << labelPath;
+        QFile::remove(tempPath);
+        return false;
+    }
+
+    // Record a revision
+    QVariantList afterSnapshot;
+    QVariantMap revEntry;
+    revEntry[QStringLiteral("labelType")] = QStringLiteral("anomaly");
+    revEntry[QStringLiteral("isAnomalous")] = isAnomalous;
+    afterSnapshot.append(revEntry);
+
+    QString revId = createRevision(datasetId, sampleId,
+                                   QStringLiteral("manual"),
+                                   QVariantList(),
+                                   afterSnapshot);
+    if (revId.isEmpty()) {
+        qWarning() << "AnnotationService: Anomaly label saved but revision record failed for sample:" << sampleId;
     }
 
     return true;

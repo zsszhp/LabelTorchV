@@ -68,7 +68,7 @@ Rectangle {
 
             ComboBox {
                 id: modelFamilyCombo
-                model: ["yolov5", "yolov8", "yolov8_obb", "yolov10", "yolov11"]
+                model: ["yolov5", "yolov8", "yolov8_obb", "yolov8_cls", "yolov10", "yolov11", "anomaly"]
                 currentIndex: 1
                 Layout.fillWidth: true
 

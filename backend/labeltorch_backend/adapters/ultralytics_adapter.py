@@ -19,8 +19,10 @@ class UltralyticsAdapter(TrainingAdapter):
         "yolov5": {"task": "detect"},
         "yolov8": {"task": "detect"},
         "yolov8_obb": {"task": "obb"},
+        "yolov8_cls": {"task": "classify"},
         "yolov10": {"task": "detect"},
         "yolov11": {"task": "detect"},
+        "anomaly": {"task": "anomaly"},
     }
 
     def __init__(self):
@@ -77,6 +79,9 @@ class UltralyticsAdapter(TrainingAdapter):
             if model_family == "yolov8_obb":
                 model_name = f"yolov8{model_variant}-obb.pt"
                 task = "obb"
+            elif model_family == "yolov8_cls":
+                model_name = f"yolov8{model_variant}-cls.pt"
+                task = "classify"
             elif model_family == "yolov5":
                 model_name = f"yolov5{model_variant}.pt"
                 task = "detect"
@@ -86,6 +91,16 @@ class UltralyticsAdapter(TrainingAdapter):
             elif model_family == "yolov11":
                 model_name = f"yolo11{model_variant}.pt"
                 task = "detect"
+            elif model_family == "anomaly":
+                # Anomaly detection uses a different paradigm (one-class / reconstruction-based)
+                # Ultralytics does not natively support anomaly detection training
+                self._status = "failed"
+                return {
+                    "status": "failed",
+                    "error": "Anomaly detection training requires a custom plugin. "
+                             "Ultralytics does not natively support anomaly detection. "
+                             "Please install an anomaly detection trainer plugin to use this feature.",
+                }
             else:
                 model_name = f"yolov8{model_variant}.pt"
                 task = "detect"
