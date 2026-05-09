@@ -28,12 +28,28 @@ public:
     Q_INVOKABLE void closeProject();
     Q_INVOKABLE QVariantMap getCurrentProject() const;
 
+    /**
+     * @brief Get the current task type for a project.
+     * Returns: "detect", "obb", "classify", or "anomaly".
+     * Defaults to "detect" if not set.
+     */
+    Q_INVOKABLE QString getTaskType(const QString &projectId);
+
+    /**
+     * @brief Set the task type for a project.
+     * @param taskType One of: "detect", "obb", "classify", "anomaly"
+     */
+    Q_INVOKABLE bool setTaskType(const QString &projectId, const QString &taskType);
+
 signals:
     void currentProjectChanged();
+    void taskTypeChanged(const QString &projectId, const QString &taskType);
 
 private:
     QString m_currentProjectId;
     TaxonomyService *m_taxonomyService = nullptr;
+
+    bool ensureTaskTypeColumn();
 };
 
 #endif

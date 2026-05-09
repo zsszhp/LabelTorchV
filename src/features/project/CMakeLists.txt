@@ -8,6 +8,7 @@ qt_add_qml_module(labeltorch_project
         qml/ProjectPage.qml
         qml/ProjectCard.qml
         qml/TaxonomyPage.qml
+        qml/TaskTypeSwitcher.qml
     SOURCES
         ProjectService.h
         ProjectService.cpp

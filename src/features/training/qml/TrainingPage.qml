@@ -19,6 +19,40 @@ Item {
         logView.clear()
     }
 
+    // Auto-select model family based on project task type
+    function applyTaskTypeToModelFamily(taskType) {
+        if (!configPanel) return
+        switch (taskType) {
+            case "detect":
+                configPanel.modelFamily = "yolov8"
+                break
+            case "obb":
+                configPanel.modelFamily = "yolov8_obb"
+                break
+            case "classify":
+                configPanel.modelFamily = "yolov8_cls"
+                break
+            case "anomaly":
+                configPanel.modelFamily = "anomaly"
+                break
+        }
+    }
+
+    // Sync with global task type changes
+    Connections {
+        target: ApplicationWindow.window
+        function onCurrentTaskTypeChanged() {
+            root.applyTaskTypeToModelFamily(ApplicationWindow.window.currentTaskType)
+        }
+    }
+
+    // On load, set initial model family from project task type
+    Component.onCompleted: {
+        if (appController.projectOpen) {
+            root.applyTaskTypeToModelFamily(projectService.getTaskType(appController.currentProjectId))
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         anchors.margins: 12

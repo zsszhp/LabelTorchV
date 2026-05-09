@@ -12,6 +12,29 @@ ApplicationWindow {
     title: "标炬 LabelTorch"
     color: "#1e1e2e"
 
+    // Global task type property - synced with project metadata
+    property string currentTaskType: "detect"
+
+    // Update task type when project changes
+    Connections {
+        target: appController
+        function onCurrentProjectIdChanged() {
+            if (appController.projectOpen) {
+                root.currentTaskType = projectService.getTaskType(appController.currentProjectId)
+            } else {
+                root.currentTaskType = "detect"
+            }
+        }
+    }
+
+    // Sync task type changes back to project
+    function onTaskTypeChanged(taskType) {
+        if (appController.projectOpen && taskType !== root.currentTaskType) {
+            root.currentTaskType = taskType
+            projectService.setTaskType(appController.currentProjectId, taskType)
+        }
+    }
+
     // 主布局：左导航 + 中央内容 + 底部日志
     RowLayout {
         anchors.fill: parent
@@ -157,6 +180,16 @@ ApplicationWindow {
                             font.pixelSize: 14
                             font.bold: true
                             color: "#cdd6f4"
+                        }
+
+                        // Task type switcher in header
+                        TaskTypeSwitcher {
+                            visible: appController.projectOpen
+                            taskType: root.currentTaskType
+                            switcherEnabled: appController.projectOpen
+                            onTaskTypeSelected: function(taskType) {
+                                root.onTaskTypeChanged(taskType)
+                            }
                         }
 
                         Item { Layout.fillWidth: true }

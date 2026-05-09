@@ -19,6 +19,45 @@ Item {
     // Anomaly detection state
     property bool isAnomalous: false
 
+    // Sync annotation mode with project task type from Main.qml
+    Connections {
+        target: ApplicationWindow.window
+        function onCurrentTaskTypeChanged() {
+            var taskType = ApplicationWindow.window.currentTaskType
+            if (taskType === "detect") {
+                root.annotationMode = "detect"
+                root.shapeMode = 0
+                annotationService.setShapeType(0)
+            } else if (taskType === "obb") {
+                root.annotationMode = "detect"
+                root.shapeMode = 1
+                annotationService.setShapeType(1)
+            } else if (taskType === "classify") {
+                root.annotationMode = "classify"
+            } else if (taskType === "anomaly") {
+                root.annotationMode = "anomaly"
+            }
+        }
+    }
+
+    // On component load, read initial task type from project
+    Component.onCompleted: {
+        if (appController.projectOpen) {
+            var taskType = projectService.getTaskType(appController.currentProjectId)
+            if (taskType === "detect") {
+                root.annotationMode = "detect"
+                root.shapeMode = 0
+            } else if (taskType === "obb") {
+                root.annotationMode = "detect"
+                root.shapeMode = 1
+            } else if (taskType === "classify") {
+                root.annotationMode = "classify"
+            } else if (taskType === "anomaly") {
+                root.annotationMode = "anomaly"
+            }
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         spacing: 0
