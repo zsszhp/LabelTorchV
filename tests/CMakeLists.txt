@@ -104,3 +104,19 @@ target_include_directories(test_training PRIVATE
     ${CMAKE_SOURCE_DIR}/src/core/ipc
 )
 add_test(NAME TrainingTest COMMAND test_training)
+
+# 模型服务测试
+add_executable(test_model
+    test_model.cpp
+)
+target_link_libraries(test_model PRIVATE
+    labeltorch_core
+    labeltorch_model
+    Qt6::Test
+    Qt6::Sql
+)
+target_include_directories(test_model PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/features/model
+    ${CMAKE_SOURCE_DIR}/src/core/database
+)
+add_test(NAME ModelTest COMMAND test_model)

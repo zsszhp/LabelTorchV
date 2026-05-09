@@ -22,6 +22,9 @@
 #include "SnapshotModel.h"
 #include "TrainingService.h"
 #include "TrainingModel.h"
+#include "ModelRegistry.h"
+#include "MetricService.h"
+#include "ModelVersionModel.h"
 #include "Database.h"
 
 int main(int argc, char *argv[])
@@ -56,6 +59,9 @@ int main(int argc, char *argv[])
     SnapshotModel snapshotModel;
     TrainingService trainingService;
     TrainingModel trainingModel;
+    ModelRegistry modelRegistry;
+    MetricService metricService;
+    ModelVersionModel modelVersionModel;
 
     // 启动Python后端（如果可用）
     QString pythonExec = "F:/A/anaconda/envs/labeltorch/python.exe";
@@ -85,6 +91,9 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("snapshotModel", &snapshotModel);
     engine.rootContext()->setContextProperty("trainingService", &trainingService);
     engine.rootContext()->setContextProperty("trainingModel", &trainingModel);
+    engine.rootContext()->setContextProperty("modelRegistry", &modelRegistry);
+    engine.rootContext()->setContextProperty("metricService", &metricService);
+    engine.rootContext()->setContextProperty("modelVersionModel", &modelVersionModel);
 
     // 加载主窗口
     const QUrl url(u"qrc:/LabelTorch/Shell/qml/Main.qml"_qs);

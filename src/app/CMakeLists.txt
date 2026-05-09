@@ -27,6 +27,7 @@ target_include_directories(labeltorch PRIVATE
     ${CMAKE_SOURCE_DIR}/src/features/annotation
     ${CMAKE_SOURCE_DIR}/src/features/annotation/canvas
     ${CMAKE_SOURCE_DIR}/src/features/training
+    ${CMAKE_SOURCE_DIR}/src/features/model
     ${CMAKE_SOURCE_DIR}/src/core/database
     ${CMAKE_SOURCE_DIR}/src/core/utils
 )
