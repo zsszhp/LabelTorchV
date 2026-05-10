@@ -556,13 +556,15 @@ bool ClassMappingService::remapLabelFile(const QString &filePath, const QMap<int
 
     file.close();
 
-    // Write the remapped content back
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-        qWarning() << "ClassMappingService::remapLabelFile: cannot write file:" << filePath;
+    // Write the remapped content to a temp file first, then rename (atomic write)
+    QString tempPath = filePath + QStringLiteral(".tmp");
+    QFile tempFile(tempPath);
+    if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+        qWarning() << "ClassMappingService::remapLabelFile: cannot write temp file:" << tempPath;
         return false;
     }
 
-    QTextStream out(&file);
+    QTextStream out(&tempFile);
     for (int i = 0; i < outputLines.size(); ++i) {
         out << outputLines[i];
         if (i < outputLines.size() - 1) {
@@ -570,7 +572,16 @@ bool ClassMappingService::remapLabelFile(const QString &filePath, const QMap<int
         }
     }
     out.flush();
-    file.close();
+    tempFile.close();
+
+    // Remove original and rename temp to original
+    QFile::remove(filePath);
+    if (!QFile::rename(tempPath, filePath)) {
+        qWarning() << "ClassMappingService::remapLabelFile: failed to rename temp file to:" << filePath;
+        // Try to restore from temp if rename failed
+        QFile::rename(tempPath, filePath);
+        return false;
+    }
 
     return true;
 }

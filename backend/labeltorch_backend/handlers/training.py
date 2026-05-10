@@ -29,7 +29,8 @@ async def handle_start(payload: dict) -> dict:
 
     register_builtin_adapters()  # Ensure built-ins are registered
 
-    task_id = payload.get("task_id", "unknown")
+    # C++ frontend sends "run_id", accept both keys for compatibility
+    task_id = payload.get("run_id", payload.get("task_id", "unknown"))
     config = payload.get("config", {})
     adapter_name = config.get("adapter", "ultralytics")
 
@@ -59,7 +60,7 @@ async def _run_training(task_id: str, adapter, config: dict):
 
 async def handle_stop(payload: dict) -> dict:
     """停止训练任务"""
-    task_id = payload.get("task_id", "")
+    task_id = payload.get("run_id", payload.get("task_id", ""))
     adapter = _active_tasks.get(task_id)
     if adapter:
         adapter.stop_training()
@@ -69,7 +70,7 @@ async def handle_stop(payload: dict) -> dict:
 
 async def handle_status(payload: dict) -> dict:
     """查询训练状态"""
-    task_id = payload.get("task_id", "")
+    task_id = payload.get("run_id", payload.get("task_id", ""))
     adapter = _active_tasks.get(task_id)
     if adapter:
         return adapter.get_status()

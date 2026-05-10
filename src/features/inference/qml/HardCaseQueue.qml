@@ -239,9 +239,9 @@ Item {
                     radius: 6
                     color: delegateMouseArea.containsMouse ? "#313244" : "#252536"
                     border.color: Qt.rgba(
-                        parseFloat(getPriorityColor(model.reason).substring(1, 3)) / 255,
-                        parseFloat(getPriorityColor(model.reason).substring(3, 5)) / 255,
-                        parseFloat(getPriorityColor(model.reason).substring(5, 7)) / 255,
+                        parseInt(getPriorityColor(model.reason).substring(1, 3), 16) / 255,
+                        parseInt(getPriorityColor(model.reason).substring(3, 5), 16) / 255,
+                        parseInt(getPriorityColor(model.reason).substring(5, 7), 16) / 255,
                         0.3
                     )
                     border.width: 1
@@ -274,9 +274,9 @@ Item {
                             width: reasonLabel.implicitWidth + 12
                             radius: 4
                             color: Qt.rgba(
-                                parseFloat(getPriorityColor(model.reason).substring(1, 3)) / 255,
-                                parseFloat(getPriorityColor(model.reason).substring(3, 5)) / 255,
-                                parseFloat(getPriorityColor(model.reason).substring(5, 7)) / 255,
+                                parseInt(getPriorityColor(model.reason).substring(1, 3), 16) / 255,
+                                parseInt(getPriorityColor(model.reason).substring(3, 5), 16) / 255,
+                                parseInt(getPriorityColor(model.reason).substring(5, 7), 16) / 255,
                                 0.15
                             )
                             border.color: getPriorityColor(model.reason)

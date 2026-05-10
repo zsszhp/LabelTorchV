@@ -63,7 +63,7 @@ class UltralyticsAdapter(TrainingAdapter):
         model_variant = config.get("model_variant", "n")  # n/s/m/l/x
         data_yaml = config.get("data_yaml", "")
         epochs = config.get("epochs", 100)
-        imgsz = config.get("imgsz", 640)
+        imgsz = config.get("imgsz", config.get("img_size", 640))
         batch = config.get("batch", 16)
         device = config.get("device", "cpu")
         patience = config.get("patience", 50)
