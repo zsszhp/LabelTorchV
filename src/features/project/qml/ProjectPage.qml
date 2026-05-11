@@ -143,14 +143,16 @@ Item {
         onAccepted: {
             if (projectNameField.text && projectPathField.text) {
                 var pid = projectService.createProject(projectNameField.text, projectPathField.text)
-                projectModel.refresh()
                 if (pid) {
+                    projectModel.refresh()
                     projectService.openProject(pid)
                     appController.openProject(pid, projectNameField.text)
                     var taxonomies = taxonomyService.listTaxonomies(pid)
                     if (taxonomies.length > 0) {
                         taxonomyModel.taxonomyId = taxonomies[0].id
                     }
+                } else {
+                    projectModel.refresh()
                 }
                 projectNameField.clear()
                 projectPathField.clear()
@@ -158,10 +160,15 @@ Item {
         }
     }
 
-    FolderDialog {
+    FileDialog {
         id: folderDialog
-        onSelectedFolderChanged: {
-            projectPathField.text = selectedFolder
+        title: "选择项目目录"
+        currentFolder: "file:///C:/"
+        onAccepted: {
+            var path = folderDialog.selectedFile.toString()
+            if (path.startsWith("file:///")) path = path.substring(8)
+            else if (path.startsWith("file://")) path = path.substring(7)
+            projectPathField.text = decodeURIComponent(path)
         }
     }
 }

@@ -8,6 +8,7 @@ add_library(labeltorch_core STATIC
     ipc/IpcClient.cpp
     ipc/IpcProtocol.cpp
     cache/ThumbnailCache.cpp
+    utils/Log.cpp
 )
 
 target_include_directories(labeltorch_core PUBLIC

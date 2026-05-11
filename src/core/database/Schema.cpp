@@ -1,7 +1,10 @@
 #include "Schema.h"
+#include "utils/Log.h"
 
 QStringList Schema::createTableStatements()
 {
+    ltTrace(LT_LOG_DB()) << "Generating create table statements";
+
     return {
         // 项目表
         "CREATE TABLE IF NOT EXISTS projects ("

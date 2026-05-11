@@ -4,6 +4,7 @@
 .opencode
 .comate
 
+.vs
 # Reference projects (large repos, cloned locally)
 reference/*/
 !reference/README.md

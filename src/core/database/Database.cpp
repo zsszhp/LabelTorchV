@@ -1,8 +1,8 @@
 #include "Database.h"
 #include "Schema.h"
+#include "utils/Log.h"
 #include <QSqlQuery>
 #include <QSqlError>
-#include <QDebug>
 #include <QFileInfo>
 
 Database &Database::instance()
@@ -23,12 +23,14 @@ Database::~Database()
 
 bool Database::open(const QString &dbPath)
 {
+    ltTrace(LT_LOG_DB()) << "Opening database at" << dbPath;
+
     m_dbPath = dbPath;
     m_db = QSqlDatabase::addDatabase("QSQLITE", "labeltorch");
     m_db.setDatabaseName(dbPath);
 
     if (!m_db.open()) {
-        qWarning() << "Failed to open database:" << dbPath << m_db.lastError().text();
+        ltError(LT_LOG_DB()) << "Failed to open database:" << dbPath << m_db.lastError().text();
         return false;
     }
 
@@ -37,7 +39,7 @@ bool Database::open(const QString &dbPath)
     query.exec("PRAGMA journal_mode=WAL");
     query.exec("PRAGMA foreign_keys=ON");
 
-    qDebug() << "Database opened:" << dbPath;
+    ltInfo(LT_LOG_DB()) << "Database opened:" << dbPath;
     return true;
 }
 
@@ -45,7 +47,7 @@ void Database::close()
 {
     if (m_db.isOpen()) {
         m_db.close();
-        qDebug() << "Database closed:" << m_dbPath;
+        ltInfo(LT_LOG_DB()) << "Database closed:" << m_dbPath;
     }
 }
 
@@ -56,10 +58,15 @@ bool Database::isOpen() const
 
 bool Database::initializeSchema()
 {
-    if (!m_db.isOpen()) return false;
+    ltTrace(LT_LOG_DB()) << "Initializing schema";
+
+    if (!m_db.isOpen()) {
+        ltError(LT_LOG_DB()) << "Cannot initialize schema: database not open";
+        return false;
+    }
 
     int version = currentSchemaVersion();
-    qDebug() << "Current schema version:" << version;
+    ltDebug(LT_LOG_DB()) << "Current schema version:" << version;
 
     if (version == 0) {
         return createTables();
@@ -70,6 +77,7 @@ bool Database::initializeSchema()
 
 bool Database::migrate()
 {
+    ltTrace(LT_LOG_DB()) << "Running migrations";
     // 迁移机制：后续版本通过增量SQL执行迁移
     // 当前版本为1，无需迁移
     return true;
@@ -82,13 +90,15 @@ QSqlDatabase Database::database() const
 
 bool Database::createTables()
 {
+    ltTrace(LT_LOG_DB()) << "Creating tables";
+
     QSqlQuery query(m_db);
 
     // 创建schema_version表
     if (!query.exec("CREATE TABLE IF NOT EXISTS schema_version ("
                      "version INTEGER PRIMARY KEY"
                      ")")) {
-        qWarning() << "Failed to create schema_version table:" << query.lastError().text();
+        ltError(LT_LOG_DB()) << "Failed to create schema_version table:" << query.lastError().text();
         return false;
     }
 
@@ -96,14 +106,14 @@ bool Database::createTables()
     const auto &statements = Schema::createTableStatements();
     for (const auto &sql : statements) {
         if (!query.exec(sql)) {
-            qWarning() << "Failed to execute:" << sql << query.lastError().text();
+            ltError(LT_LOG_DB()) << "Failed to execute DDL:" << query.lastError().text();
             return false;
         }
     }
 
     // 记录当前schema版本
     query.exec("INSERT INTO schema_version (version) VALUES (1)");
-    qDebug() << "Schema initialized successfully";
+    ltInfo(LT_LOG_DB()) << "Schema initialized successfully";
     return true;
 }
 

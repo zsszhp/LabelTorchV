@@ -29,6 +29,7 @@
 #include "AssistedLabelService.h"
 #include "ExportService.h"
 #include "Database.h"
+#include "utils/Log.h"
 
 int main(int argc, char *argv[])
 {
@@ -37,6 +38,11 @@ int main(int argc, char *argv[])
     app.setApplicationName("LabelTorch");
     app.setApplicationVersion("0.1.0");
 
+    // 初始化日志系统（最先执行）
+    Log::init();
+    ltInfo(LT_LOG_APP()) << "Application starting" << "version" << app.applicationVersion()
+                         << "Qt" << QT_VERSION_STR;
+
     QQuickStyle::setStyle("Basic");
 
     // 初始化数据库（应用级，存储在AppData）
@@ -44,6 +50,7 @@ int main(int argc, char *argv[])
     QDir().mkpath(dbPath);
     Database::instance().open(dbPath + "/labeltorch.db");
     Database::instance().initializeSchema();
+    ltInfo(LT_LOG_DB()) << "Database initialized at" << dbPath + "/labeltorch.db";
 
     // 初始化服务
     AppController controller;
@@ -73,6 +80,7 @@ int main(int argc, char *argv[])
     QString pythonExec = "F:/A/anaconda/envs/labeltorch/python.exe";
     QString serverScript = "F:/project/my/LabelTorchV/backend/labeltorch_backend/__main__.py";
     ipcClient.startBackend(pythonExec, serverScript);
+    ltInfo(LT_LOG_IPC()) << "Python backend start requested" << pythonExec;
 
     // 注入依赖
     projectService.setTaxonomyService(&taxonomyService);
@@ -111,11 +119,17 @@ int main(int argc, char *argv[])
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
                      &app, [url](QObject *obj, const QUrl &objUrl) {
-        if (!obj && url == objUrl)
+        if (!obj && url == objUrl) {
+            ltError(LT_LOG_APP()) << "Failed to load Main.qml";
             QCoreApplication::exit(-1);
+        }
     }, Qt::QueuedConnection);
 
+    ltInfo(LT_LOG_APP()) << "Loading main QML";
     engine.load(url);
 
-    return app.exec();
+    int ret = app.exec();
+    ltInfo(LT_LOG_APP()) << "Application exiting with code" << ret;
+    Log::shutdown();
+    return ret;
 }

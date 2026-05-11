@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QProcess>
 #include <QJsonObject>
+#include <QTimer>
 
 /**
  * @brief IPC客户端
@@ -45,6 +46,8 @@ private:
     bool m_connected = false;
     QString m_requestIdPrefix;
     int m_requestCounter = 0;
+    QTimer *m_heartbeatTimer = nullptr;
+    bool m_heartbeatPending = false;
 };
 
 #endif // IPCCLIENT_H

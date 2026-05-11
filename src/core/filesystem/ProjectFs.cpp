@@ -1,14 +1,16 @@
 #include "ProjectFs.h"
+#include "utils/Log.h"
 #include <QDir>
-#include <QDebug>
 
 ProjectFs::ProjectFs(QObject *parent) : QObject(parent) {}
 
 bool ProjectFs::createProjectDirs(const QString &rootPath)
 {
+    ltTrace(LT_LOG_FS()) << "createProjectDirs rootPath=" << rootPath;
+
     QDir dir(rootPath);
     if (!dir.exists() && !dir.mkpath(".")) {
-        qWarning() << "Failed to create project root:" << rootPath;
+        ltError(LT_LOG_FS()) << "Failed to create project root:" << rootPath;
         return false;
     }
 
@@ -22,18 +24,20 @@ bool ProjectFs::createProjectDirs(const QString &rootPath)
 
     for (const auto &sub : subDirs) {
         if (!dir.mkpath(sub)) {
-            qWarning() << "Failed to create directory:" << sub;
+            ltError(LT_LOG_FS()) << "Failed to create subdirectory:" << sub << "under" << rootPath;
             return false;
         }
     }
 
-    qDebug() << "Project directories created:" << rootPath;
+    ltInfo(LT_LOG_FS()) << "Project directories created:" << rootPath;
     return true;
 }
 
 bool ProjectFs::validateProjectDir(const QString &rootPath)
 {
-    return QDir(rootPath).exists() && QFileInfo(rootPath + "/project.json").exists();
+    bool valid = QDir(rootPath).exists() && QFileInfo(rootPath + "/project.json").exists();
+    ltTrace(LT_LOG_FS()) << "validateProjectDir rootPath=" << rootPath << "valid=" << valid;
+    return valid;
 }
 
 QString ProjectFs::dataDir(const QString &rootPath) { return rootPath + "/data"; }
