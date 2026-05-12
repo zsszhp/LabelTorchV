@@ -1,16 +1,21 @@
 #include "ImportScanner.h"
+#include "utils/Log.h"
 
 #include <QDir>
 #include <QFileInfo>
 #include <QFile>
 #include <QTextStream>
 #include <QMap>
-#include <QDebug>
 
-ImportScanner::ImportScanner(QObject *parent) : QObject(parent) {}
+ImportScanner::ImportScanner(QObject *parent) : QObject(parent)
+{
+    ltTrace(LT_LOG_DATASET()) << "ImportScanner parent=" << parent;
+}
 
 QVariantMap ImportScanner::scan(const QString &imageDir, const QString &labelDir)
 {
+    ltTrace(LT_LOG_DATASET()) << "scan imageDir=" << imageDir << "labelDir=" << labelDir;
+
     QVariantMap result;
     QVariantList samples;
 
@@ -18,7 +23,7 @@ QVariantMap ImportScanner::scan(const QString &imageDir, const QString &labelDir
     QDir lblDir(labelDir);
 
     if (!imgDir.exists()) {
-        qWarning() << "ImportScanner: Image directory does not exist:" << imageDir;
+        ltError(LT_LOG_DATASET()) << "Image directory does not exist:" << imageDir;
         result["total"] = 0;
         result["matched"] = 0;
         result["unmatchedImages"] = 0;
@@ -30,7 +35,7 @@ QVariantMap ImportScanner::scan(const QString &imageDir, const QString &labelDir
     }
 
     if (!lblDir.exists()) {
-        qWarning() << "ImportScanner: Label directory does not exist:" << labelDir;
+        ltError(LT_LOG_DATASET()) << "Label directory does not exist:" << labelDir;
         result["total"] = 0;
         result["matched"] = 0;
         result["unmatchedImages"] = 0;
@@ -40,6 +45,8 @@ QVariantMap ImportScanner::scan(const QString &imageDir, const QString &labelDir
         emit scanCompleted();
         return result;
     }
+
+    ltInfo(LT_LOG_DATASET()) << "Scan start: imageDir=" << imageDir << "labelDir=" << labelDir;
 
     // Collect image files by stem
     QFileInfoList imageFiles = imgDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
@@ -129,9 +136,9 @@ QVariantMap ImportScanner::scan(const QString &imageDir, const QString &labelDir
     result["unmatchedLabels"] = unmatchedLabels;
     result["samples"] = samples;
 
-    qDebug() << "ImportScanner: Scan completed - matched:" << matched
-             << "unmatched images:" << unmatchedImages
-             << "unmatched labels:" << unmatchedLabels;
+    ltInfo(LT_LOG_DATASET()) << "Scan completed - matched:" << matched
+                             << "unmatched images:" << unmatchedImages
+                             << "unmatched labels:" << unmatchedLabels;
 
     emit scanCompleted();
     return result;
@@ -139,9 +146,12 @@ QVariantMap ImportScanner::scan(const QString &imageDir, const QString &labelDir
 
 bool ImportScanner::parseLabelFile(const QString &filePath, QSet<int> &classIds, QStringList &errors)
 {
+    ltTrace(LT_LOG_DATASET()) << "parseLabelFile filePath=" << filePath;
+
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         errors.append(QStringLiteral("Cannot open file"));
+        ltWarning(LT_LOG_DATASET()) << "parseLabelFile: cannot open file:" << filePath;
         return false;
     }
 
@@ -192,11 +202,15 @@ bool ImportScanner::parseLabelFile(const QString &filePath, QSet<int> &classIds,
         }
     }
 
+    ltDebug(LT_LOG_DATASET()) << "parseLabelFile: filePath=" << filePath
+                              << "valid=" << allValid << "classIds=" << classIds.size();
     return allValid;
 }
 
 QVariantMap ImportScanner::validateOBBLine(const QString &line)
 {
+    ltTrace(LT_LOG_DATASET()) << "validateOBBLine line=" << line.left(50);
+
     QVariantMap result;
     result["valid"] = false;
     result["error"] = QString();
@@ -238,6 +252,8 @@ QVariantMap ImportScanner::validateOBBLine(const QString &line)
 
 bool ImportScanner::isImageFile(const QString &fileName)
 {
+    ltTrace(LT_LOG_DATASET()) << "isImageFile fileName=" << fileName;
+
     QString ext = QFileInfo(fileName).suffix().toLower();
     return ext == QStringLiteral("jpg")
         || ext == QStringLiteral("jpeg")
@@ -247,5 +263,7 @@ bool ImportScanner::isImageFile(const QString &fileName)
 
 bool ImportScanner::isLabelFile(const QString &fileName)
 {
+    ltTrace(LT_LOG_DATASET()) << "isLabelFile fileName=" << fileName;
+
     return QFileInfo(fileName).suffix().toLower() == QStringLiteral("txt");
 }

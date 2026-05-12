@@ -3,17 +3,23 @@
 #include "database/Database.h"
 #include "filesystem/ProjectFs.h"
 #include "utils/Id.h"
+#include "utils/Log.h"
 #include <QSqlQuery>
 #include <QSqlError>
-#include <QDebug>
 
 ProjectService::ProjectService(QObject *parent) : QObject(parent) {}
 
 QString ProjectService::createProject(const QString &name, const QString &rootPath)
 {
-    QString projectId = Id::generate();
+    ltTrace(LT_LOG_PROJECT()) << "createProject name=" << name << "path=" << rootPath;
 
-    if (!ProjectFs::createProjectDirs(rootPath)) return {};
+    QString projectId = Id::generate();
+    ltTrace(LT_LOG_PROJECT()) << "Generated project ID:" << projectId;
+
+    if (!ProjectFs::createProjectDirs(rootPath)) {
+        ltError(LT_LOG_PROJECT()) << "Failed to create project directories:" << rootPath;
+        return {};
+    }
 
     QSqlQuery query(Database::instance().database());
     query.prepare("INSERT INTO projects (id, name, root_path) VALUES (?, ?, ?)");
@@ -22,7 +28,7 @@ QString ProjectService::createProject(const QString &name, const QString &rootPa
     query.addBindValue(rootPath);
 
     if (!query.exec()) {
-        qWarning() << "Failed to create project:" << query.lastError().text();
+        ltError(LT_LOG_PROJECT()) << "Failed to create project:" << query.lastError().text();
         return {};
     }
 
@@ -31,12 +37,14 @@ QString ProjectService::createProject(const QString &name, const QString &rootPa
         m_taxonomyService->createTaxonomy(projectId, "默认类别体系", {});
     }
 
-    qDebug() << "Project created:" << projectId << name;
+    ltInfo(LT_LOG_PROJECT()) << "Project created:" << projectId << name << "at" << rootPath;
     return projectId;
 }
 
 QVariantList ProjectService::listProjects()
 {
+    ltTrace(LT_LOG_PROJECT()) << "listProjects";
+
     QVariantList projects;
     QSqlQuery query(Database::instance().database());
     query.exec("SELECT id, name, root_path, created_at FROM projects ORDER BY updated_at DESC");
@@ -49,38 +57,59 @@ QVariantList ProjectService::listProjects()
         p["createdAt"] = query.value(3);
         projects.append(p);
     }
+
+    ltDebug(LT_LOG_PROJECT()) << "Listed" << projects.size() << "projects";
     return projects;
 }
 
 bool ProjectService::deleteProject(const QString &projectId)
 {
+    ltTrace(LT_LOG_PROJECT()) << "deleteProject id=" << projectId;
+
     QSqlQuery query(Database::instance().database());
     query.prepare("DELETE FROM projects WHERE id = ?");
     query.addBindValue(projectId);
-    return query.exec();
+    bool ok = query.exec();
+
+    if (ok) {
+        ltInfo(LT_LOG_PROJECT()) << "Project deleted:" << projectId;
+    } else {
+        ltError(LT_LOG_PROJECT()) << "Failed to delete project:" << query.lastError().text();
+    }
+    return ok;
 }
 
 bool ProjectService::openProject(const QString &projectId)
 {
+    ltTrace(LT_LOG_PROJECT()) << "openProject id=" << projectId;
+
     QSqlQuery query(Database::instance().database());
     query.prepare("SELECT id FROM projects WHERE id = ?");
     query.addBindValue(projectId);
     if (query.exec() && query.next()) {
         m_currentProjectId = projectId;
         emit currentProjectChanged();
+        ltInfo(LT_LOG_PROJECT()) << "Project opened:" << projectId;
         return true;
     }
+
+    ltWarning(LT_LOG_PROJECT()) << "Project not found:" << projectId;
     return false;
 }
 
 void ProjectService::closeProject()
 {
+    ltTrace(LT_LOG_PROJECT()) << "closeProject";
+
     m_currentProjectId.clear();
     emit currentProjectChanged();
+    ltInfo(LT_LOG_PROJECT()) << "Project closed";
 }
 
 QVariantMap ProjectService::getCurrentProject() const
 {
+    ltTrace(LT_LOG_PROJECT()) << "getCurrentProject";
+
     if (m_currentProjectId.isEmpty()) return {};
 
     QSqlQuery query(Database::instance().database());
@@ -103,22 +132,26 @@ QVariantMap ProjectService::getCurrentProject() const
 
 bool ProjectService::ensureTaskTypeColumn()
 {
+    ltTrace(LT_LOG_PROJECT()) << "ensureTaskTypeColumn";
+
     QSqlQuery query(Database::instance().database());
     query.exec("SELECT task_type FROM projects LIMIT 0");
     if (query.lastError().isValid()) {
         // Column does not exist, add it via ALTER TABLE
         QSqlQuery alterQuery(Database::instance().database());
         if (!alterQuery.exec("ALTER TABLE projects ADD COLUMN task_type TEXT DEFAULT 'detect'")) {
-            qWarning() << "Failed to add task_type column:" << alterQuery.lastError().text();
+            ltError(LT_LOG_PROJECT()) << "Failed to add task_type column:" << alterQuery.lastError().text();
             return false;
         }
-        qDebug() << "Added task_type column to projects table";
+        ltInfo(LT_LOG_PROJECT()) << "Added task_type column to projects table";
     }
     return true;
 }
 
 QString ProjectService::getTaskType(const QString &projectId)
 {
+    ltTrace(LT_LOG_PROJECT()) << "getTaskType projectId=" << projectId;
+
     if (projectId.isEmpty()) return QStringLiteral("detect");
 
     // Ensure the task_type column exists
@@ -136,11 +169,13 @@ QString ProjectService::getTaskType(const QString &projectId)
 
 bool ProjectService::setTaskType(const QString &projectId, const QString &taskType)
 {
+    ltTrace(LT_LOG_PROJECT()) << "setTaskType projectId=" << projectId << "taskType=" << taskType;
+
     if (projectId.isEmpty()) return false;
 
     // Validate task type
     if (taskType != "detect" && taskType != "obb" && taskType != "classify" && taskType != "anomaly") {
-        qWarning() << "Invalid task type:" << taskType;
+        ltWarning(LT_LOG_PROJECT()) << "Invalid task type:" << taskType;
         return false;
     }
 
@@ -154,10 +189,10 @@ bool ProjectService::setTaskType(const QString &projectId, const QString &taskTy
 
     if (query.exec()) {
         emit taskTypeChanged(projectId, taskType);
-        qDebug() << "Task type set:" << projectId << taskType;
+        ltInfo(LT_LOG_PROJECT()) << "Task type set:" << projectId << taskType;
         return true;
     }
 
-    qWarning() << "Failed to set task type:" << query.lastError().text();
+    ltError(LT_LOG_PROJECT()) << "Failed to set task type:" << query.lastError().text();
     return false;
 }

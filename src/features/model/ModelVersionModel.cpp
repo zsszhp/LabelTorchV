@@ -1,16 +1,25 @@
 #include "ModelVersionModel.h"
 #include "Database.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QJsonDocument>
 #include <QJsonObject>
 
-ModelVersionModel::ModelVersionModel(QObject *parent) : QAbstractListModel(parent) {}
+ModelVersionModel::ModelVersionModel(QObject *parent) : QAbstractListModel(parent)
+{
+    ltTrace(LT_LOG_MODEL()) << "parent=" << parent;
+}
 
-int ModelVersionModel::rowCount(const QModelIndex &) const { return m_versions.size(); }
+int ModelVersionModel::rowCount(const QModelIndex &) const
+{
+    return m_versions.size();
+}
 
 QVariant ModelVersionModel::data(const QModelIndex &index, int role) const
 {
+    ltTrace(LT_LOG_MODEL()) << "row=" << index.row() << "role=" << role;
+
     if (!index.isValid() || index.row() < 0 || index.row() >= m_versions.size())
         return {};
 
@@ -43,12 +52,15 @@ QHash<int, QByteArray> ModelVersionModel::roleNames() const
 
 void ModelVersionModel::setProjectId(const QString &projectId)
 {
+    ltTrace(LT_LOG_MODEL()) << "projectId=" << projectId;
     m_projectId = projectId;
     refresh();
 }
 
 void ModelVersionModel::refresh()
 {
+    ltTrace(LT_LOG_MODEL()) << "projectId=" << m_projectId;
+
     beginResetModel();
     m_versions.clear();
 
@@ -88,6 +100,11 @@ void ModelVersionModel::refresh()
 
     endResetModel();
     emit countChanged();
+
+    ltDebug(LT_LOG_MODEL()) << "Refreshed" << m_versions.size() << "model versions for project:" << m_projectId;
 }
 
-int ModelVersionModel::count() const { return m_versions.size(); }
+int ModelVersionModel::count() const
+{
+    return m_versions.size();
+}

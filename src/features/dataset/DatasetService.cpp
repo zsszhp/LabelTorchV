@@ -2,13 +2,13 @@
 #include "ImportScanner.h"
 #include "database/Database.h"
 #include "utils/Id.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QSet>
-#include <QDebug>
 #include <QFile>
 #include <QTextStream>
 #include <algorithm>
@@ -18,15 +18,21 @@ DatasetService::DatasetService(QObject *parent)
     : QObject(parent)
     , m_scanner(new ImportScanner(this))
 {
+    ltTrace(LT_LOG_DATASET()) << "DatasetService parent=" << parent;
 }
 
 QString DatasetService::importDataset(const QString &projectId, const QString &name,
                                       const QString &imageDir, const QString &labelDir)
 {
+    ltTrace(LT_LOG_DATASET()) << "importDataset projectId=" << projectId << "name=" << name
+                              << "imageDir=" << imageDir << "labelDir=" << labelDir;
+
     if (projectId.isEmpty() || name.isEmpty() || imageDir.isEmpty() || labelDir.isEmpty()) {
-        qWarning() << "DatasetService::importDataset: missing required parameters";
+        ltWarning(LT_LOG_DATASET()) << "importDataset: missing required parameters";
         return {};
     }
+
+    ltInfo(LT_LOG_DATASET()) << "Import start: name=" << name << "imageDir=" << imageDir << "labelDir=" << labelDir;
 
     // Step 1: Create the dataset record with 'scanning' status
     QString datasetId = Id::generate();
@@ -41,17 +47,17 @@ QString DatasetService::importDataset(const QString &projectId, const QString &n
     query.addBindValue(labelDir);
 
     if (!query.exec()) {
-        qWarning() << "DatasetService: Failed to create dataset record:" << query.lastError().text();
+        ltError(LT_LOG_DATASET()) << "Failed to create dataset record:" << query.lastError().text();
         return {};
     }
 
-    qDebug() << "DatasetService: Dataset record created:" << datasetId << name << "- scanning...";
+    ltDebug(LT_LOG_DATASET()) << "Dataset record created:" << datasetId << name << "- scanning...";
 
     // Step 2: Run the scan
     QVariantMap scanResult = m_scanner->scan(imageDir, labelDir);
 
     if (scanResult.contains("error")) {
-        qWarning() << "DatasetService: Scan failed:" << scanResult["error"].toString();
+        ltError(LT_LOG_DATASET()) << "Scan failed:" << scanResult["error"].toString();
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return {};
     }
@@ -71,21 +77,21 @@ QString DatasetService::importDataset(const QString &projectId, const QString &n
 
     // Step 3: Update status to 'importing'
     if (!updateImportStatus(datasetId, QStringLiteral("importing"))) {
-        qWarning() << "DatasetService: Failed to update status to importing";
+        ltError(LT_LOG_DATASET()) << "Failed to update status to importing";
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return {};
     }
 
     // Step 4: Insert matched samples
     if (!insertSamples(datasetId, matchedSamples)) {
-        qWarning() << "DatasetService: Failed to insert samples";
+        ltError(LT_LOG_DATASET()) << "Failed to insert samples";
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return {};
     }
 
     // Step 5: Extract and store class schema
     if (!extractAndStoreSchema(datasetId, matchedSamples)) {
-        qWarning() << "DatasetService: Failed to extract class schema";
+        ltError(LT_LOG_DATASET()) << "Failed to extract class schema";
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return {};
     }
@@ -97,18 +103,20 @@ QString DatasetService::importDataset(const QString &projectId, const QString &n
     updateQuery.addBindValue(datasetId);
 
     if (!updateQuery.exec()) {
-        qWarning() << "DatasetService: Failed to finalize dataset:" << updateQuery.lastError().text();
+        ltError(LT_LOG_DATASET()) << "Failed to finalize dataset:" << updateQuery.lastError().text();
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return {};
     }
 
-    qDebug() << "DatasetService: Import completed:" << datasetId
-             << "with" << matchedSamples.size() << "samples";
+    ltInfo(LT_LOG_DATASET()) << "Import completed:" << datasetId
+                             << "with" << matchedSamples.size() << "samples";
     return datasetId;
 }
 
 QVariantList DatasetService::listDatasets(const QString &projectId)
 {
+    ltTrace(LT_LOG_DATASET()) << "listDatasets projectId=" << projectId;
+
     QVariantList result;
     QSqlQuery query(Database::instance().database());
     query.prepare("SELECT id, project_id, name, image_root, label_root, format, "
@@ -117,7 +125,7 @@ QVariantList DatasetService::listDatasets(const QString &projectId)
     query.addBindValue(projectId);
 
     if (!query.exec()) {
-        qWarning() << "DatasetService::listDatasets failed:" << query.lastError().text();
+        ltError(LT_LOG_DATASET()) << "listDatasets failed:" << query.lastError().text();
         return result;
     }
 
@@ -134,11 +142,15 @@ QVariantList DatasetService::listDatasets(const QString &projectId)
         d["createdAt"] = query.value(8);
         result.append(d);
     }
+
+    ltDebug(LT_LOG_DATASET()) << "listDatasets: found" << result.size() << "datasets for project" << projectId;
     return result;
 }
 
 QVariantMap DatasetService::getDataset(const QString &datasetId)
 {
+    ltTrace(LT_LOG_DATASET()) << "getDataset datasetId=" << datasetId;
+
     QSqlQuery query(Database::instance().database());
     query.prepare("SELECT id, project_id, name, image_root, label_root, format, "
                   "sample_count, import_status, created_at "
@@ -163,6 +175,8 @@ QVariantMap DatasetService::getDataset(const QString &datasetId)
 
 bool DatasetService::deleteDataset(const QString &datasetId)
 {
+    ltTrace(LT_LOG_DATASET()) << "deleteDataset datasetId=" << datasetId;
+
     QSqlDatabase db = Database::instance().database();
 
     // Delete imported_label_schemas first (depends on dataset)
@@ -170,7 +184,7 @@ bool DatasetService::deleteDataset(const QString &datasetId)
     schemaQuery.prepare("DELETE FROM imported_label_schemas WHERE dataset_id = ?");
     schemaQuery.addBindValue(datasetId);
     if (!schemaQuery.exec()) {
-        qWarning() << "DatasetService: Failed to delete label schemas:" << schemaQuery.lastError().text();
+        ltError(LT_LOG_DATASET()) << "Failed to delete label schemas:" << schemaQuery.lastError().text();
         return false;
     }
 
@@ -179,7 +193,7 @@ bool DatasetService::deleteDataset(const QString &datasetId)
     samplesQuery.prepare("DELETE FROM dataset_samples WHERE dataset_id = ?");
     samplesQuery.addBindValue(datasetId);
     if (!samplesQuery.exec()) {
-        qWarning() << "DatasetService: Failed to delete samples:" << samplesQuery.lastError().text();
+        ltError(LT_LOG_DATASET()) << "Failed to delete samples:" << samplesQuery.lastError().text();
         return false;
     }
 
@@ -188,16 +202,18 @@ bool DatasetService::deleteDataset(const QString &datasetId)
     datasetQuery.prepare("DELETE FROM datasets WHERE id = ?");
     datasetQuery.addBindValue(datasetId);
     if (!datasetQuery.exec()) {
-        qWarning() << "DatasetService: Failed to delete dataset:" << datasetQuery.lastError().text();
+        ltError(LT_LOG_DATASET()) << "Failed to delete dataset:" << datasetQuery.lastError().text();
         return false;
     }
 
-    qDebug() << "DatasetService: Deleted dataset and associated records:" << datasetId;
+    ltInfo(LT_LOG_DATASET()) << "Deleted dataset and associated records:" << datasetId;
     return true;
 }
 
 QVariantMap DatasetService::getSampleStats(const QString &datasetId)
 {
+    ltTrace(LT_LOG_DATASET()) << "getSampleStats datasetId=" << datasetId;
+
     QVariantMap result;
     result["totalSamples"] = 0;
     result["validSamples"] = 0;
@@ -206,7 +222,7 @@ QVariantMap DatasetService::getSampleStats(const QString &datasetId)
     result["unlabeledSamples"] = 0;
 
     if (datasetId.isEmpty()) {
-        qWarning() << "DatasetService::getSampleStats: datasetId is empty";
+        ltWarning(LT_LOG_DATASET()) << "getSampleStats: datasetId is empty";
         return result;
     }
 
@@ -224,7 +240,7 @@ QVariantMap DatasetService::getSampleStats(const QString &datasetId)
     countQuery.addBindValue(datasetId);
 
     if (!countQuery.exec()) {
-        qWarning() << "DatasetService::getSampleStats: count query failed:" << countQuery.lastError().text();
+        ltError(LT_LOG_DATASET()) << "getSampleStats: count query failed:" << countQuery.lastError().text();
         return result;
     }
 
@@ -249,7 +265,7 @@ QVariantMap DatasetService::getSampleStats(const QString &datasetId)
     sampleQuery.addBindValue(datasetId);
 
     if (!sampleQuery.exec()) {
-        qWarning() << "DatasetService::getSampleStats: sample query failed:" << sampleQuery.lastError().text();
+        ltError(LT_LOG_DATASET()) << "getSampleStats: sample query failed:" << sampleQuery.lastError().text();
         result["classDistribution"] = classDist;
         result["annotationDensity"] = densityMap;
         return result;
@@ -316,15 +332,17 @@ QVariantMap DatasetService::getSampleStats(const QString &datasetId)
     }
     result["annotationDensity"] = densityMap;
 
-    qDebug() << "DatasetService::getSampleStats: dataset" << datasetId
-             << "total:" << result["totalSamples"] << "valid:" << result["validSamples"]
-             << "classDist size:" << classDist.size();
+    ltDebug(LT_LOG_DATASET()) << "getSampleStats: dataset" << datasetId
+                              << "total:" << result["totalSamples"] << "valid:" << result["validSamples"]
+                              << "classDist size:" << classDist.size();
 
     return result;
 }
 
 QVariantMap DatasetService::detectAnomalies(const QString &datasetId)
 {
+    ltTrace(LT_LOG_DATASET()) << "detectAnomalies datasetId=" << datasetId;
+
     QVariantMap result;
     QVariantList emptyLabels;
     QVariantList classErrors;
@@ -332,7 +350,7 @@ QVariantMap DatasetService::detectAnomalies(const QString &datasetId)
     QVariantList duplicateImages;
 
     if (datasetId.isEmpty()) {
-        qWarning() << "DatasetService::detectAnomalies: datasetId is empty";
+        ltWarning(LT_LOG_DATASET()) << "detectAnomalies: datasetId is empty";
         result["emptyLabels"] = emptyLabels;
         result["classErrors"] = classErrors;
         result["sizeAnomalies"] = sizeAnomalies;
@@ -385,7 +403,7 @@ QVariantMap DatasetService::detectAnomalies(const QString &datasetId)
     sampleQuery.addBindValue(datasetId);
 
     if (!sampleQuery.exec()) {
-        qWarning() << "DatasetService::detectAnomalies: sample query failed:" << sampleQuery.lastError().text();
+        ltError(LT_LOG_DATASET()) << "detectAnomalies: sample query failed:" << sampleQuery.lastError().text();
         result["emptyLabels"] = emptyLabels;
         result["classErrors"] = classErrors;
         result["sizeAnomalies"] = sizeAnomalies;
@@ -446,21 +464,23 @@ QVariantMap DatasetService::detectAnomalies(const QString &datasetId)
     result["duplicateImages"] = duplicateImages;
     result["totalAnomalies"] = emptyLabels.size() + classErrors.size() + sizeAnomalies.size() + duplicateImages.size();
 
-    qDebug() << "DatasetService::detectAnomalies: dataset" << datasetId
-             << "emptyLabels:" << emptyLabels.size()
-             << "classErrors:" << classErrors.size()
-             << "duplicateImages:" << duplicateImages.size()
-             << "total:" << result["totalAnomalies"];
+    ltDebug(LT_LOG_DATASET()) << "detectAnomalies: dataset" << datasetId
+                              << "emptyLabels:" << emptyLabels.size()
+                              << "classErrors:" << classErrors.size()
+                              << "duplicateImages:" << duplicateImages.size()
+                              << "total:" << result["totalAnomalies"];
 
     return result;
 }
 
 QVariantList DatasetService::getClassDistribution(const QString &datasetId)
 {
+    ltTrace(LT_LOG_DATASET()) << "getClassDistribution datasetId=" << datasetId;
+
     QVariantList result;
 
     if (datasetId.isEmpty()) {
-        qWarning() << "DatasetService::getClassDistribution: datasetId is empty";
+        ltWarning(LT_LOG_DATASET()) << "getClassDistribution: datasetId is empty";
         return result;
     }
 
@@ -493,7 +513,7 @@ QVariantList DatasetService::getClassDistribution(const QString &datasetId)
     sampleQuery.addBindValue(datasetId);
 
     if (!sampleQuery.exec()) {
-        qWarning() << "DatasetService::getClassDistribution: sample query failed:" << sampleQuery.lastError().text();
+        ltError(LT_LOG_DATASET()) << "getClassDistribution: sample query failed:" << sampleQuery.lastError().text();
         return result;
     }
 
@@ -540,21 +560,23 @@ QVariantList DatasetService::getClassDistribution(const QString &datasetId)
         result.append(entry);
     }
 
-    qDebug() << "DatasetService::getClassDistribution: dataset" << datasetId
-             << "classes:" << result.size();
+    ltDebug(LT_LOG_DATASET()) << "getClassDistribution: dataset" << datasetId
+                              << "classes:" << result.size();
 
     return result;
 }
 
 bool DatasetService::updateImportStatus(const QString &datasetId, const QString &status)
 {
+    ltTrace(LT_LOG_DATASET()) << "updateImportStatus datasetId=" << datasetId << "status=" << status;
+
     QSqlQuery query(Database::instance().database());
     query.prepare("UPDATE datasets SET import_status = ? WHERE id = ?");
     query.addBindValue(status);
     query.addBindValue(datasetId);
 
     if (!query.exec()) {
-        qWarning() << "DatasetService: Failed to update import status:" << query.lastError().text();
+        ltError(LT_LOG_DATASET()) << "Failed to update import status:" << query.lastError().text();
         return false;
     }
     return true;
@@ -562,6 +584,8 @@ bool DatasetService::updateImportStatus(const QString &datasetId, const QString 
 
 bool DatasetService::insertSamples(const QString &datasetId, const QVariantList &samples)
 {
+    ltTrace(LT_LOG_DATASET()) << "insertSamples datasetId=" << datasetId << "count=" << samples.size();
+
     QSqlDatabase db = Database::instance().database();
 
     for (const auto &s : samples) {
@@ -593,17 +617,19 @@ bool DatasetService::insertSamples(const QString &datasetId, const QVariantList 
         }
 
         if (!query.exec()) {
-            qWarning() << "DatasetService: Failed to insert sample:" << query.lastError().text();
+            ltError(LT_LOG_DATASET()) << "Failed to insert sample:" << query.lastError().text();
             return false;
         }
     }
 
-    qDebug() << "DatasetService: Inserted" << samples.size() << "samples for dataset" << datasetId;
+    ltDebug(LT_LOG_DATASET()) << "Inserted" << samples.size() << "samples for dataset" << datasetId;
     return true;
 }
 
 bool DatasetService::extractAndStoreSchema(const QString &datasetId, const QVariantList &samples)
 {
+    ltTrace(LT_LOG_DATASET()) << "extractAndStoreSchema datasetId=" << datasetId << "sampleCount=" << samples.size();
+
     // Collect all class IDs from all samples
     QSet<int> allClassIds;
     for (const auto &s : samples) {
@@ -615,7 +641,7 @@ bool DatasetService::extractAndStoreSchema(const QString &datasetId, const QVari
     }
 
     if (allClassIds.isEmpty()) {
-        qDebug() << "DatasetService: No class IDs found in any label file";
+        ltDebug(LT_LOG_DATASET()) << "No class IDs found in any label file";
         // Still store an empty schema
     }
 
@@ -660,11 +686,11 @@ bool DatasetService::extractAndStoreSchema(const QString &datasetId, const QVari
     query.addBindValue(classOrderJson);
 
     if (!query.exec()) {
-        qWarning() << "DatasetService: Failed to insert label schema:" << query.lastError().text();
+        ltError(LT_LOG_DATASET()) << "Failed to insert label schema:" << query.lastError().text();
         return false;
     }
 
-    qDebug() << "DatasetService: Extracted schema with" << classNames.size()
-             << "class names, appearing class IDs:" << sortedIds;
+    ltDebug(LT_LOG_DATASET()) << "Extracted schema with" << classNames.size()
+                              << "class names, appearing class IDs:" << sortedIds;
     return true;
 }

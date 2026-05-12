@@ -1,5 +1,6 @@
 #include "SnapshotService.h"
 #include "Database.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -13,12 +14,17 @@
 #include <QFile>
 #include <QTextStream>
 
-SnapshotService::SnapshotService(QObject *parent) : QObject(parent) {}
+SnapshotService::SnapshotService(QObject *parent) : QObject(parent)
+{
+    ltTrace(LT_LOG_TRAINING()) << "parent=" << parent;
+}
 
 QString SnapshotService::createSnapshot(const QString &datasetId,
                                          double trainRatio,
                                          const QString &splitStrategy)
 {
+    ltTrace(LT_LOG_TRAINING()) << "datasetId=" << datasetId << "trainRatio=" << trainRatio << "splitStrategy=" << splitStrategy;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return {};
 
@@ -120,11 +126,18 @@ QString SnapshotService::createSnapshot(const QString &datasetId,
 
     if (!insertQuery.exec()) return {};
 
+    ltInfo(LT_LOG_TRAINING()) << "Created snapshot:" << snapshotId
+                              << "datasetId=" << datasetId
+                              << "samples=" << allSampleIds.size()
+                              << "train=" << trainIds.size()
+                              << "val=" << valIds.size();
     return snapshotId;
 }
 
 QVariantList SnapshotService::listSnapshots(const QString &datasetId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "datasetId=" << datasetId;
+
     auto db = Database::instance().database();
     QVariantList result;
 
@@ -171,11 +184,14 @@ QVariantList SnapshotService::listSnapshots(const QString &datasetId)
         result.append(snapshot);
     }
 
+    ltDebug(LT_LOG_TRAINING()) << "Listed" << result.size() << "snapshots for dataset:" << datasetId;
     return result;
 }
 
 QVariantMap SnapshotService::getSnapshot(const QString &snapshotId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "snapshotId=" << snapshotId;
+
     auto db = Database::instance().database();
     QVariantMap result;
 
@@ -207,6 +223,8 @@ QVariantMap SnapshotService::getSnapshot(const QString &snapshotId)
 
 bool SnapshotService::deleteSnapshot(const QString &snapshotId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "snapshotId=" << snapshotId;
+
     auto db = Database::instance().database();
 
     // Check if any training runs reference this snapshot
@@ -214,17 +232,25 @@ bool SnapshotService::deleteSnapshot(const QString &snapshotId)
     checkQuery.prepare("SELECT COUNT(*) FROM training_runs WHERE snapshot_id = ?");
     checkQuery.addBindValue(snapshotId);
     if (checkQuery.exec() && checkQuery.next() && checkQuery.value(0).toInt() > 0) {
+        ltWarning(LT_LOG_TRAINING()) << "Cannot delete snapshot, referenced by training runs:" << snapshotId;
         return false; // Cannot delete: in use by training runs
     }
 
     QSqlQuery deleteQuery(db);
     deleteQuery.prepare("DELETE FROM dataset_snapshots WHERE id = ?");
     deleteQuery.addBindValue(snapshotId);
-    return deleteQuery.exec();
+
+    if (deleteQuery.exec()) {
+        ltInfo(LT_LOG_TRAINING()) << "Deleted snapshot:" << snapshotId;
+        return true;
+    }
+    return false;
 }
 
 QVariantList SnapshotService::getSampleManifest(const QString &snapshotId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "snapshotId=" << snapshotId;
+
     auto db = Database::instance().database();
     QVariantList result;
 
@@ -244,6 +270,8 @@ QVariantList SnapshotService::getSampleManifest(const QString &snapshotId)
 
 QVariantMap SnapshotService::getSplitManifest(const QString &snapshotId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "snapshotId=" << snapshotId;
+
     auto db = Database::instance().database();
     QVariantMap result;
 
@@ -272,6 +300,8 @@ QVariantMap SnapshotService::getSplitManifest(const QString &snapshotId)
 
 bool SnapshotService::isImmutable(const QString &snapshotId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "snapshotId=" << snapshotId;
+
     auto db = Database::instance().database();
 
     QSqlQuery query(db);
@@ -283,11 +313,13 @@ bool SnapshotService::isImmutable(const QString &snapshotId)
 
 bool SnapshotService::isOBBDataset(const QString &datasetId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "datasetId=" << datasetId;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
     if (datasetId.isEmpty()) {
-        qWarning() << "SnapshotService::isOBBDataset: datasetId is empty";
+        ltWarning(LT_LOG_TRAINING()) << "datasetId is empty";
         return false;
     }
 
@@ -298,7 +330,7 @@ bool SnapshotService::isOBBDataset(const QString &datasetId)
     query.addBindValue(datasetId);
 
     if (!query.exec()) {
-        qWarning() << "SnapshotService::isOBBDataset: query failed:" << query.lastError().text();
+        ltError(LT_LOG_TRAINING()) << "query failed:" << query.lastError().text();
         return false;
     }
 
@@ -335,16 +367,16 @@ bool SnapshotService::isOBBDataset(const QString &datasetId)
     }
 
     if (checkedFiles == 0) {
-        qDebug() << "SnapshotService::isOBBDataset: no valid label files found for dataset" << datasetId;
+        ltDebug(LT_LOG_TRAINING()) << "No valid label files found for dataset:" << datasetId;
         return false;
     }
 
     // If any files have OBB format lines, consider it an OBB dataset
     bool isOBB = obbCount > 0 && obbCount >= hbbCount;
 
-    qDebug() << "SnapshotService::isOBBDataset: dataset" << datasetId
-             << "obbCount:" << obbCount << "hbbCount:" << hbbCount
-             << "result:" << isOBB;
+    ltInfo(LT_LOG_TRAINING()) << "Dataset" << datasetId
+                              << "obbCount:" << obbCount << "hbbCount:" << hbbCount
+                              << "result:" << isOBB;
 
     return isOBB;
 }

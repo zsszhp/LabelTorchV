@@ -1,6 +1,7 @@
 #include "TrainingService.h"
 #include "Database.h"
 #include "ipc/IpcClient.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -8,12 +9,15 @@
 #include <QJsonObject>
 #include <QUuid>
 #include <QDateTime>
-#include <QDebug>
 
-TrainingService::TrainingService(QObject *parent) : QObject(parent) {}
+TrainingService::TrainingService(QObject *parent) : QObject(parent)
+{
+    ltTrace(LT_LOG_TRAINING()) << "parent=" << parent;
+}
 
 void TrainingService::setIpcClient(IpcClient *client)
 {
+    ltTrace(LT_LOG_TRAINING()) << "client=" << client;
     m_ipcClient = client;
 }
 
@@ -21,6 +25,8 @@ QString TrainingService::createRun(const QString &projectId,
                                     const QString &snapshotId,
                                     const QString &config)
 {
+    ltTrace(LT_LOG_TRAINING()) << "projectId=" << projectId << "snapshotId=" << snapshotId;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return {};
 
@@ -28,7 +34,7 @@ QString TrainingService::createRun(const QString &projectId,
     QJsonParseError parseError;
     QJsonDocument configDoc = QJsonDocument::fromJson(config.toUtf8(), &parseError);
     if (parseError.error != QJsonParseError::NoError) {
-        qWarning() << "Invalid config JSON:" << parseError.errorString();
+        ltWarning(LT_LOG_TRAINING()) << "Invalid config JSON:" << parseError.errorString();
         return {};
     }
 
@@ -46,15 +52,18 @@ QString TrainingService::createRun(const QString &projectId,
     query.addBindValue(configJson);
 
     if (!query.exec()) {
-        qWarning() << "Failed to create training run:" << query.lastError().text();
+        ltError(LT_LOG_TRAINING()) << "Failed to create training run:" << query.lastError().text();
         return {};
     }
 
+    ltInfo(LT_LOG_TRAINING()) << "Created training run:" << runId << "for project:" << projectId;
     return runId;
 }
 
 bool TrainingService::startTraining(const QString &runId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "runId=" << runId;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
@@ -66,7 +75,7 @@ bool TrainingService::startTraining(const QString &runId)
 
     QString currentStatus = checkQuery.value(0).toString();
     if (currentStatus != "draft") {
-        qWarning() << "Cannot start training run in status:" << currentStatus;
+        ltWarning(LT_LOG_TRAINING()) << "Cannot start training run in status:" << currentStatus;
         return false;
     }
 
@@ -91,7 +100,7 @@ bool TrainingService::startTraining(const QString &runId)
     updateQuery.addBindValue(runId);
 
     if (!updateQuery.exec()) {
-        qWarning() << "Failed to update training run status:" << updateQuery.lastError().text();
+        ltError(LT_LOG_TRAINING()) << "Failed to update training run status:" << updateQuery.lastError().text();
         return false;
     }
 
@@ -111,12 +120,15 @@ bool TrainingService::startTraining(const QString &runId)
         }
     }
 
+    ltInfo(LT_LOG_TRAINING()) << "Training run started:" << runId;
     emit runStatusChanged(runId, "running");
     return true;
 }
 
 bool TrainingService::stopTraining(const QString &runId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "runId=" << runId;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
@@ -128,7 +140,7 @@ bool TrainingService::stopTraining(const QString &runId)
 
     QString currentStatus = checkQuery.value(0).toString();
     if (currentStatus != "running") {
-        qWarning() << "Cannot stop training run in status:" << currentStatus;
+        ltWarning(LT_LOG_TRAINING()) << "Cannot stop training run in status:" << currentStatus;
         return false;
     }
 
@@ -148,16 +160,19 @@ bool TrainingService::stopTraining(const QString &runId)
     updateQuery.addBindValue(runId);
 
     if (!updateQuery.exec()) {
-        qWarning() << "Failed to update training run status:" << updateQuery.lastError().text();
+        ltError(LT_LOG_TRAINING()) << "Failed to update training run status:" << updateQuery.lastError().text();
         return false;
     }
 
+    ltInfo(LT_LOG_TRAINING()) << "Training run stopped:" << runId;
     emit runStatusChanged(runId, "cancelled");
     return true;
 }
 
 QVariantList TrainingService::listRuns(const QString &projectId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "projectId=" << projectId;
+
     auto db = Database::instance().database();
     QVariantList result;
 
@@ -185,11 +200,14 @@ QVariantList TrainingService::listRuns(const QString &projectId)
         result.append(run);
     }
 
+    ltDebug(LT_LOG_TRAINING()) << "Listed" << result.size() << "runs for project:" << projectId;
     return result;
 }
 
 QVariantMap TrainingService::getRun(const QString &runId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "runId=" << runId;
+
     auto db = Database::instance().database();
     QVariantMap result;
 
@@ -218,6 +236,8 @@ QVariantMap TrainingService::getRun(const QString &runId)
 
 bool TrainingService::deleteRun(const QString &runId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "runId=" << runId;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
@@ -229,18 +249,25 @@ bool TrainingService::deleteRun(const QString &runId)
 
     QString status = checkQuery.value(0).toString();
     if (status != "draft" && status != "cancelled" && status != "failed") {
-        qWarning() << "Cannot delete training run in status:" << status;
+        ltWarning(LT_LOG_TRAINING()) << "Cannot delete training run in status:" << status;
         return false;
     }
 
     QSqlQuery deleteQuery(db);
     deleteQuery.prepare("DELETE FROM training_runs WHERE id = ?");
     deleteQuery.addBindValue(runId);
-    return deleteQuery.exec();
+
+    if (deleteQuery.exec()) {
+        ltInfo(LT_LOG_TRAINING()) << "Deleted training run:" << runId;
+        return true;
+    }
+    return false;
 }
 
 bool TrainingService::updateRunStatus(const QString &runId, const QString &status)
 {
+    ltTrace(LT_LOG_TRAINING()) << "runId=" << runId << "status=" << status;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
@@ -259,16 +286,18 @@ bool TrainingService::updateRunStatus(const QString &runId, const QString &statu
     }
 
     if (!query.exec()) {
-        qWarning() << "Failed to update run status:" << query.lastError().text();
+        ltError(LT_LOG_TRAINING()) << "Failed to update run status:" << query.lastError().text();
         return false;
     }
 
+    ltInfo(LT_LOG_TRAINING()) << "Run status updated:" << runId << "->" << status;
     emit runStatusChanged(runId, status);
     return true;
 }
 
 QStringList TrainingService::listAdapters()
 {
+    ltTrace(LT_LOG_TRAINING());
     QStringList result;
     result << QStringLiteral("ultralytics");
     return result;

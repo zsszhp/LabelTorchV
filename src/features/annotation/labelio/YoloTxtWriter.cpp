@@ -1,10 +1,10 @@
 #include "YoloTxtWriter.h"
+#include "utils/Log.h"
 
 #include <QFile>
 #include <QTextStream>
 #include <QFileInfo>
 #include <QDir>
-#include <QDebug>
 
 // ---------------------------------------------------------------------------
 // HBB methods
@@ -12,12 +12,14 @@
 
 bool YoloTxtWriter::write(const QString &filePath, const QVector<AxisAlignedBox> &annotations)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "filePath=" << filePath << "count=" << annotations.size();
+
     // Ensure parent directory exists
     QFileInfo fi(filePath);
     QDir dir = fi.absoluteDir();
     if (!dir.exists()) {
         if (!dir.mkpath(QLatin1String("."))) {
-            qWarning() << "YoloTxtWriter: cannot create directory:" << dir.absolutePath();
+            ltError(LT_LOG_ANNOTATION()) << "cannot create directory:" << dir.absolutePath();
             return false;
         }
     }
@@ -28,7 +30,7 @@ bool YoloTxtWriter::write(const QString &filePath, const QVector<AxisAlignedBox>
     {
         QFile tempFile(tempPath);
         if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-            qWarning() << "YoloTxtWriter: cannot open temp file for writing:" << tempPath;
+            ltError(LT_LOG_ANNOTATION()) << "cannot open temp file for writing:" << tempPath;
             return false;
         }
 
@@ -39,7 +41,7 @@ bool YoloTxtWriter::write(const QString &filePath, const QVector<AxisAlignedBox>
 
         out.flush();
         if (!tempFile.flush()) {
-            qWarning() << "YoloTxtWriter: flush failed for temp file:" << tempPath;
+            ltError(LT_LOG_ANNOTATION()) << "flush failed for temp file:" << tempPath;
             QFile::remove(tempPath);
             return false;
         }
@@ -48,7 +50,7 @@ bool YoloTxtWriter::write(const QString &filePath, const QVector<AxisAlignedBox>
     // Remove the existing destination file (if any)
     if (QFile::exists(filePath)) {
         if (!QFile::remove(filePath)) {
-            qWarning() << "YoloTxtWriter: cannot remove existing file:" << filePath;
+            ltError(LT_LOG_ANNOTATION()) << "cannot remove existing file:" << filePath;
             QFile::remove(tempPath);
             return false;
         }
@@ -56,16 +58,19 @@ bool YoloTxtWriter::write(const QString &filePath, const QVector<AxisAlignedBox>
 
     // Rename temp file to the final destination
     if (!QFile::rename(tempPath, filePath)) {
-        qWarning() << "YoloTxtWriter: cannot rename temp file to:" << filePath;
+        ltError(LT_LOG_ANNOTATION()) << "cannot rename temp file to:" << filePath;
         QFile::remove(tempPath);
         return false;
     }
 
+    ltInfo(LT_LOG_ANNOTATION()) << "Wrote" << annotations.size() << "HBB annotations to" << filePath;
     return true;
 }
 
 QString YoloTxtWriter::formatLine(const AxisAlignedBox &ann)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "classIndex=" << ann.classIndex;
+
     // Format: class_id cx cy w h   (6 decimal places)
     return QStringLiteral("%1 %2 %3 %4 %5")
         .arg(ann.classIndex)
@@ -81,12 +86,14 @@ QString YoloTxtWriter::formatLine(const AxisAlignedBox &ann)
 
 bool YoloTxtWriter::writeOBB(const QString &filePath, const QVector<RotatedBox> &annotations)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "filePath=" << filePath << "count=" << annotations.size();
+
     // Ensure parent directory exists
     QFileInfo fi(filePath);
     QDir dir = fi.absoluteDir();
     if (!dir.exists()) {
         if (!dir.mkpath(QLatin1String("."))) {
-            qWarning() << "YoloTxtWriter: cannot create directory for OBB:" << dir.absolutePath();
+            ltError(LT_LOG_ANNOTATION()) << "cannot create directory for OBB:" << dir.absolutePath();
             return false;
         }
     }
@@ -97,7 +104,7 @@ bool YoloTxtWriter::writeOBB(const QString &filePath, const QVector<RotatedBox> 
     {
         QFile tempFile(tempPath);
         if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-            qWarning() << "YoloTxtWriter: cannot open temp file for OBB writing:" << tempPath;
+            ltError(LT_LOG_ANNOTATION()) << "cannot open temp file for OBB writing:" << tempPath;
             return false;
         }
 
@@ -108,7 +115,7 @@ bool YoloTxtWriter::writeOBB(const QString &filePath, const QVector<RotatedBox> 
 
         out.flush();
         if (!tempFile.flush()) {
-            qWarning() << "YoloTxtWriter: flush failed for OBB temp file:" << tempPath;
+            ltError(LT_LOG_ANNOTATION()) << "flush failed for OBB temp file:" << tempPath;
             QFile::remove(tempPath);
             return false;
         }
@@ -117,7 +124,7 @@ bool YoloTxtWriter::writeOBB(const QString &filePath, const QVector<RotatedBox> 
     // Remove the existing destination file (if any)
     if (QFile::exists(filePath)) {
         if (!QFile::remove(filePath)) {
-            qWarning() << "YoloTxtWriter: cannot remove existing file for OBB:" << filePath;
+            ltError(LT_LOG_ANNOTATION()) << "cannot remove existing file for OBB:" << filePath;
             QFile::remove(tempPath);
             return false;
         }
@@ -125,16 +132,19 @@ bool YoloTxtWriter::writeOBB(const QString &filePath, const QVector<RotatedBox> 
 
     // Rename temp file to the final destination
     if (!QFile::rename(tempPath, filePath)) {
-        qWarning() << "YoloTxtWriter: cannot rename temp file to OBB:" << filePath;
+        ltError(LT_LOG_ANNOTATION()) << "cannot rename temp file to OBB:" << filePath;
         QFile::remove(tempPath);
         return false;
     }
 
+    ltInfo(LT_LOG_ANNOTATION()) << "Wrote" << annotations.size() << "OBB annotations to" << filePath;
     return true;
 }
 
 QString YoloTxtWriter::formatOBBLine(const RotatedBox &ann)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "classIndex=" << ann.classIndex;
+
     // Format: class_id x1 y1 x2 y2 x3 y3 x4 y4   (6 decimal places)
     // Get corner points from the RotatedBox
     QString corners = ann.toYoloOBB();

@@ -1,19 +1,24 @@
 #include "AssistedLabelService.h"
 #include "Database.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QDebug>
 #include <QSet>
 #include <algorithm>
 
-AssistedLabelService::AssistedLabelService(QObject *parent) : QObject(parent) {}
+AssistedLabelService::AssistedLabelService(QObject *parent) : QObject(parent)
+{
+    ltTrace(LT_LOG_INFERENCE()) << "parent=" << parent;
+}
 
 QVariantList AssistedLabelService::getCandidates(const QString &batchId)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId;
+
     QVariantList result;
     QJsonObject snapshotObj;
 
@@ -34,17 +39,20 @@ QVariantList AssistedLabelService::getCandidates(const QString &batchId)
         result.append(candidate);
     }
 
+    ltDebug(LT_LOG_INFERENCE()) << "Retrieved" << result.size() << "candidates for batch:" << batchId;
     return result;
 }
 
 bool AssistedLabelService::confirmCandidate(const QString &batchId, int candidateIndex)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId << "candidateIndex=" << candidateIndex;
+
     QJsonObject snapshotObj;
     if (!readSnapshot(batchId, snapshotObj)) return false;
 
     QJsonArray candidates = snapshotObj.value("candidates").toArray();
     if (candidateIndex < 0 || candidateIndex >= candidates.size()) {
-        qWarning() << "Candidate index out of range:" << candidateIndex;
+        ltWarning(LT_LOG_INFERENCE()) << "Candidate index out of range:" << candidateIndex;
         return false;
     }
 
@@ -53,17 +61,23 @@ bool AssistedLabelService::confirmCandidate(const QString &batchId, int candidat
     candidates[candidateIndex] = candidate;
 
     snapshotObj["candidates"] = candidates;
-    return writeSnapshot(batchId, snapshotObj);
+    if (writeSnapshot(batchId, snapshotObj)) {
+        ltInfo(LT_LOG_INFERENCE()) << "Confirmed candidate" << candidateIndex << "in batch:" << batchId;
+        return true;
+    }
+    return false;
 }
 
 bool AssistedLabelService::rejectCandidate(const QString &batchId, int candidateIndex)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId << "candidateIndex=" << candidateIndex;
+
     QJsonObject snapshotObj;
     if (!readSnapshot(batchId, snapshotObj)) return false;
 
     QJsonArray candidates = snapshotObj.value("candidates").toArray();
     if (candidateIndex < 0 || candidateIndex >= candidates.size()) {
-        qWarning() << "Candidate index out of range:" << candidateIndex;
+        ltWarning(LT_LOG_INFERENCE()) << "Candidate index out of range:" << candidateIndex;
         return false;
     }
 
@@ -72,11 +86,17 @@ bool AssistedLabelService::rejectCandidate(const QString &batchId, int candidate
     candidates[candidateIndex] = candidate;
 
     snapshotObj["candidates"] = candidates;
-    return writeSnapshot(batchId, snapshotObj);
+    if (writeSnapshot(batchId, snapshotObj)) {
+        ltInfo(LT_LOG_INFERENCE()) << "Rejected candidate" << candidateIndex << "in batch:" << batchId;
+        return true;
+    }
+    return false;
 }
 
 int AssistedLabelService::confirmAllAboveThreshold(const QString &batchId, double threshold)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId << "threshold=" << threshold;
+
     QJsonObject snapshotObj;
     if (!readSnapshot(batchId, snapshotObj)) return -1;
 
@@ -97,11 +117,14 @@ int AssistedLabelService::confirmAllAboveThreshold(const QString &batchId, doubl
     snapshotObj["candidates"] = candidates;
     if (!writeSnapshot(batchId, snapshotObj)) return -1;
 
+    ltInfo(LT_LOG_INFERENCE()) << "Confirmed" << count << "candidates above threshold" << threshold << "in batch:" << batchId;
     return count;
 }
 
 int AssistedLabelService::rejectAllBelowThreshold(const QString &batchId, double threshold)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId << "threshold=" << threshold;
+
     QJsonObject snapshotObj;
     if (!readSnapshot(batchId, snapshotObj)) return -1;
 
@@ -122,11 +145,14 @@ int AssistedLabelService::rejectAllBelowThreshold(const QString &batchId, double
     snapshotObj["candidates"] = candidates;
     if (!writeSnapshot(batchId, snapshotObj)) return -1;
 
+    ltInfo(LT_LOG_INFERENCE()) << "Rejected" << count << "candidates below threshold" << threshold << "in batch:" << batchId;
     return count;
 }
 
 QVariantMap AssistedLabelService::getBatchStats(const QString &batchId)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId;
+
     QVariantMap result;
     result["total"] = 0;
     result["confirmed"] = 0;
@@ -160,6 +186,8 @@ QVariantMap AssistedLabelService::getBatchStats(const QString &batchId)
 
 QVariantList AssistedLabelService::getLowConfidenceSamples(const QString &batchId, float threshold)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId << "threshold=" << threshold;
+
     QVariantList result;
     QJsonObject snapshotObj;
 
@@ -189,6 +217,8 @@ QVariantList AssistedLabelService::getLowConfidenceSamples(const QString &batchI
 
 QVariantMap AssistedLabelService::getConfidenceStats(const QString &batchId, float threshold)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId << "threshold=" << threshold;
+
     QVariantMap result;
     result["totalCandidates"] = 0;
     result["lowConfCount"] = 0;
@@ -226,6 +256,8 @@ QVariantMap AssistedLabelService::getConfidenceStats(const QString &batchId, flo
 
 QVariantList AssistedLabelService::getFalsePositives(const QString &batchId)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId;
+
     QVariantList result;
     QJsonObject snapshotObj;
 
@@ -258,6 +290,8 @@ QVariantList AssistedLabelService::getFalsePositives(const QString &batchId)
 
 QVariantList AssistedLabelService::getFalseNegatives(const QString &batchId, const QString &datasetId)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId << "datasetId=" << datasetId;
+
     QVariantList result;
     auto db = Database::instance().database();
     if (!db.isOpen()) return result;
@@ -268,7 +302,7 @@ QVariantList AssistedLabelService::getFalseNegatives(const QString &batchId, con
     sampleQuery.prepare("SELECT id FROM dataset_samples WHERE dataset_id = ?");
     sampleQuery.addBindValue(datasetId);
     if (!sampleQuery.exec()) {
-        qWarning() << "Failed to query dataset_samples:" << sampleQuery.lastError().text();
+        ltError(LT_LOG_INFERENCE()) << "Failed to query dataset_samples:" << sampleQuery.lastError().text();
         return result;
     }
     while (sampleQuery.next()) {
@@ -302,11 +336,14 @@ QVariantList AssistedLabelService::getFalseNegatives(const QString &batchId, con
         result.append(sampleId);
     }
 
+    ltDebug(LT_LOG_INFERENCE()) << "Found" << result.size() << "false negatives for batch:" << batchId;
     return result;
 }
 
 QVariantList AssistedLabelService::getHardCaseQueue(const QString &batchId, const QString &datasetId, float lowConfThreshold)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId << "datasetId=" << datasetId << "lowConfThreshold=" << lowConfThreshold;
+
     QVariantList result;
 
     // Collect false negatives (priority 3 - highest)
@@ -355,11 +392,14 @@ QVariantList AssistedLabelService::getHardCaseQueue(const QString &batchId, cons
         return a.toMap().value("priority").toInt() > b.toMap().value("priority").toInt();
     });
 
+    ltDebug(LT_LOG_INFERENCE()) << "Built hard case queue with" << result.size() << "entries for batch:" << batchId;
     return result;
 }
 
 bool AssistedLabelService::readSnapshot(const QString &batchId, QJsonObject &snapshotObj)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
@@ -368,7 +408,7 @@ bool AssistedLabelService::readSnapshot(const QString &batchId, QJsonObject &sna
     query.addBindValue(batchId);
 
     if (!query.exec() || !query.next()) {
-        qWarning() << "Batch not found:" << batchId;
+        ltWarning(LT_LOG_INFERENCE()) << "Batch not found:" << batchId;
         return false;
     }
 
@@ -390,6 +430,8 @@ bool AssistedLabelService::readSnapshot(const QString &batchId, QJsonObject &sna
 
 bool AssistedLabelService::writeSnapshot(const QString &batchId, const QJsonObject &snapshotObj)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
@@ -402,7 +444,7 @@ bool AssistedLabelService::writeSnapshot(const QString &batchId, const QJsonObje
     query.addBindValue(batchId);
 
     if (!query.exec()) {
-        qWarning() << "Failed to update snapshot:" << query.lastError().text();
+        ltError(LT_LOG_INFERENCE()) << "Failed to update snapshot:" << query.lastError().text();
         return false;
     }
 

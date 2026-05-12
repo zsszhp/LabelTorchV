@@ -1,6 +1,7 @@
 #include "ClassMappingService.h"
 #include "database/Database.h"
 #include "utils/Id.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -9,17 +10,19 @@
 #include <QJsonArray>
 #include <QFile>
 #include <QTextStream>
-#include <QDebug>
 
 ClassMappingService::ClassMappingService(QObject *parent)
     : QObject(parent)
 {
+    ltTrace(LT_LOG_DATASET()) << "ClassMappingService parent=" << parent;
 }
 
 QVariantMap ClassMappingService::getSourceSchema(const QString &datasetId)
 {
+    ltTrace(LT_LOG_DATASET()) << "getSourceSchema datasetId=" << datasetId;
+
     if (datasetId.isEmpty()) {
-        qWarning() << "ClassMappingService::getSourceSchema: datasetId is empty";
+        ltWarning(LT_LOG_DATASET()) << "getSourceSchema: datasetId is empty";
         return {};
     }
 
@@ -29,7 +32,7 @@ QVariantMap ClassMappingService::getSourceSchema(const QString &datasetId)
     query.addBindValue(datasetId);
 
     if (!query.exec()) {
-        qWarning() << "ClassMappingService::getSourceSchema: query failed:" << query.lastError().text();
+        ltError(LT_LOG_DATASET()) << "getSourceSchema: query failed:" << query.lastError().text();
         return {};
     }
 
@@ -43,7 +46,7 @@ QVariantMap ClassMappingService::getSourceSchema(const QString &datasetId)
         return schema;
     }
 
-    qDebug() << "ClassMappingService::getSourceSchema: no schema found for dataset" << datasetId;
+    ltDebug(LT_LOG_DATASET()) << "getSourceSchema: no schema found for dataset" << datasetId;
     return {};
 }
 
@@ -51,13 +54,18 @@ QString ClassMappingService::createMapping(const QString &datasetId, const QStri
                                             const QString &targetTaxonomyId,
                                             const QVariantMap &mappingRules)
 {
+    ltTrace(LT_LOG_DATASET()) << "createMapping datasetId=" << datasetId
+                              << "sourceSchemaId=" << sourceSchemaId
+                              << "targetTaxonomyId=" << targetTaxonomyId
+                              << "mappingRules count=" << mappingRules.size();
+
     if (datasetId.isEmpty() || sourceSchemaId.isEmpty() || targetTaxonomyId.isEmpty()) {
-        qWarning() << "ClassMappingService::createMapping: missing required parameters";
+        ltWarning(LT_LOG_DATASET()) << "createMapping: missing required parameters";
         return {};
     }
 
     if (mappingRules.isEmpty()) {
-        qWarning() << "ClassMappingService::createMapping: mappingRules is empty";
+        ltWarning(LT_LOG_DATASET()) << "createMapping: mappingRules is empty";
         return {};
     }
 
@@ -81,22 +89,24 @@ QString ClassMappingService::createMapping(const QString &datasetId, const QStri
     query.addBindValue(rulesJson);
 
     if (!query.exec()) {
-        qWarning() << "ClassMappingService::createMapping: insert failed:" << query.lastError().text();
+        ltError(LT_LOG_DATASET()) << "createMapping: insert failed:" << query.lastError().text();
         return {};
     }
 
-    qDebug() << "ClassMappingService: Created mapping revision" << revisionId
-             << "for dataset" << datasetId
-             << "schema" << sourceSchemaId << "-> taxonomy" << targetTaxonomyId;
+    ltInfo(LT_LOG_DATASET()) << "Created mapping revision" << revisionId
+                             << "for dataset" << datasetId
+                             << "schema" << sourceSchemaId << "-> taxonomy" << targetTaxonomyId;
     return revisionId;
 }
 
 QVariantList ClassMappingService::listMappings(const QString &datasetId)
 {
+    ltTrace(LT_LOG_DATASET()) << "listMappings datasetId=" << datasetId;
+
     QVariantList result;
 
     if (datasetId.isEmpty()) {
-        qWarning() << "ClassMappingService::listMappings: datasetId is empty";
+        ltWarning(LT_LOG_DATASET()) << "listMappings: datasetId is empty";
         return result;
     }
 
@@ -107,7 +117,7 @@ QVariantList ClassMappingService::listMappings(const QString &datasetId)
     query.addBindValue(datasetId);
 
     if (!query.exec()) {
-        qWarning() << "ClassMappingService::listMappings: query failed:" << query.lastError().text();
+        ltError(LT_LOG_DATASET()) << "listMappings: query failed:" << query.lastError().text();
         return result;
     }
 
@@ -122,29 +132,33 @@ QVariantList ClassMappingService::listMappings(const QString &datasetId)
         result.append(rev);
     }
 
+    ltDebug(LT_LOG_DATASET()) << "listMappings: found" << result.size() << "mappings for dataset" << datasetId;
     return result;
 }
 
 QVariantMap ClassMappingService::previewMapping(const QString &datasetId, const QVariantMap &mappingRules)
 {
+    ltTrace(LT_LOG_DATASET()) << "previewMapping datasetId=" << datasetId
+                              << "mappingRules count=" << mappingRules.size();
+
     QVariantMap result;
     result["totalLabels"] = 0;
     result["affectedLabels"] = 0;
 
     if (datasetId.isEmpty()) {
-        qWarning() << "ClassMappingService::previewMapping: datasetId is empty";
+        ltWarning(LT_LOG_DATASET()) << "previewMapping: datasetId is empty";
         return result;
     }
 
     if (mappingRules.isEmpty()) {
-        qWarning() << "ClassMappingService::previewMapping: mappingRules is empty";
+        ltWarning(LT_LOG_DATASET()) << "previewMapping: mappingRules is empty";
         return result;
     }
 
     // Step 1: Get the source schema for this dataset
     QVariantMap schema = getSourceSchema(datasetId);
     if (schema.isEmpty()) {
-        qWarning() << "ClassMappingService::previewMapping: no source schema found for dataset" << datasetId;
+        ltWarning(LT_LOG_DATASET()) << "previewMapping: no source schema found for dataset" << datasetId;
         return result;
     }
 
@@ -153,7 +167,7 @@ QVariantMap ClassMappingService::previewMapping(const QString &datasetId, const 
     // Step 2: Build source index -> name map
     QMap<int, QString> sourceIndexName = buildSourceIndexNameMap(sourceSchemaId);
     if (sourceIndexName.isEmpty()) {
-        qWarning() << "ClassMappingService::previewMapping: empty source class index map";
+        ltWarning(LT_LOG_DATASET()) << "previewMapping: empty source class index map";
         return result;
     }
 
@@ -176,7 +190,7 @@ QVariantMap ClassMappingService::previewMapping(const QString &datasetId, const 
     sampleQuery.addBindValue(datasetId);
 
     if (!sampleQuery.exec()) {
-        qWarning() << "ClassMappingService::previewMapping: sample query failed:" << sampleQuery.lastError().text();
+        ltError(LT_LOG_DATASET()) << "previewMapping: sample query failed:" << sampleQuery.lastError().text();
         return result;
     }
 
@@ -190,7 +204,7 @@ QVariantMap ClassMappingService::previewMapping(const QString &datasetId, const 
 
         QFile file(labelPath);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            qWarning() << "ClassMappingService::previewMapping: cannot open label file:" << labelPath;
+            ltWarning(LT_LOG_DATASET()) << "previewMapping: cannot open label file:" << labelPath;
             continue;
         }
 
@@ -243,17 +257,19 @@ QVariantMap ClassMappingService::previewMapping(const QString &datasetId, const 
     result["affectedLabels"] = affectedLabels;
     result["newClassDistribution"] = distributionVariant;
 
-    qDebug() << "ClassMappingService::previewMapping: totalLabels" << totalLabels
-             << "affectedLabels" << affectedLabels
-             << "distinct target classes" << newClassDistribution.size();
+    ltDebug(LT_LOG_DATASET()) << "previewMapping: totalLabels" << totalLabels
+                              << "affectedLabels" << affectedLabels
+                              << "distinct target classes" << newClassDistribution.size();
 
     return result;
 }
 
 bool ClassMappingService::applyMapping(const QString &mappingRevisionId)
 {
+    ltTrace(LT_LOG_DATASET()) << "applyMapping mappingRevisionId=" << mappingRevisionId;
+
     if (mappingRevisionId.isEmpty()) {
-        qWarning() << "ClassMappingService::applyMapping: mappingRevisionId is empty";
+        ltWarning(LT_LOG_DATASET()) << "applyMapping: mappingRevisionId is empty";
         return false;
     }
 
@@ -264,12 +280,12 @@ bool ClassMappingService::applyMapping(const QString &mappingRevisionId)
     revQuery.addBindValue(mappingRevisionId);
 
     if (!revQuery.exec()) {
-        qWarning() << "ClassMappingService::applyMapping: revision query failed:" << revQuery.lastError().text();
+        ltError(LT_LOG_DATASET()) << "applyMapping: revision query failed:" << revQuery.lastError().text();
         return false;
     }
 
     if (!revQuery.next()) {
-        qWarning() << "ClassMappingService::applyMapping: revision not found:" << mappingRevisionId;
+        ltError(LT_LOG_DATASET()) << "applyMapping: revision not found:" << mappingRevisionId;
         return false;
     }
 
@@ -278,10 +294,13 @@ bool ClassMappingService::applyMapping(const QString &mappingRevisionId)
     QString targetTaxonomyId = revQuery.value(2).toString();
     QString mappingRulesJson = revQuery.value(3).toString();
 
+    ltInfo(LT_LOG_DATASET()) << "Applying mapping revision" << mappingRevisionId
+                             << "dataset=" << datasetId << "taxonomy=" << targetTaxonomyId;
+
     // Step 2: Parse the mapping rules JSON
     QJsonDocument rulesDoc = QJsonDocument::fromJson(mappingRulesJson.toUtf8());
     if (!rulesDoc.isObject()) {
-        qWarning() << "ClassMappingService::applyMapping: invalid mapping_rules_json";
+        ltError(LT_LOG_DATASET()) << "applyMapping: invalid mapping_rules_json";
         return false;
     }
     QJsonObject rulesObj = rulesDoc.object();
@@ -292,7 +311,7 @@ bool ClassMappingService::applyMapping(const QString &mappingRevisionId)
     // Step 3: Build source index -> name map
     QMap<int, QString> sourceIndexName = buildSourceIndexNameMap(sourceSchemaId);
     if (sourceIndexName.isEmpty()) {
-        qWarning() << "ClassMappingService::applyMapping: empty source class index map";
+        ltError(LT_LOG_DATASET()) << "applyMapping: empty source class index map";
         return false;
     }
 
@@ -326,8 +345,8 @@ bool ClassMappingService::applyMapping(const QString &mappingRevisionId)
             targetNameIndex[targetName] = newIndex;
             taxonomyUpdated = true;
 
-            qDebug() << "ClassMappingService::applyMapping: adding new class to taxonomy:" << targetName
-                     << "at index" << newIndex;
+            ltDebug(LT_LOG_DATASET()) << "applyMapping: adding new class to taxonomy:" << targetName
+                                      << "at index" << newIndex;
         }
     }
 
@@ -345,12 +364,12 @@ bool ClassMappingService::applyMapping(const QString &mappingRevisionId)
         updateTaxQuery.addBindValue(targetTaxonomyId);
 
         if (!updateTaxQuery.exec()) {
-            qWarning() << "ClassMappingService::applyMapping: failed to update taxonomy:" << updateTaxQuery.lastError().text();
+            ltError(LT_LOG_DATASET()) << "applyMapping: failed to update taxonomy:" << updateTaxQuery.lastError().text();
             return false;
         }
 
-        qDebug() << "ClassMappingService::applyMapping: taxonomy updated with new classes, now"
-                 << taxonomyClasses.size() << "classes";
+        ltInfo(LT_LOG_DATASET()) << "applyMapping: taxonomy updated with new classes, now"
+                                 << taxonomyClasses.size() << "classes";
     }
 
     // Step 6: Build source class index -> target class index remapping
@@ -373,15 +392,15 @@ bool ClassMappingService::applyMapping(const QString &mappingRevisionId)
             indexRemap[sourceIndex] = targetNameIndex[targetName];
         } else {
             // This should not happen since we added all missing classes above
-            qWarning() << "ClassMappingService::applyMapping: target class name not found in taxonomy:" << targetName;
+            ltWarning(LT_LOG_DATASET()) << "applyMapping: target class name not found in taxonomy:" << targetName;
             // Fall back: keep original index
             indexRemap[sourceIndex] = sourceIndex;
         }
     }
 
-    qDebug() << "ClassMappingService::applyMapping: built index remap with" << indexRemap.size() << "entries";
+    ltDebug(LT_LOG_DATASET()) << "applyMapping: built index remap with" << indexRemap.size() << "entries";
     for (auto it = indexRemap.constBegin(); it != indexRemap.constEnd(); ++it) {
-        qDebug() << "  class" << it.key() << "->" << it.value();
+        ltDebug(LT_LOG_DATASET()) << "  class" << it.key() << "->" << it.value();
     }
 
     // Step 7: Remap all label files for this dataset
@@ -390,7 +409,7 @@ bool ClassMappingService::applyMapping(const QString &mappingRevisionId)
     sampleQuery.addBindValue(datasetId);
 
     if (!sampleQuery.exec()) {
-        qWarning() << "ClassMappingService::applyMapping: sample query failed:" << sampleQuery.lastError().text();
+        ltError(LT_LOG_DATASET()) << "applyMapping: sample query failed:" << sampleQuery.lastError().text();
         return false;
     }
 
@@ -407,7 +426,7 @@ bool ClassMappingService::applyMapping(const QString &mappingRevisionId)
         QMap<int, int> newClassCounts;
 
         if (!remapLabelFile(labelPath, indexRemap, affectedCount, totalCount, newClassCounts)) {
-            qWarning() << "ClassMappingService::applyMapping: failed to remap label file:" << labelPath;
+            ltWarning(LT_LOG_DATASET()) << "applyMapping: failed to remap label file:" << labelPath;
             // Continue processing other files rather than aborting entirely
             continue;
         }
@@ -417,16 +436,18 @@ bool ClassMappingService::applyMapping(const QString &mappingRevisionId)
         totalLabelsAffected += affectedCount;
     }
 
-    qDebug() << "ClassMappingService::applyMapping: completed for revision" << mappingRevisionId
-             << "- processed" << totalFiles << "label files,"
-             << totalLabelsRemapped << "total labels,"
-             << totalLabelsAffected << "labels affected by remapping";
+    ltInfo(LT_LOG_DATASET()) << "applyMapping: completed for revision" << mappingRevisionId
+                             << "- processed" << totalFiles << "label files,"
+                             << totalLabelsRemapped << "total labels,"
+                             << totalLabelsAffected << "labels affected by remapping";
 
     return true;
 }
 
 QMap<int, QString> ClassMappingService::buildSourceIndexNameMap(const QString &sourceSchemaId)
 {
+    ltTrace(LT_LOG_DATASET()) << "buildSourceIndexNameMap sourceSchemaId=" << sourceSchemaId;
+
     QMap<int, QString> result;
 
     QSqlQuery query(Database::instance().database());
@@ -434,12 +455,12 @@ QMap<int, QString> ClassMappingService::buildSourceIndexNameMap(const QString &s
     query.addBindValue(sourceSchemaId);
 
     if (!query.exec()) {
-        qWarning() << "ClassMappingService::buildSourceIndexNameMap: query failed:" << query.lastError().text();
+        ltError(LT_LOG_DATASET()) << "buildSourceIndexNameMap: query failed:" << query.lastError().text();
         return result;
     }
 
     if (!query.next()) {
-        qWarning() << "ClassMappingService::buildSourceIndexNameMap: schema not found:" << sourceSchemaId;
+        ltWarning(LT_LOG_DATASET()) << "buildSourceIndexNameMap: schema not found:" << sourceSchemaId;
         return result;
     }
 
@@ -447,7 +468,7 @@ QMap<int, QString> ClassMappingService::buildSourceIndexNameMap(const QString &s
     QJsonDocument doc = QJsonDocument::fromJson(classNamesJson.toUtf8());
 
     if (!doc.isArray()) {
-        qWarning() << "ClassMappingService::buildSourceIndexNameMap: raw_class_names_json is not an array";
+        ltWarning(LT_LOG_DATASET()) << "buildSourceIndexNameMap: raw_class_names_json is not an array";
         return result;
     }
 
@@ -461,6 +482,8 @@ QMap<int, QString> ClassMappingService::buildSourceIndexNameMap(const QString &s
 
 QMap<QString, int> ClassMappingService::buildTargetNameIndexMap(const QString &taxonomyId)
 {
+    ltTrace(LT_LOG_DATASET()) << "buildTargetNameIndexMap taxonomyId=" << taxonomyId;
+
     QMap<QString, int> result;
 
     QSqlQuery query(Database::instance().database());
@@ -468,12 +491,12 @@ QMap<QString, int> ClassMappingService::buildTargetNameIndexMap(const QString &t
     query.addBindValue(taxonomyId);
 
     if (!query.exec()) {
-        qWarning() << "ClassMappingService::buildTargetNameIndexMap: query failed:" << query.lastError().text();
+        ltError(LT_LOG_DATASET()) << "buildTargetNameIndexMap: query failed:" << query.lastError().text();
         return result;
     }
 
     if (!query.next()) {
-        qWarning() << "ClassMappingService::buildTargetNameIndexMap: taxonomy not found:" << taxonomyId;
+        ltWarning(LT_LOG_DATASET()) << "buildTargetNameIndexMap: taxonomy not found:" << taxonomyId;
         return result;
     }
 
@@ -481,7 +504,7 @@ QMap<QString, int> ClassMappingService::buildTargetNameIndexMap(const QString &t
     QJsonDocument doc = QJsonDocument::fromJson(classesJson.toUtf8());
 
     if (!doc.isArray()) {
-        qWarning() << "ClassMappingService::buildTargetNameIndexMap: class_definitions_json is not an array";
+        ltWarning(LT_LOG_DATASET()) << "buildTargetNameIndexMap: class_definitions_json is not an array";
         return result;
     }
 
@@ -496,13 +519,15 @@ QMap<QString, int> ClassMappingService::buildTargetNameIndexMap(const QString &t
 bool ClassMappingService::remapLabelFile(const QString &filePath, const QMap<int, int> &indexRemap,
                                           int &affectedCount, int &totalCount, QMap<int, int> &newClassCounts)
 {
+    ltTrace(LT_LOG_DATASET()) << "remapLabelFile filePath=" << filePath << "remapEntries=" << indexRemap.size();
+
     affectedCount = 0;
     totalCount = 0;
     newClassCounts.clear();
 
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qWarning() << "ClassMappingService::remapLabelFile: cannot open file:" << filePath;
+        ltError(LT_LOG_DATASET()) << "remapLabelFile: cannot open file:" << filePath;
         return false;
     }
 
@@ -560,7 +585,7 @@ bool ClassMappingService::remapLabelFile(const QString &filePath, const QMap<int
     QString tempPath = filePath + QStringLiteral(".tmp");
     QFile tempFile(tempPath);
     if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-        qWarning() << "ClassMappingService::remapLabelFile: cannot write temp file:" << tempPath;
+        ltError(LT_LOG_DATASET()) << "remapLabelFile: cannot write temp file:" << tempPath;
         return false;
     }
 
@@ -577,7 +602,7 @@ bool ClassMappingService::remapLabelFile(const QString &filePath, const QMap<int
     // Remove original and rename temp to original
     QFile::remove(filePath);
     if (!QFile::rename(tempPath, filePath)) {
-        qWarning() << "ClassMappingService::remapLabelFile: failed to rename temp file to:" << filePath;
+        ltError(LT_LOG_DATASET()) << "remapLabelFile: failed to rename temp file to:" << filePath;
         // Try to restore from temp if rename failed
         QFile::rename(tempPath, filePath);
         return false;

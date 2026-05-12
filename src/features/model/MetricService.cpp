@@ -1,17 +1,22 @@
 #include "MetricService.h"
 #include "Database.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QDebug>
 
-MetricService::MetricService(QObject *parent) : QObject(parent) {}
+MetricService::MetricService(QObject *parent) : QObject(parent)
+{
+    ltTrace(LT_LOG_MODEL()) << "parent=" << parent;
+}
 
 QVariantMap MetricService::getMetrics(const QString &versionId)
 {
+    ltTrace(LT_LOG_MODEL()) << "versionId=" << versionId;
+
     QVariantMap result;
 
     auto db = Database::instance().database();
@@ -64,6 +69,8 @@ QVariantMap MetricService::getMetrics(const QString &versionId)
 
 QVariantList MetricService::getMetricHistory(const QString &runId)
 {
+    ltTrace(LT_LOG_MODEL()) << "runId=" << runId;
+
     QVariantList result;
 
     auto db = Database::instance().database();
@@ -79,7 +86,7 @@ QVariantList MetricService::getMetricHistory(const QString &runId)
     query.addBindValue(runId);
 
     if (!query.exec()) {
-        qWarning() << "Failed to get metric history:" << query.lastError().text();
+        ltError(LT_LOG_MODEL()) << "Failed to get metric history:" << query.lastError().text();
         return result;
     }
 
@@ -93,11 +100,14 @@ QVariantList MetricService::getMetricHistory(const QString &runId)
         }
     }
 
+    ltDebug(LT_LOG_MODEL()) << "Retrieved" << result.size() << "metric history entries for run:" << runId;
     return result;
 }
 
 QVariantList MetricService::compareMultipleVersions(const QVariantList &versionIds)
 {
+    ltTrace(LT_LOG_MODEL()) << "versionIds.count=" << versionIds.size();
+
     QVariantList result;
 
     auto db = Database::instance().database();
@@ -140,6 +150,8 @@ QVariantList MetricService::compareMultipleVersions(const QVariantList &versionI
 
 QVariantList MetricService::getVersionsBySnapshot(const QString &snapshotId)
 {
+    ltTrace(LT_LOG_MODEL()) << "snapshotId=" << snapshotId;
+
     QVariantList result;
 
     auto db = Database::instance().database();
@@ -159,7 +171,7 @@ QVariantList MetricService::getVersionsBySnapshot(const QString &snapshotId)
     query.addBindValue(snapshotId);
 
     if (!query.exec()) {
-        qWarning() << "Failed to get versions by snapshot:" << query.lastError().text();
+        ltError(LT_LOG_MODEL()) << "Failed to get versions by snapshot:" << query.lastError().text();
         return result;
     }
 
@@ -181,11 +193,14 @@ QVariantList MetricService::getVersionsBySnapshot(const QString &snapshotId)
         result.append(version);
     }
 
+    ltDebug(LT_LOG_MODEL()) << "Retrieved" << result.size() << "versions for snapshot:" << snapshotId;
     return result;
 }
 
 QVariantMap MetricService::compareVersions(const QString &versionId1, const QString &versionId2)
 {
+    ltTrace(LT_LOG_MODEL()) << "versionId1=" << versionId1 << "versionId2=" << versionId2;
+
     QVariantMap result;
 
     auto db = Database::instance().database();
@@ -196,6 +211,7 @@ QVariantMap MetricService::compareVersions(const QString &versionId1, const QStr
     QVariantMap metrics2 = getMetrics(versionId2);
 
     if (metrics1.isEmpty() || metrics2.isEmpty()) {
+        ltWarning(LT_LOG_MODEL()) << "One or both versions not found for comparison";
         result["error"] = "One or both versions not found";
         return result;
     }
@@ -237,5 +253,6 @@ QVariantMap MetricService::compareVersions(const QString &versionId1, const QStr
 
     result["comparison"] = comparison;
 
+    ltInfo(LT_LOG_MODEL()) << "Compared versions:" << versionId1 << "vs" << versionId2;
     return result;
 }

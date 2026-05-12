@@ -1,12 +1,12 @@
 #include "AnnotationModel.h"
 #include "AnnotationService.h"
 #include "utils/Id.h"
-
-#include <QDebug>
+#include "utils/Log.h"
 
 AnnotationModel::AnnotationModel(QObject *parent)
     : QAbstractListModel(parent)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "parent=" << parent;
 }
 
 int AnnotationModel::rowCount(const QModelIndex &parent) const
@@ -42,6 +42,9 @@ QVariant AnnotationModel::data(const QModelIndex &index, int role) const
 
 bool AnnotationModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "row=" << (index.isValid() ? index.row() : -1)
+                                 << "role=" << role << "value=" << value;
+
     if (!index.isValid() || index.row() < 0 || index.row() >= m_annotations.size())
         return false;
 
@@ -91,6 +94,8 @@ int AnnotationModel::count() const
 
 void AnnotationModel::loadFromLabel(const QString &labelPath)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath;
+
     AnnotationService svc;
     QVariantList loaded = svc.loadAnnotations(labelPath);
 
@@ -119,19 +124,25 @@ void AnnotationModel::loadFromLabel(const QString &labelPath)
     endResetModel();
     emit countChanged();
 
-    qDebug() << "AnnotationModel: Loaded" << m_annotations.size()
-             << "annotations from" << labelPath;
+    ltInfo(LT_LOG_ANNOTATION()) << "Loaded" << m_annotations.size()
+                                << "annotations from" << labelPath;
 }
 
 void AnnotationModel::addAnnotation(int classIndex, const QString &className,
                                     float cx, float cy, float w, float h)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "classIndex=" << classIndex << "className=" << className
+                                 << "cx=" << cx << "cy=" << cy << "w=" << w << "h=" << h;
     addOBBAnnotation(classIndex, className, cx, cy, w, h, 0.0f);
 }
 
 void AnnotationModel::addOBBAnnotation(int classIndex, const QString &className,
                                         float cx, float cy, float w, float h, float angle)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "classIndex=" << classIndex << "className=" << className
+                                 << "cx=" << cx << "cy=" << cy << "w=" << w << "h=" << h
+                                 << "angle=" << angle;
+
     int newRow = m_annotations.size();
     beginInsertRows(QModelIndex(), newRow, newRow);
 
@@ -153,21 +164,32 @@ void AnnotationModel::addOBBAnnotation(int classIndex, const QString &className,
 
     endInsertRows();
     emit countChanged();
+
+    ltInfo(LT_LOG_ANNOTATION()) << "Added annotation id=" << entry.id
+                                << "class=" << className << "row=" << newRow;
 }
 
 void AnnotationModel::removeAnnotation(int row)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "row=" << row;
+
     if (row < 0 || row >= m_annotations.size())
         return;
 
+    QString removedId = m_annotations[row].id;
     beginRemoveRows(QModelIndex(), row, row);
     m_annotations.removeAt(row);
     endRemoveRows();
     emit countChanged();
+
+    ltInfo(LT_LOG_ANNOTATION()) << "Removed annotation id=" << removedId << "row=" << row;
 }
 
 void AnnotationModel::updateGeometry(int row, float cx, float cy, float w, float h)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "row=" << row << "cx=" << cx << "cy=" << cy
+                                 << "w=" << w << "h=" << h;
+
     if (row < 0 || row >= m_annotations.size())
         return;
 
@@ -182,6 +204,9 @@ void AnnotationModel::updateGeometry(int row, float cx, float cy, float w, float
 
 void AnnotationModel::updateOBBGeometry(int row, float cx, float cy, float w, float h, float angle)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "row=" << row << "cx=" << cx << "cy=" << cy
+                                 << "w=" << w << "h=" << h << "angle=" << angle;
+
     if (row < 0 || row >= m_annotations.size())
         return;
 
@@ -197,6 +222,9 @@ void AnnotationModel::updateOBBGeometry(int row, float cx, float cy, float w, fl
 
 void AnnotationModel::setClassIndex(int row, int classIndex, const QString &className)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "row=" << row << "classIndex=" << classIndex
+                                 << "className=" << className;
+
     if (row < 0 || row >= m_annotations.size())
         return;
 
@@ -205,10 +233,14 @@ void AnnotationModel::setClassIndex(int row, int classIndex, const QString &clas
     ann.className  = className;
 
     emitDataChanged(row);
+
+    ltInfo(LT_LOG_ANNOTATION()) << "Changed class for row=" << row << "to" << className;
 }
 
 void AnnotationModel::setSelected(int row, bool selected)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "row=" << row << "selected=" << selected;
+
     if (row < 0 || row >= m_annotations.size())
         return;
 
@@ -224,6 +256,8 @@ void AnnotationModel::setSelected(int row, bool selected)
 
 QVariantList AnnotationModel::toVariantList() const
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "count=" << m_annotations.size();
+
     QVariantList result;
     result.reserve(m_annotations.size());
 

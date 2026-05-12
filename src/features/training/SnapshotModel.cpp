@@ -1,17 +1,26 @@
 #include "SnapshotModel.h"
 #include "Database.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
 
-SnapshotModel::SnapshotModel(QObject *parent) : QAbstractListModel(parent) {}
+SnapshotModel::SnapshotModel(QObject *parent) : QAbstractListModel(parent)
+{
+    ltTrace(LT_LOG_TRAINING()) << "parent=" << parent;
+}
 
-int SnapshotModel::rowCount(const QModelIndex &) const { return m_snapshots.size(); }
+int SnapshotModel::rowCount(const QModelIndex &) const
+{
+    return m_snapshots.size();
+}
 
 QVariant SnapshotModel::data(const QModelIndex &index, int role) const
 {
+    ltTrace(LT_LOG_TRAINING()) << "row=" << index.row() << "role=" << role;
+
     if (!index.isValid() || index.row() < 0 || index.row() >= m_snapshots.size())
         return {};
 
@@ -46,12 +55,15 @@ QHash<int, QByteArray> SnapshotModel::roleNames() const
 
 void SnapshotModel::setDatasetId(const QString &datasetId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "datasetId=" << datasetId;
     m_datasetId = datasetId;
     refresh();
 }
 
 void SnapshotModel::refresh()
 {
+    ltTrace(LT_LOG_TRAINING()) << "datasetId=" << m_datasetId;
+
     beginResetModel();
     m_snapshots.clear();
 
@@ -94,6 +106,11 @@ void SnapshotModel::refresh()
 
     endResetModel();
     emit countChanged();
+
+    ltDebug(LT_LOG_TRAINING()) << "Refreshed" << m_snapshots.size() << "snapshots for dataset:" << m_datasetId;
 }
 
-int SnapshotModel::count() const { return m_snapshots.size(); }
+int SnapshotModel::count() const
+{
+    return m_snapshots.size();
+}

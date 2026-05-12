@@ -1,6 +1,7 @@
 #include "InferenceService.h"
 #include "Database.h"
 #include "ipc/IpcClient.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -9,12 +10,15 @@
 #include <QJsonArray>
 #include <QUuid>
 #include <QDateTime>
-#include <QDebug>
 
-InferenceService::InferenceService(QObject *parent) : QObject(parent) {}
+InferenceService::InferenceService(QObject *parent) : QObject(parent)
+{
+    ltTrace(LT_LOG_INFERENCE()) << "parent=" << parent;
+}
 
 void InferenceService::setIpcClient(IpcClient *client)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "client=" << client;
     m_ipcClient = client;
 }
 
@@ -24,6 +28,12 @@ QString InferenceService::runInference(const QString &modelVersionId,
                                         double confThreshold,
                                         double iouThreshold)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "modelVersionId=" << modelVersionId
+                                << "datasetId=" << datasetId
+                                << "sampleScope=" << sampleScope
+                                << "confThreshold=" << confThreshold
+                                << "iouThreshold=" << iouThreshold;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return {};
 
@@ -32,7 +42,7 @@ QString InferenceService::runInference(const QString &modelVersionId,
     checkVersion.prepare("SELECT id FROM model_versions WHERE id = ?");
     checkVersion.addBindValue(modelVersionId);
     if (!checkVersion.exec() || !checkVersion.next()) {
-        qWarning() << "Model version not found:" << modelVersionId;
+        ltError(LT_LOG_INFERENCE()) << "Model version not found:" << modelVersionId;
         return {};
     }
 
@@ -41,7 +51,7 @@ QString InferenceService::runInference(const QString &modelVersionId,
     checkDataset.prepare("SELECT id FROM datasets WHERE id = ?");
     checkDataset.addBindValue(datasetId);
     if (!checkDataset.exec() || !checkDataset.next()) {
-        qWarning() << "Dataset not found:" << datasetId;
+        ltError(LT_LOG_INFERENCE()) << "Dataset not found:" << datasetId;
         return {};
     }
 
@@ -69,7 +79,7 @@ QString InferenceService::runInference(const QString &modelVersionId,
     query.addBindValue(snapshotJson);
 
     if (!query.exec()) {
-        qWarning() << "Failed to create inference batch:" << query.lastError().text();
+        ltError(LT_LOG_INFERENCE()) << "Failed to create inference batch:" << query.lastError().text();
         return {};
     }
 
@@ -85,12 +95,17 @@ QString InferenceService::runInference(const QString &modelVersionId,
         m_ipcClient->sendRequest("inference.run", payload);
     }
 
+    ltInfo(LT_LOG_INFERENCE()) << "Created inference batch:" << batchId
+                               << "modelVersion:" << modelVersionId
+                               << "dataset:" << datasetId;
     emit batchStatusChanged(batchId, "pending");
     return batchId;
 }
 
 QVariantMap InferenceService::getBatchStatus(const QString &batchId)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId;
+
     auto db = Database::instance().database();
     QVariantMap result;
 
@@ -131,6 +146,8 @@ QVariantMap InferenceService::getBatchStatus(const QString &batchId)
 
 QVariantList InferenceService::listBatches(const QString &datasetId)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "datasetId=" << datasetId;
+
     auto db = Database::instance().database();
     QVariantList result;
 
@@ -144,7 +161,7 @@ QVariantList InferenceService::listBatches(const QString &datasetId)
     query.addBindValue(datasetId);
 
     if (!query.exec()) {
-        qWarning() << "Failed to list inference batches:" << query.lastError().text();
+        ltError(LT_LOG_INFERENCE()) << "Failed to list inference batches:" << query.lastError().text();
         return result;
     }
 
@@ -175,11 +192,14 @@ QVariantList InferenceService::listBatches(const QString &datasetId)
         result.append(batch);
     }
 
+    ltDebug(LT_LOG_INFERENCE()) << "Listed" << result.size() << "batches for dataset:" << datasetId;
     return result;
 }
 
 bool InferenceService::cancelBatch(const QString &batchId)
 {
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
@@ -202,7 +222,7 @@ bool InferenceService::cancelBatch(const QString &batchId)
     // Check if already in a terminal state
     QString currentStatus = snapshotObj.value("status").toString("pending");
     if (currentStatus == "completed" || currentStatus == "cancelled") {
-        qWarning() << "Cannot cancel batch in status:" << currentStatus;
+        ltWarning(LT_LOG_INFERENCE()) << "Cannot cancel batch in status:" << currentStatus;
         return false;
     }
 
@@ -217,7 +237,7 @@ bool InferenceService::cancelBatch(const QString &batchId)
     updateQuery.addBindValue(batchId);
 
     if (!updateQuery.exec()) {
-        qWarning() << "Failed to cancel batch:" << updateQuery.lastError().text();
+        ltError(LT_LOG_INFERENCE()) << "Failed to cancel batch:" << updateQuery.lastError().text();
         return false;
     }
 
@@ -228,6 +248,7 @@ bool InferenceService::cancelBatch(const QString &batchId)
         m_ipcClient->sendRequest("inference.cancel", payload);
     }
 
+    ltInfo(LT_LOG_INFERENCE()) << "Cancelled inference batch:" << batchId;
     emit batchStatusChanged(batchId, "cancelled");
     return true;
 }

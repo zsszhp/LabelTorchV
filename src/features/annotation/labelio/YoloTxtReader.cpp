@@ -1,9 +1,9 @@
 #include "YoloTxtReader.h"
+#include "utils/Log.h"
 
 #include <QFile>
 #include <QTextStream>
 #include <QUuid>
-#include <QDebug>
 #include <cmath>
 
 #ifndef M_PI
@@ -16,11 +16,13 @@
 
 QVector<AxisAlignedBox> YoloTxtReader::read(const QString &filePath)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "filePath=" << filePath;
+
     QVector<AxisAlignedBox> result;
 
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qWarning() << "YoloTxtReader: cannot open file:" << filePath;
+        ltError(LT_LOG_ANNOTATION()) << "cannot open file:" << filePath;
         return result;
     }
 
@@ -36,22 +38,27 @@ QVector<AxisAlignedBox> YoloTxtReader::read(const QString &filePath)
         if (ann.classIndex >= 0) {
             result.append(ann);
         } else {
-            qWarning() << "YoloTxtReader: skipping invalid line:" << line;
+            ltWarning(LT_LOG_ANNOTATION()) << "skipping invalid line:" << line;
         }
     }
 
     file.close();
+
+    ltInfo(LT_LOG_ANNOTATION()) << "Read" << result.size() << "HBB annotations from" << filePath;
     return result;
 }
 
 AxisAlignedBox YoloTxtReader::parseLine(const QString &line)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "line=" << line;
+
     AxisAlignedBox ann;
     ann.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
 
     QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
     if (parts.size() != 5) {
         ann.classIndex = -1;   // mark as invalid
+        ltWarning(LT_LOG_ANNOTATION()) << "Invalid HBB line: expected 5 parts, got" << parts.size();
         return ann;
     }
 
@@ -60,6 +67,7 @@ AxisAlignedBox YoloTxtReader::parseLine(const QString &line)
     int classId = parts[0].toInt(&ok);
     if (!ok || classId < 0) {
         ann.classIndex = -1;
+        ltWarning(LT_LOG_ANNOTATION()) << "Invalid class_id in HBB line:" << parts[0];
         return ann;
     }
     ann.classIndex = classId;
@@ -71,6 +79,7 @@ AxisAlignedBox YoloTxtReader::parseLine(const QString &line)
         coords[i] = parts[i + 1].toFloat(&convOk);
         if (!convOk || coords[i] < 0.0f || coords[i] > 1.0f) {
             ann.classIndex = -1;
+            ltWarning(LT_LOG_ANNOTATION()) << "Invalid coordinate value at index" << (i + 1) << ":" << parts[i + 1];
             return ann;
         }
     }
@@ -89,11 +98,13 @@ AxisAlignedBox YoloTxtReader::parseLine(const QString &line)
 
 QVector<RotatedBox> YoloTxtReader::readOBB(const QString &filePath)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "filePath=" << filePath;
+
     QVector<RotatedBox> result;
 
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qWarning() << "YoloTxtReader: cannot open file for OBB:" << filePath;
+        ltError(LT_LOG_ANNOTATION()) << "cannot open file for OBB:" << filePath;
         return result;
     }
 
@@ -108,22 +119,27 @@ QVector<RotatedBox> YoloTxtReader::readOBB(const QString &filePath)
         if (ann.classIndex >= 0) {
             result.append(ann);
         } else {
-            qWarning() << "YoloTxtReader: skipping invalid OBB line:" << line;
+            ltWarning(LT_LOG_ANNOTATION()) << "skipping invalid OBB line:" << line;
         }
     }
 
     file.close();
+
+    ltInfo(LT_LOG_ANNOTATION()) << "Read" << result.size() << "OBB annotations from" << filePath;
     return result;
 }
 
 RotatedBox YoloTxtReader::parseOBBLine(const QString &line)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "line=" << line;
+
     RotatedBox ann;
     ann.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
 
     QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
     if (parts.size() != 9) {
         ann.classIndex = -1;
+        ltWarning(LT_LOG_ANNOTATION()) << "Invalid OBB line: expected 9 parts, got" << parts.size();
         return ann;
     }
 
@@ -132,6 +148,7 @@ RotatedBox YoloTxtReader::parseOBBLine(const QString &line)
     int classId = parts[0].toInt(&ok);
     if (!ok || classId < 0) {
         ann.classIndex = -1;
+        ltWarning(LT_LOG_ANNOTATION()) << "Invalid class_id in OBB line:" << parts[0];
         return ann;
     }
     ann.classIndex = classId;
@@ -143,6 +160,7 @@ RotatedBox YoloTxtReader::parseOBBLine(const QString &line)
         coords[i] = parts[i + 1].toFloat(&convOk);
         if (!convOk || coords[i] < 0.0f || coords[i] > 1.0f) {
             ann.classIndex = -1;
+            ltWarning(LT_LOG_ANNOTATION()) << "Invalid coordinate value at index" << (i + 1) << ":" << parts[i + 1];
             return ann;
         }
     }
@@ -175,9 +193,11 @@ RotatedBox YoloTxtReader::parseOBBLine(const QString &line)
 
 Geometry::ShapeType YoloTxtReader::detectFormat(const QString &filePath)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "filePath=" << filePath;
+
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qWarning() << "YoloTxtReader: cannot open file for format detection:" << filePath;
+        ltError(LT_LOG_ANNOTATION()) << "cannot open file for format detection:" << filePath;
         return Geometry::HBB;  // default fallback
     }
 
@@ -191,15 +211,21 @@ Geometry::ShapeType YoloTxtReader::detectFormat(const QString &filePath)
         QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
         file.close();
 
-        if (parts.size() == 9)
+        if (parts.size() == 9) {
+            ltInfo(LT_LOG_ANNOTATION()) << "Detected OBB format for" << filePath;
             return Geometry::OBB;
-        if (parts.size() == 5)
+        }
+        if (parts.size() == 5) {
+            ltInfo(LT_LOG_ANNOTATION()) << "Detected HBB format for" << filePath;
             return Geometry::HBB;
+        }
 
         // Unknown format, default to HBB
+        ltWarning(LT_LOG_ANNOTATION()) << "Unknown format (parts=" << parts.size() << "), defaulting to HBB for" << filePath;
         return Geometry::HBB;
     }
 
     file.close();
+    ltDebug(LT_LOG_ANNOTATION()) << "Empty file, defaulting to HBB for" << filePath;
     return Geometry::HBB;  // empty file defaults to HBB
 }

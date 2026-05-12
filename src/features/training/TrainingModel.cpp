@@ -1,16 +1,25 @@
 #include "TrainingModel.h"
 #include "Database.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QJsonDocument>
 #include <QJsonObject>
 
-TrainingModel::TrainingModel(QObject *parent) : QAbstractListModel(parent) {}
+TrainingModel::TrainingModel(QObject *parent) : QAbstractListModel(parent)
+{
+    ltTrace(LT_LOG_TRAINING()) << "parent=" << parent;
+}
 
-int TrainingModel::rowCount(const QModelIndex &) const { return m_runs.size(); }
+int TrainingModel::rowCount(const QModelIndex &) const
+{
+    return m_runs.size();
+}
 
 QVariant TrainingModel::data(const QModelIndex &index, int role) const
 {
+    ltTrace(LT_LOG_TRAINING()) << "row=" << index.row() << "role=" << role;
+
     if (!index.isValid() || index.row() < 0 || index.row() >= m_runs.size())
         return {};
 
@@ -41,12 +50,15 @@ QHash<int, QByteArray> TrainingModel::roleNames() const
 
 void TrainingModel::setProjectId(const QString &projectId)
 {
+    ltTrace(LT_LOG_TRAINING()) << "projectId=" << projectId;
     m_projectId = projectId;
     refresh();
 }
 
 void TrainingModel::refresh()
 {
+    ltTrace(LT_LOG_TRAINING()) << "projectId=" << m_projectId;
+
     beginResetModel();
     m_runs.clear();
 
@@ -83,6 +95,11 @@ void TrainingModel::refresh()
 
     endResetModel();
     emit countChanged();
+
+    ltDebug(LT_LOG_TRAINING()) << "Refreshed" << m_runs.size() << "runs for project:" << m_projectId;
 }
 
-int TrainingModel::count() const { return m_runs.size(); }
+int TrainingModel::count() const
+{
+    return m_runs.size();
+}

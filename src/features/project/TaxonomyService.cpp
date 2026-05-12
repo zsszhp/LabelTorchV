@@ -1,16 +1,18 @@
 #include "TaxonomyService.h"
 #include "database/Database.h"
 #include "utils/Id.h"
+#include "utils/Log.h"
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonArray>
-#include <QDebug>
 
 TaxonomyService::TaxonomyService(QObject *parent) : QObject(parent) {}
 
 QString TaxonomyService::createTaxonomy(const QString &projectId, const QString &name, const QVariantList &classes)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "createTaxonomy projectId=" << projectId << "name=" << name << "classCount=" << classes.size();
+
     QString taxonomyId = Id::generate();
 
     QJsonArray arr;
@@ -25,15 +27,17 @@ QString TaxonomyService::createTaxonomy(const QString &projectId, const QString 
     query.addBindValue(classesJson);
 
     if (!query.exec()) {
-        qWarning() << "Failed to create taxonomy:" << query.lastError().text();
+        ltError(LT_LOG_TAXONOMY()) << "Failed to create taxonomy:" << query.lastError().text();
         return {};
     }
-    qDebug() << "Taxonomy created:" << taxonomyId << name << "with" << classes.size() << "classes";
+    ltInfo(LT_LOG_TAXONOMY()) << "Taxonomy created:" << taxonomyId << name << "with" << classes.size() << "classes";
     return taxonomyId;
 }
 
 QVariantList TaxonomyService::listTaxonomies(const QString &projectId)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "listTaxonomies projectId=" << projectId;
+
     QVariantList result;
     QSqlQuery query(Database::instance().database());
     query.prepare("SELECT id, name, version, class_definitions_json FROM taxonomies WHERE project_id = ?");
@@ -47,11 +51,15 @@ QVariantList TaxonomyService::listTaxonomies(const QString &projectId)
         t["classesJson"] = query.value(3);
         result.append(t);
     }
+
+    ltDebug(LT_LOG_TAXONOMY()) << "Listed" << result.size() << "taxonomies for project" << projectId;
     return result;
 }
 
 QVariantMap TaxonomyService::getTaxonomy(const QString &taxonomyId)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "getTaxonomy id=" << taxonomyId;
+
     QSqlQuery query(Database::instance().database());
     query.prepare("SELECT id, project_id, name, version, class_definitions_json FROM taxonomies WHERE id = ?");
     query.addBindValue(taxonomyId);
@@ -69,14 +77,25 @@ QVariantMap TaxonomyService::getTaxonomy(const QString &taxonomyId)
 
 bool TaxonomyService::deleteTaxonomy(const QString &taxonomyId)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "deleteTaxonomy id=" << taxonomyId;
+
     QSqlQuery query(Database::instance().database());
     query.prepare("DELETE FROM taxonomies WHERE id = ?");
     query.addBindValue(taxonomyId);
-    return query.exec();
+    bool ok = query.exec();
+
+    if (ok) {
+        ltInfo(LT_LOG_TAXONOMY()) << "Taxonomy deleted:" << taxonomyId;
+    } else {
+        ltError(LT_LOG_TAXONOMY()) << "Failed to delete taxonomy:" << query.lastError().text();
+    }
+    return ok;
 }
 
 bool TaxonomyService::addClass(const QString &taxonomyId, const QString &className)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "addClass taxonomyId=" << taxonomyId << "class=" << className;
+
     QVariantList classes = getClasses(taxonomyId);
     classes.append(className);
 
@@ -89,14 +108,17 @@ bool TaxonomyService::addClass(const QString &taxonomyId, const QString &classNa
     query.addBindValue(classesJson);
     query.addBindValue(taxonomyId);
     if (!query.exec()) {
-        qWarning() << "Failed to add class:" << query.lastError().text();
+        ltError(LT_LOG_TAXONOMY()) << "Failed to add class:" << query.lastError().text();
         return false;
     }
+    ltInfo(LT_LOG_TAXONOMY()) << "Class added:" << className << "to taxonomy" << taxonomyId;
     return true;
 }
 
 bool TaxonomyService::removeClass(const QString &taxonomyId, int classIndex)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "removeClass taxonomyId=" << taxonomyId << "index=" << classIndex;
+
     QVariantList classes = getClasses(taxonomyId);
     if (classIndex < 0 || classIndex >= classes.size()) return false;
     classes.removeAt(classIndex);
@@ -110,14 +132,17 @@ bool TaxonomyService::removeClass(const QString &taxonomyId, int classIndex)
     query.addBindValue(classesJson);
     query.addBindValue(taxonomyId);
     if (!query.exec()) {
-        qWarning() << "Failed to remove class:" << query.lastError().text();
+        ltError(LT_LOG_TAXONOMY()) << "Failed to remove class:" << query.lastError().text();
         return false;
     }
+    ltInfo(LT_LOG_TAXONOMY()) << "Class removed at index" << classIndex << "from taxonomy" << taxonomyId;
     return true;
 }
 
 bool TaxonomyService::renameClass(const QString &taxonomyId, int classIndex, const QString &newName)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "renameClass taxonomyId=" << taxonomyId << "index=" << classIndex << "newName=" << newName;
+
     QVariantList classes = getClasses(taxonomyId);
     if (classIndex < 0 || classIndex >= classes.size()) return false;
     classes[classIndex] = newName;
@@ -131,7 +156,7 @@ bool TaxonomyService::renameClass(const QString &taxonomyId, int classIndex, con
     query.addBindValue(classesJson);
     query.addBindValue(taxonomyId);
     if (!query.exec()) {
-        qWarning() << "Failed to rename class:" << query.lastError().text();
+        ltError(LT_LOG_TAXONOMY()) << "Failed to rename class:" << query.lastError().text();
         return false;
     }
     return true;
@@ -139,6 +164,8 @@ bool TaxonomyService::renameClass(const QString &taxonomyId, int classIndex, con
 
 bool TaxonomyService::reorderClasses(const QString &taxonomyId, const QVariantList &newOrder)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "reorderClasses taxonomyId=" << taxonomyId << "count=" << newOrder.size();
+
     QJsonArray arr;
     for (const auto &c : newOrder) arr.append(c.toString());
     QString classesJson = QJsonDocument(arr).toJson(QJsonDocument::Compact);
@@ -148,7 +175,7 @@ bool TaxonomyService::reorderClasses(const QString &taxonomyId, const QVariantLi
     query.addBindValue(classesJson);
     query.addBindValue(taxonomyId);
     if (!query.exec()) {
-        qWarning() << "Failed to reorder classes:" << query.lastError().text();
+        ltError(LT_LOG_TAXONOMY()) << "Failed to reorder classes:" << query.lastError().text();
         return false;
     }
     return true;
@@ -156,6 +183,8 @@ bool TaxonomyService::reorderClasses(const QString &taxonomyId, const QVariantLi
 
 QVariantList TaxonomyService::getClasses(const QString &taxonomyId)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "getClasses taxonomyId=" << taxonomyId;
+
     QSqlQuery query(Database::instance().database());
     query.prepare("SELECT class_definitions_json FROM taxonomies WHERE id = ?");
     query.addBindValue(taxonomyId);
@@ -170,6 +199,8 @@ QVariantList TaxonomyService::getClasses(const QString &taxonomyId)
 
 int TaxonomyService::getTaxonomyVersion(const QString &taxonomyId)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "getTaxonomyVersion id=" << taxonomyId;
+
     QSqlQuery query(Database::instance().database());
     query.prepare("SELECT version FROM taxonomies WHERE id = ?");
     query.addBindValue(taxonomyId);

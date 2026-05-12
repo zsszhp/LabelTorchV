@@ -1,19 +1,25 @@
 #include "CanvasController.h"
-#include <QDebug>
+#include "utils/Log.h"
 #include <QImage>
 
-CanvasController::CanvasController(QObject *parent) : QObject(parent) {}
+CanvasController::CanvasController(QObject *parent) : QObject(parent)
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "parent=" << parent;
+}
 
 void CanvasController::setZoom(qreal z)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "z=" << z << "current=" << m_zoom;
     if (qFuzzyCompare(m_zoom, z)) return;
     m_zoom = z;
     emit zoomChanged();
     emit canvasUpdateRequested();
+    ltInfo(LT_LOG_ANNOTATION()) << "Zoom changed to" << z;
 }
 
 void CanvasController::setPanX(qreal x)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "x=" << x << "current=" << m_panX;
     if (qFuzzyCompare(m_panX, x)) return;
     m_panX = x;
     emit panChanged();
@@ -22,6 +28,7 @@ void CanvasController::setPanX(qreal x)
 
 void CanvasController::setPanY(qreal y)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "y=" << y << "current=" << m_panY;
     if (qFuzzyCompare(m_panY, y)) return;
     m_panY = y;
     emit panChanged();
@@ -30,13 +37,17 @@ void CanvasController::setPanY(qreal y)
 
 void CanvasController::setDrawMode(const QString &mode)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "mode=" << mode << "current=" << m_drawMode;
     if (m_drawMode == mode) return;
     m_drawMode = mode;
     emit drawModeChanged();
+    ltInfo(LT_LOG_ANNOTATION()) << "Draw mode changed to" << mode;
 }
 
 void CanvasController::loadImage(const QString &imagePath, const QString &labelPath)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "imagePath=" << imagePath << "labelPath=" << labelPath;
+
     m_currentImagePath = imagePath;
     m_currentLabelPath = labelPath;
 
@@ -48,17 +59,22 @@ void CanvasController::loadImage(const QString &imagePath, const QString &labelP
     } else {
         m_imageWidth = 0;
         m_imageHeight = 0;
-        qWarning() << "CanvasController: cannot load image:" << imagePath;
+        ltError(LT_LOG_ANNOTATION()) << "cannot load image:" << imagePath;
     }
 
     m_dirty = false;
     emit dirtyChanged();
     emit currentImageChanged();
     emit canvasUpdateRequested();
+
+    ltInfo(LT_LOG_ANNOTATION()) << "Image loaded:" << imagePath
+                                << m_imageWidth << "x" << m_imageHeight;
 }
 
 void CanvasController::fitToView(qreal viewWidth, qreal viewHeight)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "viewWidth=" << viewWidth << "viewHeight=" << viewHeight;
+
     if (m_imageWidth <= 0 || m_imageHeight <= 0) return;
 
     qreal scaleX = viewWidth / m_imageWidth;
@@ -72,16 +88,23 @@ void CanvasController::fitToView(qreal viewWidth, qreal viewHeight)
     emit zoomChanged();
     emit panChanged();
     emit canvasUpdateRequested();
+
+    ltDebug(LT_LOG_ANNOTATION()) << "Fit to view: zoom=" << m_zoom
+                                 << "pan=(" << m_panX << "," << m_panY << ")";
 }
 
 void CanvasController::resetView()
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "resetting view";
+
     m_zoom = 1.0;
     m_panX = 0;
     m_panY = 0;
     emit zoomChanged();
     emit panChanged();
     emit canvasUpdateRequested();
+
+    ltInfo(LT_LOG_ANNOTATION()) << "View reset to defaults";
 }
 
 qreal CanvasController::imageToCanvasX(qreal imgX) const
@@ -108,16 +131,20 @@ qreal CanvasController::canvasToImageY(qreal canvasY) const
 
 void CanvasController::markDirty()
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "dirty=" << m_dirty;
     if (!m_dirty) {
         m_dirty = true;
         emit dirtyChanged();
+        ltInfo(LT_LOG_ANNOTATION()) << "Canvas marked dirty";
     }
 }
 
 void CanvasController::clearDirty()
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "dirty=" << m_dirty;
     if (m_dirty) {
         m_dirty = false;
         emit dirtyChanged();
+        ltInfo(LT_LOG_ANNOTATION()) << "Canvas dirty flag cleared";
     }
 }

@@ -5,13 +5,13 @@
 #include "geometry/RotatedBox.h"
 #include "database/Database.h"
 #include "utils/Id.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
-#include <QDebug>
 #include <QFile>
 #include <QTextStream>
 #include <QFileInfo>
@@ -20,10 +20,13 @@
 AnnotationService::AnnotationService(QObject *parent)
     : QObject(parent)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "parent=" << parent;
 }
 
 QVariantList AnnotationService::loadAnnotations(const QString &labelPath)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath << "shapeType=" << m_shapeType;
+
     QVariantList result;
 
     if (m_shapeType == 1) {
@@ -50,12 +53,17 @@ QVariantList AnnotationService::loadAnnotations(const QString &labelPath)
         result.append(m);
     }
 
+    ltInfo(LT_LOG_ANNOTATION()) << "Loaded" << boxes.size() << "HBB annotations from" << labelPath;
     return result;
 }
 
 bool AnnotationService::saveAnnotations(const QString &labelPath, const QString &datasetId,
                                         const QString &sampleId, const QVariantList &annotations)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath << "datasetId=" << datasetId
+                                 << "sampleId=" << sampleId << "count=" << annotations.size()
+                                 << "shapeType=" << m_shapeType;
+
     if (m_shapeType == 1) {
         // OBB mode
         return saveOBBAnnotations(labelPath, datasetId, sampleId, annotations);
@@ -84,7 +92,7 @@ bool AnnotationService::saveAnnotations(const QString &labelPath, const QString 
 
     // Write to file atomically
     if (!YoloTxtWriter::write(labelPath, boxes)) {
-        qWarning() << "AnnotationService: Failed to write annotations to:" << labelPath;
+        ltError(LT_LOG_ANNOTATION()) << "Failed to write annotations to:" << labelPath;
         return false;
     }
 
@@ -94,15 +102,18 @@ bool AnnotationService::saveAnnotations(const QString &labelPath, const QString 
                                    QVariantList(),
                                    annotations);
     if (revId.isEmpty()) {
-        qWarning() << "AnnotationService: File saved but revision record failed for sample:" << sampleId;
+        ltWarning(LT_LOG_ANNOTATION()) << "File saved but revision record failed for sample:" << sampleId;
         // File was written successfully; revision failure is non-fatal
     }
 
+    ltInfo(LT_LOG_ANNOTATION()) << "Saved" << boxes.size() << "HBB annotations to" << labelPath;
     return true;
 }
 
 QVariantList AnnotationService::loadOBBAnnotations(const QString &labelPath)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath;
+
     QVariantList result;
 
     QVector<RotatedBox> boxes = YoloTxtReader::readOBB(labelPath);
@@ -124,12 +135,16 @@ QVariantList AnnotationService::loadOBBAnnotations(const QString &labelPath)
         result.append(m);
     }
 
+    ltInfo(LT_LOG_ANNOTATION()) << "Loaded" << boxes.size() << "OBB annotations from" << labelPath;
     return result;
 }
 
 bool AnnotationService::saveOBBAnnotations(const QString &labelPath, const QString &datasetId,
                                             const QString &sampleId, const QVariantList &annotations)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath << "datasetId=" << datasetId
+                                 << "sampleId=" << sampleId << "count=" << annotations.size();
+
     // Convert QVariantList -> QVector<RotatedBox>
     QVector<RotatedBox> boxes;
     boxes.reserve(annotations.size());
@@ -153,7 +168,7 @@ bool AnnotationService::saveOBBAnnotations(const QString &labelPath, const QStri
 
     // Write to file atomically in OBB format
     if (!YoloTxtWriter::writeOBB(labelPath, boxes)) {
-        qWarning() << "AnnotationService: Failed to write OBB annotations to:" << labelPath;
+        ltError(LT_LOG_ANNOTATION()) << "Failed to write OBB annotations to:" << labelPath;
         return false;
     }
 
@@ -163,14 +178,17 @@ bool AnnotationService::saveOBBAnnotations(const QString &labelPath, const QStri
                                    QVariantList(),
                                    annotations);
     if (revId.isEmpty()) {
-        qWarning() << "AnnotationService: OBB file saved but revision record failed for sample:" << sampleId;
+        ltWarning(LT_LOG_ANNOTATION()) << "OBB file saved but revision record failed for sample:" << sampleId;
     }
 
+    ltInfo(LT_LOG_ANNOTATION()) << "Saved" << boxes.size() << "OBB annotations to" << labelPath;
     return true;
 }
 
 QVariantMap AnnotationService::loadClassificationLabels(const QString &labelPath)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath;
+
     QVariantMap result;
 
     QFile file(labelPath);
@@ -182,7 +200,7 @@ QVariantMap AnnotationService::loadClassificationLabels(const QString &labelPath
     }
 
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qWarning() << "AnnotationService: Failed to open classification label file:" << labelPath;
+        ltError(LT_LOG_ANNOTATION()) << "Failed to open classification label file:" << labelPath;
         result[QStringLiteral("labelType")] = QStringLiteral("single");
         result[QStringLiteral("classId")] = -1;
         result[QStringLiteral("className")] = QString();
@@ -207,7 +225,7 @@ QVariantMap AnnotationService::loadClassificationLabels(const QString &labelPath
         bool ok = false;
         int classId = parts[0].toInt(&ok);
         if (!ok) {
-            qWarning() << "AnnotationService: Invalid class_id in classification label file:" << labelPath;
+            ltWarning(LT_LOG_ANNOTATION()) << "Invalid class_id in classification label file:" << labelPath;
             classId = -1;
         }
         result[QStringLiteral("labelType")] = QStringLiteral("single");
@@ -230,12 +248,17 @@ QVariantMap AnnotationService::loadClassificationLabels(const QString &labelPath
         result[QStringLiteral("classNames")] = classNames;
     }
 
+    ltInfo(LT_LOG_ANNOTATION()) << "Loaded classification labels from" << labelPath
+                                << "type=" << result[QStringLiteral("labelType")].toString();
     return result;
 }
 
 bool AnnotationService::saveClassificationLabels(const QString &labelPath, const QString &datasetId,
                                                   const QString &sampleId, const QVariantMap &labels)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath << "datasetId=" << datasetId
+                                 << "sampleId=" << sampleId;
+
     QString labelType = labels[QStringLiteral("labelType")].toString();
     QString content;
 
@@ -258,7 +281,7 @@ bool AnnotationService::saveClassificationLabels(const QString &labelPath, const
     QDir dir = fi.absoluteDir();
     if (!dir.exists()) {
         if (!dir.mkpath(QLatin1String("."))) {
-            qWarning() << "AnnotationService: cannot create directory for classification label:" << dir.absolutePath();
+            ltError(LT_LOG_ANNOTATION()) << "cannot create directory for classification label:" << dir.absolutePath();
             return false;
         }
     }
@@ -267,7 +290,7 @@ bool AnnotationService::saveClassificationLabels(const QString &labelPath, const
     {
         QFile tempFile(tempPath);
         if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-            qWarning() << "AnnotationService: cannot open temp file for classification label:" << tempPath;
+            ltError(LT_LOG_ANNOTATION()) << "cannot open temp file for classification label:" << tempPath;
             return false;
         }
 
@@ -275,7 +298,7 @@ bool AnnotationService::saveClassificationLabels(const QString &labelPath, const
         out << content << QLatin1Char('\n');
         out.flush();
         if (!tempFile.flush()) {
-            qWarning() << "AnnotationService: flush failed for classification temp file:" << tempPath;
+            ltError(LT_LOG_ANNOTATION()) << "flush failed for classification temp file:" << tempPath;
             QFile::remove(tempPath);
             return false;
         }
@@ -283,14 +306,14 @@ bool AnnotationService::saveClassificationLabels(const QString &labelPath, const
 
     if (QFile::exists(labelPath)) {
         if (!QFile::remove(labelPath)) {
-            qWarning() << "AnnotationService: cannot remove existing classification label file:" << labelPath;
+            ltError(LT_LOG_ANNOTATION()) << "cannot remove existing classification label file:" << labelPath;
             QFile::remove(tempPath);
             return false;
         }
     }
 
     if (!QFile::rename(tempPath, labelPath)) {
-        qWarning() << "AnnotationService: cannot rename temp file to classification label:" << labelPath;
+        ltError(LT_LOG_ANNOTATION()) << "cannot rename temp file to classification label:" << labelPath;
         QFile::remove(tempPath);
         return false;
     }
@@ -311,14 +334,17 @@ bool AnnotationService::saveClassificationLabels(const QString &labelPath, const
                                    QVariantList(),
                                    afterSnapshot);
     if (revId.isEmpty()) {
-        qWarning() << "AnnotationService: Classification label saved but revision record failed for sample:" << sampleId;
+        ltWarning(LT_LOG_ANNOTATION()) << "Classification label saved but revision record failed for sample:" << sampleId;
     }
 
+    ltInfo(LT_LOG_ANNOTATION()) << "Saved classification labels to" << labelPath << "type=" << labelType;
     return true;
 }
 
 QVariantMap AnnotationService::loadAnomalyLabels(const QString &labelPath)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath;
+
     QVariantMap result;
 
     QFile file(labelPath);
@@ -329,7 +355,7 @@ QVariantMap AnnotationService::loadAnomalyLabels(const QString &labelPath)
     }
 
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qWarning() << "AnnotationService: Failed to open anomaly label file:" << labelPath;
+        ltError(LT_LOG_ANNOTATION()) << "Failed to open anomaly label file:" << labelPath;
         result[QStringLiteral("isAnomalous")] = false;
         result[QStringLiteral("anomalyType")] = QString();
         return result;
@@ -351,7 +377,7 @@ QVariantMap AnnotationService::loadAnomalyLabels(const QString &labelPath)
     bool ok = false;
     int labelValue = parts[0].toInt(&ok);
     if (!ok) {
-        qWarning() << "AnnotationService: Invalid anomaly label in file:" << labelPath;
+        ltWarning(LT_LOG_ANNOTATION()) << "Invalid anomaly label in file:" << labelPath;
         result[QStringLiteral("isAnomalous")] = false;
         result[QStringLiteral("anomalyType")] = QString();
         return result;
@@ -366,12 +392,17 @@ QVariantMap AnnotationService::loadAnomalyLabels(const QString &labelPath)
         result[QStringLiteral("anomalyType")] = QString();
     }
 
+    ltInfo(LT_LOG_ANNOTATION()) << "Loaded anomaly labels from" << labelPath
+                                << "isAnomalous=" << result[QStringLiteral("isAnomalous")].toBool();
     return result;
 }
 
 bool AnnotationService::saveAnomalyLabels(const QString &labelPath, const QString &datasetId,
                                            const QString &sampleId, bool isAnomalous)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath << "datasetId=" << datasetId
+                                 << "sampleId=" << sampleId << "isAnomalous=" << isAnomalous;
+
     // Content: "0" for normal, "1" for anomalous
     QString content = isAnomalous ? QStringLiteral("1") : QStringLiteral("0");
 
@@ -380,7 +411,7 @@ bool AnnotationService::saveAnomalyLabels(const QString &labelPath, const QStrin
     QDir dir = fi.absoluteDir();
     if (!dir.exists()) {
         if (!dir.mkpath(QLatin1String("."))) {
-            qWarning() << "AnnotationService: cannot create directory for anomaly label:" << dir.absolutePath();
+            ltError(LT_LOG_ANNOTATION()) << "cannot create directory for anomaly label:" << dir.absolutePath();
             return false;
         }
     }
@@ -389,7 +420,7 @@ bool AnnotationService::saveAnomalyLabels(const QString &labelPath, const QStrin
     {
         QFile tempFile(tempPath);
         if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-            qWarning() << "AnnotationService: cannot open temp file for anomaly label:" << tempPath;
+            ltError(LT_LOG_ANNOTATION()) << "cannot open temp file for anomaly label:" << tempPath;
             return false;
         }
 
@@ -397,7 +428,7 @@ bool AnnotationService::saveAnomalyLabels(const QString &labelPath, const QStrin
         out << content << QLatin1Char('\n');
         out.flush();
         if (!tempFile.flush()) {
-            qWarning() << "AnnotationService: flush failed for anomaly temp file:" << tempPath;
+            ltError(LT_LOG_ANNOTATION()) << "flush failed for anomaly temp file:" << tempPath;
             QFile::remove(tempPath);
             return false;
         }
@@ -405,14 +436,14 @@ bool AnnotationService::saveAnomalyLabels(const QString &labelPath, const QStrin
 
     if (QFile::exists(labelPath)) {
         if (!QFile::remove(labelPath)) {
-            qWarning() << "AnnotationService: cannot remove existing anomaly label file:" << labelPath;
+            ltError(LT_LOG_ANNOTATION()) << "cannot remove existing anomaly label file:" << labelPath;
             QFile::remove(tempPath);
             return false;
         }
     }
 
     if (!QFile::rename(tempPath, labelPath)) {
-        qWarning() << "AnnotationService: cannot rename temp file to anomaly label:" << labelPath;
+        ltError(LT_LOG_ANNOTATION()) << "cannot rename temp file to anomaly label:" << labelPath;
         QFile::remove(tempPath);
         return false;
     }
@@ -429,16 +460,18 @@ bool AnnotationService::saveAnomalyLabels(const QString &labelPath, const QStrin
                                    QVariantList(),
                                    afterSnapshot);
     if (revId.isEmpty()) {
-        qWarning() << "AnnotationService: Anomaly label saved but revision record failed for sample:" << sampleId;
+        ltWarning(LT_LOG_ANNOTATION()) << "Anomaly label saved but revision record failed for sample:" << sampleId;
     }
 
+    ltInfo(LT_LOG_ANNOTATION()) << "Saved anomaly labels to" << labelPath << "isAnomalous=" << isAnomalous;
     return true;
 }
 
 void AnnotationService::setShapeType(int shapeType)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "shapeType=" << shapeType;
     m_shapeType = shapeType;
-    qDebug() << "AnnotationService: shape type set to" << (shapeType == 1 ? "OBB" : "HBB");
+    ltInfo(LT_LOG_ANNOTATION()) << "Shape type set to" << (shapeType == 1 ? "OBB" : "HBB");
 }
 
 QString AnnotationService::createRevision(const QString &datasetId, const QString &sampleId,
@@ -446,6 +479,11 @@ QString AnnotationService::createRevision(const QString &datasetId, const QStrin
                                           const QVariantList &beforeSnapshot,
                                           const QVariantList &afterSnapshot)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "datasetId=" << datasetId << "sampleId=" << sampleId
+                                 << "sourceType=" << sourceType
+                                 << "beforeCount=" << beforeSnapshot.size()
+                                 << "afterCount=" << afterSnapshot.size();
+
     QString revisionId = Id::generate();
 
     // Serialize before snapshot to JSON
@@ -501,17 +539,19 @@ QString AnnotationService::createRevision(const QString &datasetId, const QStrin
     query.addBindValue(afterJson);
 
     if (!query.exec()) {
-        qWarning() << "AnnotationService: Failed to create revision:" << query.lastError().text();
+        ltError(LT_LOG_ANNOTATION()) << "Failed to create revision:" << query.lastError().text();
         return {};
     }
 
-    qDebug() << "AnnotationService: Revision created:" << revisionId
+    ltDebug(LT_LOG_ANNOTATION()) << "Revision created:" << revisionId
              << "sample:" << sampleId << "source:" << sourceType;
     return revisionId;
 }
 
 QVariantList AnnotationService::listSamples(const QString &datasetId)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "datasetId=" << datasetId;
+
     QVariantList result;
 
     QSqlQuery query(Database::instance().database());
@@ -521,7 +561,7 @@ QVariantList AnnotationService::listSamples(const QString &datasetId)
     query.addBindValue(datasetId);
 
     if (!query.exec()) {
-        qWarning() << "AnnotationService::listSamples failed:" << query.lastError().text();
+        ltError(LT_LOG_ANNOTATION()) << "listSamples failed:" << query.lastError().text();
         return result;
     }
 
@@ -539,11 +579,14 @@ QVariantList AnnotationService::listSamples(const QString &datasetId)
         result.append(s);
     }
 
+    ltDebug(LT_LOG_ANNOTATION()) << "Listed" << result.size() << "samples for dataset" << datasetId;
     return result;
 }
 
 QVariantMap AnnotationService::getSample(const QString &sampleId)
 {
+    ltTrace(LT_LOG_ANNOTATION()) << "sampleId=" << sampleId;
+
     QSqlQuery query(Database::instance().database());
     query.prepare("SELECT id, dataset_id, image_path, label_path, width, height, "
                   "hash, validation_status, error_code "
@@ -564,7 +607,7 @@ QVariantMap AnnotationService::getSample(const QString &sampleId)
         return s;
     }
 
-    qWarning() << "AnnotationService::getSample: not found or error:" << sampleId
+    ltWarning(LT_LOG_ANNOTATION()) << "Sample not found or query error:" << sampleId
                << query.lastError().text();
     return {};
 }

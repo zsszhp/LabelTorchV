@@ -1,5 +1,6 @@
 #include "ProjectModel.h"
 #include "database/Database.h"
+#include "utils/Log.h"
 #include <QSqlQuery>
 
 ProjectModel::ProjectModel(QObject *parent) : QAbstractListModel(parent) { refresh(); }
@@ -26,6 +27,8 @@ QHash<int, QByteArray> ProjectModel::roleNames() const
 
 void ProjectModel::refresh()
 {
+    ltTrace(LT_LOG_PROJECT()) << "refresh";
+
     beginResetModel();
     m_projects.clear();
     QSqlQuery query(Database::instance().database());
@@ -35,4 +38,6 @@ void ProjectModel::refresh()
                           query.value(2).toString(), query.value(3).toString()});
     }
     endResetModel();
+
+    ltDebug(LT_LOG_PROJECT()) << "Refreshed" << m_projects.size() << "projects";
 }

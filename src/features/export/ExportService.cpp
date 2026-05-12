@@ -1,6 +1,7 @@
 #include "ExportService.h"
 #include "Database.h"
 #include "ipc/IpcClient.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -8,12 +9,15 @@
 #include <QJsonObject>
 #include <QUuid>
 #include <QDateTime>
-#include <QDebug>
 
-ExportService::ExportService(QObject *parent) : QObject(parent) {}
+ExportService::ExportService(QObject *parent) : QObject(parent)
+{
+    ltTrace(LT_LOG_EXPORT()) << "parent=" << parent;
+}
 
 void ExportService::setIpcClient(IpcClient *client)
 {
+    ltTrace(LT_LOG_EXPORT()) << "client=" << client;
     m_ipcClient = client;
 }
 
@@ -21,6 +25,10 @@ QString ExportService::exportModel(const QString &modelVersionId,
                                     const QString &format,
                                     const QString &optionsJson)
 {
+    ltTrace(LT_LOG_EXPORT()) << "modelVersionId=" << modelVersionId
+                             << "format=" << format
+                             << "optionsJson=" << optionsJson;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return {};
 
@@ -29,7 +37,7 @@ QString ExportService::exportModel(const QString &modelVersionId,
     checkVersion.prepare("SELECT id, best_weight_path FROM model_versions WHERE id = ?");
     checkVersion.addBindValue(modelVersionId);
     if (!checkVersion.exec() || !checkVersion.next()) {
-        qWarning() << "Model version not found:" << modelVersionId;
+        ltError(LT_LOG_EXPORT()) << "Model version not found:" << modelVersionId;
         return {};
     }
 
@@ -37,7 +45,7 @@ QString ExportService::exportModel(const QString &modelVersionId,
 
     // Validate format
     if (format != "pt" && format != "onnx" && format != "tflite" && format != "engine") {
-        qWarning() << "Invalid export format:" << format;
+        ltWarning(LT_LOG_EXPORT()) << "Invalid export format:" << format;
         return {};
     }
 
@@ -47,7 +55,7 @@ QString ExportService::exportModel(const QString &modelVersionId,
         QJsonParseError parseError;
         QJsonDocument::fromJson(optionsJson.toUtf8(), &parseError);
         if (parseError.error != QJsonParseError::NoError) {
-            qWarning() << "Invalid options JSON:" << parseError.errorString();
+            ltWarning(LT_LOG_EXPORT()) << "Invalid options JSON:" << parseError.errorString();
             return {};
         }
     } else {
@@ -89,7 +97,7 @@ QString ExportService::exportModel(const QString &modelVersionId,
     query.addBindValue(""); // validation_result empty initially
 
     if (!query.exec()) {
-        qWarning() << "Failed to create export artifact:" << query.lastError().text();
+        ltError(LT_LOG_EXPORT()) << "Failed to create export artifact:" << query.lastError().text();
         return {};
     }
 
@@ -107,12 +115,17 @@ QString ExportService::exportModel(const QString &modelVersionId,
     // Transition to running status
     updateExportStatus(artifactId, "running");
 
+    ltInfo(LT_LOG_EXPORT()) << "Created export artifact:" << artifactId
+                            << "format:" << format
+                            << "modelVersion:" << modelVersionId;
     emit exportStatusChanged(artifactId, "pending");
     return artifactId;
 }
 
 QVariantMap ExportService::getExportStatus(const QString &artifactId)
 {
+    ltTrace(LT_LOG_EXPORT()) << "artifactId=" << artifactId;
+
     auto db = Database::instance().database();
     QVariantMap result;
 
@@ -152,6 +165,8 @@ QVariantMap ExportService::getExportStatus(const QString &artifactId)
 
 QVariantList ExportService::listExports(const QString &modelVersionId)
 {
+    ltTrace(LT_LOG_EXPORT()) << "modelVersionId=" << modelVersionId;
+
     auto db = Database::instance().database();
     QVariantList result;
 
@@ -165,7 +180,7 @@ QVariantList ExportService::listExports(const QString &modelVersionId)
     query.addBindValue(modelVersionId);
 
     if (!query.exec()) {
-        qWarning() << "Failed to list exports:" << query.lastError().text();
+        ltError(LT_LOG_EXPORT()) << "Failed to list exports:" << query.lastError().text();
         return result;
     }
 
@@ -195,11 +210,14 @@ QVariantList ExportService::listExports(const QString &modelVersionId)
         result.append(artifact);
     }
 
+    ltDebug(LT_LOG_EXPORT()) << "Listed" << result.size() << "exports for model version:" << modelVersionId;
     return result;
 }
 
 bool ExportService::verifyExport(const QString &artifactId)
 {
+    ltTrace(LT_LOG_EXPORT()) << "artifactId=" << artifactId;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
@@ -222,7 +240,7 @@ bool ExportService::verifyExport(const QString &artifactId)
     // Can only verify succeeded exports
     QString currentStatus = optionsObj.value("status").toString("pending");
     if (currentStatus != "succeeded") {
-        qWarning() << "Cannot verify export in status:" << currentStatus;
+        ltWarning(LT_LOG_EXPORT()) << "Cannot verify export in status:" << currentStatus;
         return false;
     }
 
@@ -241,11 +259,14 @@ bool ExportService::verifyExport(const QString &artifactId)
         m_ipcClient->sendRequest("artifact.verify", payload);
     }
 
+    ltInfo(LT_LOG_EXPORT()) << "Verifying export artifact:" << artifactId;
     return true;
 }
 
 bool ExportService::updateExportStatus(const QString &artifactId, const QString &status)
 {
+    ltTrace(LT_LOG_EXPORT()) << "artifactId=" << artifactId << "status=" << status;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
@@ -275,10 +296,11 @@ bool ExportService::updateExportStatus(const QString &artifactId, const QString 
     updateQuery.addBindValue(artifactId);
 
     if (!updateQuery.exec()) {
-        qWarning() << "Failed to update export status:" << updateQuery.lastError().text();
+        ltError(LT_LOG_EXPORT()) << "Failed to update export status:" << updateQuery.lastError().text();
         return false;
     }
 
+    ltInfo(LT_LOG_EXPORT()) << "Export status updated:" << artifactId << "->" << status;
     emit exportStatusChanged(artifactId, status);
     return true;
 }

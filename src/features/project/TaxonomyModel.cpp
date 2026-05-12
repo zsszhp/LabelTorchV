@@ -1,6 +1,7 @@
 #include "TaxonomyModel.h"
 #include "TaxonomyService.h"
 #include "database/Database.h"
+#include "utils/Log.h"
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QSqlQuery>
@@ -26,6 +27,7 @@ QHash<int, QByteArray> TaxonomyModel::roleNames() const
 
 void TaxonomyModel::setTaxonomyId(const QString &id)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "setTaxonomyId id=" << id;
     if (m_taxonomyId != id) {
         m_taxonomyId = id;
         emit taxonomyIdChanged();
@@ -35,6 +37,8 @@ void TaxonomyModel::setTaxonomyId(const QString &id)
 
 void TaxonomyModel::refresh()
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "refresh taxonomyId=" << m_taxonomyId;
+
     if (m_taxonomyId.isEmpty()) {
         beginResetModel();
         m_classes.clear();
@@ -51,11 +55,16 @@ void TaxonomyModel::refresh()
         m_classes.clear();
         for (const auto &v : doc.array()) m_classes.append(v.toString());
         endResetModel();
+        ltDebug(LT_LOG_TAXONOMY()) << "Refreshed" << m_classes.size() << "classes";
+    } else {
+        ltWarning(LT_LOG_TAXONOMY()) << "Failed to load taxonomy:" << query.lastError().text();
     }
 }
 
 bool TaxonomyModel::addClass(const QString &className)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "addClass name=" << className;
+
     if (m_taxonomyId.isEmpty() || className.trimmed().isEmpty()) return false;
 
     int insertRow = m_classes.size();
@@ -71,11 +80,15 @@ bool TaxonomyModel::addClass(const QString &className)
     query.prepare("UPDATE taxonomies SET class_definitions_json = ?, version = version + 1 WHERE id = ?");
     query.addBindValue(json);
     query.addBindValue(m_taxonomyId);
-    return query.exec();
+    bool ok = query.exec();
+    if (!ok) ltWarning(LT_LOG_TAXONOMY()) << "Failed to persist addClass:" << query.lastError().text();
+    return ok;
 }
 
 bool TaxonomyModel::removeClass(int index)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "removeClass index=" << index;
+
     if (index < 0 || index >= m_classes.size()) return false;
 
     beginRemoveRows(QModelIndex(), index, index);
@@ -89,11 +102,15 @@ bool TaxonomyModel::removeClass(int index)
     query.prepare("UPDATE taxonomies SET class_definitions_json = ?, version = version + 1 WHERE id = ?");
     query.addBindValue(json);
     query.addBindValue(m_taxonomyId);
-    return query.exec();
+    bool ok = query.exec();
+    if (!ok) ltWarning(LT_LOG_TAXONOMY()) << "Failed to persist removeClass:" << query.lastError().text();
+    return ok;
 }
 
 bool TaxonomyModel::renameClass(int index, const QString &newName)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "renameClass index=" << index << "newName=" << newName;
+
     if (index < 0 || index >= m_classes.size() || newName.trimmed().isEmpty()) return false;
 
     m_classes[index] = newName.trimmed();
@@ -106,5 +123,7 @@ bool TaxonomyModel::renameClass(int index, const QString &newName)
     query.prepare("UPDATE taxonomies SET class_definitions_json = ?, version = version + 1 WHERE id = ?");
     query.addBindValue(json);
     query.addBindValue(m_taxonomyId);
-    return query.exec();
+    bool ok = query.exec();
+    if (!ok) ltWarning(LT_LOG_TAXONOMY()) << "Failed to persist renameClass:" << query.lastError().text();
+    return ok;
 }

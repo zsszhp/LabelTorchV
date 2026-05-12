@@ -1,9 +1,13 @@
 #include "DatasetModel.h"
 #include "database/Database.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 
-DatasetModel::DatasetModel(QObject *parent) : QAbstractListModel(parent) {}
+DatasetModel::DatasetModel(QObject *parent) : QAbstractListModel(parent)
+{
+    ltTrace(LT_LOG_DATASET()) << "DatasetModel parent=" << parent;
+}
 
 int DatasetModel::rowCount(const QModelIndex &) const
 {
@@ -12,6 +16,8 @@ int DatasetModel::rowCount(const QModelIndex &) const
 
 QVariant DatasetModel::data(const QModelIndex &index, int role) const
 {
+    ltTrace(LT_LOG_DATASET()) << "data row=" << (index.isValid() ? index.row() : -1) << "role=" << role;
+
     if (!index.isValid() || index.row() >= m_datasets.size())
         return {};
 
@@ -29,6 +35,8 @@ QVariant DatasetModel::data(const QModelIndex &index, int role) const
 
 QHash<int, QByteArray> DatasetModel::roleNames() const
 {
+    ltTrace(LT_LOG_DATASET()) << "roleNames";
+
     return {
         {IdRole,           "datasetId"},
         {NameRole,         "name"},
@@ -41,15 +49,20 @@ QHash<int, QByteArray> DatasetModel::roleNames() const
 
 void DatasetModel::setProjectId(const QString &projectId)
 {
+    ltTrace(LT_LOG_DATASET()) << "setProjectId projectId=" << projectId;
+
     if (m_projectId != projectId) {
         m_projectId = projectId;
         emit projectIdChanged();
+        ltInfo(LT_LOG_DATASET()) << "Project changed, refreshing dataset model for projectId=" << projectId;
         refresh();
     }
 }
 
 void DatasetModel::refresh()
 {
+    ltTrace(LT_LOG_DATASET()) << "refresh projectId=" << m_projectId;
+
     QSqlQuery query(Database::instance().database());
 
     if (m_projectId.isEmpty()) {
@@ -75,7 +88,11 @@ void DatasetModel::refresh()
             d.createdAt = query.value(5).toString();
             m_datasets.append(d);
         }
+    } else {
+        ltWarning(LT_LOG_DATASET()) << "refresh: query failed";
     }
 
     endResetModel();
+
+    ltDebug(LT_LOG_DATASET()) << "refresh: loaded" << m_datasets.size() << "datasets";
 }

@@ -1,5 +1,6 @@
 #include "ModelRegistry.h"
 #include "Database.h"
+#include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -8,15 +9,19 @@
 #include <QJsonArray>
 #include <QUuid>
 #include <QDateTime>
-#include <QDebug>
 
-ModelRegistry::ModelRegistry(QObject *parent) : QObject(parent) {}
+ModelRegistry::ModelRegistry(QObject *parent) : QObject(parent)
+{
+    ltTrace(LT_LOG_MODEL()) << "parent=" << parent;
+}
 
 QString ModelRegistry::registerModelVersion(const QString &runId,
                                               const QString &bestWeightPath,
                                               const QString &lastWeightPath,
                                               const QString &metricsJson)
 {
+    ltTrace(LT_LOG_MODEL()) << "runId=" << runId << "bestWeightPath=" << bestWeightPath << "lastWeightPath=" << lastWeightPath;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return {};
 
@@ -25,7 +30,7 @@ QString ModelRegistry::registerModelVersion(const QString &runId,
         QJsonParseError parseError;
         QJsonDocument::fromJson(metricsJson.toUtf8(), &parseError);
         if (parseError.error != QJsonParseError::NoError) {
-            qWarning() << "Invalid metrics JSON:" << parseError.errorString();
+            ltWarning(LT_LOG_MODEL()) << "Invalid metrics JSON:" << parseError.errorString();
             return {};
         }
     }
@@ -44,15 +49,18 @@ QString ModelRegistry::registerModelVersion(const QString &runId,
     query.addBindValue(metricsJson.isEmpty() ? "{}" : metricsJson);
 
     if (!query.exec()) {
-        qWarning() << "Failed to register model version:" << query.lastError().text();
+        ltError(LT_LOG_MODEL()) << "Failed to register model version:" << query.lastError().text();
         return {};
     }
 
+    ltInfo(LT_LOG_MODEL()) << "Registered model version:" << versionId << "for run:" << runId;
     return versionId;
 }
 
 QVariantList ModelRegistry::listModelVersions(const QString &projectId)
 {
+    ltTrace(LT_LOG_MODEL()) << "projectId=" << projectId;
+
     auto db = Database::instance().database();
     QVariantList result;
 
@@ -69,7 +77,7 @@ QVariantList ModelRegistry::listModelVersions(const QString &projectId)
     query.addBindValue(projectId);
 
     if (!query.exec()) {
-        qWarning() << "Failed to list model versions:" << query.lastError().text();
+        ltError(LT_LOG_MODEL()) << "Failed to list model versions:" << query.lastError().text();
         return result;
     }
 
@@ -86,11 +94,14 @@ QVariantList ModelRegistry::listModelVersions(const QString &projectId)
         result.append(version);
     }
 
+    ltDebug(LT_LOG_MODEL()) << "Listed" << result.size() << "model versions for project:" << projectId;
     return result;
 }
 
 QVariantMap ModelRegistry::getModelVersion(const QString &versionId)
 {
+    ltTrace(LT_LOG_MODEL()) << "versionId=" << versionId;
+
     auto db = Database::instance().database();
     QVariantMap result;
 
@@ -120,6 +131,8 @@ QVariantMap ModelRegistry::getModelVersion(const QString &versionId)
 
 bool ModelRegistry::deleteModelVersion(const QString &versionId)
 {
+    ltTrace(LT_LOG_MODEL()) << "versionId=" << versionId;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
@@ -131,7 +144,7 @@ bool ModelRegistry::deleteModelVersion(const QString &versionId)
 
     int exportCount = checkQuery.value(0).toInt();
     if (exportCount > 0) {
-        qWarning() << "Cannot delete model version:" << exportCount << "exports reference it";
+        ltWarning(LT_LOG_MODEL()) << "Cannot delete model version:" << exportCount << "exports reference it";
         return false;
     }
 
@@ -142,7 +155,7 @@ bool ModelRegistry::deleteModelVersion(const QString &versionId)
     if (checkAssist.exec() && checkAssist.next()) {
         int assistCount = checkAssist.value(0).toInt();
         if (assistCount > 0) {
-            qWarning() << "Cannot delete model version:" << assistCount << "assisted label batches reference it";
+            ltWarning(LT_LOG_MODEL()) << "Cannot delete model version:" << assistCount << "assisted label batches reference it";
             return false;
         }
     }
@@ -156,11 +169,18 @@ bool ModelRegistry::deleteModelVersion(const QString &versionId)
     QSqlQuery deleteQuery(db);
     deleteQuery.prepare("DELETE FROM model_versions WHERE id = ?");
     deleteQuery.addBindValue(versionId);
-    return deleteQuery.exec();
+
+    if (deleteQuery.exec()) {
+        ltInfo(LT_LOG_MODEL()) << "Deleted model version:" << versionId;
+        return true;
+    }
+    return false;
 }
 
 bool ModelRegistry::setParentVersion(const QString &versionId, const QString &parentVersionId)
 {
+    ltTrace(LT_LOG_MODEL()) << "versionId=" << versionId << "parentVersionId=" << parentVersionId;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
@@ -169,13 +189,13 @@ bool ModelRegistry::setParentVersion(const QString &versionId, const QString &pa
     checkQuery.prepare("SELECT id FROM model_versions WHERE id = ?");
     checkQuery.addBindValue(parentVersionId);
     if (!checkQuery.exec() || !checkQuery.next()) {
-        qWarning() << "Parent version not found:" << parentVersionId;
+        ltWarning(LT_LOG_MODEL()) << "Parent version not found:" << parentVersionId;
         return false;
     }
 
     // Prevent circular: a version cannot be its own parent
     if (versionId == parentVersionId) {
-        qWarning() << "Cannot set a version as its own parent";
+        ltWarning(LT_LOG_MODEL()) << "Cannot set a version as its own parent";
         return false;
     }
 
@@ -185,14 +205,18 @@ bool ModelRegistry::setParentVersion(const QString &versionId, const QString &pa
     query.addBindValue(versionId);
 
     if (!query.exec()) {
-        qWarning() << "Failed to set parent version:" << query.lastError().text();
+        ltError(LT_LOG_MODEL()) << "Failed to set parent version:" << query.lastError().text();
         return false;
     }
+
+    ltInfo(LT_LOG_MODEL()) << "Set parent version:" << versionId << "->" << parentVersionId;
     return true;
 }
 
 bool ModelRegistry::setTag(const QString &versionId, const QString &tag)
 {
+    ltTrace(LT_LOG_MODEL()) << "versionId=" << versionId << "tag=" << tag;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
@@ -232,14 +256,18 @@ bool ModelRegistry::setTag(const QString &versionId, const QString &tag)
     updateQuery.addBindValue(versionId);
 
     if (!updateQuery.exec()) {
-        qWarning() << "Failed to set tag:" << updateQuery.lastError().text();
+        ltError(LT_LOG_MODEL()) << "Failed to set tag:" << updateQuery.lastError().text();
         return false;
     }
+
+    ltInfo(LT_LOG_MODEL()) << "Set tag:" << tag << "on version:" << versionId;
     return true;
 }
 
 bool ModelRegistry::removeTag(const QString &versionId, const QString &tag)
 {
+    ltTrace(LT_LOG_MODEL()) << "versionId=" << versionId << "tag=" << tag;
+
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
@@ -284,8 +312,10 @@ bool ModelRegistry::removeTag(const QString &versionId, const QString &tag)
     updateQuery.addBindValue(versionId);
 
     if (!updateQuery.exec()) {
-        qWarning() << "Failed to remove tag:" << updateQuery.lastError().text();
+        ltError(LT_LOG_MODEL()) << "Failed to remove tag:" << updateQuery.lastError().text();
         return false;
     }
+
+    ltInfo(LT_LOG_MODEL()) << "Removed tag:" << tag << "from version:" << versionId;
     return true;
 }
