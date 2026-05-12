@@ -14,10 +14,12 @@ def create_request(request_id: str, command: str, payload: dict = None) -> dict:
     }
 
 
-def create_response(request_id: str, success: bool, result: dict = None, error: dict = None) -> dict:
+def create_response(request_id: str, success: bool, result: dict = None,
+                    error: dict = None, command: str = "") -> dict:
     return {
         "type": "response",
         "request_id": request_id,
+        "command": command,
         "success": success,
         "result": result or {},
         "error": error or {},

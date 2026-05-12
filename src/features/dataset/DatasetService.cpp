@@ -582,6 +582,58 @@ bool DatasetService::updateImportStatus(const QString &datasetId, const QString 
     return true;
 }
 
+QVariantList DatasetService::listSamples(const QString &datasetId, int offset, int limit)
+{
+    ltTrace(LT_LOG_DATASET()) << "listSamples datasetId=" << datasetId << "offset=" << offset << "limit=" << limit;
+
+    QVariantList result;
+    if (datasetId.isEmpty()) return result;
+
+    QSqlQuery query(Database::instance().database());
+    query.prepare("SELECT id, image_path, label_path, validation_status, split, width, height "
+                  "FROM dataset_samples WHERE dataset_id = ? "
+                  "ORDER BY image_path LIMIT ? OFFSET ?");
+    query.addBindValue(datasetId);
+    query.addBindValue(limit);
+    query.addBindValue(offset);
+
+    if (!query.exec()) {
+        ltError(LT_LOG_DATASET()) << "listSamples failed:" << query.lastError().text();
+        return result;
+    }
+
+    while (query.next()) {
+        QVariantMap s;
+        s["id"] = query.value(0);
+        s["imagePath"] = query.value(1);
+        s["labelPath"] = query.value(2);
+        s["validationStatus"] = query.value(3);
+        s["split"] = query.value(4);
+        s["width"] = query.value(5);
+        s["height"] = query.value(6);
+        result.append(s);
+    }
+
+    ltDebug(LT_LOG_DATASET()) << "listSamples: returned" << result.size() << "samples";
+    return result;
+}
+
+int DatasetService::getSampleCount(const QString &datasetId)
+{
+    ltTrace(LT_LOG_DATASET()) << "getSampleCount datasetId=" << datasetId;
+
+    if (datasetId.isEmpty()) return 0;
+
+    QSqlQuery query(Database::instance().database());
+    query.prepare("SELECT COUNT(*) FROM dataset_samples WHERE dataset_id = ?");
+    query.addBindValue(datasetId);
+
+    if (query.exec() && query.next()) {
+        return query.value(0).toInt();
+    }
+    return 0;
+}
+
 bool DatasetService::insertSamples(const QString &datasetId, const QVariantList &samples)
 {
     ltTrace(LT_LOG_DATASET()) << "insertSamples datasetId=" << datasetId << "count=" << samples.size();

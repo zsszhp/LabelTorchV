@@ -1,7 +1,7 @@
-// Main.qml - 标炬主窗口
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import LabelTorch.Shell
 
 ApplicationWindow {
     id: root
@@ -10,12 +10,12 @@ ApplicationWindow {
     minimumWidth: 960
     minimumHeight: 600
     title: "标炬 LabelTorch"
-    color: "#1e1e2e"
+    color: Theme.bgPrimary
 
-    // Global task type property - synced with project metadata
     property string currentTaskType: "detect"
+    property string gpuStatusText: "GPU: 检测中..."
+    property color gpuStatusColor: Theme.textMuted
 
-    // Update task type when project changes
     Connections {
         target: appController
         function onCurrentProjectIdChanged() {
@@ -27,7 +27,65 @@ ApplicationWindow {
         }
     }
 
-    // Sync task type changes back to project
+    Connections {
+        target: ipcClient
+        function onResponseReceived(response) {
+            var cmd = response.command || ""
+            if (response.success) {
+                var result = response.result || {}
+                if (result.cuda_available !== undefined) {
+                    if (result.cuda_available) {
+                        var gpuName = result.gpu_name || "Unknown GPU"
+                        var cudaVer = result.cuda_version || result.torch_cuda || "?"
+                        gpuStatusText = "GPU: " + gpuName + " (CUDA " + cudaVer + ")"
+                        gpuStatusColor = Theme.accentSuccess
+                    } else {
+                        gpuStatusText = "GPU: 不可用 (仅CPU)"
+                        gpuStatusColor = Theme.accentWarning
+                    }
+                    logPanel.appendLog("[环境] Python " + (result.python_version || result.torch_version || "?"))
+                    logPanel.appendLog("[环境] PyTorch " + (result.torch_version || "?"))
+                    logPanel.appendLog("[环境] Ultralytics " + (result.ultralytics_version || "?"))
+                    logPanel.appendLog("[环境] CUDA " + (result.cuda_available ? "可用" : "不可用"))
+                }
+            }
+        }
+        function onConnectedChanged() {
+            if (ipcClient.connected) {
+                gpuStatusText = "GPU: 已连接，检测中..."
+                gpuStatusColor = Theme.accentPrimary
+                ipcClient.sendRequest("environment.check", {})
+            } else {
+                gpuStatusText = "Python 后端: 未连接"
+                gpuStatusColor = Theme.accentError
+            }
+        }
+        function onEventReceived(event) {
+            var eventType = event.event_type || ""
+            var payload = event.payload || {}
+            if (eventType === "task.progress") {
+                var epoch = payload.epoch || 0
+                var total = payload.total_epochs || 0
+                var metrics = payload.metrics || {}
+                logPanel.appendLog("[训练] Epoch " + epoch + "/" + total +
+                    " box_loss=" + (metrics.box_loss || "?").toFixed(4) +
+                    " cls_loss=" + (metrics.cls_loss || "?").toFixed(4))
+            } else if (eventType === "task.succeeded") {
+                logPanel.appendLog("[训练] 训练完成! epochs=" + (payload.epochs_completed || "?") +
+                    " early_stopped=" + (payload.early_stopped || false))
+                if (payload.metrics) {
+                    logPanel.appendLog("[训练] mAP50=" + (payload.metrics.mAP50 || "?") +
+                        " mAP50-95=" + (payload.metrics["mAP50-95"] || "?"))
+                }
+            } else if (eventType === "task.failed") {
+                logPanel.appendLog("[训练] 训练失败: " + (payload.error || "未知错误"))
+            }
+        }
+        function onBackendError(error) {
+            logPanel.appendLog("[错误] " + error)
+        }
+    }
+
     function onTaskTypeChanged(taskType) {
         if (appController.projectOpen && taskType !== root.currentTaskType) {
             root.currentTaskType = taskType
@@ -35,61 +93,58 @@ ApplicationWindow {
         }
     }
 
-    // 主布局：左导航 + 中央内容 + 底部日志
     RowLayout {
         anchors.fill: parent
         spacing: 0
 
-        // 左侧导航栏
         Rectangle {
-            Layout.preferredWidth: 220
+            Layout.preferredWidth: Theme.navWidth
             Layout.fillHeight: true
-            color: "#181825"
+            color: Theme.bgSecondary
 
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 0
                 spacing: 0
 
-                // 应用标题
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 48
-                    color: "#11111b"
+                    color: Theme.bgTertiary
 
                     Label {
                         anchors.centerIn: parent
                         text: "标炬 LabelTorch"
-                        font.pixelSize: 16
+                        font.pixelSize: Theme.fontSizeLarge
                         font.bold: true
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
+                        font.family: Theme.fontFamily
                     }
                 }
 
-                // 当前项目信息
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: appController.projectOpen ? 40 : 0
                     visible: appController.projectOpen
-                    color: "#1e1e2e"
+                    color: Theme.bgPrimary
 
                     Label {
                         anchors.centerIn: parent
                         text: appController.currentProjectName
-                        font.pixelSize: 12
-                        color: "#89b4fa"
+                        font.pixelSize: Theme.fontSizeNormal
+                        color: Theme.accentPrimary
+                        font.family: Theme.fontFamily
                         elide: Text.ElideRight
                         width: parent.width - 16
                         horizontalAlignment: Text.AlignHCenter
                     }
                 }
 
-                // 导航列表
                 ListView {
                     id: navList
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.topMargin: 8
+                    Layout.topMargin: Theme.spacingNormal
                     clip: true
                     model: [
                         { name: "项目管理", icon: "\u25C6", page: "project" },
@@ -109,60 +164,77 @@ ApplicationWindow {
                         contentItem: Row {
                             spacing: 10
                             leftPadding: 16
-                            Label { text: modelData.icon; font.pixelSize: 16; color: parent.parent.enabled ? "#cdd6f4" : "#585b70"; anchors.verticalCenter: parent.verticalCenter }
+                            Label {
+                                text: modelData.icon
+                                font.pixelSize: Theme.fontSizeLarge
+                                color: parent.parent.enabled ? Theme.textPrimary : Theme.textDisabled
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
                             Label {
                                 text: modelData.name
-                                font.pixelSize: 14
-                                color: highlighted ? "#89b4fa" : (parent.parent.enabled ? "#cdd6f4" : "#585b70")
+                                font.pixelSize: Theme.fontSizeNormal
+                                font.family: Theme.fontFamily
+                                color: highlighted ? Theme.accentPrimary : (parent.parent.enabled ? Theme.textPrimary : Theme.textDisabled)
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                         }
 
                         background: Rectangle {
-                            color: highlighted ? "#313244" : (parent.hovered ? "#1e1e2e" : "transparent")
-                            radius: 4
+                            color: highlighted ? Theme.bgSelected : (parent.hovered ? Theme.bgPrimary : "transparent")
+                            radius: Theme.radiusSmall
                         }
 
                         onClicked: appController.currentPage = modelData.page
                     }
                 }
 
-                // 底部状态
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 32
-                    color: "#11111b"
+                    color: Theme.bgTertiary
 
-                    Label {
-                        anchors.centerIn: parent
-                        text: "Python 后端: 未连接"
-                        font.pixelSize: 11
-                        color: "#6c7086"
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: 4
+
+                        Rectangle {
+                            width: 8
+                            height: 8
+                            radius: 4
+                            color: ipcClient.connected ? Theme.accentSuccess : Theme.accentError
+                        }
+
+                        Label {
+                            text: ipcClient.connected ? "后端已连接" : "后端未连接"
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.textMuted
+                            font.family: Theme.fontFamily
+                        }
                     }
                 }
             }
         }
 
-        // 右侧内容区
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: "#1e1e2e"
+            color: Theme.bgPrimary
 
             ColumnLayout {
                 anchors.fill: parent
                 spacing: 0
 
-                // 顶部状态栏
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 40
-                    color: "#181825"
+                    Layout.preferredHeight: Theme.statusBarHeight
+                    color: Theme.bgSecondary
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 16
-                        anchors.rightMargin: 16
+                        anchors.leftMargin: Theme.spacingLarge
+                        anchors.rightMargin: Theme.spacingLarge
 
                         Label {
                             text: {
@@ -177,33 +249,43 @@ ApplicationWindow {
                                     default: return "标炬"
                                 }
                             }
-                            font.pixelSize: 14
+                            font.pixelSize: Theme.fontSizeNormal
                             font.bold: true
-                            color: "#cdd6f4"
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
                         }
 
-                        // Task type switcher in header
-                        TaskTypeSwitcher {
+                        Loader {
                             visible: appController.projectOpen
-                            taskType: root.currentTaskType
-                            switcherEnabled: appController.projectOpen
-                            onTaskTypeSelected: function(taskType) {
-                                root.onTaskTypeChanged(taskType)
+                            source: "qrc:/LabelTorch/Project/qml/TaskTypeSwitcher.qml"
+                            onLoaded: {
+                                if (item) {
+                                    item.taskType = root.currentTaskType
+                                    item.switcherEnabled = appController.projectOpen
+                                    item.taskTypeSelected.connect(function(tt) { root.onTaskTypeChanged(tt) })
+                                }
                             }
                         }
 
                         Item { Layout.fillWidth: true }
 
                         Label {
+                            text: gpuStatusText
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: gpuStatusColor
+                            font.family: Theme.fontFamily
+                        }
+
+                        Label {
                             visible: appController.projectOpen
                             text: appController.currentProjectName
-                            font.pixelSize: 12
-                            color: "#a6adc8"
+                            font.pixelSize: Theme.fontSizeNormal
+                            color: Theme.textSecondary
+                            font.family: Theme.fontFamily
                         }
                     }
                 }
 
-                // 中央内容
                 StackLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -220,36 +302,26 @@ ApplicationWindow {
                         }
                     }
 
-                    // 项目管理页
                     Loader { source: "qrc:/LabelTorch/Project/qml/ProjectPage.qml" }
-                    // 类别体系页
                     Loader { source: "qrc:/LabelTorch/Project/qml/TaxonomyPage.qml" }
-                    // 数据导入页
                     Loader { source: "qrc:/LabelTorch/Dataset/qml/ImportPage.qml" }
-                    // 标注工作台
                     Loader { source: "qrc:/LabelTorch/Annotation/qml/AnnotationPage.qml" }
-                    // 训练工作台
                     Loader { source: "qrc:/LabelTorch/Training/qml/TrainingPage.qml" }
-                    // 版本中心
                     Loader { source: "qrc:/LabelTorch/Model/qml/ModelPage.qml" }
-                    // 导出中心
                     Loader { source: "qrc:/LabelTorch/Export/qml/ExportPage.qml" }
                 }
 
-                // 底部任务面板
-                Rectangle {
+                LogPanel {
+                    id: logPanel
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 120
-                    color: "#181825"
-
-                    Label {
-                        anchors.centerIn: parent
-                        text: "任务与日志面板 - 待实现"
-                        color: "#6c7086"
-                        font.pixelSize: 12
-                    }
+                    Layout.preferredHeight: collapsed ? 28 : Theme.logPanelHeight
                 }
             }
         }
+    }
+
+    Component.onCompleted: {
+        logPanel.appendLog("[标炬] LabelTorch v0.1.0 启动")
+        logPanel.appendLog("[标炬] 正在连接 Python 后端...")
     }
 }

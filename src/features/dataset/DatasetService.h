@@ -83,6 +83,12 @@ public:
      */
     Q_INVOKABLE QVariantList getClassDistribution(const QString &datasetId);
 
+    Q_INVOKABLE QVariantList listSamples(const QString &datasetId, int offset = 0, int limit = 100);
+    Q_INVOKABLE int getSampleCount(const QString &datasetId);
+
+    Q_INVOKABLE QString appendImport(const QString &datasetId, const QString &imageDir, const QString &labelDir);
+    Q_INVOKABLE bool resplitDataset(const QString &datasetId, double valRatio = 0.2, int seed = 42);
+
 private:
     bool updateImportStatus(const QString &datasetId, const QString &status);
     bool insertSamples(const QString &datasetId, const QVariantList &samples);

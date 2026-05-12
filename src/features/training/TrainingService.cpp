@@ -19,6 +19,73 @@ void TrainingService::setIpcClient(IpcClient *client)
 {
     ltTrace(LT_LOG_TRAINING()) << "client=" << client;
     m_ipcClient = client;
+
+    if (m_ipcClient) {
+        connect(m_ipcClient, &IpcClient::eventReceived, this, [this](const QJsonObject &event) {
+            QString eventType = event[QStringLiteral("event_type")].toString();
+            if (eventType.startsWith(QStringLiteral("task."))) {
+                QVariantMap ev;
+                ev[QStringLiteral("event_type")] = eventType;
+                ev[QStringLiteral("task_id")] = event[QStringLiteral("task_id")].toString();
+                ev[QStringLiteral("payload")] = event[QStringLiteral("payload")].toVariant().toMap();
+                handleTrainingEvent(ev);
+            }
+        });
+    }
+}
+
+void TrainingService::handleTrainingEvent(const QVariantMap &event)
+{
+    QString eventType = event[QStringLiteral("event_type")].toString();
+    QString taskId = event[QStringLiteral("task_id")].toString();
+    QVariantMap payload = event[QStringLiteral("payload")].toMap();
+
+    ltDebug(LT_LOG_TRAINING()) << "handleTrainingEvent type=" << eventType << "taskId=" << taskId;
+
+    if (eventType == QStringLiteral("task.succeeded")) {
+        updateRunStatus(taskId, QStringLiteral("succeeded"));
+
+        QString bestWeight = payload[QStringLiteral("best_weight_path")].toString();
+        QString lastWeight = payload[QStringLiteral("last_weight_path")].toString();
+        QVariantMap metrics = payload[QStringLiteral("metrics")].toMap();
+
+        if (!bestWeight.isEmpty()) {
+            QJsonObject metricsObj = QJsonObject::fromVariantMap(metrics);
+            QString metricsJson = QString::fromUtf8(QJsonDocument(metricsObj).toJson(QJsonDocument::Compact));
+
+            QSqlQuery runQuery(Database::instance().database());
+            runQuery.prepare("SELECT project_id FROM training_runs WHERE id = ?");
+            runQuery.addBindValue(taskId);
+            if (runQuery.exec() && runQuery.next()) {
+                QString projectId = runQuery.value(0).toString();
+
+                QSqlQuery versionQuery(Database::instance().database());
+                QString versionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+                versionQuery.prepare(
+                    "INSERT INTO model_versions (id, run_id, project_id, best_weight_path, last_weight_path, "
+                    "metrics_snapshot_json, tag) VALUES (?, ?, ?, ?, ?, ?, 'baseline')"
+                );
+                versionQuery.addBindValue(versionId);
+                versionQuery.addBindValue(taskId);
+                versionQuery.addBindValue(projectId);
+                versionQuery.addBindValue(bestWeight);
+                versionQuery.addBindValue(lastWeight);
+                versionQuery.addBindValue(metricsJson);
+
+                if (versionQuery.exec()) {
+                    ltInfo(LT_LOG_TRAINING()) << "Auto-registered model version:" << versionId
+                                              << "for run:" << taskId;
+                } else {
+                    ltError(LT_LOG_TRAINING()) << "Failed to register model version:"
+                                               << versionQuery.lastError().text();
+                }
+            }
+        }
+    } else if (eventType == QStringLiteral("task.failed")) {
+        updateRunStatus(taskId, QStringLiteral("failed"));
+    } else if (eventType == QStringLiteral("task.started")) {
+        updateRunStatus(taskId, QStringLiteral("running"));
+    }
 }
 
 QString TrainingService::createRun(const QString &projectId,

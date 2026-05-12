@@ -1,6 +1,3 @@
-# src/features/dataset/CMakeLists.txt
-# 数据集管理功能模块
-
 qt_add_qml_module(labeltorch_dataset
     URI LabelTorch.Dataset
     STATIC
@@ -8,6 +5,8 @@ qt_add_qml_module(labeltorch_dataset
         qml/ImportPage.qml
         qml/ClassMappingPage.qml
         qml/DatasetStatsView.qml
+        qml/DatasetBrowserPage.qml
+        qml/ClassManagerPanel.qml
     SOURCES
         DatasetService.h
         DatasetService.cpp

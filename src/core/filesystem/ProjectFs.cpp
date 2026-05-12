@@ -1,6 +1,10 @@
 #include "ProjectFs.h"
 #include "utils/Log.h"
 #include <QDir>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QDateTime>
 
 ProjectFs::ProjectFs(QObject *parent) : QObject(parent) {}
 
@@ -30,6 +34,39 @@ bool ProjectFs::createProjectDirs(const QString &rootPath)
     }
 
     ltInfo(LT_LOG_FS()) << "Project directories created:" << rootPath;
+    return true;
+}
+
+bool ProjectFs::createProjectJson(const QString &rootPath, const QString &projectName,
+                                   const QString &taskType)
+{
+    ltTrace(LT_LOG_FS()) << "createProjectJson rootPath=" << rootPath << "name=" << projectName;
+
+    QString filePath = rootPath + QStringLiteral("/project.json");
+    QFile file(filePath);
+    if (file.exists()) {
+        ltWarning(LT_LOG_FS()) << "project.json already exists:" << filePath;
+        return true;
+    }
+
+    if (!file.open(QIODevice::WriteOnly)) {
+        ltError(LT_LOG_FS()) << "Failed to create project.json:" << filePath;
+        return false;
+    }
+
+    QJsonObject json;
+    json[QStringLiteral("name")] = projectName;
+    json[QStringLiteral("task_type")] = taskType;
+    json[QStringLiteral("version")] = QStringLiteral("1.0");
+    json[QStringLiteral("created_at")] = QDateTime::currentDateTime().toString(Qt::ISODate);
+    json[QStringLiteral("updated_at")] = QDateTime::currentDateTime().toString(Qt::ISODate);
+    json[QStringLiteral("labeltorch_version")] = QStringLiteral("0.1.0");
+
+    QJsonDocument doc(json);
+    file.write(doc.toJson());
+    file.close();
+
+    ltInfo(LT_LOG_FS()) << "project.json created:" << filePath;
     return true;
 }
 

@@ -21,6 +21,11 @@ QString ProjectService::createProject(const QString &name, const QString &rootPa
         return {};
     }
 
+    if (!ProjectFs::createProjectJson(rootPath, name, QStringLiteral("detect"))) {
+        ltError(LT_LOG_PROJECT()) << "Failed to create project.json:" << rootPath;
+        return {};
+    }
+
     QSqlQuery query(Database::instance().database());
     query.prepare("INSERT INTO projects (id, name, root_path) VALUES (?, ?, ?)");
     query.addBindValue(projectId);

@@ -4,11 +4,6 @@
 #include <QObject>
 #include <QString>
 
-/**
- * @brief 项目文件系统管理
- *
- * 按 11-project-filesystem-spec-v2.md 规范管理项目目录结构
- */
 class ProjectFs : public QObject
 {
     Q_OBJECT
@@ -17,6 +12,8 @@ public:
     explicit ProjectFs(QObject *parent = nullptr);
 
     static bool createProjectDirs(const QString &rootPath);
+    static bool createProjectJson(const QString &rootPath, const QString &projectName,
+                                   const QString &taskType = QStringLiteral("detect"));
     static bool validateProjectDir(const QString &rootPath);
 
     static QString dataDir(const QString &rootPath);

@@ -18,6 +18,8 @@ public:
 
     void setIpcClient(IpcClient *client);
 
+    Q_INVOKABLE void handleTrainingEvent(const QVariantMap &event);
+
     /**
      * @brief Create a training run in draft status.
      * @param projectId The project ID.

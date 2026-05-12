@@ -1,6 +1,3 @@
-# src/core/CMakeLists.txt
-# 核心基础设施静态库
-
 add_library(labeltorch_core STATIC
     database/Database.cpp
     database/Schema.cpp
@@ -9,6 +6,7 @@ add_library(labeltorch_core STATIC
     ipc/IpcProtocol.cpp
     cache/ThumbnailCache.cpp
     utils/Log.cpp
+    utils/AppSettings.cpp
 )
 
 target_include_directories(labeltorch_core PUBLIC

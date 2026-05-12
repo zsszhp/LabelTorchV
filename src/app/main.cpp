@@ -30,6 +30,7 @@
 #include "ExportService.h"
 #include "Database.h"
 #include "utils/Log.h"
+#include "utils/AppSettings.h"
 
 int main(int argc, char *argv[])
 {
@@ -38,21 +39,19 @@ int main(int argc, char *argv[])
     app.setApplicationName("LabelTorch");
     app.setApplicationVersion("0.1.0");
 
-    // 初始化日志系统（最先执行）
     Log::init();
     ltInfo(LT_LOG_APP()) << "Application starting" << "version" << app.applicationVersion()
                          << "Qt" << QT_VERSION_STR;
 
     QQuickStyle::setStyle("Basic");
 
-    // 初始化数据库（应用级，存储在AppData）
     QString dbPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(dbPath);
     Database::instance().open(dbPath + "/labeltorch.db");
     Database::instance().initializeSchema();
     ltInfo(LT_LOG_DB()) << "Database initialized at" << dbPath + "/labeltorch.db";
 
-    // 初始化服务
+    AppSettings appSettings;
     AppController controller;
     ProjectService projectService;
     ProjectModel projectModel;
@@ -76,21 +75,28 @@ int main(int argc, char *argv[])
     AssistedLabelService assistedLabelService;
     ExportService exportService;
 
-    // 启动Python后端（如果可用）
-    QString pythonExec = "F:/A/anaconda/envs/labeltorch/python.exe";
-    QString serverScript = "F:/project/my/LabelTorchV/backend/labeltorch_backend/__main__.py";
-    ipcClient.startBackend(pythonExec, serverScript);
+    QString pythonExec = appSettings.pythonPath();
+    if (pythonExec.isEmpty() || pythonExec == QStringLiteral("python")) {
+        pythonExec = QStringLiteral("python");
+    }
+    ipcClient.startBackend(pythonExec);
     ltInfo(LT_LOG_IPC()) << "Python backend start requested" << pythonExec;
 
-    // 注入依赖
     projectService.setTaxonomyService(&taxonomyService);
     trainingService.setIpcClient(&ipcClient);
     inferenceService.setIpcClient(&ipcClient);
     exportService.setIpcClient(&ipcClient);
 
+    QObject::connect(&controller, &AppController::currentProjectIdChanged, [&]() {
+        if (controller.projectOpen()) {
+            appSettings.addRecentProject(controller.currentProjectName());
+            appSettings.setLastProjectPath(controller.currentProjectName());
+        }
+    });
+
     QQmlApplicationEngine engine;
 
-    // 注册服务到QML上下文
+    engine.rootContext()->setContextProperty("appSettings", &appSettings);
     engine.rootContext()->setContextProperty("appController", &controller);
     engine.rootContext()->setContextProperty("projectService", &projectService);
     engine.rootContext()->setContextProperty("projectModel", &projectModel);
@@ -114,7 +120,6 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("assistedLabelService", &assistedLabelService);
     engine.rootContext()->setContextProperty("exportService", &exportService);
 
-    // 加载主窗口
     const QUrl url(u"qrc:/LabelTorch/Shell/qml/Main.qml"_qs);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,

@@ -4,13 +4,10 @@
 #include <QObject>
 #include <QProcess>
 #include <QJsonObject>
+#include <QJsonArray>
+#include <QMap>
 #include <QTimer>
 
-/**
- * @brief IPC客户端
- *
- * 通过QProcess启动Python后端进程，使用stdin/stdout JSON-RPC通信
- */
 class IpcClient : public QObject
 {
     Q_OBJECT
@@ -18,14 +15,14 @@ class IpcClient : public QObject
 
 public:
     explicit IpcClient(QObject *parent = nullptr);
-    ~IpcClient() override;
+    ~IpcClient();
 
-    bool connected() const { return m_connected; }
+    bool connected() const;
 
-    void startBackend(const QString &pythonExec, const QString &serverScript);
-    void stopBackend();
-
-    void sendRequest(const QString &command, const QJsonObject &payload = {});
+    Q_INVOKABLE void startBackend(const QString &pythonPath = QString(),
+                                   const QString &scriptPath = QString());
+    Q_INVOKABLE void stopBackend();
+    Q_INVOKABLE void sendRequest(const QString &command, const QJsonObject &payload = {});
 
 signals:
     void connectedChanged();
@@ -34,20 +31,20 @@ signals:
     void backendError(const QString &error);
 
 private slots:
-    void onBackendOutput();
-    void onBackendError();
+    void onBackendReadyRead();
     void onBackendFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onBackendErrorOccurred(QProcess::ProcessError error);
 
 private:
     void processMessage(const QJsonObject &msg);
-    void checkHeartbeat();
+    void tryStartBackend();
 
     QProcess *m_process = nullptr;
     bool m_connected = false;
-    QString m_requestIdPrefix;
     int m_requestCounter = 0;
-    QTimer *m_heartbeatTimer = nullptr;
-    bool m_heartbeatPending = false;
+    QMap<QString, QString> m_pendingCommands;
+    QTimer *m_watchdog = nullptr;
+    bool m_autoRestart = true;
 };
 
 #endif // IPCCLIENT_H

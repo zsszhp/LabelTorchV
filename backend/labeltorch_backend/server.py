@@ -24,6 +24,7 @@ class IpcServer:
             "train.stop": training.handle_stop,
             "train.status": training.handle_status,
             "train.list_adapters": training.handle_list_adapters,
+            "train.data_split": training.handle_data_split,
             "inference.run": inference.handle_run,
             "export.run": export.handle_run,
             "artifact.verify": export.handle_verify,
@@ -70,20 +71,22 @@ class IpcServer:
         if handler is None:
             response = create_response(
                 request_id, False,
-                error={"code": "UNKNOWN_COMMAND", "message": f"Unknown command: {command}"}
+                error={"code": "UNKNOWN_COMMAND", "message": f"Unknown command: {command}"},
+                command=command
             )
             self._send(response)
             return
 
         try:
             result = await handler(payload)
-            response = create_response(request_id, True, result=result)
+            response = create_response(request_id, True, result=result, command=command)
             self._send(response)
         except Exception as e:
             logger.error(f"Handler error for {command}: {e}")
             response = create_response(
                 request_id, False,
-                error={"code": "HANDLER_ERROR", "message": str(e), "recoverable": True}
+                error={"code": "HANDLER_ERROR", "message": str(e), "recoverable": True},
+                command=command
             )
             self._send(response)
 
@@ -97,9 +100,24 @@ class IpcServer:
         sys.stdout.write(json.dumps(message, ensure_ascii=False) + "\n")
         sys.stdout.flush()
 
+    def send_event(self, event_type: str, task_id: str, payload: dict = None):
+        """发送事件到Qt前端"""
+        event = create_event(event_type, task_id, payload)
+        self._send(event)
+
+
+_server_instance = None
+
+
+def get_server():
+    global _server_instance
+    return _server_instance
+
 
 def main():
     """入口点"""
+    global _server_instance
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
@@ -107,6 +125,7 @@ def main():
     )
 
     server = IpcServer()
+    _server_instance = server
     asyncio.run(server.start())
 
 
