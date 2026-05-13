@@ -1,6 +1,7 @@
 // ExportPage.qml - Export Center
 import QtQuick
 import QtQuick.Controls
+import LabelTorch.Shell
 import QtQuick.Layouts
 
 Item {
@@ -34,7 +35,7 @@ Item {
         Rectangle {
             Layout.preferredWidth: 400
             Layout.fillHeight: true
-            color: "#181825"
+            color: Theme.bgCard
             radius: 8
 
             ColumnLayout {
@@ -45,7 +46,7 @@ Item {
                 // Section title
                 Label {
                     text: "Export Model"
-                    color: "#89b4fa"
+                    color: Theme.accentPrimary
                     font.pixelSize: 16
                     font.bold: true
                 }
@@ -57,7 +58,7 @@ Item {
 
                     Label {
                         text: "Model Version:"
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                         font.pixelSize: 13
                         Layout.preferredWidth: 100
                     }
@@ -75,16 +76,16 @@ Item {
 
                         contentItem: Label {
                             text: versionCombo.displayText
-                            color: "#cdd6f4"
+                            color: Theme.textPrimary
                             font.pixelSize: 13
                             verticalAlignment: Text.AlignVCenter
                             leftPadding: 8
                         }
 
                         background: Rectangle {
-                            color: "#313244"
+                            color: Theme.bgInput
                             radius: 4
-                            border.color: versionCombo.activeFocus ? "#89b4fa" : "#45475a"
+                            border.color: versionCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                             border.width: 1
                         }
 
@@ -102,8 +103,8 @@ Item {
                             }
 
                             background: Rectangle {
-                                color: "#1e1e2e"
-                                border.color: "#45475a"
+                                color: Theme.bgPrimary
+                                border.color: Theme.borderNormal
                                 radius: 4
                             }
                         }
@@ -112,7 +113,7 @@ Item {
                             width: versionCombo.width
                             contentItem: Label {
                                 text: model.versionId.substring(0, 8) + "..." + (model.bestWeightPath ? " (" + model.bestWeightPath + ")" : "")
-                                color: highlighted ? "#89b4fa" : "#cdd6f4"
+                                color: highlighted ? Theme.accentPrimary : Theme.textPrimary
                                 font.pixelSize: 12
                                 font.family: "monospace"
                                 verticalAlignment: Text.AlignVCenter
@@ -120,7 +121,7 @@ Item {
                             }
                             highlighted: versionCombo.highlightedIndex === index
                             background: Rectangle {
-                                color: highlighted ? "#313244" : "#1e1e2e"
+                                color: highlighted ? Theme.bgInput : Theme.bgPrimary
                             }
                         }
 
@@ -138,7 +139,7 @@ Item {
 
                     Label {
                         text: "Format:"
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                         font.pixelSize: 13
                         Layout.preferredWidth: 100
                     }
@@ -151,16 +152,16 @@ Item {
 
                         contentItem: Label {
                             text: formatCombo.displayText
-                            color: "#cdd6f4"
+                            color: Theme.textPrimary
                             font.pixelSize: 13
                             verticalAlignment: Text.AlignVCenter
                             leftPadding: 8
                         }
 
                         background: Rectangle {
-                            color: "#313244"
+                            color: Theme.bgInput
                             radius: 4
-                            border.color: formatCombo.activeFocus ? "#89b4fa" : "#45475a"
+                            border.color: formatCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                             border.width: 1
                         }
 
@@ -178,8 +179,8 @@ Item {
                             }
 
                             background: Rectangle {
-                                color: "#1e1e2e"
-                                border.color: "#45475a"
+                                color: Theme.bgPrimary
+                                border.color: Theme.borderNormal
                                 radius: 4
                             }
                         }
@@ -188,14 +189,14 @@ Item {
                             width: formatCombo.width
                             contentItem: Label {
                                 text: modelData.toUpperCase()
-                                color: highlighted ? "#89b4fa" : "#cdd6f4"
+                                color: highlighted ? Theme.accentPrimary : Theme.textPrimary
                                 font.pixelSize: 13
                                 font.bold: true
                                 verticalAlignment: Text.AlignVCenter
                             }
                             highlighted: formatCombo.highlightedIndex === index
                             background: Rectangle {
-                                color: highlighted ? "#313244" : "#1e1e2e"
+                                color: highlighted ? Theme.bgInput : Theme.bgPrimary
                             }
                         }
                     }
@@ -226,7 +227,7 @@ Item {
                             default: return ""
                             }
                         }
-                        color: "#6c7086"
+                        color: Theme.textMuted
                         font.pixelSize: 12
                         horizontalAlignment: Text.AlignHCenter
                     }
@@ -243,14 +244,14 @@ Item {
                     Layout.fillWidth: true
 
                     background: Rectangle {
-                        color: parent.enabled ? (parent.pressed ? "#74c7a0" : "#a6e3a1") : "#45475a"
+                        color: parent.enabled ? (parent.pressed ? "#74c7a0" : Theme.accentSuccess) : Theme.borderNormal
                         radius: 6
                         implicitHeight: 40
                     }
 
                     contentItem: Label {
                         text: parent.text
-                        color: parent.enabled ? "#1e1e2e" : "#6c7086"
+                        color: parent.enabled ? Theme.bgPrimary : Theme.textMuted
                         font.pixelSize: 14
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
@@ -267,11 +268,11 @@ Item {
                         var artifactId = exportService.exportModel(selectedVersionId, format, optionsJson)
                         if (artifactId !== "") {
                             statusLabel.text = "Export started: " + artifactId.substring(0, 8) + "..."
-                            statusLabel.color = "#a6e3a1"
+                            statusLabel.color = Theme.accentSuccess
                             refreshExports()
                         } else {
                             statusLabel.text = "Failed to start export"
-                            statusLabel.color = "#f38ba8"
+                            statusLabel.color = Theme.accentError
                         }
                     }
                 }
@@ -281,7 +282,7 @@ Item {
                     id: statusLabel
                     Layout.fillWidth: true
                     text: ""
-                    color: "#a6e3a1"
+                    color: Theme.accentSuccess
                     font.pixelSize: 12
                     wrapMode: Text.WordWrap
                 }
@@ -292,7 +293,7 @@ Item {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: "#181825"
+            color: Theme.bgCard
             radius: 8
 
             ColumnLayout {
@@ -306,7 +307,7 @@ Item {
 
                     Label {
                         text: "Export History"
-                        color: "#89b4fa"
+                        color: Theme.accentPrimary
                         font.pixelSize: 16
                         font.bold: true
                     }
@@ -315,14 +316,14 @@ Item {
 
                     Label {
                         text: exportHistory.length + " artifacts"
-                        color: "#6c7086"
+                        color: Theme.textMuted
                         font.pixelSize: 12
                     }
 
                     Button {
                         text: "Refresh"
                         flat: true
-                        palette.buttonText: "#89b4fa"
+                        palette.buttonText: Theme.accentPrimary
                         font.pixelSize: 12
                         onClicked: refreshExports()
                     }
@@ -333,7 +334,7 @@ Item {
                     Layout.fillWidth: true
                     visible: selectedVersionId !== ""
                     text: "Showing exports for version: " + selectedVersionId.substring(0, 8) + "..."
-                    color: "#a6adc8"
+                    color: Theme.textSecondary
                     font.pixelSize: 12
                     font.family: "monospace"
                 }
@@ -353,7 +354,7 @@ Item {
                         text: selectedVersionId === "" ?
                             "Select a model version to view exports" :
                             "No exports yet for this version"
-                        color: "#6c7086"
+                        color: Theme.textMuted
                         font.pixelSize: 14
                         horizontalAlignment: Text.AlignHCenter
                     }
@@ -362,7 +363,7 @@ Item {
                         width: exportList.width
                         height: 72
                         radius: 6
-                        color: delegateMouseArea.containsMouse ? "#313244" : "#252536"
+                        color: delegateMouseArea.containsMouse ? Theme.bgInput : "#252536"
 
                         RowLayout {
                             anchors.fill: parent
@@ -377,12 +378,12 @@ Item {
                                 radius: 5
                                 color: {
                                     switch (modelData.status) {
-                                    case "pending": return "#89b4fa"
-                                    case "running": return "#f9e2af"
-                                    case "verifying": return "#f9e2af"
-                                    case "succeeded": return "#a6e3a1"
-                                    case "failed": return "#f38ba8"
-                                    default: return "#6c7086"
+                                    case "pending": return Theme.accentPrimary
+                                    case "running": return Theme.accentWarning
+                                    case "verifying": return Theme.accentWarning
+                                    case "succeeded": return Theme.accentSuccess
+                                    case "failed": return Theme.accentError
+                                    default: return Theme.textMuted
                                     }
                                 }
                             }
@@ -398,7 +399,7 @@ Item {
 
                                     Label {
                                         text: modelData.id.substring(0, 8) + "..."
-                                        color: "#89b4fa"
+                                        color: Theme.accentPrimary
                                         font.pixelSize: 13
                                         font.family: "monospace"
                                     }
@@ -409,14 +410,14 @@ Item {
                                         Layout.preferredWidth: formatBadgeText.implicitWidth + 12
                                         radius: 4
                                         color: "#89b4fa20"
-                                        border.color: "#89b4fa"
+                                        border.color: Theme.accentPrimary
                                         border.width: 1
 
                                         Label {
                                             id: formatBadgeText
                                             anchors.centerIn: parent
                                             text: modelData.format ? modelData.format.toUpperCase() : ""
-                                            color: "#89b4fa"
+                                            color: Theme.accentPrimary
                                             font.pixelSize: 10
                                             font.bold: true
                                         }
@@ -439,12 +440,12 @@ Item {
                                         }
                                         border.color: {
                                             switch (modelData.status) {
-                                            case "pending": return "#89b4fa"
-                                            case "running": return "#f9e2af"
-                                            case "verifying": return "#f9e2af"
-                                            case "succeeded": return "#a6e3a1"
-                                            case "failed": return "#f38ba8"
-                                            default: return "#45475a"
+                                            case "pending": return Theme.accentPrimary
+                                            case "running": return Theme.accentWarning
+                                            case "verifying": return Theme.accentWarning
+                                            case "succeeded": return Theme.accentSuccess
+                                            case "failed": return Theme.accentError
+                                            default: return Theme.borderNormal
                                             }
                                         }
                                         border.width: 1
@@ -455,12 +456,12 @@ Item {
                                             text: modelData.status || "pending"
                                             color: {
                                                 switch (modelData.status) {
-                                                case "pending": return "#89b4fa"
-                                                case "running": return "#f9e2af"
-                                                case "verifying": return "#f9e2af"
-                                                case "succeeded": return "#a6e3a1"
-                                                case "failed": return "#f38ba8"
-                                                default: return "#6c7086"
+                                                case "pending": return Theme.accentPrimary
+                                                case "running": return Theme.accentWarning
+                                                case "verifying": return Theme.accentWarning
+                                                case "succeeded": return Theme.accentSuccess
+                                                case "failed": return Theme.accentError
+                                                default: return Theme.textMuted
                                                 }
                                             }
                                             font.pixelSize: 10
@@ -475,7 +476,7 @@ Item {
                                 Label {
                                     Layout.fillWidth: true
                                     text: modelData.outputPath || "N/A"
-                                    color: "#a6adc8"
+                                    color: Theme.textSecondary
                                     font.pixelSize: 11
                                     font.family: "monospace"
                                     elide: Text.ElideMiddle
@@ -484,7 +485,7 @@ Item {
                                 // Timestamp
                                 Label {
                                     text: modelData.createdAt || "N/A"
-                                    color: "#6c7086"
+                                    color: Theme.textMuted
                                     font.pixelSize: 10
                                 }
                             }
@@ -499,14 +500,14 @@ Item {
                                 background: Rectangle {
                                     color: parent.pressed ? "#74c7a0" : "#a6e3a120"
                                     radius: 4
-                                    border.color: "#a6e3a1"
+                                    border.color: Theme.accentSuccess
                                     border.width: 1
                                     implicitHeight: 28
                                 }
 
                                 contentItem: Label {
                                     text: parent.text
-                                    color: "#a6e3a1"
+                                    color: Theme.accentSuccess
                                     font.pixelSize: 11
                                     font.bold: true
                                     horizontalAlignment: Text.AlignHCenter
@@ -516,11 +517,11 @@ Item {
                                 onClicked: {
                                     if (exportService.verifyExport(modelData.id)) {
                                         statusLabel.text = "Verification started for " + modelData.id.substring(0, 8) + "..."
-                                        statusLabel.color = "#f9e2af"
+                                        statusLabel.color = Theme.accentWarning
                                         refreshExports()
                                     } else {
                                         statusLabel.text = "Failed to start verification"
-                                        statusLabel.color = "#f38ba8"
+                                        statusLabel.color = Theme.accentError
                                     }
                                 }
                             }

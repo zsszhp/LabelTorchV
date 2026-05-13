@@ -1,4 +1,4 @@
-import os, glob
+import os, glob, sys
 
 replacements = {
     '"#1e1e2e"': 'Theme.bgPrimary',
@@ -12,7 +12,7 @@ replacements = {
     '"#a6e3a1"': 'Theme.accentSuccess',
     '"#f9e2af"': 'Theme.accentWarning',
     '"#45475a"': 'Theme.borderNormal',
-import sys
+}
 
 dirs = [
     r'f:\project\my\LabelTorchV\src\features\model\qml',
@@ -20,15 +20,15 @@ dirs = [
 ]
 for qml_dir in dirs:
     for fpath in glob.glob(os.path.join(qml_dir, '*.qml')):
-    with open(fpath, 'r', encoding='utf-8') as f:
-        content = f.read()
-    
-    for old, new in replacements.items():
-        content = content.replace(old, new)
+        with open(fpath, 'r', encoding='utf-8') as f:
+            content = f.read()
         
-    if 'import LabelTorch.Shell' not in content:
-        content = content.replace('import QtQuick.Controls\n', 'import QtQuick.Controls\nimport LabelTorch.Shell\n')
-        
-    with open(fpath, 'w', encoding='utf-8') as f:
-        f.write(content)
+        for old, new in replacements.items():
+            content = content.replace(old, new)
+            
+        if 'import LabelTorch.Shell' not in content:
+            content = content.replace('import QtQuick.Controls\n', 'import QtQuick.Controls\nimport LabelTorch.Shell\n')
+            
+        with open(fpath, 'w', encoding='utf-8') as f:
+            f.write(content)
 print('Done!')

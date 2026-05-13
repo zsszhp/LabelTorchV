@@ -1,6 +1,7 @@
 // ComparePage.qml - Experiment Comparison
 import QtQuick
 import QtQuick.Controls
+import LabelTorch.Shell
 import QtQuick.Layouts
 
 Item {
@@ -30,7 +31,7 @@ Item {
         Rectangle {
             Layout.preferredWidth: 380
             Layout.fillHeight: true
-            color: "#181825"
+            color: Theme.bgCard
             radius: 8
 
             ColumnLayout {
@@ -44,7 +45,7 @@ Item {
 
                     Label {
                         text: "Select Versions"
-                        color: "#89b4fa"
+                        color: Theme.accentPrimary
                         font.pixelSize: 16
                         font.bold: true
                     }
@@ -53,7 +54,7 @@ Item {
 
                     Label {
                         text: selectedVersionIds.length + " selected"
-                        color: "#6c7086"
+                        color: Theme.textMuted
                         font.pixelSize: 12
                     }
                 }
@@ -65,7 +66,7 @@ Item {
 
                     Label {
                         text: "Mode:"
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                         font.pixelSize: 12
                     }
 
@@ -74,13 +75,13 @@ Item {
                         text: "Horizontal"
                         font.pixelSize: 11
                         flat: true
-                        palette.buttonText: compareMode === "horizontal" ? "#89b4fa" : "#6c7086"
+                        palette.buttonText: compareMode === "horizontal" ? Theme.accentPrimary : Theme.textMuted
                         onClicked: compareMode = "horizontal"
 
                         background: Rectangle {
                             radius: 4
-                            color: compareMode === "horizontal" ? "#313244" : "transparent"
-                            border.color: compareMode === "horizontal" ? "#89b4fa" : "transparent"
+                            color: compareMode === "horizontal" ? Theme.bgInput : "transparent"
+                            border.color: compareMode === "horizontal" ? Theme.accentPrimary : "transparent"
                             border.width: compareMode === "horizontal" ? 1 : 0
                         }
                     }
@@ -90,13 +91,13 @@ Item {
                         text: "Vertical (Chain)"
                         font.pixelSize: 11
                         flat: true
-                        palette.buttonText: compareMode === "vertical" ? "#89b4fa" : "#6c7086"
+                        palette.buttonText: compareMode === "vertical" ? Theme.accentPrimary : Theme.textMuted
                         onClicked: compareMode = "vertical"
 
                         background: Rectangle {
                             radius: 4
-                            color: compareMode === "vertical" ? "#313244" : "transparent"
-                            border.color: compareMode === "vertical" ? "#89b4fa" : "transparent"
+                            color: compareMode === "vertical" ? Theme.bgInput : "transparent"
+                            border.color: compareMode === "vertical" ? Theme.accentPrimary : "transparent"
                             border.width: compareMode === "vertical" ? 1 : 0
                         }
                     }
@@ -108,7 +109,7 @@ Item {
                     text: compareMode === "horizontal"
                           ? "Compare versions trained on the same dataset snapshot"
                           : "Compare versions in the same incremental training chain"
-                    color: "#6c7086"
+                    color: Theme.textMuted
                     font.pixelSize: 10
                     font.italic: true
                     wrapMode: Text.WordWrap
@@ -127,7 +128,7 @@ Item {
                         anchors.centerIn: parent
                         visible: versionCheckList.count === 0
                         text: "No model versions yet"
-                        color: "#6c7086"
+                        color: Theme.textMuted
                         font.pixelSize: 14
                         horizontalAlignment: Text.AlignHCenter
                     }
@@ -136,8 +137,8 @@ Item {
                         width: versionCheckList.width
                         height: 56
                         radius: 6
-                        color: isChecked ? "#313244" : (checkMouseArea.containsMouse ? "#252536" : "#1e1e2e")
-                        border.color: isChecked ? "#89b4fa" : "transparent"
+                        color: isChecked ? Theme.bgInput : (checkMouseArea.containsMouse ? "#252536" : Theme.bgPrimary)
+                        border.color: isChecked ? Theme.accentPrimary : "transparent"
                         border.width: isChecked ? 1 : 0
 
                         property bool isChecked: selectedVersionIds.indexOf(model.versionId) >= 0
@@ -168,13 +169,13 @@ Item {
                                     x: versionCheckBox.leftPadding
                                     y: parent.height / 2 - height / 2
                                     radius: 3
-                                    color: versionCheckBox.checked ? "#89b4fa" : "#181825"
-                                    border.color: versionCheckBox.checked ? "#89b4fa" : "#6c7086"
+                                    color: versionCheckBox.checked ? Theme.accentPrimary : Theme.bgCard
+                                    border.color: versionCheckBox.checked ? Theme.accentPrimary : Theme.textMuted
 
                                     Label {
                                         anchors.centerIn: parent
                                         text: versionCheckBox.checked ? "\u2713" : ""
-                                        color: "#1e1e2e"
+                                        color: Theme.bgPrimary
                                         font.pixelSize: 12
                                         font.bold: true
                                     }
@@ -187,7 +188,7 @@ Item {
 
                                 Label {
                                     text: model.versionId.substring(0, 8) + "..."
-                                    color: "#89b4fa"
+                                    color: Theme.accentPrimary
                                     font.pixelSize: 12
                                     font.family: "monospace"
                                 }
@@ -195,7 +196,7 @@ Item {
                                 Label {
                                     text: "Run: " + model.runId.substring(0, 8) + "..." +
                                           (model.parentVersionId && model.parentVersionId !== "" ? "  Parent: " + model.parentVersionId.substring(0, 8) + "..." : "")
-                                    color: "#6c7086"
+                                    color: Theme.textMuted
                                     font.pixelSize: 10
                                     font.family: "monospace"
                                 }
@@ -223,14 +224,14 @@ Item {
 
                         background: Rectangle {
                             radius: 6
-                            color: parent.enabled ? "#89b4fa" : "#313244"
+                            color: parent.enabled ? Theme.accentPrimary : Theme.bgInput
                             implicitHeight: 32
                             implicitWidth: 120
                         }
 
                         contentItem: Label {
                             text: parent.text
-                            color: parent.enabled ? "#1e1e2e" : "#6c7086"
+                            color: parent.enabled ? Theme.bgPrimary : Theme.textMuted
                             font.pixelSize: 12
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter
@@ -252,7 +253,7 @@ Item {
                         enabled: selectedVersionIds.length > 0
                         font.pixelSize: 12
                         flat: true
-                        palette.buttonText: "#f38ba8"
+                        palette.buttonText: Theme.accentError
 
                         onClicked: {
                             selectedVersionIds = []
@@ -268,7 +269,7 @@ Item {
                         enabled: versionCheckList.count > 0
                         font.pixelSize: 11
                         flat: true
-                        palette.buttonText: "#a6e3a1"
+                        palette.buttonText: Theme.accentSuccess
 
                         onClicked: {
                             var ids = []
@@ -288,7 +289,7 @@ Item {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: "#181825"
+            color: Theme.bgCard
             radius: 8
 
             ColumnLayout {
@@ -302,7 +303,7 @@ Item {
 
                     Label {
                         text: "Comparison Results"
-                        color: "#89b4fa"
+                        color: Theme.accentPrimary
                         font.pixelSize: 16
                         font.bold: true
                     }
@@ -312,7 +313,7 @@ Item {
                     Label {
                         visible: hasCompared && comparisonData.length >= 2
                         text: compareMode === "horizontal" ? "Horizontal: Same Snapshot" : "Vertical: Incremental Chain"
-                        color: compareMode === "horizontal" ? "#a6e3a1" : "#f9e2af"
+                        color: compareMode === "horizontal" ? Theme.accentSuccess : Theme.accentWarning
                         font.pixelSize: 11
                     }
                 }
@@ -325,7 +326,7 @@ Item {
                     text: !hasCompared
                           ? "Select 2 or more versions and click Compare"
                           : "Need at least 2 versions with metrics to compare"
-                    color: "#6c7086"
+                    color: Theme.textMuted
                     font.pixelSize: 14
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -357,7 +358,7 @@ Item {
                                 Label {
                                     anchors.centerIn: parent
                                     text: "Metric"
-                                    color: "#cdd6f4"
+                                    color: Theme.textPrimary
                                     font.pixelSize: 12
                                     font.bold: true
                                 }
@@ -379,7 +380,7 @@ Item {
 
                                         Label {
                                             text: modelData.versionId.substring(0, 8) + "..."
-                                            color: "#89b4fa"
+                                            color: Theme.accentPrimary
                                             font.pixelSize: 11
                                             font.family: "monospace"
                                             Layout.alignment: Qt.AlignHCenter
@@ -394,7 +395,7 @@ Item {
                                                 }
                                                 return "Root version"
                                             }
-                                            color: "#6c7086"
+                                            color: Theme.textMuted
                                             font.pixelSize: 9
                                             font.family: "monospace"
                                             Layout.alignment: Qt.AlignHCenter
@@ -421,13 +422,13 @@ Item {
                                     Rectangle {
                                         width: 140
                                         height: 40
-                                        color: "#1e1e2e"
+                                        color: Theme.bgPrimary
                                         radius: 4
 
                                         Label {
                                             anchors.centerIn: parent
                                             text: modelData
-                                            color: "#cdd6f4"
+                                            color: Theme.textPrimary
                                             font.pixelSize: 12
                                             font.bold: true
                                         }
@@ -446,7 +447,7 @@ Item {
                                             color: {
                                                 var metricName = metricRowRepeater.model[index]
                                                 var val = modelData.metrics[metricName]
-                                                if (val === undefined || isNaN(Number(val))) return "#1e1e2e"
+                                                if (val === undefined || isNaN(Number(val))) return Theme.bgPrimary
 
                                                 // Collect all valid values for this metric across versions
                                                 var values = []
@@ -457,7 +458,7 @@ Item {
                                                     }
                                                 }
 
-                                                if (values.length < 2) return "#1e1e2e"
+                                                if (values.length < 2) return Theme.bgPrimary
 
                                                 var numVal = Number(val)
                                                 var maxVal = Math.max.apply(null, values)
@@ -465,7 +466,7 @@ Item {
 
                                                 if (numVal === maxVal) return "#a6e3a120"  // green bg for best
                                                 if (numVal === minVal) return "#f38ba820"   // red bg for worst
-                                                return "#1e1e2e"
+                                                return Theme.bgPrimary
                                             }
 
                                             border.color: {
@@ -487,8 +488,8 @@ Item {
                                                 var maxVal = Math.max.apply(null, values)
                                                 var minVal = Math.min.apply(null, values)
 
-                                                if (numVal === maxVal) return "#a6e3a1"  // green border for best
-                                                if (numVal === minVal) return "#f38ba8"   // red border for worst
+                                                if (numVal === maxVal) return Theme.accentSuccess  // green border for best
+                                                if (numVal === minVal) return Theme.accentError   // red border for worst
                                                 return "transparent"
                                             }
                                             border.width: 1
@@ -506,7 +507,7 @@ Item {
                                                 color: {
                                                     var metricName = metricRowRepeater.model[index]
                                                     var val = modelData.metrics[metricName]
-                                                    if (val === undefined || isNaN(Number(val))) return "#6c7086"
+                                                    if (val === undefined || isNaN(Number(val))) return Theme.textMuted
 
                                                     var values = []
                                                     for (var i = 0; i < comparisonData.length; i++) {
@@ -516,15 +517,15 @@ Item {
                                                         }
                                                     }
 
-                                                    if (values.length < 2) return "#cdd6f4"
+                                                    if (values.length < 2) return Theme.textPrimary
 
                                                     var numVal = Number(val)
                                                     var maxVal = Math.max.apply(null, values)
                                                     var minVal = Math.min.apply(null, values)
 
-                                                    if (numVal === maxVal) return "#a6e3a1"  // green text for best
-                                                    if (numVal === minVal) return "#f38ba8"   // red text for worst
-                                                    return "#cdd6f4"
+                                                    if (numVal === maxVal) return Theme.accentSuccess  // green text for best
+                                                    if (numVal === minVal) return Theme.accentError   // red text for worst
+                                                    return Theme.textPrimary
                                                 }
                                                 font.pixelSize: 13
                                                 font.bold: true
@@ -538,7 +539,7 @@ Item {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     height: 1
-                                    color: "#313244"
+                                    color: Theme.bgInput
                                 }
                             }
                         }
@@ -556,12 +557,12 @@ Item {
                                     height: 12
                                     radius: 2
                                     color: "#a6e3a120"
-                                    border.color: "#a6e3a1"
+                                    border.color: Theme.accentSuccess
                                     border.width: 1
                                 }
                                 Label {
                                     text: "Best"
-                                    color: "#a6e3a1"
+                                    color: Theme.accentSuccess
                                     font.pixelSize: 11
                                 }
                             }
@@ -573,12 +574,12 @@ Item {
                                     height: 12
                                     radius: 2
                                     color: "#f38ba820"
-                                    border.color: "#f38ba8"
+                                    border.color: Theme.accentError
                                     border.width: 1
                                 }
                                 Label {
                                     text: "Worst"
-                                    color: "#f38ba8"
+                                    color: Theme.accentError
                                     font.pixelSize: 11
                                 }
                             }
@@ -587,7 +588,7 @@ Item {
 
                             Label {
                                 text: comparisonData.length + " versions compared"
-                                color: "#6c7086"
+                                color: Theme.textMuted
                                 font.pixelSize: 11
                             }
                         }

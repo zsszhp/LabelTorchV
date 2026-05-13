@@ -1,6 +1,7 @@
 // MetricChart.qml - Metrics display (text-based, chart rendering deferred)
 import QtQuick
 import QtQuick.Controls
+import LabelTorch.Shell
 import QtQuick.Layouts
 
 Item {
@@ -11,7 +12,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "#1e1e2e"
+        color: Theme.bgPrimary
         radius: 6
 
         ColumnLayout {
@@ -25,7 +26,7 @@ Item {
 
                 Label {
                     text: "Metrics"
-                    color: "#89b4fa"
+                    color: Theme.accentPrimary
                     font.pixelSize: 14
                     font.bold: true
                 }
@@ -34,7 +35,7 @@ Item {
 
                 Label {
                     text: "Text view (chart rendering deferred)"
-                    color: "#6c7086"
+                    color: Theme.textMuted
                     font.pixelSize: 11
                     font.italic: true
                 }
@@ -68,7 +69,7 @@ Item {
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 60
-                        color: "#181825"
+                        color: Theme.bgCard
                         radius: 6
 
                         ColumnLayout {
@@ -77,7 +78,7 @@ Item {
 
                             Label {
                                 text: modelData.name
-                                color: "#6c7086"
+                                color: Theme.textMuted
                                 font.pixelSize: 10
                                 Layout.alignment: Qt.AlignHCenter
                             }
@@ -89,7 +90,7 @@ Item {
                                     }
                                     return String(val)
                                 }
-                                color: "#a6e3a1"
+                                color: Theme.accentSuccess
                                 font.pixelSize: 16
                                 font.bold: true
                                 font.family: "monospace"
@@ -105,7 +106,7 @@ Item {
                 Layout.fillWidth: true
                 visible: keyMetricsRepeater.count === 0
                 text: "No key metrics (mAP50, mAP50-95, precision, recall, fitness) found in metrics snapshot"
-                color: "#6c7086"
+                color: Theme.textMuted
                 font.pixelSize: 12
                 wrapMode: Text.WordWrap
             }
@@ -114,7 +115,7 @@ Item {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 1
-                color: "#313244"
+                color: Theme.bgInput
                 visible: keyMetricsRepeater.count > 0
             }
 
@@ -138,7 +139,7 @@ Item {
                             return root.metricsJson
                         }
                     }
-                    color: "#a6adc8"
+                    color: Theme.textSecondary
                     font.pixelSize: 12
                     font.family: "monospace"
                     selectByMouse: true
@@ -154,7 +155,7 @@ Item {
                 Layout.fillWidth: true
                 visible: root.versionId !== ""
                 text: "Training curves summary: requires epoch data from Python backend (deferred)"
-                color: "#6c7086"
+                color: Theme.textMuted
                 font.pixelSize: 11
                 font.italic: true
             }

@@ -1,6 +1,7 @@
 // ModelPage.qml - Version Center
 import QtQuick
 import QtQuick.Controls
+import LabelTorch.Shell
 import QtQuick.Layouts
 
 Item {
@@ -33,13 +34,13 @@ Item {
                 width: implicitWidth + 24
 
                 background: Rectangle {
-                    color: modelTabBar.currentIndex === 0 ? "#313244" : "transparent"
+                    color: modelTabBar.currentIndex === 0 ? Theme.bgInput : "transparent"
                     radius: 6
                 }
 
                 contentItem: Label {
                     text: parent.text
-                    color: modelTabBar.currentIndex === 0 ? "#89b4fa" : "#6c7086"
+                    color: modelTabBar.currentIndex === 0 ? Theme.accentPrimary : Theme.textMuted
                     font.pixelSize: 13
                     font.bold: modelTabBar.currentIndex === 0
                     horizontalAlignment: Text.AlignHCenter
@@ -53,13 +54,13 @@ Item {
                 width: implicitWidth + 24
 
                 background: Rectangle {
-                    color: modelTabBar.currentIndex === 1 ? "#313244" : "transparent"
+                    color: modelTabBar.currentIndex === 1 ? Theme.bgInput : "transparent"
                     radius: 6
                 }
 
                 contentItem: Label {
                     text: parent.text
-                    color: modelTabBar.currentIndex === 1 ? "#89b4fa" : "#6c7086"
+                    color: modelTabBar.currentIndex === 1 ? Theme.accentPrimary : Theme.textMuted
                     font.pixelSize: 13
                     font.bold: modelTabBar.currentIndex === 1
                     horizontalAlignment: Text.AlignHCenter
@@ -82,7 +83,7 @@ Item {
                 Rectangle {
                     Layout.preferredWidth: 400
                     Layout.fillHeight: true
-                    color: "#181825"
+                    color: Theme.bgCard
                     radius: 8
 
                     ColumnLayout {
@@ -96,7 +97,7 @@ Item {
 
                             Label {
                                 text: "Model Versions"
-                                color: "#89b4fa"
+                                color: Theme.accentPrimary
                                 font.pixelSize: 16
                                 font.bold: true
                             }
@@ -105,14 +106,14 @@ Item {
 
                             Label {
                                 text: modelVersionModel.count + " versions"
-                                color: "#6c7086"
+                                color: Theme.textMuted
                                 font.pixelSize: 12
                             }
 
                             Button {
                                 text: "Refresh"
                                 flat: true
-                                palette.buttonText: "#89b4fa"
+                                palette.buttonText: Theme.accentPrimary
                                 font.pixelSize: 12
                                 onClicked: modelVersionModel.refresh()
                             }
@@ -131,7 +132,7 @@ Item {
                                 anchors.centerIn: parent
                                 visible: versionList.count === 0
                                 text: "No model versions yet\nComplete a training run to register a version"
-                                color: "#6c7086"
+                                color: Theme.textMuted
                                 font.pixelSize: 14
                                 horizontalAlignment: Text.AlignHCenter
                             }
@@ -140,8 +141,8 @@ Item {
                                 width: versionList.width
                                 height: 72
                                 radius: 6
-                                color: selectedVersionId === model.versionId ? "#313244" : (mouseArea.containsMouse ? "#252536" : "#1e1e2e")
-                                border.color: selectedVersionId === model.versionId ? "#89b4fa" : "transparent"
+                                color: selectedVersionId === model.versionId ? Theme.bgInput : (mouseArea.containsMouse ? "#252536" : Theme.bgPrimary)
+                                border.color: selectedVersionId === model.versionId ? Theme.accentPrimary : "transparent"
                                 border.width: selectedVersionId === model.versionId ? 1 : 0
 
                                 ColumnLayout {
@@ -158,7 +159,7 @@ Item {
 
                                         Label {
                                             text: model.versionId.substring(0, 8) + "..."
-                                            color: "#89b4fa"
+                                            color: Theme.accentPrimary
                                             font.pixelSize: 13
                                             font.family: "monospace"
                                         }
@@ -193,10 +194,10 @@ Item {
                                                     }
                                                     border.color: {
                                                         switch(modelData) {
-                                                        case "baseline": return "#89b4fa"
-                                                        case "best-so-far": return "#a6e3a1"
-                                                        case "production-candidate": return "#f9e2af"
-                                                        default: return "#45475a"
+                                                        case "baseline": return Theme.accentPrimary
+                                                        case "best-so-far": return Theme.accentSuccess
+                                                        case "production-candidate": return Theme.accentWarning
+                                                        default: return Theme.borderNormal
                                                         }
                                                     }
                                                     border.width: 1
@@ -207,10 +208,10 @@ Item {
                                                         text: modelData
                                                         color: {
                                                             switch(modelData) {
-                                                            case "baseline": return "#89b4fa"
-                                                            case "best-so-far": return "#a6e3a1"
-                                                            case "production-candidate": return "#f9e2af"
-                                                            default: return "#a6adc8"
+                                                            case "baseline": return Theme.accentPrimary
+                                                            case "best-so-far": return Theme.accentSuccess
+                                                            case "production-candidate": return Theme.accentWarning
+                                                            default: return Theme.textSecondary
                                                             }
                                                         }
                                                         font.pixelSize: 10
@@ -225,7 +226,7 @@ Item {
                                         Label {
                                             visible: model.parentVersionId && model.parentVersionId !== ""
                                             text: "parent: " + model.parentVersionId.substring(0, 8) + "..."
-                                            color: "#6c7086"
+                                            color: Theme.textMuted
                                             font.pixelSize: 10
                                             font.family: "monospace"
                                         }
@@ -237,14 +238,14 @@ Item {
 
                                         Label {
                                             text: "Run: " + model.runId.substring(0, 8) + "..."
-                                            color: "#a6adc8"
+                                            color: Theme.textSecondary
                                             font.pixelSize: 11
                                             font.family: "monospace"
                                         }
 
                                         Label {
                                             text: model.createdAt || "N/A"
-                                            color: "#6c7086"
+                                            color: Theme.textMuted
                                             font.pixelSize: 11
                                         }
                                     }
@@ -271,7 +272,7 @@ Item {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    color: "#181825"
+                    color: Theme.bgCard
                     radius: 8
 
                     ColumnLayout {
@@ -285,7 +286,7 @@ Item {
                             Layout.fillHeight: true
                             visible: selectedVersionId === ""
                             text: "Select a model version to view details"
-                            color: "#6c7086"
+                            color: Theme.textMuted
                             font.pixelSize: 14
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
@@ -298,7 +299,7 @@ Item {
 
                             Label {
                                 text: "Version Details"
-                                color: "#89b4fa"
+                                color: Theme.accentPrimary
                                 font.pixelSize: 16
                                 font.bold: true
                             }
@@ -309,7 +310,7 @@ Item {
                                 visible: selectedVersionId !== ""
                                 text: "Delete"
                                 flat: true
-                                palette.buttonText: "#f38ba8"
+                                palette.buttonText: Theme.accentError
                                 font.pixelSize: 12
 
                                 onClicked: {
@@ -327,7 +328,7 @@ Item {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 120
                             visible: selectedVersionId !== ""
-                            color: "#1e1e2e"
+                            color: Theme.bgPrimary
                             radius: 6
 
                             ColumnLayout {
@@ -337,10 +338,10 @@ Item {
 
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Label { text: "ID:"; color: "#6c7086"; font.pixelSize: 12; Layout.preferredWidth: 100 }
+                                    Label { text: "ID:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: selectedVersionId
-                                        color: "#cdd6f4"
+                                        color: Theme.textPrimary
                                         font.pixelSize: 12
                                         font.family: "monospace"
                                         Layout.fillWidth: true
@@ -349,10 +350,10 @@ Item {
                                 }
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Label { text: "Run ID:"; color: "#6c7086"; font.pixelSize: 12; Layout.preferredWidth: 100 }
+                                    Label { text: "Run ID:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: selectedVersion ? selectedVersion.runId || "N/A" : "N/A"
-                                        color: "#cdd6f4"
+                                        color: Theme.textPrimary
                                         font.pixelSize: 12
                                         font.family: "monospace"
                                         Layout.fillWidth: true
@@ -361,10 +362,10 @@ Item {
                                 }
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Label { text: "Best Weights:"; color: "#6c7086"; font.pixelSize: 12; Layout.preferredWidth: 100 }
+                                    Label { text: "Best Weights:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: selectedVersion ? selectedVersion.bestWeightPath || "N/A" : "N/A"
-                                        color: "#a6e3a1"
+                                        color: Theme.accentSuccess
                                         font.pixelSize: 12
                                         font.family: "monospace"
                                         Layout.fillWidth: true
@@ -373,10 +374,10 @@ Item {
                                 }
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Label { text: "Last Weights:"; color: "#6c7086"; font.pixelSize: 12; Layout.preferredWidth: 100 }
+                                    Label { text: "Last Weights:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: selectedVersion ? selectedVersion.lastWeightPath || "N/A" : "N/A"
-                                        color: "#a6adc8"
+                                        color: Theme.textSecondary
                                         font.pixelSize: 12
                                         font.family: "monospace"
                                         Layout.fillWidth: true
@@ -385,7 +386,7 @@ Item {
                                 }
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Label { text: "Parent:"; color: "#6c7086"; font.pixelSize: 12; Layout.preferredWidth: 100 }
+                                    Label { text: "Parent:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: {
                                             if (!selectedVersion) return "None"
@@ -393,7 +394,7 @@ Item {
                                             if (!pv || pv === "") return "None"
                                             return pv.substring(0, 8) + "..."
                                         }
-                                        color: "#89b4fa"
+                                        color: Theme.accentPrimary
                                         font.pixelSize: 12
                                         font.family: "monospace"
                                     }
@@ -409,14 +410,14 @@ Item {
 
                             Label {
                                 text: "Tags:"
-                                color: "#cdd6f4"
+                                color: Theme.textPrimary
                                 font.pixelSize: 13
                             }
 
                             Button {
                                 text: "Baseline"
                                 flat: true
-                                palette.buttonText: "#89b4fa"
+                                palette.buttonText: Theme.accentPrimary
                                 font.pixelSize: 11
                                 onClicked: {
                                     modelRegistry.setTag(selectedVersionId, "baseline")
@@ -429,7 +430,7 @@ Item {
                             Button {
                                 text: "Best-so-far"
                                 flat: true
-                                palette.buttonText: "#a6e3a1"
+                                palette.buttonText: Theme.accentSuccess
                                 font.pixelSize: 11
                                 onClicked: {
                                     modelRegistry.setTag(selectedVersionId, "best-so-far")
@@ -442,7 +443,7 @@ Item {
                             Button {
                                 text: "Production"
                                 flat: true
-                                palette.buttonText: "#f9e2af"
+                                palette.buttonText: Theme.accentWarning
                                 font.pixelSize: 11
                                 onClicked: {
                                     modelRegistry.setTag(selectedVersionId, "production-candidate")
@@ -457,7 +458,7 @@ Item {
                             Button {
                                 text: "Clear Tags"
                                 flat: true
-                                palette.buttonText: "#f38ba8"
+                                palette.buttonText: Theme.accentError
                                 font.pixelSize: 11
                                 onClicked: {
                                     modelRegistry.removeTag(selectedVersionId, "baseline")
@@ -488,14 +489,14 @@ Item {
 
                                 Label {
                                     text: "Version Lineage"
-                                    color: "#89b4fa"
+                                    color: Theme.accentPrimary
                                     font.pixelSize: 12
                                     font.bold: true
                                 }
 
                                 Label {
                                     id: lineageLabel
-                                    color: "#a6adc8"
+                                    color: Theme.textSecondary
                                     font.pixelSize: 11
                                     font.family: "monospace"
                                     wrapMode: Text.WordWrap
