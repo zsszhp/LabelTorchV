@@ -12,11 +12,14 @@ replacements = {
     '"#a6e3a1"': 'Theme.accentSuccess',
     '"#f9e2af"': 'Theme.accentWarning',
     '"#45475a"': 'Theme.borderNormal',
-}
-
 import sys
-qml_dir = r'f:\project\my\LabelTorchV\src\features\training\qml'
-for fpath in glob.glob(os.path.join(qml_dir, '*.qml')):
+
+dirs = [
+    r'f:\project\my\LabelTorchV\src\features\model\qml',
+    r'f:\project\my\LabelTorchV\src\features\export\qml'
+]
+for qml_dir in dirs:
+    for fpath in glob.glob(os.path.join(qml_dir, '*.qml')):
     with open(fpath, 'r', encoding='utf-8') as f:
         content = f.read()
     
