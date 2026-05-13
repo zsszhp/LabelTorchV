@@ -1,6 +1,7 @@
 // DatasetStatsView.qml - 数据统计视图
 import QtQuick
 import QtQuick.Controls
+import LabelTorch.Shell
 import QtQuick.Layouts
 
 Item {
@@ -23,7 +24,7 @@ Item {
                 text: "数据统计"
                 font.pixelSize: 24
                 font.bold: true
-                color: "#cdd6f4"
+                color: Theme.textPrimary
             }
 
             Item { Layout.fillWidth: true }
@@ -31,7 +32,7 @@ Item {
             Label {
                 visible: !appController.projectOpen
                 text: "请先打开项目"
-                color: "#f38ba8"
+                color: Theme.accentError
                 font.pixelSize: 14
             }
 
@@ -43,10 +44,10 @@ Item {
                 textRole: "name"
                 valueRole: "datasetId"
 
-                background: Rectangle { color: "#313244"; radius: 4; border.color: "#45475a" }
+                background: Rectangle { color: Theme.bgInput; radius: 4; border.color: Theme.borderNormal }
                 contentItem: Label {
                     text: datasetCombo.displayText
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                     font.pixelSize: 14
                     verticalAlignment: Text.AlignVCenter
                     leftPadding: 8
@@ -73,7 +74,7 @@ Item {
             Rectangle {
                 Layout.preferredWidth: 320
                 Layout.fillHeight: true
-                color: "#181825"
+                color: Theme.bgCard
                 radius: 8
 
                 ColumnLayout {
@@ -85,7 +86,7 @@ Item {
                         text: "样本统计"
                         font.pixelSize: 16
                         font.bold: true
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                     }
 
                     // 统计卡片
@@ -98,22 +99,22 @@ Item {
                         StatCard {
                             cardTitle: "总数"
                             cardValue: currentStats ? currentStats.totalSamples : "-"
-                            valueColor: "#89b4fa"
+                            valueColor: Theme.accentPrimary
                         }
                         StatCard {
                             cardTitle: "有效"
                             cardValue: currentStats ? currentStats.validSamples : "-"
-                            valueColor: "#a6e3a1"
+                            valueColor: Theme.accentSuccess
                         }
                         StatCard {
                             cardTitle: "无效"
                             cardValue: currentStats ? currentStats.invalidSamples : "-"
-                            valueColor: "#f38ba8"
+                            valueColor: Theme.accentError
                         }
                         StatCard {
                             cardTitle: "未标注"
                             cardValue: currentStats ? currentStats.unlabeledSamples : "-"
-                            valueColor: "#f9e2af"
+                            valueColor: Theme.accentWarning
                         }
                     }
 
@@ -122,7 +123,7 @@ Item {
                         text: "标注密度"
                         font.pixelSize: 14
                         font.bold: true
-                        color: "#a6adc8"
+                        color: Theme.textSecondary
                         Layout.topMargin: 8
                     }
 
@@ -144,7 +145,7 @@ Item {
                     Label {
                         visible: !currentStats
                         text: "选择数据集并点击\"刷新统计\"查看数据"
-                        color: "#6c7086"
+                        color: Theme.textMuted
                         font.pixelSize: 12
                         wrapMode: Text.WordWrap
                         Layout.fillWidth: true
@@ -157,7 +158,7 @@ Item {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                color: "#181825"
+                color: Theme.bgCard
                 radius: 8
 
                 ColumnLayout {
@@ -169,7 +170,7 @@ Item {
                         text: "类别分布"
                         font.pixelSize: 16
                         font.bold: true
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                     }
 
                     ListView {
@@ -193,7 +194,7 @@ Item {
 
                                 Label {
                                     text: modelData.className
-                                    color: "#cdd6f4"
+                                    color: Theme.textPrimary
                                     font.pixelSize: 12
                                     Layout.preferredWidth: 80
                                     elide: Text.ElideRight
@@ -203,7 +204,7 @@ Item {
                                     Layout.fillWidth: true
                                     height: 16
                                     radius: 3
-                                    color: "#313244"
+                                    color: Theme.bgInput
 
                                     Rectangle {
                                         width: parent.width * (modelData.count / maxCount())
@@ -219,7 +220,7 @@ Item {
 
                                 Label {
                                     text: modelData.count
-                                    color: "#a6adc8"
+                                    color: Theme.textSecondary
                                     font.pixelSize: 12
                                     Layout.preferredWidth: 50
                                     horizontalAlignment: Text.AlignRight
@@ -231,7 +232,7 @@ Item {
                             visible: classDistList.length === 0
                             anchors.centerIn: parent
                             text: "暂无类别分布数据"
-                            color: "#6c7086"
+                            color: Theme.textMuted
                             font.pixelSize: 13
                         }
                     }
@@ -244,7 +245,7 @@ Item {
             visible: appController.projectOpen
             Layout.fillWidth: true
             Layout.preferredHeight: 200
-            color: "#181825"
+            color: Theme.bgCard
             radius: 8
 
             ColumnLayout {
@@ -259,7 +260,7 @@ Item {
                         text: "异常检测"
                         font.pixelSize: 16
                         font.bold: true
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                     }
 
                     Item { Layout.fillWidth: true }
@@ -285,7 +286,7 @@ Item {
 
                         width: ListView.view.width
                         height: anomalyContent.height + 16 + (isExpanded && model.count > 0 ? detailText.height + 8 : 0)
-                        color: "#1e1e2e"
+                        color: Theme.bgPrimary
                         radius: 4
 
                         Column {
@@ -302,13 +303,13 @@ Item {
                                     width: 8
                                     height: 8
                                     radius: 4
-                                    color: model.count > 0 ? "#f38ba8" : "#a6e3a1"
+                                    color: model.count > 0 ? Theme.accentError : Theme.accentSuccess
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
 
                                 Label {
                                     text: model.label
-                                    color: "#cdd6f4"
+                                    color: Theme.textPrimary
                                     font.pixelSize: 13
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
@@ -317,7 +318,7 @@ Item {
 
                                 Label {
                                     text: model.count + " 项"
-                                    color: model.count > 0 ? "#f38ba8" : "#a6e3a1"
+                                    color: model.count > 0 ? Theme.accentError : Theme.accentSuccess
                                     font.pixelSize: 13
                                     font.bold: true
                                     anchors.verticalCenter: parent.verticalCenter
@@ -328,7 +329,7 @@ Item {
                                 id: detailText
                                 visible: isExpanded && model.count > 0
                                 text: model.count > 0 ? model.ids.join(", ") : ""
-                                color: "#6c7086"
+                                color: Theme.textMuted
                                 font.pixelSize: 11
                                 font.family: "Consolas"
                                 wrapMode: Text.WordWrap
@@ -346,7 +347,7 @@ Item {
                 Label {
                     visible: !currentAnomalies
                     text: "点击\"检测异常\"扫描数据集问题"
-                    color: "#6c7086"
+                    color: Theme.textMuted
                     font.pixelSize: 12
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
@@ -359,11 +360,11 @@ Item {
     component StatCard: Rectangle {
         property string cardTitle: ""
         property var cardValue: "-"
-        property color valueColor: "#89b4fa"
+        property color valueColor: Theme.accentPrimary
 
         Layout.fillWidth: true
         height: 64
-        color: "#1e1e2e"
+        color: Theme.bgPrimary
         radius: 6
 
         Column {
@@ -372,7 +373,7 @@ Item {
 
             Label {
                 text: cardTitle
-                color: "#6c7086"
+                color: Theme.textMuted
                 font.pixelSize: 11
                 horizontalAlignment: Text.AlignHCenter
             }
@@ -396,14 +397,14 @@ Item {
 
         Label {
             text: statLabel
-            color: "#6c7086"
+            color: Theme.textMuted
             font.pixelSize: 10
             horizontalAlignment: Text.AlignHCenter
         }
 
         Label {
             text: statValue
-            color: "#cdd6f4"
+            color: Theme.textPrimary
             font.pixelSize: 14
             font.bold: true
             horizontalAlignment: Text.AlignHCenter
@@ -450,7 +451,7 @@ Item {
     }
 
     function barColor(idx) {
-        var colors = ["#89b4fa", "#a6e3a1", "#f9e2af", "#f38ba8", "#cba6f7", "#94e2d5", "#fab387", "#74c7ec"]
+        var colors = [Theme.accentPrimary, Theme.accentSuccess, Theme.accentWarning, Theme.accentError, "#cba6f7", "#94e2d5", "#fab387", "#74c7ec"]
         return colors[idx % colors.length]
     }
 

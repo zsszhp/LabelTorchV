@@ -1,6 +1,7 @@
 // ImportPage.qml - YOLO txt 数据导入页面
 import QtQuick
 import QtQuick.Controls
+import LabelTorch.Shell
 import QtQuick.Layouts
 import QtQuick.Dialogs
 
@@ -20,7 +21,7 @@ Item {
                 text: "数据导入"
                 font.pixelSize: 24
                 font.bold: true
-                color: "#cdd6f4"
+                color: Theme.textPrimary
             }
 
             Item { Layout.fillWidth: true }
@@ -36,7 +37,7 @@ Item {
             visible: !appController.projectOpen
             text: "请先打开一个项目再导入数据"
             font.pixelSize: 14
-            color: "#f38ba8"
+            color: Theme.accentError
             Layout.fillWidth: true
         }
 
@@ -45,7 +46,7 @@ Item {
             visible: appController.projectOpen
             Layout.fillWidth: true
             Layout.preferredHeight: 280
-            color: "#181825"
+            color: Theme.bgCard
             radius: 8
 
             ColumnLayout {
@@ -57,20 +58,20 @@ Item {
                     text: "YOLO txt 格式导入"
                     font.pixelSize: 16
                     font.bold: true
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                 }
 
                 // 数据集名称
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
-                    Label { text: "数据集名称"; color: "#cdd6f4"; Layout.preferredWidth: 80 }
+                    Label { text: "数据集名称"; color: Theme.textPrimary; Layout.preferredWidth: 80 }
                     TextField {
                         id: datasetNameField
                         Layout.fillWidth: true
                         placeholderText: "输入数据集名称"
-                        color: "#cdd6f4"
-                        background: Rectangle { color: "#313244"; radius: 4; border.color: datasetNameField.activeFocus ? "#89b4fa" : "#45475a"; border.width: 1 }
+                        color: Theme.textPrimary
+                        background: Rectangle { color: Theme.bgInput; radius: 4; border.color: datasetNameField.activeFocus ? Theme.accentPrimary : Theme.borderNormal; border.width: 1 }
                     }
                 }
 
@@ -78,13 +79,13 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
-                    Label { text: "图片目录"; color: "#cdd6f4"; Layout.preferredWidth: 80 }
+                    Label { text: "图片目录"; color: Theme.textPrimary; Layout.preferredWidth: 80 }
                     TextField {
                         id: imageDirField
                         Layout.fillWidth: true
                         placeholderText: "选择图片目录 (images/)"
-                        color: "#cdd6f4"
-                        background: Rectangle { color: "#313244"; radius: 4; border.color: imageDirField.activeFocus ? "#89b4fa" : "#45475a"; border.width: 1 }
+                        color: Theme.textPrimary
+                        background: Rectangle { color: Theme.bgInput; radius: 4; border.color: imageDirField.activeFocus ? Theme.accentPrimary : Theme.borderNormal; border.width: 1 }
                     }
                     Button {
                         text: "浏览"
@@ -96,13 +97,13 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
-                    Label { text: "标签目录"; color: "#cdd6f4"; Layout.preferredWidth: 80 }
+                    Label { text: "标签目录"; color: Theme.textPrimary; Layout.preferredWidth: 80 }
                     TextField {
                         id: labelDirField
                         Layout.fillWidth: true
                         placeholderText: "选择标签目录 (labels/)"
-                        color: "#cdd6f4"
-                        background: Rectangle { color: "#313244"; radius: 4; border.color: labelDirField.activeFocus ? "#89b4fa" : "#45475a"; border.width: 1 }
+                        color: Theme.textPrimary
+                        background: Rectangle { color: Theme.bgInput; radius: 4; border.color: labelDirField.activeFocus ? Theme.accentPrimary : Theme.borderNormal; border.width: 1 }
                     }
                     Button {
                         text: "浏览"
@@ -139,7 +140,7 @@ Item {
             text: "已导入数据集"
             font.pixelSize: 16
             font.bold: true
-            color: "#cdd6f4"
+            color: Theme.textPrimary
         }
 
         ListView {
@@ -153,7 +154,7 @@ Item {
             delegate: Rectangle {
                 width: ListView.view.width
                 height: 72
-                color: "#313244"
+                color: Theme.bgInput
                 radius: 8
 
                 RowLayout {
@@ -163,18 +164,18 @@ Item {
 
                     Column {
                         Layout.fillWidth: true
-                        Label { text: model.name; font.bold: true; color: "#cdd6f4"; font.pixelSize: 14 }
-                        Label { text: model.imageRoot; color: "#6c7086"; font.pixelSize: 11; elide: Text.ElideMiddle; width: parent.width }
+                        Label { text: model.name; font.bold: true; color: Theme.textPrimary; font.pixelSize: 14 }
+                        Label { text: model.imageRoot; color: Theme.textMuted; font.pixelSize: 11; elide: Text.ElideMiddle; width: parent.width }
                     }
 
                     Rectangle {
                         width: 12; height: 12; radius: 6
-                        color: model.importStatus === "completed" ? "#a6e3a1" :
-                               model.importStatus === "failed" ? "#f38ba8" : "#f9e2af"
+                        color: model.importStatus === "completed" ? Theme.accentSuccess :
+                               model.importStatus === "failed" ? Theme.accentError : Theme.accentWarning
                     }
 
-                    Label { text: model.sampleCount + " 张"; color: "#a6adc8"; font.pixelSize: 12 }
-                    Label { text: model.importStatus; color: "#6c7086"; font.pixelSize: 11 }
+                    Label { text: model.sampleCount + " 张"; color: Theme.textSecondary; font.pixelSize: 12 }
+                    Label { text: model.importStatus; color: Theme.textMuted; font.pixelSize: 11 }
 
                     Button {
                         text: "删除"

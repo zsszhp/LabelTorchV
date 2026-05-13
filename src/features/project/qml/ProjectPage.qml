@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
+import LabelTorch.Shell
 
 Item {
     ColumnLayout {
@@ -18,7 +19,7 @@ Item {
                 text: "项目管理"
                 font.pixelSize: 24
                 font.bold: true
-                color: "#cdd6f4"
+                color: Theme.textPrimary
             }
 
             Item { Layout.fillWidth: true }
@@ -37,7 +38,7 @@ Item {
         Label {
             text: "创建或打开一个项目开始工作"
             font.pixelSize: 14
-            color: "#a6adc8"
+            color: Theme.textSecondary
         }
 
         // 项目列表
@@ -51,9 +52,9 @@ Item {
             delegate: Rectangle {
                 width: ListView.view.width
                 height: 64
-                color: mouseArea.containsMouse ? "#313244" : "#313244"
+                color: mouseArea.containsMouse ? Theme.bgHover : Theme.bgCard
                 radius: 8
-                border.color: appController.currentProjectId === model.projectId ? "#89b4fa" : "transparent"
+                border.color: appController.currentProjectId === model.projectId ? Theme.accentPrimary : "transparent"
                 border.width: appController.currentProjectId === model.projectId ? 2 : 0
 
                 RowLayout {
@@ -63,11 +64,11 @@ Item {
 
                     Column {
                         Layout.fillWidth: true
-                        Label { text: model.name; font.bold: true; color: "#cdd6f4"; font.pixelSize: 14 }
-                        Label { text: model.path; color: "#6c7086"; font.pixelSize: 11 }
+                        Label { text: model.name; font.bold: true; color: Theme.textPrimary; font.pixelSize: 14 }
+                        Label { text: model.path; color: Theme.textMuted; font.pixelSize: 11 }
                     }
 
-                    Label { text: model.createdAt; color: "#6c7086"; font.pixelSize: 11 }
+                    Label { text: model.createdAt; color: Theme.textMuted; font.pixelSize: 11 }
 
                     Button {
                         text: appController.currentProjectId === model.projectId ? "已打开" : "打开"
@@ -113,24 +114,24 @@ Item {
             width: parent.width
             spacing: 12
 
-            Label { text: "项目名称"; color: "#cdd6f4" }
+            Label { text: "项目名称"; color: Theme.textPrimary }
             TextField {
                 id: projectNameField
                 Layout.fillWidth: true
                 placeholderText: "输入项目名称"
-                color: "#cdd6f4"
-                background: Rectangle { color: "#313244"; radius: 4; border.color: projectNameField.activeFocus ? "#89b4fa" : "#45475a"; border.width: 1 }
+                color: Theme.textPrimary
+                background: Rectangle { color: Theme.bgInput; radius: 4; border.color: projectNameField.activeFocus ? Theme.borderFocus : Theme.borderNormal; border.width: 1 }
             }
 
-            Label { text: "项目路径"; color: "#cdd6f4" }
+            Label { text: "项目路径"; color: Theme.textPrimary }
             RowLayout {
                 Layout.fillWidth: true
                 TextField {
                     id: projectPathField
                     Layout.fillWidth: true
                     placeholderText: "选择项目目录"
-                    color: "#cdd6f4"
-                    background: Rectangle { color: "#313244"; radius: 4; border.color: projectPathField.activeFocus ? "#89b4fa" : "#45475a"; border.width: 1 }
+                    color: Theme.textPrimary
+                    background: Rectangle { color: Theme.bgInput; radius: 4; border.color: projectPathField.activeFocus ? Theme.borderFocus : Theme.borderNormal; border.width: 1 }
                 }
                 Button {
                     text: "浏览"
