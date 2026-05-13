@@ -14,7 +14,8 @@ replacements = {
     '"#45475a"': 'Theme.borderNormal',
 }
 
-qml_dir = r'f:\project\my\LabelTorchV\src\features\dataset\qml'
+import sys
+qml_dir = r'f:\project\my\LabelTorchV\src\features\training\qml'
 for fpath in glob.glob(os.path.join(qml_dir, '*.qml')):
     with open(fpath, 'r', encoding='utf-8') as f:
         content = f.read()

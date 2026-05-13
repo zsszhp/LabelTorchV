@@ -1,6 +1,7 @@
 // TrainingPage.qml - Training workbench
 import QtQuick
 import QtQuick.Controls
+import LabelTorch.Shell
 import QtQuick.Layouts
 
 Item {
@@ -62,7 +63,7 @@ Item {
         Rectangle {
             Layout.preferredWidth: 380
             Layout.fillHeight: true
-            color: "#181825"
+            color: Theme.bgCard
             radius: 8
 
             ColumnLayout {
@@ -73,7 +74,7 @@ Item {
                 // Section title
                 Label {
                     text: "New Training Run"
-                    color: "#89b4fa"
+                    color: Theme.accentPrimary
                     font.pixelSize: 16
                     font.bold: true
                 }
@@ -85,7 +86,7 @@ Item {
 
                     Label {
                         text: "Snapshot:"
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                         font.pixelSize: 13
                         Layout.preferredWidth: 72
                     }
@@ -103,16 +104,16 @@ Item {
 
                         contentItem: Label {
                             text: snapshotCombo.displayText
-                            color: "#cdd6f4"
+                            color: Theme.textPrimary
                             font.pixelSize: 13
                             verticalAlignment: Text.AlignVCenter
                             leftPadding: 8
                         }
 
                         background: Rectangle {
-                            color: "#313244"
+                            color: Theme.bgInput
                             radius: 4
-                            border.color: snapshotCombo.activeFocus ? "#89b4fa" : "#45475a"
+                            border.color: snapshotCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                             border.width: 1
                         }
 
@@ -130,8 +131,8 @@ Item {
                             }
 
                             background: Rectangle {
-                                color: "#1e1e2e"
-                                border.color: "#45475a"
+                                color: Theme.bgPrimary
+                                border.color: Theme.borderNormal
                                 radius: 4
                             }
                         }
@@ -140,14 +141,14 @@ Item {
                             width: snapshotCombo.width
                             contentItem: Label {
                                 text: model.snapshotId.substring(0, 8) + "... (" + model.sampleCount + " samples, train:" + model.trainCount + " val:" + model.valCount + ")"
-                                color: highlighted ? "#89b4fa" : "#cdd6f4"
+                                color: highlighted ? Theme.accentPrimary : Theme.textPrimary
                                 font.pixelSize: 12
                                 font.family: "monospace"
                                 verticalAlignment: Text.AlignVCenter
                             }
                             highlighted: snapshotCombo.highlightedIndex === index
                             background: Rectangle {
-                                color: highlighted ? "#313244" : "#1e1e2e"
+                                color: highlighted ? Theme.bgInput : Theme.bgPrimary
                             }
                         }
 
@@ -161,7 +162,7 @@ Item {
                 Label {
                     id: snapshotInfoLabel
                     Layout.fillWidth: true
-                    color: "#a6adc8"
+                    color: Theme.textSecondary
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
                     visible: text !== ""
@@ -184,7 +185,7 @@ Item {
 
                     Label {
                         text: "Adapter:"
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                         font.pixelSize: 13
                         Layout.preferredWidth: 72
                     }
@@ -201,16 +202,16 @@ Item {
 
                         contentItem: Label {
                             text: adapterCombo.displayText
-                            color: "#cdd6f4"
+                            color: Theme.textPrimary
                             font.pixelSize: 13
                             verticalAlignment: Text.AlignVCenter
                             leftPadding: 8
                         }
 
                         background: Rectangle {
-                            color: "#313244"
+                            color: Theme.bgInput
                             radius: 4
-                            border.color: adapterCombo.activeFocus ? "#89b4fa" : "#45475a"
+                            border.color: adapterCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                             border.width: 1
                         }
 
@@ -228,8 +229,8 @@ Item {
                             }
 
                             background: Rectangle {
-                                color: "#1e1e2e"
-                                border.color: "#45475a"
+                                color: Theme.bgPrimary
+                                border.color: Theme.borderNormal
                                 radius: 4
                             }
                         }
@@ -238,13 +239,13 @@ Item {
                             width: adapterCombo.width
                             contentItem: Label {
                                 text: modelData
-                                color: highlighted ? "#89b4fa" : "#cdd6f4"
+                                color: highlighted ? Theme.accentPrimary : Theme.textPrimary
                                 font.pixelSize: 13
                                 verticalAlignment: Text.AlignVCenter
                             }
                             highlighted: adapterCombo.highlightedIndex === index
                             background: Rectangle {
-                                color: highlighted ? "#313244" : "#1e1e2e"
+                                color: highlighted ? Theme.bgInput : Theme.bgPrimary
                             }
                         }
 
@@ -267,7 +268,7 @@ Item {
                     Layout.fillWidth: true
                     visible: configPanel.modelFamily === "yolov8_obb"
                     text: "[OBB] Oriented Bounding Box training mode"
-                    color: "#f9e2af"
+                    color: Theme.accentWarning
                     font.pixelSize: 11
                     font.bold: true
                     wrapMode: Text.WordWrap
@@ -286,14 +287,14 @@ Item {
                         Layout.fillWidth: true
 
                         background: Rectangle {
-                            color: parent.enabled ? (parent.pressed ? "#74c7a0" : "#a6e3a1") : "#45475a"
+                            color: parent.enabled ? (parent.pressed ? "#74c7a0" : Theme.accentSuccess) : Theme.borderNormal
                             radius: 6
                             implicitHeight: 36
                         }
 
                         contentItem: Label {
                             text: parent.text
-                            color: parent.enabled ? "#1e1e2e" : "#6c7086"
+                            color: parent.enabled ? Theme.bgPrimary : Theme.textMuted
                             font.pixelSize: 13
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter
@@ -310,7 +311,7 @@ Item {
                                 currentRunId = runId
                                 currentRunStatus = "draft"
                                 statusLabel.text = "Run created: " + runId.substring(0, 8) + "..."
-                                statusLabel.color = "#a6e3a1"
+                                statusLabel.color = Theme.accentSuccess
                                 logView.clear()
                                 logView.appendLog("[LabelTorch] Training run created: " + runId)
                                 logView.appendLog("[LabelTorch] Starting training...")
@@ -320,12 +321,12 @@ Item {
                                     statusLabel.text = "Training started: " + runId.substring(0, 8) + "..."
                                 } else {
                                     statusLabel.text = "Failed to start training"
-                                    statusLabel.color = "#f38ba8"
+                                    statusLabel.color = Theme.accentError
                                     logView.appendLog("[LabelTorch] ERROR: Failed to start training")
                                 }
                             } else {
                                 statusLabel.text = "Failed to create training run"
-                                statusLabel.color = "#f38ba8"
+                                statusLabel.color = Theme.accentError
                             }
                         }
                     }
@@ -337,14 +338,14 @@ Item {
                         Layout.preferredWidth: 80
 
                         background: Rectangle {
-                            color: parent.enabled ? (parent.pressed ? "#d6758e" : "#f38ba8") : "#45475a"
+                            color: parent.enabled ? (parent.pressed ? "#d6758e" : Theme.accentError) : Theme.borderNormal
                             radius: 6
                             implicitHeight: 36
                         }
 
                         contentItem: Label {
                             text: parent.text
-                            color: parent.enabled ? "#1e1e2e" : "#6c7086"
+                            color: parent.enabled ? Theme.bgPrimary : Theme.textMuted
                             font.pixelSize: 13
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter
@@ -366,7 +367,7 @@ Item {
                     id: statusLabel
                     Layout.fillWidth: true
                     text: ""
-                    color: "#a6e3a1"
+                    color: Theme.accentSuccess
                     font.pixelSize: 12
                     wrapMode: Text.WordWrap
                 }
@@ -377,7 +378,7 @@ Item {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: "#181825"
+            color: Theme.bgCard
             radius: 8
 
             ColumnLayout {
@@ -398,14 +399,14 @@ Item {
 
                         contentItem: Label {
                             text: parent.text
-                            color: parent.checked ? "#89b4fa" : "#6c7086"
+                            color: parent.checked ? Theme.accentPrimary : Theme.textMuted
                             font.pixelSize: 13
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
 
                         background: Rectangle {
-                            color: parent.checked ? "#313244" : "transparent"
+                            color: parent.checked ? Theme.bgInput : "transparent"
                             radius: 4
                         }
                     }
@@ -416,14 +417,14 @@ Item {
 
                         contentItem: Label {
                             text: parent.text
-                            color: parent.checked ? "#89b4fa" : "#6c7086"
+                            color: parent.checked ? Theme.accentPrimary : Theme.textMuted
                             font.pixelSize: 13
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
 
                         background: Rectangle {
-                            color: parent.checked ? "#313244" : "transparent"
+                            color: parent.checked ? Theme.bgInput : "transparent"
                             radius: 4
                         }
                     }
@@ -451,7 +452,7 @@ Item {
                             anchors.centerIn: parent
                             visible: runHistoryList.count === 0
                             text: "No training runs yet"
-                            color: "#6c7086"
+                            color: Theme.textMuted
                             font.pixelSize: 14
                         }
 
@@ -459,8 +460,8 @@ Item {
                             width: runHistoryList.width
                             height: 56
                             radius: 6
-                            color: mouseArea.containsMouse ? "#313244" : "#252536"
-                            border.color: model.runId === currentRunId ? "#89b4fa" : "transparent"
+                            color: mouseArea.containsMouse ? Theme.bgInput : "#252536"
+                            border.color: model.runId === currentRunId ? Theme.accentPrimary : "transparent"
                             border.width: model.runId === currentRunId ? 1 : 0
 
                             RowLayout {
@@ -476,12 +477,12 @@ Item {
                                     radius: 5
                                     color: {
                                         switch (model.status) {
-                                        case "running": return "#f9e2af"
-                                        case "succeeded": return "#a6e3a1"
-                                        case "failed": return "#f38ba8"
-                                        case "cancelled": return "#6c7086"
-                                        case "draft": return "#89b4fa"
-                                        default: return "#6c7086"
+                                        case "running": return Theme.accentWarning
+                                        case "succeeded": return Theme.accentSuccess
+                                        case "failed": return Theme.accentError
+                                        case "cancelled": return Theme.textMuted
+                                        case "draft": return Theme.accentPrimary
+                                        default: return Theme.textMuted
                                         }
                                     }
                                 }
@@ -489,7 +490,7 @@ Item {
                                 // Run ID
                                 Label {
                                     text: model.runId.substring(0, 8) + "..."
-                                    color: "#89b4fa"
+                                    color: Theme.accentPrimary
                                     font.pixelSize: 13
                                     font.family: "monospace"
                                     Layout.preferredWidth: 80
@@ -507,17 +508,17 @@ Item {
                                         case "failed": return "#f38ba820"
                                         case "cancelled": return "#6c708620"
                                         case "draft": return "#89b4fa20"
-                                        default: return "#45475a"
+                                        default: return Theme.borderNormal
                                         }
                                     }
                                     border.color: {
                                         switch (model.status) {
-                                        case "running": return "#f9e2af"
-                                        case "succeeded": return "#a6e3a1"
-                                        case "failed": return "#f38ba8"
-                                        case "cancelled": return "#6c7086"
-                                        case "draft": return "#89b4fa"
-                                        default: return "#45475a"
+                                        case "running": return Theme.accentWarning
+                                        case "succeeded": return Theme.accentSuccess
+                                        case "failed": return Theme.accentError
+                                        case "cancelled": return Theme.textMuted
+                                        case "draft": return Theme.accentPrimary
+                                        default: return Theme.borderNormal
                                         }
                                     }
                                     border.width: 1
@@ -528,12 +529,12 @@ Item {
                                         text: model.status
                                         color: {
                                             switch (model.status) {
-                                            case "running": return "#f9e2af"
-                                            case "succeeded": return "#a6e3a1"
-                                            case "failed": return "#f38ba8"
-                                            case "cancelled": return "#6c7086"
-                                            case "draft": return "#89b4fa"
-                                            default: return "#6c7086"
+                                            case "running": return Theme.accentWarning
+                                            case "succeeded": return Theme.accentSuccess
+                                            case "failed": return Theme.accentError
+                                            case "cancelled": return Theme.textMuted
+                                            case "draft": return Theme.accentPrimary
+                                            default: return Theme.textMuted
                                             }
                                         }
                                         font.pixelSize: 11
@@ -544,7 +545,7 @@ Item {
                                 // Snapshot ID
                                 Label {
                                     text: "Snapshot: " + model.snapshotId.substring(0, 8) + "..."
-                                    color: "#a6adc8"
+                                    color: Theme.textSecondary
                                     font.pixelSize: 12
                                 }
 
@@ -556,7 +557,7 @@ Item {
                                         }
                                         return "Not started"
                                     }
-                                    color: "#6c7086"
+                                    color: Theme.textMuted
                                     font.pixelSize: 11
                                 }
 
@@ -567,7 +568,7 @@ Item {
                                     text: "Delete"
                                     flat: true
                                     visible: model.status === "draft" || model.status === "cancelled" || model.status === "failed"
-                                    palette.buttonText: "#f38ba8"
+                                    palette.buttonText: Theme.accentError
                                     font.pixelSize: 11
                                     onClicked: {
                                         if (trainingService.deleteRun(model.runId)) {

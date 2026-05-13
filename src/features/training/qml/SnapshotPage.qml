@@ -1,6 +1,7 @@
 // SnapshotPage.qml - 数据快照管理
 import QtQuick
 import QtQuick.Controls
+import LabelTorch.Shell
 import QtQuick.Layouts
 import QtQuick.Dialogs
 
@@ -19,7 +20,7 @@ Item {
 
             Label {
                 text: "数据集:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
             }
 
@@ -43,7 +44,7 @@ Item {
 
             Label {
                 text: "训练比例:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
             }
 
@@ -68,13 +69,13 @@ Item {
 
             Label {
                 text: "%"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
             }
 
             Label {
                 text: "划分策略:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
             }
 
@@ -97,10 +98,10 @@ Item {
                     if (snapId !== "") {
                         snapshotModel.refresh()
                         statusLabel.text = "快照创建成功: " + snapId.substring(0, 8) + "..."
-                        statusLabel.color = "#a6e3a1"
+                        statusLabel.color = Theme.accentSuccess
                     } else {
                         statusLabel.text = "快照创建失败"
-                        statusLabel.color = "#f38ba8"
+                        statusLabel.color = Theme.accentError
                     }
                 }
             }
@@ -108,7 +109,7 @@ Item {
             Label {
                 id: statusLabel
                 text: ""
-                color: "#a6e3a1"
+                color: Theme.accentSuccess
                 font.pixelSize: 12
             }
 
@@ -128,7 +129,7 @@ Item {
                 width: snapshotList.width
                 height: 64
                 radius: 6
-                color: mouseArea.containsMouse ? "#313244" : "#252536"
+                color: mouseArea.containsMouse ? Theme.bgInput : "#252536"
 
                 RowLayout {
                     anchors.fill: parent
@@ -139,7 +140,7 @@ Item {
                     // 快照ID (缩写)
                     Label {
                         text: model.snapshotId.substring(0, 8) + "..."
-                        color: "#89b4fa"
+                        color: Theme.accentPrimary
                         font.pixelSize: 13
                         font.family: "monospace"
                         Layout.preferredWidth: 100
@@ -148,35 +149,35 @@ Item {
                     // 样本数
                     Label {
                         text: model.sampleCount + " 样本"
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                         font.pixelSize: 13
                     }
 
                     // 划分信息
                     Label {
                         text: "训练: " + model.trainCount + " / 验证: " + model.valCount
-                        color: "#a6adc8"
+                        color: Theme.textSecondary
                         font.pixelSize: 12
                     }
 
                     // 类别版本
                     Label {
                         text: "类别: " + (model.taxonomyVersion || "未知")
-                        color: "#a6adc8"
+                        color: Theme.textSecondary
                         font.pixelSize: 12
                     }
 
                     // 修订边界
                     Label {
                         text: "修订: " + (model.revisionBoundary || "无")
-                        color: "#a6adc8"
+                        color: Theme.textSecondary
                         font.pixelSize: 12
                     }
 
                     // 创建时间
                     Label {
                         text: model.createdAt || ""
-                        color: "#6c7086"
+                        color: Theme.textMuted
                         font.pixelSize: 11
                     }
 
@@ -186,7 +187,7 @@ Item {
                     Button {
                         text: "删除"
                         flat: true
-                        palette.buttonText: "#f38ba8"
+                        palette.buttonText: Theme.accentError
                         onClicked: {
                             if (snapshotService.deleteSnapshot(model.snapshotId)) {
                                 snapshotModel.refresh()
@@ -210,7 +211,7 @@ Item {
                 anchors.centerIn: parent
                 visible: snapshotList.count === 0
                 text: datasetCombo.currentValue ? "暂无快照，点击\"创建快照\"添加" : "请先选择数据集"
-                color: "#6c7086"
+                color: Theme.textMuted
                 font.pixelSize: 14
             }
         }
@@ -222,7 +223,7 @@ Item {
             visible: false
             Layout.fillWidth: true
             Layout.preferredHeight: 120
-            color: "#181825"
+            color: Theme.bgCard
             radius: 6
 
             ColumnLayout {
@@ -231,19 +232,19 @@ Item {
                 spacing: 6
 
                 RowLayout {
-                    Label { text: "快照详情"; color: "#89b4fa"; font.pixelSize: 14; font.bold: true }
+                    Label { text: "快照详情"; color: Theme.accentPrimary; font.pixelSize: 14; font.bold: true }
                     Item { Layout.fillWidth: true }
                     Button {
                         text: "关闭"
                         flat: true
-                        palette.buttonText: "#6c7086"
+                        palette.buttonText: Theme.textMuted
                         onClicked: detailPanel.visible = false
                     }
                 }
 
                 Label {
                     id: detailLabel
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                     font.pixelSize: 12
                     font.family: "monospace"
                     wrapMode: Text.WrapAnywhere
@@ -252,7 +253,7 @@ Item {
 
                 Label {
                     id: splitDetailLabel
-                    color: "#a6adc8"
+                    color: Theme.textSecondary
                     font.pixelSize: 12
                     wrapMode: Text.WrapAnywhere
                     Layout.fillWidth: true

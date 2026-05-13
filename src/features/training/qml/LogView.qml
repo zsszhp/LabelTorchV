@@ -1,6 +1,7 @@
 // LogView.qml - Training log viewer with auto-scroll
 import QtQuick
 import QtQuick.Controls
+import LabelTorch.Shell
 import QtQuick.Layouts
 
 Rectangle {
@@ -33,7 +34,7 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 32
-            color: "#181825"
+            color: Theme.bgCard
             radius: 6
 
             RowLayout {
@@ -44,7 +45,7 @@ Rectangle {
 
                 Label {
                     text: "Training Log"
-                    color: "#a6adc8"
+                    color: Theme.textSecondary
                     font.pixelSize: 12
                     font.bold: true
                 }
@@ -53,7 +54,7 @@ Rectangle {
 
                 Label {
                     text: autoScroll ? "Auto-scroll: ON" : "Auto-scroll: OFF"
-                    color: autoScroll ? "#a6e3a1" : "#6c7086"
+                    color: autoScroll ? Theme.accentSuccess : Theme.textMuted
                     font.pixelSize: 11
                 }
 
@@ -61,7 +62,7 @@ Rectangle {
                     text: "Clear"
                     flat: true
                     font.pixelSize: 11
-                    palette.buttonText: "#6c7086"
+                    palette.buttonText: Theme.textMuted
                     onClicked: root.clear()
                 }
             }
@@ -85,7 +86,7 @@ Rectangle {
                 id: logArea
                 readOnly: true
                 selectByMouse: true
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 12
                 font.family: "Consolas, Courier New, monospace"
                 wrapMode: TextEdit.NoWrap

@@ -1,11 +1,12 @@
 // ConfigPanel.qml - Training parameter configuration panel
 import QtQuick
 import QtQuick.Controls
+import LabelTorch.Shell
 import QtQuick.Layouts
 
 Rectangle {
     id: root
-    color: "#181825"
+    color: Theme.bgCard
     radius: 8
     implicitHeight: layout.implicitHeight + 24
     implicitWidth: 360
@@ -51,7 +52,7 @@ Rectangle {
 
         Label {
             text: "Training Parameters"
-            color: "#89b4fa"
+            color: Theme.accentPrimary
             font.pixelSize: 14
             font.bold: true
         }
@@ -63,7 +64,7 @@ Rectangle {
 
             Label {
                 text: "Model:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -76,16 +77,16 @@ Rectangle {
 
                 contentItem: Label {
                     text: modelFamilyCombo.displayText
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                     font.pixelSize: 13
                     verticalAlignment: Text.AlignVCenter
                     leftPadding: 8
                 }
 
                 background: Rectangle {
-                    color: "#313244"
+                    color: Theme.bgInput
                     radius: 4
-                    border.color: modelFamilyCombo.activeFocus ? "#89b4fa" : "#45475a"
+                    border.color: modelFamilyCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                     border.width: 1
                 }
 
@@ -103,8 +104,8 @@ Rectangle {
                     }
 
                     background: Rectangle {
-                        color: "#1e1e2e"
-                        border.color: "#45475a"
+                        color: Theme.bgPrimary
+                        border.color: Theme.borderNormal
                         radius: 4
                     }
                 }
@@ -113,13 +114,13 @@ Rectangle {
                     width: modelFamilyCombo.width
                     contentItem: Label {
                         text: modelData
-                        color: highlighted ? "#89b4fa" : "#cdd6f4"
+                        color: highlighted ? Theme.accentPrimary : Theme.textPrimary
                         font.pixelSize: 13
                         verticalAlignment: Text.AlignVCenter
                     }
                     highlighted: modelFamilyCombo.highlightedIndex === index
                     background: Rectangle {
-                        color: highlighted ? "#313244" : "#1e1e2e"
+                        color: highlighted ? Theme.bgInput : Theme.bgPrimary
                     }
                 }
             }
@@ -132,7 +133,7 @@ Rectangle {
 
             Label {
                 text: "Type:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -145,16 +146,16 @@ Rectangle {
 
                 contentItem: Label {
                     text: trainingTypeCombo.displayText
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                     font.pixelSize: 13
                     verticalAlignment: Text.AlignVCenter
                     leftPadding: 8
                 }
 
                 background: Rectangle {
-                    color: "#313244"
+                    color: Theme.bgInput
                     radius: 4
-                    border.color: trainingTypeCombo.activeFocus ? "#89b4fa" : "#45475a"
+                    border.color: trainingTypeCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                     border.width: 1
                 }
 
@@ -172,8 +173,8 @@ Rectangle {
                     }
 
                     background: Rectangle {
-                        color: "#1e1e2e"
-                        border.color: "#45475a"
+                        color: Theme.bgPrimary
+                        border.color: Theme.borderNormal
                         radius: 4
                     }
                 }
@@ -182,13 +183,13 @@ Rectangle {
                     width: trainingTypeCombo.width
                     contentItem: Label {
                         text: modelData
-                        color: highlighted ? "#89b4fa" : "#cdd6f4"
+                        color: highlighted ? Theme.accentPrimary : Theme.textPrimary
                         font.pixelSize: 13
                         verticalAlignment: Text.AlignVCenter
                     }
                     highlighted: trainingTypeCombo.highlightedIndex === index
                     background: Rectangle {
-                        color: highlighted ? "#313244" : "#1e1e2e"
+                        color: highlighted ? Theme.bgInput : Theme.bgPrimary
                     }
                 }
             }
@@ -202,7 +203,7 @@ Rectangle {
 
             Label {
                 text: "Parent:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -218,7 +219,7 @@ Rectangle {
                     text: parentVersionCombo.currentIndex >= 0 ?
                         parentVersionCombo.currentValue.substring(0, 8) + "..." :
                         "Select parent version"
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
@@ -226,9 +227,9 @@ Rectangle {
                 }
 
                 background: Rectangle {
-                    color: "#313244"
+                    color: Theme.bgInput
                     radius: 4
-                    border.color: parentVersionCombo.activeFocus ? "#89b4fa" : "#45475a"
+                    border.color: parentVersionCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                     border.width: 1
                 }
 
@@ -246,8 +247,8 @@ Rectangle {
                     }
 
                     background: Rectangle {
-                        color: "#1e1e2e"
-                        border.color: "#45475a"
+                        color: Theme.bgPrimary
+                        border.color: Theme.borderNormal
                         radius: 4
                     }
                 }
@@ -256,14 +257,14 @@ Rectangle {
                     width: parentVersionCombo.width
                     contentItem: Label {
                         text: model.versionId.substring(0, 8) + "... (" + model.bestWeight + ")"
-                        color: highlighted ? "#89b4fa" : "#cdd6f4"
+                        color: highlighted ? Theme.accentPrimary : Theme.textPrimary
                         font.pixelSize: 12
                         font.family: "monospace"
                         verticalAlignment: Text.AlignVCenter
                     }
                     highlighted: parentVersionCombo.highlightedIndex === index
                     background: Rectangle {
-                        color: highlighted ? "#313244" : "#1e1e2e"
+                        color: highlighted ? Theme.bgInput : Theme.bgPrimary
                     }
                 }
             }
@@ -276,7 +277,7 @@ Rectangle {
 
             Label {
                 text: "Image Size:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -295,7 +296,7 @@ Rectangle {
 
                 contentItem: Label {
                     text: imgSizeSpin.textFromValue(imgSizeSpin.value, imgSizeSpin.locale)
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
@@ -306,14 +307,14 @@ Rectangle {
                     x: imgSizeSpin.mirrored ? 0 : parent.width - width
                     height: parent.height
                     implicitWidth: 32
-                    color: imgSizeSpin.up.pressed ? "#45475a" : "#313244"
-                    border.color: "#45475a"
+                    color: imgSizeSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
+                    border.color: Theme.borderNormal
                     radius: 2
 
                     Label {
                         anchors.centerIn: parent
                         text: "+"
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                         font.pixelSize: 14
                     }
                 }
@@ -322,21 +323,21 @@ Rectangle {
                     x: imgSizeSpin.mirrored ? parent.width - width : 0
                     height: parent.height
                     implicitWidth: 32
-                    color: imgSizeSpin.down.pressed ? "#45475a" : "#313244"
-                    border.color: "#45475a"
+                    color: imgSizeSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
+                    border.color: Theme.borderNormal
                     radius: 2
 
                     Label {
                         anchors.centerIn: parent
                         text: "-"
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                         font.pixelSize: 14
                     }
                 }
 
                 background: Rectangle {
-                    color: "#313244"
-                    border.color: imgSizeSpin.activeFocus ? "#89b4fa" : "#45475a"
+                    color: Theme.bgInput
+                    border.color: imgSizeSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                     radius: 4
                 }
             }
@@ -349,7 +350,7 @@ Rectangle {
 
             Label {
                 text: "Batch:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -365,7 +366,7 @@ Rectangle {
 
                 contentItem: Label {
                     text: batchSpin.textFromValue(batchSpin.value, batchSpin.locale)
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
@@ -376,25 +377,25 @@ Rectangle {
                     x: batchSpin.mirrored ? 0 : parent.width - width
                     height: parent.height
                     implicitWidth: 32
-                    color: batchSpin.up.pressed ? "#45475a" : "#313244"
-                    border.color: "#45475a"
+                    color: batchSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
+                    border.color: Theme.borderNormal
                     radius: 2
-                    Label { anchors.centerIn: parent; text: "+"; color: "#cdd6f4"; font.pixelSize: 14 }
+                    Label { anchors.centerIn: parent; text: "+"; color: Theme.textPrimary; font.pixelSize: 14 }
                 }
 
                 down.indicator: Rectangle {
                     x: batchSpin.mirrored ? parent.width - width : 0
                     height: parent.height
                     implicitWidth: 32
-                    color: batchSpin.down.pressed ? "#45475a" : "#313244"
-                    border.color: "#45475a"
+                    color: batchSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
+                    border.color: Theme.borderNormal
                     radius: 2
-                    Label { anchors.centerIn: parent; text: "-"; color: "#cdd6f4"; font.pixelSize: 14 }
+                    Label { anchors.centerIn: parent; text: "-"; color: Theme.textPrimary; font.pixelSize: 14 }
                 }
 
                 background: Rectangle {
-                    color: "#313244"
-                    border.color: batchSpin.activeFocus ? "#89b4fa" : "#45475a"
+                    color: Theme.bgInput
+                    border.color: batchSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                     radius: 4
                 }
             }
@@ -407,7 +408,7 @@ Rectangle {
 
             Label {
                 text: "Epochs:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -423,7 +424,7 @@ Rectangle {
 
                 contentItem: Label {
                     text: epochsSpin.textFromValue(epochsSpin.value, epochsSpin.locale)
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
@@ -434,25 +435,25 @@ Rectangle {
                     x: epochsSpin.mirrored ? 0 : parent.width - width
                     height: parent.height
                     implicitWidth: 32
-                    color: epochsSpin.up.pressed ? "#45475a" : "#313244"
-                    border.color: "#45475a"
+                    color: epochsSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
+                    border.color: Theme.borderNormal
                     radius: 2
-                    Label { anchors.centerIn: parent; text: "+"; color: "#cdd6f4"; font.pixelSize: 14 }
+                    Label { anchors.centerIn: parent; text: "+"; color: Theme.textPrimary; font.pixelSize: 14 }
                 }
 
                 down.indicator: Rectangle {
                     x: epochsSpin.mirrored ? parent.width - width : 0
                     height: parent.height
                     implicitWidth: 32
-                    color: epochsSpin.down.pressed ? "#45475a" : "#313244"
-                    border.color: "#45475a"
+                    color: epochsSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
+                    border.color: Theme.borderNormal
                     radius: 2
-                    Label { anchors.centerIn: parent; text: "-"; color: "#cdd6f4"; font.pixelSize: 14 }
+                    Label { anchors.centerIn: parent; text: "-"; color: Theme.textPrimary; font.pixelSize: 14 }
                 }
 
                 background: Rectangle {
-                    color: "#313244"
-                    border.color: epochsSpin.activeFocus ? "#89b4fa" : "#45475a"
+                    color: Theme.bgInput
+                    border.color: epochsSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                     radius: 4
                 }
             }
@@ -465,7 +466,7 @@ Rectangle {
 
             Label {
                 text: "Patience:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -481,7 +482,7 @@ Rectangle {
 
                 contentItem: Label {
                     text: patienceSpin.textFromValue(patienceSpin.value, patienceSpin.locale)
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
@@ -492,25 +493,25 @@ Rectangle {
                     x: patienceSpin.mirrored ? 0 : parent.width - width
                     height: parent.height
                     implicitWidth: 32
-                    color: patienceSpin.up.pressed ? "#45475a" : "#313244"
-                    border.color: "#45475a"
+                    color: patienceSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
+                    border.color: Theme.borderNormal
                     radius: 2
-                    Label { anchors.centerIn: parent; text: "+"; color: "#cdd6f4"; font.pixelSize: 14 }
+                    Label { anchors.centerIn: parent; text: "+"; color: Theme.textPrimary; font.pixelSize: 14 }
                 }
 
                 down.indicator: Rectangle {
                     x: patienceSpin.mirrored ? parent.width - width : 0
                     height: parent.height
                     implicitWidth: 32
-                    color: patienceSpin.down.pressed ? "#45475a" : "#313244"
-                    border.color: "#45475a"
+                    color: patienceSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
+                    border.color: Theme.borderNormal
                     radius: 2
-                    Label { anchors.centerIn: parent; text: "-"; color: "#cdd6f4"; font.pixelSize: 14 }
+                    Label { anchors.centerIn: parent; text: "-"; color: Theme.textPrimary; font.pixelSize: 14 }
                 }
 
                 background: Rectangle {
-                    color: "#313244"
-                    border.color: patienceSpin.activeFocus ? "#89b4fa" : "#45475a"
+                    color: Theme.bgInput
+                    border.color: patienceSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                     radius: 4
                 }
             }
@@ -523,7 +524,7 @@ Rectangle {
 
             Label {
                 text: "Workers:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -539,7 +540,7 @@ Rectangle {
 
                 contentItem: Label {
                     text: workersSpin.textFromValue(workersSpin.value, workersSpin.locale)
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
@@ -550,25 +551,25 @@ Rectangle {
                     x: workersSpin.mirrored ? 0 : parent.width - width
                     height: parent.height
                     implicitWidth: 32
-                    color: workersSpin.up.pressed ? "#45475a" : "#313244"
-                    border.color: "#45475a"
+                    color: workersSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
+                    border.color: Theme.borderNormal
                     radius: 2
-                    Label { anchors.centerIn: parent; text: "+"; color: "#cdd6f4"; font.pixelSize: 14 }
+                    Label { anchors.centerIn: parent; text: "+"; color: Theme.textPrimary; font.pixelSize: 14 }
                 }
 
                 down.indicator: Rectangle {
                     x: workersSpin.mirrored ? parent.width - width : 0
                     height: parent.height
                     implicitWidth: 32
-                    color: workersSpin.down.pressed ? "#45475a" : "#313244"
-                    border.color: "#45475a"
+                    color: workersSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
+                    border.color: Theme.borderNormal
                     radius: 2
-                    Label { anchors.centerIn: parent; text: "-"; color: "#cdd6f4"; font.pixelSize: 14 }
+                    Label { anchors.centerIn: parent; text: "-"; color: Theme.textPrimary; font.pixelSize: 14 }
                 }
 
                 background: Rectangle {
-                    color: "#313244"
-                    border.color: workersSpin.activeFocus ? "#89b4fa" : "#45475a"
+                    color: Theme.bgInput
+                    border.color: workersSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                     radius: 4
                 }
             }
@@ -581,7 +582,7 @@ Rectangle {
 
             Label {
                 text: "AMP:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -597,7 +598,7 @@ Rectangle {
                     implicitWidth: 40
                     implicitHeight: 20
                     radius: 10
-                    color: ampSwitch.checked ? "#89b4fa" : "#45475a"
+                    color: ampSwitch.checked ? Theme.accentPrimary : Theme.borderNormal
 
                     Rectangle {
                         x: ampSwitch.checked ? parent.width - width - 2 : 2
@@ -605,7 +606,7 @@ Rectangle {
                         implicitWidth: 16
                         implicitHeight: 16
                         radius: 8
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                     }
                 }
             }
@@ -618,7 +619,7 @@ Rectangle {
 
             Label {
                 text: "Resume:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -634,7 +635,7 @@ Rectangle {
                     implicitWidth: 40
                     implicitHeight: 20
                     radius: 10
-                    color: resumeSwitch.checked ? "#89b4fa" : "#45475a"
+                    color: resumeSwitch.checked ? Theme.accentPrimary : Theme.borderNormal
 
                     Rectangle {
                         x: resumeSwitch.checked ? parent.width - width - 2 : 2
@@ -642,7 +643,7 @@ Rectangle {
                         implicitWidth: 16
                         implicitHeight: 16
                         radius: 8
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                     }
                 }
             }
@@ -655,7 +656,7 @@ Rectangle {
 
             Label {
                 text: "Device:"
-                color: "#cdd6f4"
+                color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -668,16 +669,16 @@ Rectangle {
 
                 contentItem: Label {
                     text: deviceCombo.displayText
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                     font.pixelSize: 13
                     verticalAlignment: Text.AlignVCenter
                     leftPadding: 8
                 }
 
                 background: Rectangle {
-                    color: "#313244"
+                    color: Theme.bgInput
                     radius: 4
-                    border.color: deviceCombo.activeFocus ? "#89b4fa" : "#45475a"
+                    border.color: deviceCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                     border.width: 1
                 }
 
@@ -695,8 +696,8 @@ Rectangle {
                     }
 
                     background: Rectangle {
-                        color: "#1e1e2e"
-                        border.color: "#45475a"
+                        color: Theme.bgPrimary
+                        border.color: Theme.borderNormal
                         radius: 4
                     }
                 }
@@ -705,13 +706,13 @@ Rectangle {
                     width: deviceCombo.width
                     contentItem: Label {
                         text: modelData
-                        color: highlighted ? "#89b4fa" : "#cdd6f4"
+                        color: highlighted ? Theme.accentPrimary : Theme.textPrimary
                         font.pixelSize: 13
                         verticalAlignment: Text.AlignVCenter
                     }
                     highlighted: deviceCombo.highlightedIndex === index
                     background: Rectangle {
-                        color: highlighted ? "#313244" : "#1e1e2e"
+                        color: highlighted ? Theme.bgInput : Theme.bgPrimary
                     }
                 }
             }
