@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("assistedLabelService", &assistedLabelService);
     engine.rootContext()->setContextProperty("exportService", &exportService);
 
-    const QUrl url(u"qrc:/LabelTorch/Shell/qml/Main.qml"_qs);
+    const QUrl url(u"qrc:/qt/qml/LabelTorch/Shell/qml/Main.qml"_qs);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
                      &app, [url](QObject *obj, const QUrl &objUrl) {

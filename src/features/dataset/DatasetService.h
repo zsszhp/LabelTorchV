@@ -88,6 +88,7 @@ public:
 
     Q_INVOKABLE QString appendImport(const QString &datasetId, const QString &imageDir, const QString &labelDir);
     Q_INVOKABLE bool resplitDataset(const QString &datasetId, double valRatio = 0.2, int seed = 42);
+    Q_INVOKABLE bool updateClassName(const QString &taxonomyId, int classId, const QString &name);
 
 private:
     bool updateImportStatus(const QString &datasetId, const QString &status);

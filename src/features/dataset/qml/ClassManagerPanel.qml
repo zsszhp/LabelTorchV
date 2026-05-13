@@ -8,6 +8,7 @@ Rectangle {
     color: Theme.bgPrimary
 
     property string datasetId: ""
+    property string taxonomyId: ""
     property var classDist: []
 
     function refresh() {
@@ -63,9 +64,12 @@ Rectangle {
             }
 
             delegate: Rectangle {
+                id: delegateRoot
                 width: classListView.width
                 height: 48
                 color: index % 2 === 0 ? Theme.bgPrimary : Theme.bgSecondary
+
+                property bool editing: false
 
                 RowLayout {
                     anchors.fill: parent
@@ -80,10 +84,37 @@ Rectangle {
                     }
 
                     Label {
+                        visible: !delegateRoot.editing
                         text: model.className || ("class_" + model.classId)
                         font.pixelSize: Theme.fontSizeNormal
                         color: Theme.textPrimary
                         font.family: Theme.fontFamily
+                    }
+
+                    TextField {
+                        id: nameEdit
+                        visible: delegateRoot.editing
+                        Layout.fillWidth: true
+                        text: model.className || ("class_" + model.classId)
+                        font.pixelSize: Theme.fontSizeNormal
+                        color: Theme.textPrimary
+                        font.family: Theme.fontFamily
+                        background: Rectangle { color: Theme.bgInput; radius: Theme.radiusSmall; border.color: Theme.accentPrimary; border.width: 1 }
+                        onAccepted: {
+                            if (taxonomyId) {
+                                datasetService.updateClassName(taxonomyId, model.classId, text)
+                            }
+                            classListModel.setProperty(index, "className", text)
+                            delegateRoot.editing = false
+                        }
+                        onActiveFocusChanged: {
+                            if (!activeFocus && delegateRoot.editing) {
+                                delegateRoot.editing = false
+                            }
+                        }
+                        Keys.onEscapePressed: {
+                            delegateRoot.editing = false
+                        }
                     }
 
                     Label {
@@ -100,6 +131,29 @@ Rectangle {
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.textSecondary
                         font.family: Theme.fontFamily
+                    }
+
+                    Button {
+                        visible: !delegateRoot.editing
+                        text: "✏"
+                        flat: true
+                        font.pixelSize: Theme.fontSizeSmall
+                        palette.buttonText: Theme.textMuted
+                        onClicked: {
+                            delegateRoot.editing = true
+                            nameEdit.forceActiveFocus()
+                            nameEdit.selectAll()
+                        }
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.LeftButton
+                    onDoubleClicked: {
+                        delegateRoot.editing = true
+                        nameEdit.forceActiveFocus()
+                        nameEdit.selectAll()
                     }
                 }
             }

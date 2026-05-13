@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QSqlQuery>
+#include <QSqlError>
 
 TaxonomyModel::TaxonomyModel(QObject *parent) : QAbstractListModel(parent) {}
 

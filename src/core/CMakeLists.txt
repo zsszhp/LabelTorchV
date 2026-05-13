@@ -5,6 +5,7 @@ add_library(labeltorch_core STATIC
     ipc/IpcClient.cpp
     ipc/IpcProtocol.cpp
     cache/ThumbnailCache.cpp
+    ThumbnailGenerator.cpp
     utils/Log.cpp
     utils/AppSettings.cpp
 )

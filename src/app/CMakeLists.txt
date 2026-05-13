@@ -1,6 +1,3 @@
-# src/app/CMakeLists.txt
-# 应用入口
-
 qt_add_executable(labeltorch
     main.cpp
     AppController.h
@@ -10,13 +7,21 @@ qt_add_executable(labeltorch
 target_link_libraries(labeltorch PRIVATE
     labeltorch_core
     labeltorch_shell
+    labeltorch_shellplugin
     labeltorch_project
+    labeltorch_projectplugin
     labeltorch_dataset
+    labeltorch_datasetplugin
     labeltorch_annotation
+    labeltorch_annotationplugin
     labeltorch_training
+    labeltorch_trainingplugin
     labeltorch_model
+    labeltorch_modelplugin
     labeltorch_inference
+    labeltorch_inferenceplugin
     labeltorch_export
+    labeltorch_exportplugin
     Qt6::Quick
     Qt6::QuickControls2
 )

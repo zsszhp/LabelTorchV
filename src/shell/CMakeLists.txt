@@ -1,3 +1,7 @@
+set_source_files_properties(qml/Theme.qml
+    PROPERTIES QT_QML_SINGLETON_TYPE TRUE
+)
+
 qt_add_qml_module(labeltorch_shell
     URI LabelTorch.Shell
     STATIC
@@ -8,6 +12,4 @@ qt_add_qml_module(labeltorch_shell
         qml/TaskPanel.qml
         qml/Theme.qml
         qml/LogPanel.qml
-    SINGLETONS
-        qml/Theme.qml
 )

@@ -13,6 +13,7 @@ QStringList Schema::createTableStatements()
         "  root_path TEXT NOT NULL UNIQUE,"
         "  default_device TEXT DEFAULT 'auto',"
         "  default_model_family TEXT DEFAULT 'yolov8',"
+        "  task_type TEXT DEFAULT 'detect',"
         "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
         "  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP"
         ")",
@@ -50,6 +51,7 @@ QStringList Schema::createTableStatements()
         "  height INTEGER,"
         "  hash TEXT,"
         "  validation_status TEXT DEFAULT 'valid',"
+        "  split TEXT DEFAULT 'train',"
         "  error_code TEXT"
         ")",
 

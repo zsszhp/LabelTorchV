@@ -8,11 +8,13 @@
 #include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonArray>
+#include <QJsonObject>
 #include <QSet>
 #include <QFile>
 #include <QTextStream>
 #include <algorithm>
 #include <cmath>
+#include <random>
 
 DatasetService::DatasetService(QObject *parent)
     : QObject(parent)
@@ -208,6 +210,32 @@ bool DatasetService::deleteDataset(const QString &datasetId)
 
     ltInfo(LT_LOG_DATASET()) << "Deleted dataset and associated records:" << datasetId;
     return true;
+}
+
+bool DatasetService::updateClassName(const QString &taxonomyId, int classId, const QString &name)
+{
+    if (taxonomyId.isEmpty() || name.isEmpty()) return false;
+
+    QSqlDatabase db = Database::instance().database();
+    QSqlQuery query(db);
+    query.prepare("SELECT class_definitions_json FROM taxonomies WHERE id = ?");
+    query.addBindValue(taxonomyId);
+    if (!query.exec() || !query.next()) return false;
+
+    QJsonDocument doc = QJsonDocument::fromJson(query.value(0).toString().toUtf8());
+    QJsonArray classes = doc.array();
+
+    if (classId < 0 || classId >= classes.size()) return false;
+
+    QJsonObject obj = classes[classId].toObject();
+    obj["name"] = name;
+    classes[classId] = obj;
+
+    QSqlQuery update(db);
+    update.prepare("UPDATE taxonomies SET class_definitions_json = ? WHERE id = ?");
+    update.addBindValue(QString::fromUtf8(QJsonDocument(classes).toJson(QJsonDocument::Compact)));
+    update.addBindValue(taxonomyId);
+    return update.exec();
 }
 
 QVariantMap DatasetService::getSampleStats(const QString &datasetId)
@@ -682,7 +710,6 @@ bool DatasetService::extractAndStoreSchema(const QString &datasetId, const QVari
 {
     ltTrace(LT_LOG_DATASET()) << "extractAndStoreSchema datasetId=" << datasetId << "sampleCount=" << samples.size();
 
-    // Collect all class IDs from all samples
     QSet<int> allClassIds;
     for (const auto &s : samples) {
         QVariantMap sample = s.toMap();
@@ -694,22 +721,18 @@ bool DatasetService::extractAndStoreSchema(const QString &datasetId, const QVari
 
     if (allClassIds.isEmpty()) {
         ltDebug(LT_LOG_DATASET()) << "No class IDs found in any label file";
-        // Still store an empty schema
     }
 
-    // Determine max class_id and build class name list
     int maxClassId = 0;
     for (int cid : allClassIds) {
         if (cid > maxClassId) maxClassId = cid;
     }
 
-    // Build class names list: ["class_0", "class_1", ..., "class_N"]
     QStringList classNames;
     for (int i = 0; i <= maxClassId; ++i) {
         classNames.append(QStringLiteral("class_%1").arg(i));
     }
 
-    // Build class order list: indices that actually appeared
     QVariantList classOrder;
     QList<int> sortedIds = allClassIds.values();
     std::sort(sortedIds.begin(), sortedIds.end());
@@ -717,7 +740,6 @@ bool DatasetService::extractAndStoreSchema(const QString &datasetId, const QVari
         classOrder.append(cid);
     }
 
-    // Serialize to JSON
     QJsonArray classNamesArray;
     for (const auto &name : classNames) classNamesArray.append(name);
     QString classNamesJson = QJsonDocument(classNamesArray).toJson(QJsonDocument::Compact);
@@ -726,7 +748,6 @@ bool DatasetService::extractAndStoreSchema(const QString &datasetId, const QVari
     for (const auto &idx : classOrder) classOrderArray.append(idx.toInt());
     QString classOrderJson = QJsonDocument(classOrderArray).toJson(QJsonDocument::Compact);
 
-    // Insert into imported_label_schemas
     QString schemaId = Id::generate();
     QSqlQuery query(Database::instance().database());
     query.prepare("INSERT INTO imported_label_schemas "
@@ -744,5 +765,94 @@ bool DatasetService::extractAndStoreSchema(const QString &datasetId, const QVari
 
     ltDebug(LT_LOG_DATASET()) << "Extracted schema with" << classNames.size()
                               << "class names, appearing class IDs:" << sortedIds;
+    return true;
+}
+
+QString DatasetService::appendImport(const QString &datasetId, const QString &imageDir, const QString &labelDir)
+{
+    ltTrace(LT_LOG_DATASET()) << "appendImport datasetId=" << datasetId
+                              << "imageDir=" << imageDir << "labelDir=" << labelDir;
+
+    if (datasetId.isEmpty() || imageDir.isEmpty() || labelDir.isEmpty()) {
+        ltWarning(LT_LOG_DATASET()) << "appendImport: missing required parameters";
+        return {};
+    }
+
+    QVariantMap scanResult = m_scanner->scan(imageDir, labelDir);
+    if (scanResult.contains("error")) {
+        ltError(LT_LOG_DATASET()) << "Append scan failed:" << scanResult["error"].toString();
+        return {};
+    }
+
+    QVariantList samples = scanResult["samples"].toList();
+    QVariantList matchedSamples;
+    for (const auto &s : samples) {
+        QVariantMap sample = s.toMap();
+        QString status = sample["status"].toString();
+        if (status == QStringLiteral("matched") || status == QStringLiteral("invalid_label")) {
+            matchedSamples.append(sample);
+        }
+    }
+
+    if (!insertSamples(datasetId, matchedSamples)) {
+        ltError(LT_LOG_DATASET()) << "Failed to insert appended samples";
+        return {};
+    }
+
+    QSqlQuery updateQuery(Database::instance().database());
+    updateQuery.prepare("UPDATE datasets SET sample_count = sample_count + ? WHERE id = ?");
+    updateQuery.addBindValue(matchedSamples.size());
+    updateQuery.addBindValue(datasetId);
+    if (!updateQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to update sample count:" << updateQuery.lastError().text();
+        return {};
+    }
+
+    ltInfo(LT_LOG_DATASET()) << "Append import completed:" << matchedSamples.size() << "new samples";
+    return datasetId;
+}
+
+bool DatasetService::resplitDataset(const QString &datasetId, double valRatio, int seed)
+{
+    ltTrace(LT_LOG_DATASET()) << "resplitDataset datasetId=" << datasetId
+                              << "valRatio=" << valRatio << "seed=" << seed;
+
+    if (datasetId.isEmpty()) return false;
+
+    QSqlDatabase db = Database::instance().database();
+
+    QSqlQuery idQuery(db);
+    idQuery.prepare("SELECT id FROM dataset_samples WHERE dataset_id = ? ORDER BY image_path");
+    idQuery.addBindValue(datasetId);
+    if (!idQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "resplitDataset: query failed:" << idQuery.lastError().text();
+        return false;
+    }
+
+    QStringList allIds;
+    while (idQuery.next()) {
+        allIds.append(idQuery.value(0).toString());
+    }
+
+    std::mt19937 rng(seed);
+    std::shuffle(allIds.begin(), allIds.end(), rng);
+
+    int valCount = static_cast<int>(std::round(allIds.size() * valRatio));
+
+    QSqlQuery updateQuery(db);
+    updateQuery.prepare("UPDATE dataset_samples SET split = ? WHERE id = ?");
+
+    for (int i = 0; i < allIds.size(); ++i) {
+        QString split = (i < valCount) ? QStringLiteral("val") : QStringLiteral("train");
+        updateQuery.addBindValue(split);
+        updateQuery.addBindValue(allIds[i]);
+        if (!updateQuery.exec()) {
+            ltError(LT_LOG_DATASET()) << "resplitDataset: update failed:" << updateQuery.lastError().text();
+            return false;
+        }
+    }
+
+    ltInfo(LT_LOG_DATASET()) << "resplitDataset: split" << allIds.size()
+                             << "samples into" << (allIds.size() - valCount) << "train +" << valCount << "val";
     return true;
 }

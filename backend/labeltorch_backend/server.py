@@ -7,6 +7,7 @@ import sys
 import asyncio
 import json
 import logging
+import platform
 
 from .protocol import create_response, create_event
 from .handlers import environment, training, inference, export
@@ -36,11 +37,21 @@ class IpcServer:
         """启动服务端主循环"""
         logger.info("LabelTorch Python backend started")
 
-        reader = asyncio.StreamReader()
-        protocol = asyncio.StreamReaderProtocol(reader)
-        await asyncio.get_event_loop().connect_read_pipe(
-            lambda: protocol, sys.stdin
-        )
+        if platform.system() == "Windows":
+            loop = asyncio.get_event_loop()
+            reader = asyncio.StreamReader()
+            protocol = asyncio.StreamReaderProtocol(reader)
+            try:
+                await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+            except Exception as e:
+                logger.warning(f"connect_read_pipe failed: {e}, falling back to thread reader")
+                asyncio.create_task(self._threaded_stdin_reader(reader))
+        else:
+            reader = asyncio.StreamReader()
+            protocol = asyncio.StreamReaderProtocol(reader)
+            await asyncio.get_event_loop().connect_read_pipe(
+                lambda: protocol, sys.stdin
+            )
 
         while self.running:
             try:
@@ -59,6 +70,21 @@ class IpcServer:
                 logger.error(f"Error handling message: {e}")
 
         logger.info("LabelTorch Python backend shutting down")
+
+    async def _threaded_stdin_reader(self, reader: asyncio.StreamReader):
+        """Windows fallback: read stdin in a thread and feed into StreamReader"""
+        loop = asyncio.get_event_loop()
+        while self.running:
+            try:
+                line = await loop.run_in_executor(None, sys.stdin.readline)
+                if not line:
+                    reader.feed_eof()
+                    break
+                reader.feed_data(line.encode("utf-8"))
+            except Exception as e:
+                logger.error(f"Stdin read error: {e}")
+                reader.feed_eof()
+                break
 
     async def _handle_message(self, message: dict):
         """处理收到的IPC消息"""
@@ -123,6 +149,9 @@ def main():
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
         stream=sys.stderr,
     )
+
+    if platform.system() == "Windows":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     server = IpcServer()
     _server_instance = server

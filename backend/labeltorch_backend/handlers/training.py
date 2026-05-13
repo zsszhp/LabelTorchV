@@ -100,7 +100,7 @@ async def handle_stop(payload: dict) -> dict:
     task_id = payload.get("run_id", payload.get("task_id", ""))
     adapter = _active_tasks.get(task_id)
     if adapter:
-        adapter.stop_training()
+        await adapter.stop_training()
         return {"task_id": task_id, "status": "stopping"}
     return {"task_id": task_id, "status": "not_found"}
 

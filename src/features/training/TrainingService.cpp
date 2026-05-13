@@ -62,12 +62,11 @@ void TrainingService::handleTrainingEvent(const QVariantMap &event)
                 QSqlQuery versionQuery(Database::instance().database());
                 QString versionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
                 versionQuery.prepare(
-                    "INSERT INTO model_versions (id, run_id, project_id, best_weight_path, last_weight_path, "
-                    "metrics_snapshot_json, tag) VALUES (?, ?, ?, ?, ?, ?, 'baseline')"
+                    "INSERT INTO model_versions (id, run_id, best_weight_path, last_weight_path, "
+                    "metrics_snapshot_json) VALUES (?, ?, ?, ?, ?)"
                 );
                 versionQuery.addBindValue(versionId);
                 versionQuery.addBindValue(taskId);
-                versionQuery.addBindValue(projectId);
                 versionQuery.addBindValue(bestWeight);
                 versionQuery.addBindValue(lastWeight);
                 versionQuery.addBindValue(metricsJson);

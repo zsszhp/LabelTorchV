@@ -257,7 +257,7 @@ ApplicationWindow {
 
                         Loader {
                             visible: appController.projectOpen
-                            source: "qrc:/LabelTorch/Project/qml/TaskTypeSwitcher.qml"
+                            source: "qrc:/qt/qml/LabelTorch/Project/qml/TaskTypeSwitcher.qml"
                             onLoaded: {
                                 if (item) {
                                     item.taskType = root.currentTaskType
@@ -302,13 +302,13 @@ ApplicationWindow {
                         }
                     }
 
-                    Loader { source: "qrc:/LabelTorch/Project/qml/ProjectPage.qml" }
-                    Loader { source: "qrc:/LabelTorch/Project/qml/TaxonomyPage.qml" }
-                    Loader { source: "qrc:/LabelTorch/Dataset/qml/ImportPage.qml" }
-                    Loader { source: "qrc:/LabelTorch/Annotation/qml/AnnotationPage.qml" }
-                    Loader { source: "qrc:/LabelTorch/Training/qml/TrainingPage.qml" }
-                    Loader { source: "qrc:/LabelTorch/Model/qml/ModelPage.qml" }
-                    Loader { source: "qrc:/LabelTorch/Export/qml/ExportPage.qml" }
+                    Loader { source: "qrc:/qt/qml/LabelTorch/Project/qml/ProjectPage.qml" }
+                    Loader { source: "qrc:/qt/qml/LabelTorch/Project/qml/TaxonomyPage.qml" }
+                    Loader { source: "qrc:/qt/qml/LabelTorch/Dataset/qml/ImportPage.qml" }
+                    Loader { source: "qrc:/qt/qml/LabelTorch/Annotation/qml/AnnotationPage.qml" }
+                    Loader { source: "qrc:/qt/qml/LabelTorch/Training/qml/TrainingPage.qml" }
+                    Loader { source: "qrc:/qt/qml/LabelTorch/Model/qml/ModelPage.qml" }
+                    Loader { source: "qrc:/qt/qml/LabelTorch/Export/qml/ExportPage.qml" }
                 }
 
                 LogPanel {

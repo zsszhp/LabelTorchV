@@ -2,7 +2,10 @@
 #include "IpcProtocol.h"
 #include "utils/Log.h"
 
+#include <QCoreApplication>
+#include <QDir>
 #include <QJsonDocument>
+#include <QProcessEnvironment>
 #include <QRandomGenerator>
 
 IpcClient::IpcClient(QObject *parent)
@@ -41,6 +44,23 @@ void IpcClient::startBackend(const QString &pythonPath, const QString &scriptPat
     m_process = new QProcess(this);
     m_process->setProcessChannelMode(QProcess::ForwardedErrorChannel);
 
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    QStringList candidateDirs = {
+        QCoreApplication::applicationDirPath() + QStringLiteral("/../backend"),
+        QCoreApplication::applicationDirPath() + QStringLiteral("/../../../backend"),
+        QStringLiteral("F:/project/my/LabelTorchV/backend"),
+    };
+    for (const auto &dir : candidateDirs) {
+        QString canonical = QDir(dir).canonicalPath();
+        if (!canonical.isEmpty() && QDir(canonical).exists(QStringLiteral("labeltorch_backend"))) {
+            QString existingPath = env.value(QStringLiteral("PYTHONPATH"));
+            env.insert(QStringLiteral("PYTHONPATH"),
+                       existingPath.isEmpty() ? canonical : canonical + QDir::listSeparator() + existingPath);
+            break;
+        }
+    }
+    m_process->setProcessEnvironment(env);
+
     connect(m_process, &QProcess::readyReadStandardOutput,
             this, &IpcClient::onBackendReadyRead);
     connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
@@ -61,6 +81,7 @@ void IpcClient::startBackend(const QString &pythonPath, const QString &scriptPat
     if (m_process->waitForStarted(5000)) {
         ltInfo(LT_LOG_IPC()) << "Backend process started, pid=" << m_process->processId();
         m_connected = true;
+        m_restartAttempts = 0;
         emit connectedChanged();
         m_watchdog->start();
     } else {
@@ -162,13 +183,19 @@ void IpcClient::onBackendFinished(int exitCode, QProcess::ExitStatus exitStatus)
     emit connectedChanged();
     m_watchdog->stop();
 
-    if (m_autoRestart) {
-        ltInfo(LT_LOG_IPC()) << "Auto-restarting backend in 3s...";
+    if (m_autoRestart && m_restartAttempts < MAX_RESTART_ATTEMPTS) {
+        m_restartAttempts++;
+        ltInfo(LT_LOG_IPC()) << "Auto-restarting backend in 3s... (attempt"
+                             << m_restartAttempts << "/" << MAX_RESTART_ATTEMPTS << ")";
         QTimer::singleShot(3000, this, [this]() {
-            if (m_autoRestart) {
+            if (m_autoRestart && m_restartAttempts <= MAX_RESTART_ATTEMPTS) {
                 tryStartBackend();
             }
         });
+    } else if (m_autoRestart) {
+        ltError(LT_LOG_IPC()) << "Max restart attempts reached, giving up";
+        m_autoRestart = false;
+        emit backendError(QStringLiteral("Backend failed to start after %1 attempts").arg(MAX_RESTART_ATTEMPTS));
     }
 }
 
