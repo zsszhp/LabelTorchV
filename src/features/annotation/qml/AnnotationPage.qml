@@ -1,6 +1,7 @@
 // AnnotationPage.qml - 标注工作台
 import QtQuick
 import QtQuick.Controls
+import LabelTorch.Shell
 import QtQuick.Layouts
 
 Item {
@@ -66,7 +67,7 @@ Item {
         Rectangle {
             Layout.preferredWidth: 200
             Layout.fillHeight: true
-            color: "#181825"
+            color: Theme.bgCard
 
             ColumnLayout {
                 anchors.fill: parent
@@ -78,7 +79,7 @@ Item {
                     text: "样本列表"
                     font.pixelSize: 13
                     font.bold: true
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                     leftPadding: 12
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -100,13 +101,13 @@ Item {
                         contentItem: Label {
                             text: parent.text
                             font.pixelSize: 12
-                            color: "#cdd6f4"
+                            color: Theme.textPrimary
                             elide: Text.ElideRight
                             verticalAlignment: Text.AlignVCenter
                         }
 
                         background: Rectangle {
-                            color: parent.hovered ? "#313244" : "transparent"
+                            color: parent.hovered ? Theme.bgInput : "transparent"
                         }
 
                         onClicked: {
@@ -147,11 +148,11 @@ Item {
                     ctx.clearRect(0, 0, width, height)
 
                     // Draw image background (placeholder)
-                    ctx.fillStyle = "#1e1e2e"
+                    ctx.fillStyle = Theme.bgPrimary
                     ctx.fillRect(0, 0, width, height)
 
                     if (!canvasController.currentImagePath) {
-                        ctx.fillStyle = "#6c7086"
+                        ctx.fillStyle = Theme.textMuted
                         ctx.font = "16px sans-serif"
                         ctx.textAlign = "center"
                         ctx.fillText("选择一个样本开始标注", width / 2, height / 2)
@@ -167,13 +168,13 @@ Item {
                         var imgY = canvasController.imageToCanvasY(0)
 
                         // Draw image area border with anomaly-coded color
-                        ctx.strokeStyle = isAnomalous ? "#f38ba8" : "#a6e3a1"
+                        ctx.strokeStyle = isAnomalous ? Theme.accentError : Theme.accentSuccess
                         ctx.lineWidth = 3
                         ctx.strokeRect(imgX, imgY, imgW, imgH)
 
                         // Show anomaly label at center
                         var labelText = isAnomalous ? "ANOMALOUS" : "NORMAL"
-                        var labelColor = isAnomalous ? "#f38ba8" : "#a6e3a1"
+                        var labelColor = isAnomalous ? Theme.accentError : Theme.accentSuccess
 
                         ctx.globalAlpha = 0.15
                         ctx.fillStyle = labelColor
@@ -196,12 +197,12 @@ Item {
                         var imgX = canvasController.imageToCanvasX(0)
                         var imgY = canvasController.imageToCanvasY(0)
 
-                        ctx.strokeStyle = "#45475a"
+                        ctx.strokeStyle = Theme.borderNormal
                         ctx.lineWidth = 1
                         ctx.strokeRect(imgX, imgY, imgW, imgH)
 
                         // Show classification label at center
-                        var colors = ["#f38ba8", "#a6e3a1", "#89b4fa", "#f9e2af", "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"]
+                        var colors = [Theme.accentError, Theme.accentSuccess, Theme.accentPrimary, Theme.accentWarning, "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"]
                         var labelText = ""
 
                         if (classificationMultiCheck.checked) {
@@ -225,7 +226,7 @@ Item {
                         }
 
                         ctx.globalAlpha = 1.0
-                        ctx.fillStyle = "#89b4fa"
+                        ctx.fillStyle = Theme.accentPrimary
                         ctx.font = "bold 18px sans-serif"
                         ctx.textAlign = "center"
                         ctx.fillText(labelText, imgX + imgW / 2, imgY + imgH / 2)
@@ -240,12 +241,12 @@ Item {
                     var imgY2 = canvasController.imageToCanvasY(0)
 
                     // Image border
-                    ctx.strokeStyle = "#45475a"
+                    ctx.strokeStyle = Theme.borderNormal
                     ctx.lineWidth = 1
                     ctx.strokeRect(imgX2, imgY2, imgW2, imgH2)
 
                     // Draw annotations
-                    var colors2 = ["#f38ba8", "#a6e3a1", "#89b4fa", "#f9e2af", "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"]
+                    var colors2 = [Theme.accentError, Theme.accentSuccess, Theme.accentPrimary, Theme.accentWarning, "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"]
 
                     for (var i = 0; i < annotationModel.rowCount(); i++) {
                         var idx = annotationModel.index(i, 0)
@@ -288,7 +289,7 @@ Item {
 
                             // Rotation indicator line
                             ctx.globalAlpha = 0.5
-                            ctx.strokeStyle = "#cdd6f4"
+                            ctx.strokeStyle = Theme.textPrimary
                             ctx.lineWidth = 1
                             ctx.beginPath()
                             ctx.moveTo(0, 0)
@@ -332,13 +333,13 @@ Item {
                         var label = (className || ("class_" + classIdx))
                         var textW = ctx.measureText(label).width + 8
                         ctx.fillRect(labelX, labelY, textW, 18)
-                        ctx.fillStyle = "#1e1e2e"
+                        ctx.fillStyle = Theme.bgPrimary
                         ctx.fillText(label, labelX + 4, labelY + 13)
                     }
 
                     // Draw current drawing rect
                     if (drawingRect.visible) {
-                        ctx.strokeStyle = "#89b4fa"
+                        ctx.strokeStyle = Theme.accentPrimary
                         ctx.lineWidth = 2
                         ctx.setLineDash([4, 4])
                         ctx.strokeRect(drawingRect.x, drawingRect.y, drawingRect.width, drawingRect.height)
@@ -466,14 +467,14 @@ Item {
                         }
 
                         background: Rectangle {
-                            color: parent.highlighted ? "#89b4fa" : "#313244"
+                            color: parent.highlighted ? Theme.accentPrimary : Theme.bgInput
                             radius: 3
                         }
 
                         contentItem: Label {
                             text: parent.text
                             font.pixelSize: 11
-                            color: parent.highlighted ? "#1e1e2e" : "#cdd6f4"
+                            color: parent.highlighted ? Theme.bgPrimary : Theme.textPrimary
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
@@ -491,14 +492,14 @@ Item {
                         }
 
                         background: Rectangle {
-                            color: parent.highlighted ? "#89b4fa" : "#313244"
+                            color: parent.highlighted ? Theme.accentPrimary : Theme.bgInput
                             radius: 3
                         }
 
                         contentItem: Label {
                             text: parent.text
                             font.pixelSize: 11
-                            color: parent.highlighted ? "#1e1e2e" : "#cdd6f4"
+                            color: parent.highlighted ? Theme.bgPrimary : Theme.textPrimary
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
@@ -514,14 +515,14 @@ Item {
                         }
 
                         background: Rectangle {
-                            color: parent.highlighted ? "#89b4fa" : "#313244"
+                            color: parent.highlighted ? Theme.accentPrimary : Theme.bgInput
                             radius: 3
                         }
 
                         contentItem: Label {
                             text: parent.text
                             font.pixelSize: 11
-                            color: parent.highlighted ? "#1e1e2e" : "#cdd6f4"
+                            color: parent.highlighted ? Theme.bgPrimary : Theme.textPrimary
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
@@ -537,14 +538,14 @@ Item {
                         }
 
                         background: Rectangle {
-                            color: parent.highlighted ? "#89b4fa" : "#313244"
+                            color: parent.highlighted ? Theme.accentPrimary : Theme.bgInput
                             radius: 3
                         }
 
                         contentItem: Label {
                             text: parent.text
                             font.pixelSize: 11
-                            color: parent.highlighted ? "#1e1e2e" : "#cdd6f4"
+                            color: parent.highlighted ? Theme.bgPrimary : Theme.textPrimary
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
@@ -583,7 +584,7 @@ Item {
 
                 Label {
                     text: Math.round(canvasController.zoom * 100) + "%"
-                    color: "#6c7086"
+                    color: Theme.textMuted
                     font.pixelSize: 11
                 }
             }
@@ -597,7 +598,7 @@ Item {
                 anchors.right: parent.right
                 anchors.margins: 8
                 height: classificationLayout.implicitHeight + 16
-                color: "#181825"
+                color: Theme.bgCard
                 radius: 6
 
                 ColumnLayout {
@@ -614,7 +615,7 @@ Item {
                             text: "分类模式"
                             font.pixelSize: 13
                             font.bold: true
-                            color: "#89b4fa"
+                            color: Theme.accentPrimary
                         }
 
                         Item { Layout.fillWidth: true }
@@ -628,7 +629,7 @@ Item {
                             contentItem: Label {
                                 text: classificationMultiCheck.text
                                 font.pixelSize: 12
-                                color: classificationMultiCheck.checked ? "#89b4fa" : "#cdd6f4"
+                                color: classificationMultiCheck.checked ? Theme.accentPrimary : Theme.textPrimary
                                 verticalAlignment: Text.AlignVCenter
                                 leftPadding: classificationMultiCheck.indicator.width + 6
                             }
@@ -639,13 +640,13 @@ Item {
                                 width: 16
                                 height: 16
                                 radius: 3
-                                color: classificationMultiCheck.checked ? "#89b4fa" : "#313244"
-                                border.color: classificationMultiCheck.checked ? "#89b4fa" : "#45475a"
+                                color: classificationMultiCheck.checked ? Theme.accentPrimary : Theme.bgInput
+                                border.color: classificationMultiCheck.checked ? Theme.accentPrimary : Theme.borderNormal
 
                                 Label {
                                     anchors.centerIn: parent
                                     text: classificationMultiCheck.checked ? "\u2713" : ""
-                                    color: "#1e1e2e"
+                                    color: Theme.bgPrimary
                                     font.pixelSize: 11
                                 }
                             }
@@ -666,14 +667,14 @@ Item {
                             enabled: classificationMultiCheck.checked ? selectedMultiClassIds.length > 0 : selectedClassId >= 0
 
                             background: Rectangle {
-                                color: parent.enabled ? (parent.highlighted ? "#89b4fa" : "#313244") : "#1e1e2e"
+                                color: parent.enabled ? (parent.highlighted ? Theme.accentPrimary : Theme.bgInput) : Theme.bgPrimary
                                 radius: 4
                             }
 
                             contentItem: Label {
                                 text: parent.text
                                 font.pixelSize: 12
-                                color: parent.enabled ? (parent.highlighted ? "#1e1e2e" : "#cdd6f4") : "#585b70"
+                                color: parent.enabled ? (parent.highlighted ? Theme.bgPrimary : Theme.textPrimary) : "#585b70"
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -720,19 +721,19 @@ Item {
 
                                 background: Rectangle {
                                     color: parent.isThisSelected
-                                        ? ["#f38ba8", "#a6e3a1", "#89b4fa", "#f9e2af", "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"][model.classIndex % 10]
-                                        : "#313244"
+                                        ? [Theme.accentError, Theme.accentSuccess, Theme.accentPrimary, Theme.accentWarning, "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"][model.classIndex % 10]
+                                        : Theme.bgInput
                                     radius: 4
                                     border.color: parent.isThisSelected
-                                        ? ["#f38ba8", "#a6e3a1", "#89b4fa", "#f9e2af", "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"][model.classIndex % 10]
-                                        : "#45475a"
+                                        ? [Theme.accentError, Theme.accentSuccess, Theme.accentPrimary, Theme.accentWarning, "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"][model.classIndex % 10]
+                                        : Theme.borderNormal
                                     border.width: parent.isThisSelected ? 2 : 1
                                 }
 
                                 contentItem: Label {
                                     text: model.className || ("class_" + model.classIndex)
                                     font.pixelSize: 11
-                                    color: parent.isThisSelected ? "#1e1e2e" : "#cdd6f4"
+                                    color: parent.isThisSelected ? Theme.bgPrimary : Theme.textPrimary
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                     elide: Text.ElideRight
@@ -770,7 +771,7 @@ Item {
                 anchors.right: parent.right
                 anchors.margins: 8
                 height: anomalyLayout.implicitHeight + 16
-                color: "#181825"
+                color: Theme.bgCard
                 radius: 6
 
                 ColumnLayout {
@@ -787,7 +788,7 @@ Item {
                             text: "异常检测模式"
                             font.pixelSize: 13
                             font.bold: true
-                            color: "#89b4fa"
+                            color: Theme.accentPrimary
                         }
 
                         Item { Layout.fillWidth: true }
@@ -803,9 +804,9 @@ Item {
                             Layout.preferredHeight: 44
 
                             background: Rectangle {
-                                color: !isAnomalous ? "#a6e3a1" : "#313244"
+                                color: !isAnomalous ? Theme.accentSuccess : Theme.bgInput
                                 radius: 6
-                                border.color: !isAnomalous ? "#a6e3a1" : "#45475a"
+                                border.color: !isAnomalous ? Theme.accentSuccess : Theme.borderNormal
                                 border.width: !isAnomalous ? 2 : 1
                             }
 
@@ -813,7 +814,7 @@ Item {
                                 text: parent.text
                                 font.pixelSize: 14
                                 font.bold: true
-                                color: !isAnomalous ? "#1e1e2e" : "#cdd6f4"
+                                color: !isAnomalous ? Theme.bgPrimary : Theme.textPrimary
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -835,9 +836,9 @@ Item {
                             Layout.preferredHeight: 44
 
                             background: Rectangle {
-                                color: isAnomalous ? "#f38ba8" : "#313244"
+                                color: isAnomalous ? Theme.accentError : Theme.bgInput
                                 radius: 6
-                                border.color: isAnomalous ? "#f38ba8" : "#45475a"
+                                border.color: isAnomalous ? Theme.accentError : Theme.borderNormal
                                 border.width: isAnomalous ? 2 : 1
                             }
 
@@ -845,7 +846,7 @@ Item {
                                 text: parent.text
                                 font.pixelSize: 14
                                 font.bold: true
-                                color: isAnomalous ? "#1e1e2e" : "#cdd6f4"
+                                color: isAnomalous ? Theme.bgPrimary : Theme.textPrimary
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -865,14 +866,14 @@ Item {
                             Layout.preferredHeight: 36
 
                             background: Rectangle {
-                                color: parent.highlighted ? "#89b4fa" : "#313244"
+                                color: parent.highlighted ? Theme.accentPrimary : Theme.bgInput
                                 radius: 4
                             }
 
                             contentItem: Label {
                                 text: parent.text
                                 font.pixelSize: 12
-                                color: parent.highlighted ? "#1e1e2e" : "#cdd6f4"
+                                color: parent.highlighted ? Theme.bgPrimary : Theme.textPrimary
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -898,7 +899,7 @@ Item {
                 anchors.margins: 8
                 width: 200
                 height: 44
-                color: "#181825"
+                color: Theme.bgCard
                 radius: 4
 
                 RowLayout {
@@ -909,7 +910,7 @@ Item {
                     Label {
                         text: "旋转"
                         font.pixelSize: 11
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                     }
 
                     Slider {
@@ -942,12 +943,12 @@ Item {
                             width: angleSlider.availableWidth
                             height: 4
                             radius: 2
-                            color: "#313244"
+                            color: Theme.bgInput
 
                             Rectangle {
                                 width: angleSlider.visualPosition * parent.width
                                 height: parent.height
-                                color: "#89b4fa"
+                                color: Theme.accentPrimary
                                 radius: 2
                             }
                         }
@@ -958,14 +959,14 @@ Item {
                             width: 14
                             height: 14
                             radius: 7
-                            color: angleSlider.pressed ? "#b4befe" : "#89b4fa"
+                            color: angleSlider.pressed ? "#b4befe" : Theme.accentPrimary
                         }
                     }
 
                     Label {
                         text: Math.round(angleSlider.value) + "\u00B0"
                         font.pixelSize: 11
-                        color: "#89b4fa"
+                        color: Theme.accentPrimary
                         Layout.preferredWidth: 36
                     }
                 }
@@ -986,13 +987,13 @@ Item {
 
                     Label {
                         text: canvasController.dirty ? "未保存" : "已保存"
-                        color: canvasController.dirty ? "#f38ba8" : "#a6e3a1"
+                        color: canvasController.dirty ? Theme.accentError : Theme.accentSuccess
                         font.pixelSize: 11
                     }
 
                     Label {
                         text: annotationMode === "classify" ? "CLS" : (annotationMode === "anomaly" ? "AD" : (shapeMode === 1 ? "OBB" : "HBB"))
-                        color: "#89b4fa"
+                        color: Theme.accentPrimary
                         font.pixelSize: 11
                     }
 
@@ -1004,7 +1005,7 @@ Item {
                             : (annotationMode === "anomaly"
                                ? (isAnomalous ? "异常" : "正常")
                                : (annotationModel.count + " 个标注"))
-                        color: "#6c7086"
+                        color: Theme.textMuted
                         font.pixelSize: 11
                     }
                 }
@@ -1015,7 +1016,7 @@ Item {
         Rectangle {
             Layout.preferredWidth: 200
             Layout.fillHeight: true
-            color: "#181825"
+            color: Theme.bgCard
 
             ColumnLayout {
                 anchors.fill: parent
@@ -1027,7 +1028,7 @@ Item {
                     text: "类别"
                     font.pixelSize: 13
                     font.bold: true
-                    color: "#cdd6f4"
+                    color: Theme.textPrimary
                     leftPadding: 12
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -1049,18 +1050,18 @@ Item {
                             leftPadding: 8
                             Rectangle {
                                 width: 16; height: 16; radius: 2
-                                color: ["#f38ba8", "#a6e3a1", "#89b4fa", "#f9e2af", "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"][model.classIndex % 10]
+                                color: [Theme.accentError, Theme.accentSuccess, Theme.accentPrimary, Theme.accentWarning, "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"][model.classIndex % 10]
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                             Label {
                                 text: model.className
                                 font.pixelSize: 12
-                                color: "#cdd6f4"
+                                color: Theme.textPrimary
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                         }
 
-                        background: Rectangle { color: parent.hovered ? "#313244" : "transparent" }
+                        background: Rectangle { color: parent.hovered ? Theme.bgInput : "transparent" }
 
                         onClicked: {
                             // In classification mode, clicking a class assigns it
@@ -1093,11 +1094,11 @@ Item {
                     contentItem: Label {
                         text: parent.text
                         font.pixelSize: 12
-                        color: "#f38ba8"
+                        color: Theme.accentError
                         horizontalAlignment: Text.AlignHCenter
                     }
 
-                    background: Rectangle { color: parent.hovered ? "#313244" : "transparent" }
+                    background: Rectangle { color: parent.hovered ? Theme.bgInput : "transparent" }
 
                     onClicked: {
                         // Remove selected annotations

@@ -15,8 +15,7 @@ replacements = {
 }
 
 dirs = [
-    r'f:\project\my\LabelTorchV\src\features\model\qml',
-    r'f:\project\my\LabelTorchV\src\features\export\qml'
+    r'f:\project\my\LabelTorchV\src\features\annotation\qml'
 ]
 for qml_dir in dirs:
     for fpath in glob.glob(os.path.join(qml_dir, '*.qml')):
