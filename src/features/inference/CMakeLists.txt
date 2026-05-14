@@ -9,11 +9,15 @@ qt_add_qml_module(labeltorch_inference
         qml/ReviewDialog.qml
         qml/LowConfQueue.qml
         qml/HardCaseQueue.qml
+        qml/ActiveLearningPage.qml
+        qml/QueueStatsPanel.qml
     SOURCES
         InferenceService.h
         InferenceService.cpp
         AssistedLabelService.h
         AssistedLabelService.cpp
+        ActiveLearningService.h
+        ActiveLearningService.cpp
 )
 
 target_include_directories(labeltorch_inference PRIVATE

@@ -10,7 +10,7 @@ import logging
 import platform
 
 from .protocol import create_response, create_event
-from .handlers import environment, training, inference, export
+from .handlers import environment, training, inference, export, active_learning
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,9 @@ class IpcServer:
             "inference.run": inference.handle_run,
             "export.run": export.handle_run,
             "artifact.verify": export.handle_verify,
+            "active_learning.collect_low_conf": active_learning.handle_collect_low_conf,
+            "active_learning.prioritize_queue": active_learning.handle_prioritize_queue,
+            "active_learning.queue_stats": active_learning.handle_queue_stats,
             "shutdown": self._handle_shutdown,
         }
         self.running = True
