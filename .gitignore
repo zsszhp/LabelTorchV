@@ -33,6 +33,7 @@ build_project.bat
 **/*.pro.user
 **/autogen/
 out/
+deploy/
 
 # Qt generated
 **/moc_*.cpp
