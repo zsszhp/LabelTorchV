@@ -107,6 +107,7 @@ QString ExportService::exportModel(const QString &modelVersionId,
         payload["artifact_id"] = artifactId;
         payload["model_version_id"] = modelVersionId;
         payload["format"] = format;
+        payload["weight_path"] = bestWeightPath;
         payload["output_path"] = outputPath;
         payload["options"] = QJsonDocument::fromJson(validatedOptionsJson.toUtf8()).object();
         m_ipcClient->sendRequest("export.run", payload);
