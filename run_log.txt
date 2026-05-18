@@ -1,3 +1,0 @@
-﻿[2026-05-18 21:55:37.635] [INFO ] [lt.ipc] onBackendFinish
-ed : Auto-restarting backend in 3s...  [void IpcClient::on
-BackendFinished(int, QProcess::ExitStatus):166]

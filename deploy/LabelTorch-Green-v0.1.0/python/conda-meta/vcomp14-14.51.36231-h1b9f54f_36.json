@@ -1,0 +1,56 @@
+{
+  "build": "h1b9f54f_36",
+  "build_number": 36,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/win-64",
+  "constrains": [
+    "vs2015_runtime 14.51.36231.* *_36"
+  ],
+  "depends": [
+    "ucrt >=10.0.20348.0"
+  ],
+  "extracted_package_dir": "C:\\A\\Anaconda\\pkgs\\vcomp14-14.51.36231-h1b9f54f_36",
+  "features": "",
+  "files": [
+    "Library/bin/vcomp140.dll",
+    "vcomp140.dll",
+    ".nonadmin"
+  ],
+  "fn": "vcomp14-14.51.36231-h1b9f54f_36.conda",
+  "license": "LicenseRef-MicrosoftVisualCpp2015-2022Runtime",
+  "license_family": "Proprietary",
+  "link": {
+    "source": "C:\\A\\Anaconda\\pkgs\\vcomp14-14.51.36231-h1b9f54f_36",
+    "type": 1
+  },
+  "md5": "d929e2c56341be7ae1bd9a77a9b535c2",
+  "name": "vcomp14",
+  "package_tarball_full_path": "C:\\A\\Anaconda\\pkgs\\vcomp14-14.51.36231-h1b9f54f_36.conda",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "Library/bin/vcomp140.dll",
+        "no_link": true,
+        "path_type": "hardlink",
+        "sha256": "f96f3a14d88d8846f31f3ab38a490304ce7d6e4f70fae4304c63e59c7aea2d30",
+        "sha256_in_prefix": "f96f3a14d88d8846f31f3ab38a490304ce7d6e4f70fae4304c63e59c7aea2d30",
+        "size_in_bytes": 213072
+      },
+      {
+        "_path": "vcomp140.dll",
+        "path_type": "hardlink",
+        "sha256": "f96f3a14d88d8846f31f3ab38a490304ce7d6e4f70fae4304c63e59c7aea2d30",
+        "sha256_in_prefix": "f96f3a14d88d8846f31f3ab38a490304ce7d6e4f70fae4304c63e59c7aea2d30",
+        "size_in_bytes": 213072
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "None",
+  "sha256": "bba3bcaf805eefd0aa14beb3d08a34a81d5d36e6890bd6ce33fcb968429a3bc7",
+  "size": 124124,
+  "subdir": "win-64",
+  "timestamp": 1779061850036,
+  "track_features": "",
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/win-64/vcomp14-14.51.36231-h1b9f54f_36.conda",
+  "version": "14.51.36231"
+}
