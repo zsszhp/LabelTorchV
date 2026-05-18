@@ -47,6 +47,8 @@ private:
     bool m_autoRestart = true;
     int m_restartAttempts = 0;
     static constexpr int MAX_RESTART_ATTEMPTS = 5;
+    QString m_lastPythonPath;
+    QString m_lastScriptPath;
 };
 
 #endif // IPCCLIENT_H

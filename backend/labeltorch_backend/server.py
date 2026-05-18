@@ -91,7 +91,6 @@ class IpcServer:
 
     async def _handle_message(self, message: dict):
         """处理收到的IPC消息"""
-        msg_type = message.get("type", "")
         request_id = message.get("request_id", "")
         command = message.get("command", "")
         payload = message.get("payload", {})

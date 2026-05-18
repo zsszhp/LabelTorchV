@@ -83,41 +83,41 @@ GroupBox {
                 }
             }
         }
-    }
-}
 
-/// <summary>
-/// 统计卡片组件
-/// </summary>
-Component {
-    id: statCardComponent
+        /// <summary>
+        /// 统计卡片组件
+        /// </summary>
+        Component {
+            id: statCardComponent
 
-    Rectangle {
-        id: card
-        implicitHeight: 80
-        radius: Theme.radiusMd
-        color: Theme.surfaceVariant
+            Rectangle {
+                id: card
+                implicitHeight: 80
+                radius: Theme.radiusMd
+                color: Theme.surfaceVariant
 
-        property string title: ""
-        property var value: 0
-        property string icon: ""
+                property string title: ""
+                property var value: 0
+                property string icon: ""
 
-        ColumnLayout {
-            anchors.centerIn: parent
-            spacing: 4
+                ColumnLayout {
+                    anchors.centerIn: parent
+                    spacing: 4
 
-            Label {
-                text: icon + " " + title
-                font: Theme.fontCaption
-                color: Theme.onSurfaceVariant
-                Layout.alignment: Qt.AlignHCenter
-            }
+                    Label {
+                        text: icon + " " + title
+                        font: Theme.fontCaption
+                        color: Theme.onSurfaceVariant
+                        Layout.alignment: Qt.AlignHCenter
+                    }
 
-            Label {
-                text: value
-                font: Theme.fontH4
-                color: Theme.primary
-                Layout.alignment: Qt.AlignHCenter
+                    Label {
+                        text: value
+                        font: Theme.fontH4
+                        color: Theme.primary
+                        Layout.alignment: Qt.AlignHCenter
+                    }
+                }
             }
         }
     }

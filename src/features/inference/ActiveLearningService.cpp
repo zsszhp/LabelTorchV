@@ -156,7 +156,7 @@ void ActiveLearningService::clearQueue(const QString& queueType)
 {
     QJsonArray* queue = getQueueByType(queueType);
     if (queue) {
-        queue->erase(queue->begin(), queue->end());
+        *queue = QJsonArray();
         qDebug() << "Cleared queue:" << queueType;
     }
 }

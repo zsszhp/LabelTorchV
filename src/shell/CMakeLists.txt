@@ -10,6 +10,7 @@ qt_add_qml_module(labeltorch_shell
         qml/NavTree.qml
         qml/StatusBar.qml
         qml/TaskPanel.qml
-        qml/Theme.qml
         qml/LogPanel.qml
+        qml/Theme.qml
 )
+set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON TRUE)

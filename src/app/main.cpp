@@ -75,10 +75,8 @@ int main(int argc, char *argv[])
     AssistedLabelService assistedLabelService;
     ExportService exportService;
 
-    QString pythonExec = appSettings.pythonPath();
-    if (pythonExec.isEmpty() || pythonExec == QStringLiteral("python")) {
-        pythonExec = QStringLiteral("python");
-    }
+    QString pythonExec = QStringLiteral("C:/A/Anaconda/envs/labeltorch/python.exe");
+    ltInfo(LT_LOG_APP()) << "Using Python:" << pythonExec;
     ipcClient.startBackend(pythonExec);
     ltInfo(LT_LOG_IPC()) << "Python backend start requested" << pythonExec;
 

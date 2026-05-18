@@ -34,6 +34,8 @@ bool IpcClient::connected() const
 
 void IpcClient::startBackend(const QString &pythonPath, const QString &scriptPath)
 {
+    m_lastPythonPath = pythonPath;
+    m_lastScriptPath = scriptPath;
     ltInfo(LT_LOG_IPC()) << "startBackend python=" << pythonPath << "script=" << scriptPath;
 
     if (m_process && m_process->state() != QProcess::NotRunning) {
@@ -48,7 +50,7 @@ void IpcClient::startBackend(const QString &pythonPath, const QString &scriptPat
     QStringList candidateDirs = {
         QCoreApplication::applicationDirPath() + QStringLiteral("/../backend"),
         QCoreApplication::applicationDirPath() + QStringLiteral("/../../../backend"),
-        QStringLiteral("F:/project/my/LabelTorchV/backend"),
+        QStringLiteral("D:/project/LabelTorchV/backend"),
     };
     for (const auto &dir : candidateDirs) {
         QString canonical = QDir(dir).canonicalPath();
@@ -208,5 +210,5 @@ void IpcClient::onBackendErrorOccurred(QProcess::ProcessError error)
 void IpcClient::tryStartBackend()
 {
     ltInfo(LT_LOG_IPC()) << "tryStartBackend";
-    startBackend();
+    startBackend(m_lastPythonPath, m_lastScriptPath);
 }

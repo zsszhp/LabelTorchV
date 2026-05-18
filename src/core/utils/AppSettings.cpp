@@ -51,7 +51,7 @@ void AppSettings::setLastProjectPath(const QString &path)
 
 QString AppSettings::pythonPath() const
 {
-    return m_settings.value(QStringLiteral("pythonPath"), QStringLiteral("python")).toString();
+    return m_settings.value(QStringLiteral("pythonPath"), QStringLiteral("C:/A/Anaconda/envs/labeltorch/python.exe")).toString();
 }
 
 void AppSettings::setPythonPath(const QString &path)

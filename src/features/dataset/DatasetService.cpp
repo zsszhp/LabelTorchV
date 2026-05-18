@@ -778,9 +778,15 @@ QString DatasetService::appendImport(const QString &datasetId, const QString &im
         return {};
     }
 
+    QVariantMap existing = getDataset(datasetId);
+    if (existing.isEmpty()) {
+        ltWarning(LT_LOG_DATASET()) << "appendImport: dataset not found:" << datasetId;
+        return {};
+    }
+
     QVariantMap scanResult = m_scanner->scan(imageDir, labelDir);
     if (scanResult.contains("error")) {
-        ltError(LT_LOG_DATASET()) << "Append scan failed:" << scanResult["error"].toString();
+        ltError(LT_LOG_DATASET()) << "appendImport scan failed:" << scanResult["error"].toString();
         return {};
     }
 
@@ -795,20 +801,22 @@ QString DatasetService::appendImport(const QString &datasetId, const QString &im
     }
 
     if (!insertSamples(datasetId, matchedSamples)) {
-        ltError(LT_LOG_DATASET()) << "Failed to insert appended samples";
+        ltError(LT_LOG_DATASET()) << "appendImport: failed to insert samples";
         return {};
     }
 
+    int newTotal = existing["sampleCount"].toInt() + matchedSamples.size();
     QSqlQuery updateQuery(Database::instance().database());
-    updateQuery.prepare("UPDATE datasets SET sample_count = sample_count + ? WHERE id = ?");
-    updateQuery.addBindValue(matchedSamples.size());
+    updateQuery.prepare("UPDATE datasets SET sample_count = ? WHERE id = ?");
+    updateQuery.addBindValue(newTotal);
     updateQuery.addBindValue(datasetId);
     if (!updateQuery.exec()) {
-        ltError(LT_LOG_DATASET()) << "Failed to update sample count:" << updateQuery.lastError().text();
+        ltError(LT_LOG_DATASET()) << "appendImport: failed to update sample count:" << updateQuery.lastError().text();
         return {};
     }
 
-    ltInfo(LT_LOG_DATASET()) << "Append import completed:" << matchedSamples.size() << "new samples";
+    ltInfo(LT_LOG_DATASET()) << "appendImport completed: added" << matchedSamples.size()
+                             << "samples to dataset" << datasetId;
     return datasetId;
 }
 
@@ -817,15 +825,32 @@ bool DatasetService::resplitDataset(const QString &datasetId, double valRatio, i
     ltTrace(LT_LOG_DATASET()) << "resplitDataset datasetId=" << datasetId
                               << "valRatio=" << valRatio << "seed=" << seed;
 
-    if (datasetId.isEmpty()) return false;
+    if (datasetId.isEmpty()) {
+        ltWarning(LT_LOG_DATASET()) << "resplitDataset: datasetId is empty";
+        return false;
+    }
 
     QSqlDatabase db = Database::instance().database();
 
+    QSqlQuery countQuery(db);
+    countQuery.prepare("SELECT COUNT(*) FROM dataset_samples WHERE dataset_id = ?");
+    countQuery.addBindValue(datasetId);
+    if (!countQuery.exec() || !countQuery.next()) {
+        ltError(LT_LOG_DATASET()) << "resplitDataset: count query failed:" << countQuery.lastError().text();
+        return false;
+    }
+
+    int total = countQuery.value(0).toInt();
+    if (total == 0) {
+        ltWarning(LT_LOG_DATASET()) << "resplitDataset: no samples in dataset";
+        return false;
+    }
+
     QSqlQuery idQuery(db);
-    idQuery.prepare("SELECT id FROM dataset_samples WHERE dataset_id = ? ORDER BY image_path");
+    idQuery.prepare("SELECT id FROM dataset_samples WHERE dataset_id = ? ORDER BY id");
     idQuery.addBindValue(datasetId);
     if (!idQuery.exec()) {
-        ltError(LT_LOG_DATASET()) << "resplitDataset: query failed:" << idQuery.lastError().text();
+        ltError(LT_LOG_DATASET()) << "resplitDataset: id query failed:" << idQuery.lastError().text();
         return false;
     }
 
@@ -837,13 +862,22 @@ bool DatasetService::resplitDataset(const QString &datasetId, double valRatio, i
     std::mt19937 rng(seed);
     std::shuffle(allIds.begin(), allIds.end(), rng);
 
-    int valCount = static_cast<int>(std::round(allIds.size() * valRatio));
+    int valCount = qMax(1, static_cast<int>(std::round(allIds.size() * valRatio)));
+    int trainCount = allIds.size() - valCount;
+
+    QSqlQuery clearQuery(db);
+    clearQuery.prepare("UPDATE dataset_samples SET split = NULL WHERE dataset_id = ?");
+    clearQuery.addBindValue(datasetId);
+    if (!clearQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "resplitDataset: clear split failed:" << clearQuery.lastError().text();
+        return false;
+    }
 
     QSqlQuery updateQuery(db);
     updateQuery.prepare("UPDATE dataset_samples SET split = ? WHERE id = ?");
 
     for (int i = 0; i < allIds.size(); ++i) {
-        QString split = (i < valCount) ? QStringLiteral("val") : QStringLiteral("train");
+        QString split = (i < trainCount) ? QStringLiteral("train") : QStringLiteral("val");
         updateQuery.addBindValue(split);
         updateQuery.addBindValue(allIds[i]);
         if (!updateQuery.exec()) {
@@ -852,7 +886,7 @@ bool DatasetService::resplitDataset(const QString &datasetId, double valRatio, i
         }
     }
 
-    ltInfo(LT_LOG_DATASET()) << "resplitDataset: split" << allIds.size()
-                             << "samples into" << (allIds.size() - valCount) << "train +" << valCount << "val";
+    ltInfo(LT_LOG_DATASET()) << "resplitDataset completed: train=" << trainCount
+                             << "val=" << valCount << "for dataset" << datasetId;
     return true;
 }
