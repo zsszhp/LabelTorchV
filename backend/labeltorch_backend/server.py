@@ -7,18 +7,36 @@ import sys
 import asyncio
 import json
 import logging
-import platform
 
 from .protocol import create_response, create_event
-from .handlers import environment, training, inference, export, active_learning
 
 logger = logging.getLogger(__name__)
+
+# 延迟导入以避免循环依赖
+environment = None
+training = None
+inference = None
+export = None
+
+
+def _import_handlers():
+    """延迟导入处理器模块"""
+    global environment, training, inference, export
+    from .handlers import environment as env_module
+    from .handlers import training as train_module
+    from .handlers import inference as inf_module
+    from .handlers import export as exp_module
+    environment = env_module
+    training = train_module
+    inference = inf_module
+    export = exp_module
 
 
 class IpcServer:
     """JSON-RPC IPC服务端"""
 
     def __init__(self):
+        _import_handlers()
         self.handlers = {
             "environment.check": environment.handle_check,
             "train.start": training.handle_start,
@@ -29,9 +47,6 @@ class IpcServer:
             "inference.run": inference.handle_run,
             "export.run": export.handle_run,
             "artifact.verify": export.handle_verify,
-            "active_learning.collect_low_conf": active_learning.handle_collect_low_conf,
-            "active_learning.prioritize_queue": active_learning.handle_prioritize_queue,
-            "active_learning.queue_stats": active_learning.handle_queue_stats,
             "shutdown": self._handle_shutdown,
         }
         self.running = True
@@ -40,21 +55,11 @@ class IpcServer:
         """启动服务端主循环"""
         logger.info("LabelTorch Python backend started")
 
-        if platform.system() == "Windows":
-            loop = asyncio.get_event_loop()
-            reader = asyncio.StreamReader()
-            protocol = asyncio.StreamReaderProtocol(reader)
-            try:
-                await loop.connect_read_pipe(lambda: protocol, sys.stdin)
-            except Exception as e:
-                logger.warning(f"connect_read_pipe failed: {e}, falling back to thread reader")
-                asyncio.create_task(self._threaded_stdin_reader(reader))
-        else:
-            reader = asyncio.StreamReader()
-            protocol = asyncio.StreamReaderProtocol(reader)
-            await asyncio.get_event_loop().connect_read_pipe(
-                lambda: protocol, sys.stdin
-            )
+        reader = asyncio.StreamReader()
+        protocol = asyncio.StreamReaderProtocol(reader)
+        await asyncio.get_event_loop().connect_read_pipe(
+            lambda: protocol, sys.stdin
+        )
 
         while self.running:
             try:
@@ -74,23 +79,9 @@ class IpcServer:
 
         logger.info("LabelTorch Python backend shutting down")
 
-    async def _threaded_stdin_reader(self, reader: asyncio.StreamReader):
-        """Windows fallback: read stdin in a thread and feed into StreamReader"""
-        loop = asyncio.get_event_loop()
-        while self.running:
-            try:
-                line = await loop.run_in_executor(None, sys.stdin.readline)
-                if not line:
-                    reader.feed_eof()
-                    break
-                reader.feed_data(line.encode("utf-8"))
-            except Exception as e:
-                logger.error(f"Stdin read error: {e}")
-                reader.feed_eof()
-                break
-
     async def _handle_message(self, message: dict):
         """处理收到的IPC消息"""
+        msg_type = message.get("type", "")
         request_id = message.get("request_id", "")
         command = message.get("command", "")
         payload = message.get("payload", {})
@@ -151,9 +142,6 @@ def main():
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
         stream=sys.stderr,
     )
-
-    if platform.system() == "Windows":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     server = IpcServer()
     _server_instance = server

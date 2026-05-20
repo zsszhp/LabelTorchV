@@ -8,13 +8,11 @@
 #include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonArray>
-#include <QJsonObject>
 #include <QSet>
 #include <QFile>
 #include <QTextStream>
 #include <algorithm>
 #include <cmath>
-#include <random>
 
 DatasetService::DatasetService(QObject *parent)
     : QObject(parent)
@@ -210,32 +208,6 @@ bool DatasetService::deleteDataset(const QString &datasetId)
 
     ltInfo(LT_LOG_DATASET()) << "Deleted dataset and associated records:" << datasetId;
     return true;
-}
-
-bool DatasetService::updateClassName(const QString &taxonomyId, int classId, const QString &name)
-{
-    if (taxonomyId.isEmpty() || name.isEmpty()) return false;
-
-    QSqlDatabase db = Database::instance().database();
-    QSqlQuery query(db);
-    query.prepare("SELECT class_definitions_json FROM taxonomies WHERE id = ?");
-    query.addBindValue(taxonomyId);
-    if (!query.exec() || !query.next()) return false;
-
-    QJsonDocument doc = QJsonDocument::fromJson(query.value(0).toString().toUtf8());
-    QJsonArray classes = doc.array();
-
-    if (classId < 0 || classId >= classes.size()) return false;
-
-    QJsonObject obj = classes[classId].toObject();
-    obj["name"] = name;
-    classes[classId] = obj;
-
-    QSqlQuery update(db);
-    update.prepare("UPDATE taxonomies SET class_definitions_json = ? WHERE id = ?");
-    update.addBindValue(QString::fromUtf8(QJsonDocument(classes).toJson(QJsonDocument::Compact)));
-    update.addBindValue(taxonomyId);
-    return update.exec();
 }
 
 QVariantMap DatasetService::getSampleStats(const QString &datasetId)
@@ -859,11 +831,15 @@ bool DatasetService::resplitDataset(const QString &datasetId, double valRatio, i
         allIds.append(idQuery.value(0).toString());
     }
 
-    std::mt19937 rng(seed);
-    std::shuffle(allIds.begin(), allIds.end(), rng);
+    std::srand(seed);
+    QStringList shuffled = allIds;
+    for (int i = shuffled.size() - 1; i > 0; --i) {
+        int j = std::rand() % (i + 1);
+        qSwap(shuffled[i], shuffled[j]);
+    }
 
-    int valCount = qMax(1, static_cast<int>(std::round(allIds.size() * valRatio)));
-    int trainCount = allIds.size() - valCount;
+    int valCount = qMax(1, static_cast<int>(total * valRatio));
+    int trainCount = total - valCount;
 
     QSqlQuery clearQuery(db);
     clearQuery.prepare("UPDATE dataset_samples SET split = NULL WHERE dataset_id = ?");
@@ -873,17 +849,28 @@ bool DatasetService::resplitDataset(const QString &datasetId, double valRatio, i
         return false;
     }
 
-    QSqlQuery updateQuery(db);
-    updateQuery.prepare("UPDATE dataset_samples SET split = ? WHERE id = ?");
-
-    for (int i = 0; i < allIds.size(); ++i) {
-        QString split = (i < trainCount) ? QStringLiteral("train") : QStringLiteral("val");
-        updateQuery.addBindValue(split);
-        updateQuery.addBindValue(allIds[i]);
-        if (!updateQuery.exec()) {
-            ltError(LT_LOG_DATASET()) << "resplitDataset: update failed:" << updateQuery.lastError().text();
+    QSqlQuery trainQuery(db);
+    trainQuery.prepare("UPDATE dataset_samples SET split = 'train' WHERE id = ? AND dataset_id = ?");
+    for (int i = 0; i < trainCount; ++i) {
+        trainQuery.addBindValue(shuffled[i]);
+        trainQuery.addBindValue(datasetId);
+        if (!trainQuery.exec()) {
+            ltError(LT_LOG_DATASET()) << "resplitDataset: train update failed:" << trainQuery.lastError().text();
             return false;
         }
+        trainQuery.finish();
+    }
+
+    QSqlQuery valQuery(db);
+    valQuery.prepare("UPDATE dataset_samples SET split = 'val' WHERE id = ? AND dataset_id = ?");
+    for (int i = trainCount; i < total; ++i) {
+        valQuery.addBindValue(shuffled[i]);
+        valQuery.addBindValue(datasetId);
+        if (!valQuery.exec()) {
+            ltError(LT_LOG_DATASET()) << "resplitDataset: val update failed:" << valQuery.lastError().text();
+            return false;
+        }
+        valQuery.finish();
     }
 
     ltInfo(LT_LOG_DATASET()) << "resplitDataset completed: train=" << trainCount
