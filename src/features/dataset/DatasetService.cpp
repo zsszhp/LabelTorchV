@@ -877,3 +877,30 @@ bool DatasetService::resplitDataset(const QString &datasetId, double valRatio, i
                              << "val=" << valCount << "for dataset" << datasetId;
     return true;
 }
+
+bool DatasetService::updateClassName(const QString &taxonomyId, int classId, const QString &name)
+{
+    ltTrace(LT_LOG_DATASET()) << "updateClassName taxonomyId=" << taxonomyId
+                              << "classId=" << classId << "name=" << name;
+
+    if (taxonomyId.isEmpty() || name.isEmpty()) {
+        ltWarning(LT_LOG_DATASET()) << "updateClassName: invalid parameters";
+        return false;
+    }
+
+    QSqlDatabase db = Database::instance().database();
+    QSqlQuery query(db);
+    query.prepare("UPDATE taxonomy_classes SET name = ? WHERE taxonomy_id = ? AND class_id = ?");
+    query.addBindValue(name);
+    query.addBindValue(taxonomyId);
+    query.addBindValue(classId);
+
+    if (!query.exec()) {
+        ltError(LT_LOG_DATASET()) << "updateClassName failed:" << query.lastError().text();
+        return false;
+    }
+
+    ltInfo(LT_LOG_DATASET()) << "updateClassName completed for taxonomy" << taxonomyId
+                             << "class" << classId << "->" << name;
+    return true;
+}

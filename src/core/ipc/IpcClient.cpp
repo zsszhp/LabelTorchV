@@ -83,7 +83,6 @@ void IpcClient::startBackend(const QString &pythonPath, const QString &scriptPat
     if (m_process->waitForStarted(5000)) {
         ltInfo(LT_LOG_IPC()) << "Backend process started, pid=" << m_process->processId();
         m_connected = true;
-        m_restartAttempts = 0;
         emit connectedChanged();
         m_watchdog->start();
     } else {
@@ -185,19 +184,13 @@ void IpcClient::onBackendFinished(int exitCode, QProcess::ExitStatus exitStatus)
     emit connectedChanged();
     m_watchdog->stop();
 
-    if (m_autoRestart && m_restartAttempts < MAX_RESTART_ATTEMPTS) {
-        m_restartAttempts++;
-        ltInfo(LT_LOG_IPC()) << "Auto-restarting backend in 3s... (attempt"
-                             << m_restartAttempts << "/" << MAX_RESTART_ATTEMPTS << ")";
+    if (m_autoRestart) {
+        ltInfo(LT_LOG_IPC()) << "Auto-restarting backend in 3s...";
         QTimer::singleShot(3000, this, [this]() {
-            if (m_autoRestart && m_restartAttempts <= MAX_RESTART_ATTEMPTS) {
+            if (m_autoRestart) {
                 tryStartBackend();
             }
         });
-    } else if (m_autoRestart) {
-        ltError(LT_LOG_IPC()) << "Max restart attempts reached, giving up";
-        m_autoRestart = false;
-        emit backendError(QStringLiteral("Backend failed to start after %1 attempts").arg(MAX_RESTART_ATTEMPTS));
     }
 }
 

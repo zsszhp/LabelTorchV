@@ -11,7 +11,7 @@ $scriptPath = $PSScriptRoot
 $rootDir = Resolve-Path "$scriptPath/.."
 $deployDir = "$rootDir/deploy/$packageName"
 $buildPreset = "mingw-release"
-$qtPath = "C:\A\QT\6.9.3\mingw_64"
+$qtPath = "C:\Qt\6.11.1\mingw_64"
 $pythonEnv = "C:\A\Anaconda\envs\labeltorch"
 $buildDir = "$rootDir/out/build/$buildPreset"
 

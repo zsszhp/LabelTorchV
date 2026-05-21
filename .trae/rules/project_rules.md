@@ -73,6 +73,7 @@ MVP 不包含：标注功能、辅助标注、数据治理、多模型支持
 
 ## 文件路径
 
-- Qt 安装路径：F:/A/QT/6.11.0/msvc2022_64
-- Python 环境：conda labeltorch
+- Qt 安装路径：C:/Qt/6.11.1/mingw_64（MinGW）、C:/Qt/6.11.1/msvc2022_64（MSVC）
+- Qt Tools：C:/Qt/Tools/mingw1310_64、C:/Qt/Tools/CMake_64、C:/Qt/Tools/Ninja
+- Python 环境：C:/A/Anaconda/envs/labeltorch（conda labeltorch）
 - 项目数据库：QStandardPaths::AppDataLocation
