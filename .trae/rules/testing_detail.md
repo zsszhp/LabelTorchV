@@ -1,3 +1,9 @@
+---
+description: 测试详细规范
+globs:
+alwaysApply: true
+---
+
 # 测试详细规范
 
 ## 测试文件对应关系

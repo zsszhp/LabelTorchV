@@ -1,3 +1,9 @@
+---
+description: LabelTorchV 项目根规则
+globs:
+alwaysApply: true
+---
+
 # LabelTorchV 项目规范
 
 ## 项目概述
@@ -36,6 +42,8 @@
   feat / fix / refactor / docs / test / perf / style / chore / ci
 - 每次提交必须推送到GitHub + Gitee双平台
 - 版本tag格式：v{major}.{minor}.{patch}
+- 一个commit只做一件事，完成小目标就提交，大目标完成再总结提交
+- 每个commit必须可编译，禁止提交半成品
 
 ### 发布前检查清单
 - [ ] Release编译通过
@@ -54,6 +62,7 @@
 - QML：颜色/字体/间距/圆角必须用Theme.xxx，禁止硬编码（UI一致性）
 - Python：async/await模式，Handler签名`async def handle_xxx(payload: dict) -> dict`
 - 文件命名：C++ PascalCase / QML PascalCase / Python snake_case
+- 业务参数配置驱动：训练超参/阈值/分页大小等通过AppSettings或配置文件管理，禁止源码硬编码
 
 ## 错误处理（不允许静默失败）
 - 所有外部调用（IPC/文件IO/数据库/QProcess）必须有错误处理和日志

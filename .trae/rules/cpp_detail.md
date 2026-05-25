@@ -1,3 +1,9 @@
+---
+description: C++ 详细规范
+globs: ["**/*.cpp", "**/*.h", "**/*.hpp", "**/CMakeLists.txt"]
+alwaysApply: false
+---
+
 # C++ 详细规范
 
 ## 内存管理
