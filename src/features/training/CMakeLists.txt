@@ -23,9 +23,11 @@ qt_add_qml_module(labeltorch_training
 
 target_link_libraries(labeltorch_training PUBLIC
     labeltorch_core
+    labeltorch_model
     Qt6::Quick
 )
 
 target_include_directories(labeltorch_training PRIVATE
     ${CMAKE_SOURCE_DIR}/src/core/database
+    ${CMAKE_SOURCE_DIR}/src/features/model
 )

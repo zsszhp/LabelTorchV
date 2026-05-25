@@ -1,6 +1,74 @@
 {
-    "version": 3,
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 22,
+        "patch": 0
+    },
     "configurePresets": [
+        {
+            "name": "msvc-base",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/msvc2022_64"
+            },
+            "environment": {
+                "VSCMD_ARG_TGT_ARCH": "x64",
+                "PATH": "$env:PATH;C:\\Qt\\Tools\\CMake_64\\bin;C:\\Qt\\Tools\\Ninja;C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+            }
+        },
+        {
+            "name": "x64-debug",
+            "displayName": "x64 Debug",
+            "description": "MSVC 2022 x64 Debug 多配置构建",
+            "inherits": "msvc-base",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/out/build/x64-debug",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
+                "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
+                "CMAKE_CONFIGURATION_TYPES": "Debug"
+            }
+        },
+        {
+            "name": "x64-release",
+            "displayName": "x64 Release",
+            "description": "MSVC 2022 x64 Release 多配置构建",
+            "inherits": "msvc-base",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/out/build/x64-release",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
+                "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
+                "CMAKE_CONFIGURATION_TYPES": "Release"
+            }
+        },
+        {
+            "name": "msvc2022-debug",
+            "displayName": "MSVC 2022 Debug (Ninja)",
+            "description": "使用MSVC 2022 + Ninja的单配置 Debug 构建",
+            "inherits": "msvc-base",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/msvc2022-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
+                "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe"
+            }
+        },
+        {
+            "name": "msvc2022-release",
+            "displayName": "MSVC 2022 Release (Ninja)",
+            "description": "使用MSVC 2022 + Ninja的单配置 Release 构建",
+            "inherits": "msvc-base",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/msvc2022-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
+                "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe"
+            }
+        },
         {
             "name": "mingw-debug",
             "displayName": "MinGW Debug",
@@ -26,43 +94,47 @@
                 "CMAKE_CXX_COMPILER": "C:/Qt/Tools/mingw1310_64/bin/g++.exe",
                 "CMAKE_MAKE_PROGRAM": "C:/Qt/Tools/mingw1310_64/bin/mingw32-make.exe"
             }
-        },
-        {
-            "name": "msvc2022-debug",
-            "displayName": "MSVC 2022 Debug",
-            "description": "使用MSVC 2022 v145工具集(14.51) + Ninja的Debug构建",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/out/build/msvc2022-debug",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/msvc2022_64",
-                "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
-                "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe"
-            },
-            "environment": {
-                "VSCMD_ARG_TGT_ARCH": "x64",
-                "PATH": "$env:PATH;C:\\Qt\\Tools\\CMake_64\\bin;C:\\Qt\\Tools\\Ninja;C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
-            }
-        },
-        {
-            "name": "msvc2022-release",
-            "displayName": "MSVC 2022 Release",
-            "description": "使用MSVC 2022 v145工具集(14.51) + Ninja的Release构建",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/out/build/msvc2022-release",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/msvc2022_64",
-                "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
-                "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe"
-            },
-            "environment": {
-                "VSCMD_ARG_TGT_ARCH": "x64",
-                "PATH": "$env:PATH;C:\\Qt\\Tools\\CMake_64\\bin;C:\\Qt\\Tools\\Ninja;C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
-            }
         }
     ],
     "buildPresets": [
+        {
+            "name": "x64-debug",
+            "configurePreset": "x64-debug",
+            "configuration": "Debug"
+        },
+        {
+            "name": "x64-release",
+            "configurePreset": "x64-release",
+            "configuration": "Release"
+        },
+        {
+            "name": "msvc2022-debug",
+            "configurePreset": "msvc2022-debug"
+        },
+        {
+            "name": "msvc2022-release",
+            "configurePreset": "msvc2022-release"
+        },
+        {
+            "name": "mingw-debug",
+            "configurePreset": "mingw-debug"
+        },
+        {
+            "name": "mingw-release",
+            "configurePreset": "mingw-release"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "x64-debug",
+            "configurePreset": "x64-debug",
+            "configuration": "Debug"
+        },
+        {
+            "name": "x64-release",
+            "configurePreset": "x64-release",
+            "configuration": "Release"
+        },
         {
             "name": "msvc2022-debug",
             "configurePreset": "msvc2022-debug"
