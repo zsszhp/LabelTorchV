@@ -16,27 +16,41 @@ public:
     explicit ImportScanner(QObject *parent = nullptr);
 
     /**
-     * @brief Scan directories for image-label pairs.
+     * @brief 扫描指定图片和标签目录中的图像-标签对
      *
-     * Auto-detects label format: COCO JSON (.json) takes priority over YOLO txt (.txt).
-     * When both formats exist in labelDir, JSON is used.
+     * 自动检测标签格式：COCO JSON (.json) 优先于 YOLO txt (.txt)
      *
-     * @param imageDir Directory containing image files.
-     * @param labelDir Directory containing label files (.txt or .json).
-     * @return QVariantMap with keys: total, matched, unmatchedImages, unmatchedLabels,
-     *         samples (QVariantList of {imagePath, labelPath, status, classIds, valid}),
-     *         categories (QVariantMap, only for JSON format: category_id -> name)
+     * @param imageDir 图片目录
+     * @param labelDir 标签目录
+     * @return QVariantMap 包含 total, matched, unmatchedImages, unmatchedLabels,
+     *         samples, categories 等键
      */
     Q_INVOKABLE QVariantMap scan(const QString &imageDir, const QString &labelDir);
 
     /**
-     * @brief Validate a single OBB label line (9 values: class_id x1 y1 x2 y2 x3 y3 x4 y4).
+     * @brief 扫描单个文件夹并自动识别格式与样本关系
      *
-     * Splits on whitespace, expects exactly 9 parts.
-     * First part must be a non-negative integer. Parts 1-8 must be valid floats in [0,1].
+     * 自动探测三种主流数据集布局：
+     * - 扁平结构（Flat Layout）：图片和标签在同一目录
+     * - 标准YOLO结构（Nested YOLO Layout）：images/ + labels/ 子目录
+     * - 异常检测结构（Anomalib Layout）：train/good + test/defective
      *
-     * @param line A trimmed label line string.
-     * @return QVariantMap with "valid" (bool), "error" (string), "classId" (int).
+     * @param folderPath 用户选中的文件夹绝对路径
+     * @return QVariantMap 包含：
+     *         - "detectedFormat": QString ("yolo_txt" | "coco_json" | "anomaly_unsupervised")
+     *         - "imageDir": QString (实际图片扫描基准路径)
+     *         - "labelDirOrPath": QString (实际标签文件夹或 JSON 文件绝对路径)
+     *         - "imageCount": int (探测到的有效图片总数)
+     *         - "labelCount": int (探测到的有效标签文件或标注总数)
+     *         - "unmatchedImagesCount": int (缺失标签的图片数)
+     *         - "classIds": QVariantList (提取到的类别整数 ID 列表)
+     *         - "classes": QVariantMap (COCO 中的 category_id -> name 映射)
+     *         - "isValid": bool (是否是可导入的合法数据集)
+     */
+    Q_INVOKABLE QVariantMap scanFolder(const QString &folderPath);
+
+    /**
+     * @brief 验证单行 OBB 标签（9个值：class_id x1 y1 x2 y2 x3 y3 x4 y4）
      */
     static QVariantMap validateOBBLine(const QString &line);
 
@@ -46,41 +60,56 @@ signals:
 
 private:
     /**
-     * @brief Parse a YOLO txt label file and extract class IDs.
-     * @param filePath Path to the .txt label file.
-     * @param classIds Output set of class IDs found in the file.
-     * @param errors Output list of per-line error descriptions.
-     * @return true if the file is valid (all lines have correct format), false otherwise.
+     * @brief 解析 YOLO txt 标签文件，提取类别 ID
      */
     bool parseLabelFile(const QString &filePath, QSet<int> &classIds, QStringList &errors);
 
     /**
-     * @brief Parse a COCO JSON label file and extract annotations.
-     *
-     * Reads a JSON file in COCO format (images, annotations, categories).
-     * Converts COCO bbox [x_min, y_min, width, height] (pixel coords)
-     * to YOLO format [cx, cy, w, h] (normalized 0-1).
-     *
-     * @param filePath Path to the .json label file.
-     * @return QVariantMap with keys:
-     *         "valid" (bool), "classIds" (QSet<int>), "errors" (QStringList),
-     *         "categories" (QMap<int, QString>),
-     *         "images" (QMap<int, QVariantMap>: image_id -> {file_name, width, height}),
-     *         "annotations" (QMultiMap<int, QVariantMap>: image_id -> {category_id, cx, cy, w, h})
+     * @brief 解析 COCO JSON 标签文件
      */
     QVariantMap parseJsonLabelFile(const QString &filePath);
 
     /**
-     * @brief Scan using COCO JSON label format.
-     *
-     * Reads JSON label file(s) from labelDir, matches images by file_name,
-     * creates sample records with converted annotations.
-     *
-     * @param imageDir Directory containing image files.
-     * @param labelDir Directory containing COCO JSON label files.
-     * @return QVariantMap with same keys as scan(), plus "categories".
+     * @brief 使用 COCO JSON 标签格式扫描
      */
     QVariantMap scanWithJsonLabels(const QString &imageDir, const QString &labelDir);
+
+    /**
+     * @brief 递归收集目录下所有图片文件
+     * @param dir 目标目录
+     * @param recursive 是否递归子目录
+     * @return QFileInfoList 图片文件列表
+     */
+    QFileInfoList collectImageFiles(const QDir &dir, bool recursive = true);
+
+    /**
+     * @brief 递归收集目录下所有标签文件
+     * @param dir 目标目录
+     * @param recursive 是否递归子目录
+     * @return QFileInfoList 标签文件列表
+     */
+    QFileInfoList collectLabelFiles(const QDir &dir, bool recursive = true);
+
+    /**
+     * @brief 探测 Anomalib 异常检测目录结构
+     * @param folderPath 根目录
+     * @return QVariantMap 探测结果，包含 detectedFormat, imageCount 等
+     */
+    QVariantMap detectAnomalibLayout(const QString &folderPath);
+
+    /**
+     * @brief 探测标准 YOLO 嵌套目录结构
+     * @param folderPath 根目录
+     * @return QVariantMap 探测结果
+     */
+    QVariantMap detectNestedYoloLayout(const QString &folderPath);
+
+    /**
+     * @brief 探测扁平目录结构
+     * @param folderPath 根目录
+     * @return QVariantMap 探测结果
+     */
+    QVariantMap detectFlatLayout(const QString &folderPath);
 
     static bool isImageFile(const QString &fileName);
     static bool isLabelFile(const QString &fileName);

@@ -88,6 +88,17 @@ public:
      * @return The path to data.yaml on success, or empty string on failure.
      */
     Q_INVOKABLE QString prepareSnapshotPhysicalDir(const QString &snapshotId);
+
+    /**
+     * @brief 为异常检测数据集准备快照物理目录
+     *
+     * 将数据集按 train/good、test/good、test/defective 结构复制到快照目录，
+     * 符合 Anomalib Folder Datamodule 的目录规范。
+     *
+     * @param snapshotId 快照 ID
+     * @return 快照根目录路径，失败返回空字符串
+     */
+    Q_INVOKABLE QString prepareAnomalySnapshotDir(const QString &snapshotId);
 };
 
 #endif // SNAPSHOTSERVICE_H

@@ -27,6 +27,7 @@ public:
     static constexpr const char *ASSISTED_LABEL_BATCHES = "assisted_label_batches";
     static constexpr const char *EXPORT_ARTIFACTS = "export_artifacts";
     static constexpr const char *TASK_EVENTS = "task_events";
+    static constexpr const char *RUN_METRICS = "run_metrics";
 };
 
 #endif // SCHEMA_H

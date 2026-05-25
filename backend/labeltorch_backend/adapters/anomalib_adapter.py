@@ -424,16 +424,57 @@ class AnomalibAdapter(TrainingAdapter):
             import onnx
             onnx_model = onnx.load(output_path)
 
-            # 提取合理的推荐阈值
+            # 提取合理的推荐阈值（多来源优先级：checkpoint > metrics 缓存 > 默认值）
             image_threshold = 0.5
             pixel_threshold = 0.5
+
+            # 来源1：从训练指标缓存中提取阈值
             if hasattr(self, "_metrics"):
-                # 从训练指标缓存中提取阈值
                 for key in self._metrics:
                     if "image_threshold" in key:
                         image_threshold = float(self._metrics[key])
                     if "pixel_threshold" in key:
                         pixel_threshold = float(self._metrics[key])
+
+            # 来源2：从 checkpoint 文件中提取 Anomalib 标准化阈值（优先级最高）
+            if weight_path.endswith(".ckpt"):
+                try:
+                    import torch
+                    ckpt = torch.load(weight_path, map_location="cpu", weights_only=False)
+                    if isinstance(ckpt, dict):
+                        # Anomalib 2.x 标准格式：ckpt["Normalization"]
+                        if "Normalization" in ckpt:
+                            norm_state = ckpt["Normalization"]
+                            if "image_threshold" in norm_state:
+                                t = norm_state["image_threshold"]
+                                image_threshold = float(t.item() if hasattr(t, "item") else t)
+                            if "pixel_threshold" in norm_state:
+                                t = norm_state["pixel_threshold"]
+                                pixel_threshold = float(t.item() if hasattr(t, "item") else t)
+                        # 兼容旧格式：state_dict 中含 normalization 前缀
+                        state_dict = ckpt.get("state_dict", ckpt)
+                        if isinstance(state_dict, dict):
+                            for key in state_dict:
+                                if "normalization.image_threshold" in key:
+                                    t = state_dict[key]
+                                    image_threshold = float(t.item() if hasattr(t, "item") else t)
+                                if "normalization.pixel_threshold" in key:
+                                    t = state_dict[key]
+                                    pixel_threshold = float(t.item() if hasattr(t, "item") else t)
+                except Exception as e:
+                    logger.warning(f"Failed to extract thresholds from checkpoint: {e}")
+
+            # 来源3：从已训练模型的 Anomalib Normalization 组件直接获取
+            if self._model and hasattr(self._model, "image_threshold"):
+                try:
+                    image_threshold = float(self._model.image_threshold.item() if hasattr(self._model.image_threshold, "item") else self._model.image_threshold)
+                except Exception:
+                    pass
+            if self._model and hasattr(self._model, "pixel_threshold"):
+                try:
+                    pixel_threshold = float(self._model.pixel_threshold.item() if hasattr(self._model.pixel_threshold, "item") else self._model.pixel_threshold)
+                except Exception:
+                    pass
 
             # 算法名称从配置或默认值获取
             algorithm = options.get("model_family", "efficient_ad")
@@ -460,7 +501,7 @@ class AnomalibAdapter(TrainingAdapter):
                 onnx_model.metadata_props.append(entry)
 
             onnx.save(onnx_model, output_path)
-            logger.info(f"Metadata embedded in ONNX: {output_path}")
+            logger.info(f"Metadata embedded in ONNX: {output_path}, thresholds: image={image_threshold:.4f}, pixel={pixel_threshold:.4f}")
 
             return {"status": "succeeded", "export_path": output_path}
 

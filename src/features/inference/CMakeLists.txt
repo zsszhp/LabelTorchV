@@ -22,6 +22,8 @@ qt_add_qml_module(labeltorch_inference
         ActiveLearningService.cpp
         AnomalyService.h
         AnomalyService.cpp
+        AnomalyDetector.h
+        AnomalyDetector.cpp
 )
 
 target_include_directories(labeltorch_inference PRIVATE

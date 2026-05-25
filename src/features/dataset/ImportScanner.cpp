@@ -699,3 +699,368 @@ QVariantMap ImportScanner::scanWithJsonLabels(const QString &imageDir, const QSt
 
     return result;
 }
+
+QVariantMap ImportScanner::scanFolder(const QString &folderPath)
+{
+    ltInfo(LT_LOG_DATASET()) << "scanFolder folderPath=" << folderPath;
+
+    QVariantMap result;
+    result["isValid"] = false;
+    result["detectedFormat"] = QString();
+    result["imageDir"] = QString();
+    result["labelDirOrPath"] = QString();
+    result["imageCount"] = 0;
+    result["labelCount"] = 0;
+    result["unmatchedImagesCount"] = 0;
+    result["classIds"] = QVariantList();
+    result["classes"] = QVariantMap();
+
+    if (folderPath.isEmpty()) {
+        result["error"] = QStringLiteral("文件夹路径为空");
+        return result;
+    }
+
+    QDir rootDir(folderPath);
+    if (!rootDir.exists()) {
+        result["error"] = QStringLiteral("文件夹不存在: %1").arg(folderPath);
+        return result;
+    }
+
+    // 按优先级依次探测：Anomalib → 嵌套 YOLO → 扁平结构
+    QVariantMap anomalibResult = detectAnomalibLayout(folderPath);
+    if (anomalibResult["isValid"].toBool()) {
+        ltInfo(LT_LOG_DATASET()) << "scanFolder: detected Anomalib layout";
+        return anomalibResult;
+    }
+
+    QVariantMap nestedResult = detectNestedYoloLayout(folderPath);
+    if (nestedResult["isValid"].toBool()) {
+        ltInfo(LT_LOG_DATASET()) << "scanFolder: detected nested YOLO layout";
+        return nestedResult;
+    }
+
+    QVariantMap flatResult = detectFlatLayout(folderPath);
+    if (flatResult["isValid"].toBool()) {
+        ltInfo(LT_LOG_DATASET()) << "scanFolder: detected flat layout";
+        return flatResult;
+    }
+
+    // 所有探测均失败
+    result["error"] = QStringLiteral("未在当前目录下探测到符合规范的图片与标签文件，请检查目录结构。");
+    ltWarning(LT_LOG_DATASET()) << "scanFolder: no valid dataset layout detected in" << folderPath;
+    return result;
+}
+
+QVariantMap ImportScanner::detectAnomalibLayout(const QString &folderPath)
+{
+    ltTrace(LT_LOG_DATASET()) << "detectAnomalibLayout folderPath=" << folderPath;
+
+    QVariantMap result;
+    result["isValid"] = false;
+
+    QDir rootDir(folderPath);
+
+    // 检查 train/good 目录是否存在
+    QString trainGoodPath = folderPath + QStringLiteral("/train/good");
+    if (!QDir(trainGoodPath).exists()) {
+        return result;
+    }
+
+    // 统计各子目录中的图片数量
+    int trainGoodCount = collectImageFiles(QDir(trainGoodPath), true).size();
+    int testGoodCount = 0;
+    int testDefectiveCount = 0;
+
+    QString testGoodPath = folderPath + QStringLiteral("/test/good");
+    QString testDefectivePath = folderPath + QStringLiteral("/test/defective");
+
+    if (QDir(testGoodPath).exists()) {
+        testGoodCount = collectImageFiles(QDir(testGoodPath), true).size();
+    }
+    if (QDir(testDefectivePath).exists()) {
+        testDefectiveCount = collectImageFiles(QDir(testDefectivePath), true).size();
+    }
+
+    int totalImages = trainGoodCount + testGoodCount + testDefectiveCount;
+    if (totalImages == 0) {
+        return result;
+    }
+
+    result["isValid"] = true;
+    result["detectedFormat"] = QStringLiteral("anomaly_unsupervised");
+    result["imageDir"] = folderPath;
+    result["labelDirOrPath"] = QString();
+    result["imageCount"] = totalImages;
+    result["labelCount"] = 0;
+    result["unmatchedImagesCount"] = 0;
+    result["classIds"] = QVariantList();
+    result["classes"] = QVariantMap();
+
+    // 额外提供异常检测结构的统计信息
+    QVariantMap layoutStats;
+    layoutStats["trainGood"] = trainGoodCount;
+    layoutStats["testGood"] = testGoodCount;
+    layoutStats["testDefective"] = testDefectiveCount;
+    result["layoutStats"] = layoutStats;
+
+    ltInfo(LT_LOG_DATASET()) << "Anomalib layout detected: train/good=" << trainGoodCount
+                             << "test/good=" << testGoodCount
+                             << "test/defective=" << testDefectiveCount;
+    return result;
+}
+
+QVariantMap ImportScanner::detectNestedYoloLayout(const QString &folderPath)
+{
+    ltTrace(LT_LOG_DATASET()) << "detectNestedYoloLayout folderPath=" << folderPath;
+
+    QVariantMap result;
+    result["isValid"] = false;
+
+    QDir rootDir(folderPath);
+
+    // 检查 images/ 和 labels/ 子目录是否存在
+    QString imagesPath = folderPath + QStringLiteral("/images");
+    QString labelsPath = folderPath + QStringLiteral("/labels");
+
+    bool hasImagesDir = QDir(imagesPath).exists();
+    bool hasLabelsDir = QDir(labelsPath).exists();
+
+    if (!hasImagesDir && !hasLabelsDir) {
+        return result;
+    }
+
+    // 收集 images/ 下所有图片（递归搜索 train/val 子目录）
+    QFileInfoList imageFiles = collectImageFiles(QDir(imagesPath), true);
+    if (imageFiles.isEmpty()) {
+        return result;
+    }
+
+    // 收集 labels/ 下所有标签文件
+    QFileInfoList labelFiles;
+    int labelCount = 0;
+    QSet<int> classIds;
+
+    if (hasLabelsDir) {
+        labelFiles = collectLabelFiles(QDir(labelsPath), true);
+
+        // 检查是否有 JSON 标签
+        bool hasJsonLabels = false;
+        for (const auto &fi : labelFiles) {
+            if (fi.suffix().toLower() == QStringLiteral("json")) {
+                hasJsonLabels = true;
+                break;
+            }
+        }
+
+        if (hasJsonLabels) {
+            // COCO JSON 格式
+            result["detectedFormat"] = QStringLiteral("coco_json");
+            result["labelDirOrPath"] = labelsPath;
+        } else {
+            // YOLO TXT 格式
+            result["detectedFormat"] = QStringLiteral("yolo_txt");
+            result["labelDirOrPath"] = labelsPath;
+
+            // 提取类别 ID
+            for (const auto &fi : labelFiles) {
+                if (fi.suffix().toLower() == QStringLiteral("txt")) {
+                    QSet<int> fileClassIds;
+                    QStringList errors;
+                    parseLabelFile(fi.absoluteFilePath(), fileClassIds, errors);
+                    classIds.unite(fileClassIds);
+                    labelCount++;
+                }
+            }
+        }
+    } else {
+        // 仅有 images 目录，无标签，可能是异常检测正常集
+        result["detectedFormat"] = QStringLiteral("anomaly_unsupervised");
+        result["labelDirOrPath"] = QString();
+    }
+
+    // 按文件名 stem 匹配图片和标签
+    QMap<QString, QFileInfo> imageByStem;
+    for (const auto &fi : imageFiles) {
+        imageByStem[fi.completeBaseName()] = fi;
+    }
+
+    QMap<QString, QFileInfo> labelByStem;
+    for (const auto &fi : labelFiles) {
+        if (fi.suffix().toLower() == QStringLiteral("txt")) {
+            labelByStem[fi.completeBaseName()] = fi;
+        }
+    }
+
+    int unmatchedImages = 0;
+    for (const auto &stem : imageByStem.keys()) {
+        if (!labelByStem.contains(stem)) {
+            unmatchedImages++;
+        }
+    }
+
+    QVariantList classIdList;
+    QList<int> sortedIds = classIds.values();
+    std::sort(sortedIds.begin(), sortedIds.end());
+    for (int cid : sortedIds) {
+        classIdList.append(cid);
+    }
+
+    result["isValid"] = true;
+    result["imageDir"] = imagesPath;
+    result["imageCount"] = imageFiles.size();
+    result["labelCount"] = labelByStem.size();
+    result["unmatchedImagesCount"] = unmatchedImages;
+    result["classIds"] = classIdList;
+
+    ltInfo(LT_LOG_DATASET()) << "Nested YOLO layout detected: images=" << imageFiles.size()
+                             << "labels=" << labelByStem.size()
+                             << "format=" << result["detectedFormat"].toString();
+    return result;
+}
+
+QVariantMap ImportScanner::detectFlatLayout(const QString &folderPath)
+{
+    ltTrace(LT_LOG_DATASET()) << "detectFlatLayout folderPath=" << folderPath;
+
+    QVariantMap result;
+    result["isValid"] = false;
+
+    QDir rootDir(folderPath);
+
+    // 收集根目录下所有图片和标签文件
+    QFileInfoList imageFiles = collectImageFiles(rootDir, false);
+    QFileInfoList labelFiles = collectLabelFiles(rootDir, false);
+
+    if (imageFiles.isEmpty()) {
+        return result;
+    }
+
+    // 检查是否有 JSON 标签
+    bool hasJsonLabels = false;
+    for (const auto &fi : labelFiles) {
+        if (fi.suffix().toLower() == QStringLiteral("json")) {
+            hasJsonLabels = true;
+            break;
+        }
+    }
+
+    QSet<int> classIds;
+    int labelCount = 0;
+
+    if (hasJsonLabels) {
+        result["detectedFormat"] = QStringLiteral("coco_json");
+        result["labelDirOrPath"] = folderPath;
+    } else {
+        // 检查是否有 TXT 标签
+        bool hasTxtLabels = false;
+        for (const auto &fi : labelFiles) {
+            if (fi.suffix().toLower() == QStringLiteral("txt")) {
+                hasTxtLabels = true;
+                break;
+            }
+        }
+
+        if (hasTxtLabels) {
+            result["detectedFormat"] = QStringLiteral("yolo_txt");
+            result["labelDirOrPath"] = folderPath;
+
+            // 提取类别 ID
+            for (const auto &fi : labelFiles) {
+                if (fi.suffix().toLower() == QStringLiteral("txt")) {
+                    QSet<int> fileClassIds;
+                    QStringList errors;
+                    parseLabelFile(fi.absoluteFilePath(), fileClassIds, errors);
+                    classIds.unite(fileClassIds);
+                    labelCount++;
+                }
+            }
+        } else {
+            // 仅有图片，无标签，判定为异常检测单分类正常集
+            result["detectedFormat"] = QStringLiteral("anomaly_unsupervised");
+            result["labelDirOrPath"] = QString();
+        }
+    }
+
+    // 按 stem 匹配
+    QMap<QString, QFileInfo> imageByStem;
+    for (const auto &fi : imageFiles) {
+        imageByStem[fi.completeBaseName()] = fi;
+    }
+
+    QMap<QString, QFileInfo> labelByStem;
+    for (const auto &fi : labelFiles) {
+        if (fi.suffix().toLower() == QStringLiteral("txt")) {
+            labelByStem[fi.completeBaseName()] = fi;
+        }
+    }
+
+    int unmatchedImages = 0;
+    for (const auto &stem : imageByStem.keys()) {
+        if (!labelByStem.contains(stem)) {
+            unmatchedImages++;
+        }
+    }
+
+    QVariantList classIdList;
+    QList<int> sortedIds = classIds.values();
+    std::sort(sortedIds.begin(), sortedIds.end());
+    for (int cid : sortedIds) {
+        classIdList.append(cid);
+    }
+
+    result["isValid"] = true;
+    result["imageDir"] = folderPath;
+    result["imageCount"] = imageFiles.size();
+    result["labelCount"] = labelByStem.size();
+    result["unmatchedImagesCount"] = unmatchedImages;
+    result["classIds"] = classIdList;
+
+    ltInfo(LT_LOG_DATASET()) << "Flat layout detected: images=" << imageFiles.size()
+                             << "labels=" << labelByStem.size()
+                             << "format=" << result["detectedFormat"].toString();
+    return result;
+}
+
+QFileInfoList ImportScanner::collectImageFiles(const QDir &dir, bool recursive)
+{
+    QFileInfoList result;
+    if (!dir.exists()) return result;
+
+    QFileInfoList entries = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    for (const auto &fi : entries) {
+        if (isImageFile(fi.fileName())) {
+            result.append(fi);
+        }
+    }
+
+    if (recursive) {
+        QFileInfoList subDirs = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const auto &subDir : subDirs) {
+            result.append(collectImageFiles(QDir(subDir.absoluteFilePath()), true));
+        }
+    }
+
+    return result;
+}
+
+QFileInfoList ImportScanner::collectLabelFiles(const QDir &dir, bool recursive)
+{
+    QFileInfoList result;
+    if (!dir.exists()) return result;
+
+    QFileInfoList entries = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    for (const auto &fi : entries) {
+        if (isLabelFile(fi.fileName())) {
+            result.append(fi);
+        }
+    }
+
+    if (recursive) {
+        QFileInfoList subDirs = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const auto &subDir : subDirs) {
+            result.append(collectLabelFiles(QDir(subDir.absoluteFilePath()), true));
+        }
+    }
+
+    return result;
+}

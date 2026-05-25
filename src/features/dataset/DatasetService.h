@@ -47,6 +47,25 @@ public:
                                            const QString &imageDir, const QString &jsonLabelPath);
 
     /**
+     * @brief 一键导入数据集（V2 自动探测版本）
+     *
+     * 统一的一键式导入入口，代替原有的 importDataset 和 importDatasetJson 的显式区分。
+     * 根据智能探测到的格式标识自动选择导入流程。
+     *
+     * @param projectId 当前项目 ID
+     * @param datasetName 数据集名称（默认填充为文件夹名）
+     * @param folderPath 选择的文件夹路径
+     * @param detectedFormat 智能探测到的格式标识 ("yolo_txt" | "coco_json" | "anomaly_unsupervised")
+     * @param autoMergeClasses 是否自动将探测到的新类别合并入当前项目的分类体系
+     * @return 导入成功返回 datasetId (UUID)，失败返回空字符串
+     */
+    Q_INVOKABLE QString importDatasetV2(const QString &projectId,
+                                        const QString &datasetName,
+                                        const QString &folderPath,
+                                        const QString &detectedFormat,
+                                        bool autoMergeClasses = true);
+
+    /**
      * @brief List all datasets for a project.
      * @param projectId The project to list datasets for.
      * @return QVariantList of QVariantMap entries with dataset fields.
@@ -105,11 +124,19 @@ public:
     Q_INVOKABLE bool resplitDataset(const QString &datasetId, double valRatio = 0.2, int seed = 42);
     Q_INVOKABLE bool updateClassName(const QString &taxonomyId, int classId, const QString &name);
 
+    /**
+     * @brief 扫描文件夹并自动探测数据集格式（代理 ImportScanner::scanFolder）
+     * @param folderPath 用户选中的文件夹绝对路径
+     * @return QVariantMap 探测结果
+     */
+    Q_INVOKABLE QVariantMap scanFolder(const QString &folderPath);
+
 private:
     bool updateImportStatus(const QString &datasetId, const QString &status);
     bool insertSamples(const QString &datasetId, const QVariantList &samples);
     bool extractAndStoreSchema(const QString &datasetId, const QVariantList &samples);
     bool extractAndStoreSchemaFromCategories(const QString &datasetId, const QVariantMap &categories);
+    bool importAnomalyDataset(const QString &datasetId, const QString &folderPath);
 
     ImportScanner *m_scanner;
 };

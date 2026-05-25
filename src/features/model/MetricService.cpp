@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QUuid>
 
 MetricService::MetricService(QObject *parent) : QObject(parent)
 {
@@ -254,5 +255,87 @@ QVariantMap MetricService::compareVersions(const QString &versionId1, const QStr
     result["comparison"] = comparison;
 
     ltInfo(LT_LOG_MODEL()) << "Compared versions:" << versionId1 << "vs" << versionId2;
+    return result;
+}
+
+bool MetricService::storeMetric(const QString &runId, int epoch,
+                                 const QString &metricName, double metricValue)
+{
+    ltTrace(LT_LOG_MODEL()) << "storeMetric runId=" << runId << "epoch=" << epoch
+                            << "metricName=" << metricName << "metricValue=" << metricValue;
+
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return false;
+
+    QString metricId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    QSqlQuery query(db);
+    query.prepare("INSERT INTO run_metrics (id, run_id, epoch, metric_name, metric_value) "
+                  "VALUES (?, ?, ?, ?, ?)");
+    query.addBindValue(metricId);
+    query.addBindValue(runId);
+    query.addBindValue(epoch);
+    query.addBindValue(metricName);
+    query.addBindValue(metricValue);
+
+    if (!query.exec()) {
+        ltError(LT_LOG_MODEL()) << "Failed to store metric:" << query.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+bool MetricService::storeEpochMetrics(const QString &runId, int epoch,
+                                       const QVariantMap &metrics)
+{
+    ltTrace(LT_LOG_MODEL()) << "storeEpochMetrics runId=" << runId << "epoch=" << epoch
+                            << "metrics count=" << metrics.size();
+
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return false;
+
+    for (auto it = metrics.constBegin(); it != metrics.constEnd(); ++it) {
+        bool ok = false;
+        double value = it.value().toDouble(&ok);
+        if (ok) {
+            storeMetric(runId, epoch, it.key(), value);
+        }
+    }
+    return true;
+}
+
+QVariantList MetricService::getRunMetrics(const QString &runId, const QString &metricName)
+{
+    ltTrace(LT_LOG_MODEL()) << "getRunMetrics runId=" << runId << "metricName=" << metricName;
+
+    QVariantList result;
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return result;
+
+    QSqlQuery query(db);
+    if (metricName.isEmpty()) {
+        query.prepare("SELECT epoch, metric_name, metric_value FROM run_metrics "
+                      "WHERE run_id = ? ORDER BY epoch ASC, metric_name ASC");
+        query.addBindValue(runId);
+    } else {
+        query.prepare("SELECT epoch, metric_name, metric_value FROM run_metrics "
+                      "WHERE run_id = ? AND metric_name = ? ORDER BY epoch ASC");
+        query.addBindValue(runId);
+        query.addBindValue(metricName);
+    }
+
+    if (!query.exec()) {
+        ltError(LT_LOG_MODEL()) << "Failed to get run metrics:" << query.lastError().text();
+        return result;
+    }
+
+    while (query.next()) {
+        QVariantMap entry;
+        entry["epoch"] = query.value(0).toInt();
+        entry["metricName"] = query.value(1).toString();
+        entry["metricValue"] = query.value(2).toDouble();
+        result.append(entry);
+    }
+
+    ltDebug(LT_LOG_MODEL()) << "Retrieved" << result.size() << "metric entries for run:" << runId;
     return result;
 }

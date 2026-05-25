@@ -907,6 +907,12 @@ bool DatasetService::updateClassName(const QString &taxonomyId, int classId, con
     return true;
 }
 
+QVariantMap DatasetService::scanFolder(const QString &folderPath)
+{
+    ltTrace(LT_LOG_DATASET()) << "scanFolder folderPath=" << folderPath;
+    return m_scanner->scanFolder(folderPath);
+}
+
 QString DatasetService::importDatasetJson(const QString &projectId, const QString &name,
                                            const QString &imageDir, const QString &jsonLabelPath)
 {
@@ -1044,6 +1050,224 @@ QString DatasetService::importDatasetJson(const QString &projectId, const QStrin
     ltInfo(LT_LOG_DATASET()) << "JSON import completed:" << datasetId
                              << "with" << matchedSamples.size() << "samples";
     return datasetId;
+}
+
+QString DatasetService::importDatasetV2(const QString &projectId,
+                                        const QString &datasetName,
+                                        const QString &folderPath,
+                                        const QString &detectedFormat,
+                                        bool autoMergeClasses)
+{
+    ltTrace(LT_LOG_DATASET()) << "importDatasetV2 projectId=" << projectId
+                              << "datasetName=" << datasetName
+                              << "folderPath=" << folderPath
+                              << "detectedFormat=" << detectedFormat
+                              << "autoMergeClasses=" << autoMergeClasses;
+
+    if (projectId.isEmpty() || datasetName.isEmpty() || folderPath.isEmpty() || detectedFormat.isEmpty()) {
+        ltWarning(LT_LOG_DATASET()) << "importDatasetV2: 缺少必要参数";
+        return {};
+    }
+
+    ltInfo(LT_LOG_DATASET()) << "V2 导入开始: name=" << datasetName
+                             << "folderPath=" << folderPath
+                             << "format=" << detectedFormat;
+
+    // 根据探测到的格式分发到对应的导入流程
+    if (detectedFormat == QStringLiteral("yolo_txt")) {
+        QDir baseDir(folderPath);
+        QString imageDir = baseDir.filePath(QStringLiteral("images"));
+        QString labelDir = baseDir.filePath(QStringLiteral("labels"));
+
+        // 如果 images/labels 子目录不存在，则直接使用 folderPath
+        if (!QDir(imageDir).exists()) imageDir = folderPath;
+        if (!QDir(labelDir).exists()) labelDir = folderPath;
+
+        ltDebug(LT_LOG_DATASET()) << "importDatasetV2: YOLO txt 分发 imageDir=" << imageDir
+                                  << "labelDir=" << labelDir;
+        return importDataset(projectId, datasetName, imageDir, labelDir);
+    }
+
+    if (detectedFormat == QStringLiteral("coco_json")) {
+        QDir baseDir(folderPath);
+        QString jsonLabelPath;
+
+        // 搜索常见的 COCO JSON 文件名
+        QStringList jsonCandidates = {
+            QStringLiteral("annotations.json"),
+            QStringLiteral("instances.json"),
+            QStringLiteral("coco.json")
+        };
+
+        for (const auto &candidate : jsonCandidates) {
+            QString path = baseDir.filePath(candidate);
+            if (QFile::exists(path)) {
+                jsonLabelPath = path;
+                break;
+            }
+        }
+
+        // 如果没找到，搜索目录下第一个 JSON 文件
+        if (jsonLabelPath.isEmpty()) {
+            QStringList jsonFiles = baseDir.entryList({QStringLiteral("*.json")}, QDir::Files);
+            if (!jsonFiles.isEmpty()) {
+                jsonLabelPath = baseDir.filePath(jsonFiles.first());
+            }
+        }
+
+        if (jsonLabelPath.isEmpty()) {
+            ltError(LT_LOG_DATASET()) << "importDatasetV2: 在" << folderPath << "中未找到 JSON 标签文件";
+            return {};
+        }
+
+        ltDebug(LT_LOG_DATASET()) << "importDatasetV2: COCO JSON 分发 jsonLabelPath=" << jsonLabelPath;
+        return importDatasetJson(projectId, datasetName, folderPath, jsonLabelPath);
+    }
+
+    if (detectedFormat == QStringLiteral("anomaly_unsupervised")) {
+        // 异常检测无监督格式：创建数据集记录后调用专用导入
+        QString datasetId = Id::generate();
+
+        QSqlQuery query(Database::instance().database());
+        query.prepare("INSERT INTO datasets (id, project_id, name, image_root, label_root, format, sample_count, import_status) "
+                      "VALUES (?, ?, ?, ?, ?, 'anomaly_unsupervised', 0, 'scanning')");
+        query.addBindValue(datasetId);
+        query.addBindValue(projectId);
+        query.addBindValue(datasetName);
+        query.addBindValue(folderPath);
+        query.addBindValue(folderPath);
+
+        if (!query.exec()) {
+            ltError(LT_LOG_DATASET()) << "importDatasetV2: 创建数据集记录失败:" << query.lastError().text();
+            return {};
+        }
+
+        ltDebug(LT_LOG_DATASET()) << "异常检测数据集记录已创建:" << datasetId << datasetName;
+
+        if (!importAnomalyDataset(datasetId, folderPath)) {
+            ltError(LT_LOG_DATASET()) << "importDatasetV2: 异常检测导入失败";
+            updateImportStatus(datasetId, QStringLiteral("failed"));
+            return {};
+        }
+
+        return datasetId;
+    }
+
+    ltError(LT_LOG_DATASET()) << "importDatasetV2: 不支持的格式:" << detectedFormat;
+    return {};
+}
+
+bool DatasetService::importAnomalyDataset(const QString &datasetId, const QString &folderPath)
+{
+    ltTrace(LT_LOG_DATASET()) << "importAnomalyDataset datasetId=" << datasetId
+                              << "folderPath=" << folderPath;
+
+    QDir baseDir(folderPath);
+    QStringList imageFilters = {
+        QStringLiteral("*.png"), QStringLiteral("*.jpg"), QStringLiteral("*.jpeg"),
+        QStringLiteral("*.bmp"), QStringLiteral("*.tif"), QStringLiteral("*.tiff"),
+        QStringLiteral("*.webp")
+    };
+
+    int totalSamples = 0;
+    QSqlDatabase db = Database::instance().database();
+
+    // 扫描 train/good 目录
+    QDir trainGoodDir(baseDir.filePath(QStringLiteral("train/good")));
+    if (trainGoodDir.exists()) {
+        QStringList images = trainGoodDir.entryList(imageFilters, QDir::Files);
+        for (const auto &imgName : images) {
+            QString imagePath = trainGoodDir.absoluteFilePath(imgName);
+            QString sampleId = Id::generate();
+
+            QSqlQuery query(db);
+            query.prepare("INSERT INTO dataset_samples "
+                          "(id, dataset_id, image_path, label_path, validation_status, split) "
+                          "VALUES (?, ?, ?, NULL, 'good', 'train')");
+            query.addBindValue(sampleId);
+            query.addBindValue(datasetId);
+            query.addBindValue(imagePath);
+
+            if (!query.exec()) {
+                ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 插入 train/good 样本失败:"
+                                          << query.lastError().text();
+                return false;
+            }
+            totalSamples++;
+        }
+        ltDebug(LT_LOG_DATASET()) << "importAnomalyDataset: train/good -" << images.size() << "张图片";
+    } else {
+        ltWarning(LT_LOG_DATASET()) << "importAnomalyDataset: train/good 目录不存在";
+    }
+
+    // 扫描 test 子目录
+    QDir testDir(baseDir.filePath(QStringLiteral("test")));
+    if (testDir.exists()) {
+        QStringList categoryDirs = testDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const auto &category : categoryDirs) {
+            QDir catDir(testDir.filePath(category));
+            QStringList images = catDir.entryList(imageFilters, QDir::Files);
+
+            // good 目录下的样本标记为 good，其他目录标记为 defective
+            QString validationStatus = (category == QStringLiteral("good"))
+                                           ? QStringLiteral("good")
+                                           : QStringLiteral("defective");
+
+            for (const auto &imgName : images) {
+                QString imagePath = catDir.absoluteFilePath(imgName);
+                QString sampleId = Id::generate();
+
+                QSqlQuery query(db);
+                query.prepare("INSERT INTO dataset_samples "
+                              "(id, dataset_id, image_path, label_path, validation_status, split) "
+                              "VALUES (?, ?, ?, NULL, ?, 'test')");
+                query.addBindValue(sampleId);
+                query.addBindValue(datasetId);
+                query.addBindValue(imagePath);
+                query.addBindValue(validationStatus);
+
+                if (!query.exec()) {
+                    ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 插入 test/" << category
+                                              << "样本失败:" << query.lastError().text();
+                    return false;
+                }
+                totalSamples++;
+            }
+            ltDebug(LT_LOG_DATASET()) << "importAnomalyDataset: test/" << category
+                                      << "-" << images.size() << "张图片"
+                                      << "status=" << validationStatus;
+        }
+    } else {
+        ltWarning(LT_LOG_DATASET()) << "importAnomalyDataset: test 目录不存在";
+    }
+
+    if (totalSamples == 0) {
+        ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 在" << folderPath << "中未找到任何样本";
+        return false;
+    }
+
+    // 更新状态为导入中
+    if (!updateImportStatus(datasetId, QStringLiteral("importing"))) {
+        ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 更新状态为 importing 失败";
+        return false;
+    }
+
+    // 更新样本数和最终状态
+    QSqlQuery updateQuery(db);
+    updateQuery.prepare("UPDATE datasets SET sample_count = ?, import_status = 'completed' WHERE id = ?");
+    updateQuery.addBindValue(totalSamples);
+    updateQuery.addBindValue(datasetId);
+
+    if (!updateQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 完成数据集更新失败:"
+                                  << updateQuery.lastError().text();
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return false;
+    }
+
+    ltInfo(LT_LOG_DATASET()) << "异常检测导入完成:" << datasetId
+                             << "共" << totalSamples << "个样本";
+    return true;
 }
 
 bool DatasetService::extractAndStoreSchemaFromCategories(const QString &datasetId, const QVariantMap &categories)

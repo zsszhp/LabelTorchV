@@ -47,6 +47,36 @@ public:
      * Returns QVariantList of QVariantMap with version details + snapshotId.
      */
     Q_INVOKABLE QVariantList getVersionsBySnapshot(const QString &snapshotId);
+
+    /**
+     * @brief 存储单个训练指标到 run_metrics 表
+     * @param runId 训练运行 ID
+     * @param epoch 当前 epoch
+     * @param metricName 指标名称（如 "loss", "mAP50" 等）
+     * @param metricValue 指标值
+     * @return true 成功，false 失败
+     */
+    Q_INVOKABLE bool storeMetric(const QString &runId, int epoch,
+                                  const QString &metricName, double metricValue);
+
+    /**
+     * @brief 批量存储一个 epoch 的所有指标
+     * @param runId 训练运行 ID
+     * @param epoch 当前 epoch
+     * @param metrics 指标键值对 QVariantMap
+     * @return true 成功，false 失败
+     */
+    Q_INVOKABLE bool storeEpochMetrics(const QString &runId, int epoch,
+                                        const QVariantMap &metrics);
+
+    /**
+     * @brief 获取指定训练运行的实时指标历史（从 run_metrics 表）
+     * @param runId 训练运行 ID
+     * @param metricName 指标名称（可选，为空则返回所有指标）
+     * @return QVariantList of QVariantMap with epoch, metric_name, metric_value
+     */
+    Q_INVOKABLE QVariantList getRunMetrics(const QString &runId,
+                                            const QString &metricName = QString());
 };
 
 #endif // METRICSERVICE_H

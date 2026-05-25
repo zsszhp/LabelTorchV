@@ -1,319 +1,643 @@
-// ImportPage.qml - 数据导入页面（支持 YOLO txt 和 COCO JSON 格式）
+// ImportPage.qml - V2 数据导入页面
+// 支持拖拽文件夹、自动格式探测、步骤卡片式交互
 import QtQuick
 import QtQuick.Controls
-import LabelTorch.Shell
 import QtQuick.Layouts
+import LabelTorch.Shell
 import QtQuick.Dialogs
 
 Item {
     id: root
 
-    ColumnLayout {
+    // 扫描结果状态
+    property var scanResult: null
+    property bool isScanning: false
+    property string selectedFolderPath: ""
+
+    ScrollView {
         anchors.fill: parent
-        anchors.margins: 24
-        spacing: 16
+        clip: true
+        contentWidth: availableWidth
 
-        // 标题栏
-        RowLayout {
-            Layout.fillWidth: true
+        ColumnLayout {
+            width: Math.max(root.width, 600)
+            anchors.margins: Theme.spacingXLarge
+            spacing: Theme.spacingLarge
 
+            // 标题栏
+            RowLayout {
+                Layout.fillWidth: true
+
+                Label {
+                    text: "数据导入"
+                    font.pixelSize: Theme.fontSizeDisplay
+                    font.bold: true
+                    color: Theme.textPrimary
+                    font.family: Theme.fontFamily
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Button {
+                    text: "刷新"
+                    font.family: Theme.fontFamily
+                    onClicked: datasetModel.refresh()
+                }
+            }
+
+            // 未打开项目提示
             Label {
-                text: "数据导入"
-                font.pixelSize: 24
+                visible: !appController.projectOpen
+                text: "请先打开一个项目再导入数据"
+                font.pixelSize: Theme.fontSizeNormal
+                font.family: Theme.fontFamily
+                color: Theme.accentError
+                Layout.fillWidth: true
+            }
+
+            // === 步骤卡片区域 ===
+            Rectangle {
+                visible: appController.projectOpen
+                Layout.fillWidth: true
+                Layout.preferredHeight: stepContent.implicitHeight + 32
+                color: Theme.bgCard
+                radius: Theme.radiusLarge
+
+                ColumnLayout {
+                    id: stepContent
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingLarge
+                    spacing: Theme.spacingLarge
+
+                    // 步骤1：选择数据集根目录（拖拽区域）
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.spacingNormal
+
+                        Label {
+                            text: "步骤1：选择数据集根目录"
+                            font.pixelSize: Theme.fontSizeSubheading
+                            font.bold: true
+                            font.family: Theme.fontFamily
+                            color: Theme.textPrimary
+                        }
+
+                        // 拖拽区域
+                        Rectangle {
+                            id: dropArea
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 120
+                            color: dropAreaDrag.containsDrag ? Theme.bgTertiary : Theme.bgInput
+                            radius: Theme.radiusNormal
+                            border.color: dropAreaDrag.containsDrag ? Theme.accentPrimary : Theme.borderNormal
+                            border.width: 1
+
+                            DropArea {
+                                id: dropAreaDrag
+                                anchors.fill: parent
+                                onEntered: function(drag) {
+                                    if (drag.hasUrls) drag.accepted = true
+                                }
+                                onDropped: function(drop) {
+                                    if (drop.hasUrls) {
+                                        var path = drop.urls[0].toString()
+                                        if (path.startsWith("file:///")) path = path.substring(8)
+                                        else if (path.startsWith("file://")) path = path.substring(7)
+                                        folderPathField.text = decodeURIComponent(path)
+                                        root.selectedFolderPath = folderPathField.text
+                                        startScan()
+                                    }
+                                }
+                            }
+
+                            ColumnLayout {
+                                anchors.centerIn: parent
+                                spacing: Theme.spacingSmall
+
+                                Label {
+                                    text: "📁"
+                                    font.pixelSize: 32
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+
+                                Label {
+                                    text: "点击或拖拽文件夹到此处"
+                                    font.pixelSize: Theme.fontSizeNormal
+                                    font.family: Theme.fontFamily
+                                    color: Theme.textSecondary
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+
+                                Label {
+                                    text: "支持 YOLO TXT / COCO JSON / Anomalib 异常检测格式"
+                                    font.pixelSize: Theme.fontSizeCaption
+                                    font.family: Theme.fontFamily
+                                    color: Theme.textMuted
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: folderDialog.open()
+                            }
+                        }
+
+                        // 路径输入行
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.spacingNormal
+
+                            TextField {
+                                id: folderPathField
+                                Layout.fillWidth: true
+                                placeholderText: "选择数据集根目录..."
+                                color: Theme.textPrimary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeNormal
+                                background: Rectangle {
+                                    color: Theme.bgInput
+                                    radius: Theme.radiusSmall
+                                    border.color: folderPathField.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                                    border.width: 1
+                                }
+                                onTextChanged: root.selectedFolderPath = text
+                            }
+
+                            Button {
+                                text: "浏览"
+                                font.family: Theme.fontFamily
+                                onClicked: folderDialog.open()
+                            }
+
+                            Button {
+                                text: "分析"
+                                highlighted: true
+                                enabled: folderPathField.text.trim().length > 0 && !root.isScanning
+                                font.family: Theme.fontFamily
+                                onClicked: startScan()
+                            }
+                        }
+                    }
+
+                    // 加载动画
+                    BusyIndicator {
+                        visible: root.isScanning
+                        running: root.isScanning
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.preferredHeight: 40
+                        Layout.preferredWidth: 40
+                    }
+
+                    Label {
+                        visible: root.isScanning
+                        text: "正在分析目录文件..."
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.family: Theme.fontFamily
+                        color: Theme.textSecondary
+                        Layout.alignment: Qt.AlignHCenter
+                    }
+
+                    // === 步骤2：扫描结果预览 ===
+                    ColumnLayout {
+                        visible: root.scanResult !== null && !root.isScanning
+                        Layout.fillWidth: true
+                        spacing: Theme.spacingNormal
+
+                        Label {
+                            text: "步骤2：扫描结果预览"
+                            font.pixelSize: Theme.fontSizeSubheading
+                            font.bold: true
+                            font.family: Theme.fontFamily
+                            color: Theme.textPrimary
+                        }
+
+                        // 格式徽章 + 匹配统计卡片
+                        Rectangle {
+                            Layout.fillWidth: true
+                            color: Theme.bgInput
+                            radius: Theme.radiusNormal
+                            implicitHeight: statsRow.implicitHeight + 24
+
+                            RowLayout {
+                                id: statsRow
+                                anchors.fill: parent
+                                anchors.margins: Theme.spacingNormal
+                                spacing: Theme.spacingXLarge
+
+                                // 格式徽章
+                                Rectangle {
+                                    Layout.alignment: Qt.AlignVCenter
+                                    width: formatBadgeText.implicitWidth + 16
+                                    height: 28
+                                    radius: Theme.radiusSmall
+                                    color: {
+                                        var fmt = root.scanResult ? root.scanResult.detectedFormat : ""
+                                        if (fmt === "yolo_txt") return Theme.accentPrimary
+                                        if (fmt === "coco_json") return Theme.accentSecondary
+                                        if (fmt === "anomaly_unsupervised") return Theme.accentWarning
+                                        return Theme.textMuted
+                                    }
+
+                                    Label {
+                                        id: formatBadgeText
+                                        anchors.centerIn: parent
+                                        text: {
+                                            var fmt = root.scanResult ? root.scanResult.detectedFormat : ""
+                                            if (fmt === "yolo_txt") return "YOLO 目标检测 (TXT)"
+                                            if (fmt === "coco_json") return "COCO 目标检测 (JSON)"
+                                            if (fmt === "anomaly_unsupervised") return "Anomalib 异常检测"
+                                            return "未知格式"
+                                        }
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.bold: true
+                                        font.family: Theme.fontFamily
+                                        color: "#FFFFFF"
+                                    }
+                                }
+
+                                // 图片总数
+                                ColumnLayout {
+                                    spacing: 2
+                                    Label {
+                                        text: "图片总数"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMuted
+                                    }
+                                    Label {
+                                        text: root.scanResult ? root.scanResult.imageCount : "0"
+                                        font.pixelSize: Theme.fontSizeLarge
+                                        font.bold: true
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textPrimary
+                                    }
+                                }
+
+                                // 已标注
+                                ColumnLayout {
+                                    visible: root.scanResult && root.scanResult.detectedFormat !== "anomaly_unsupervised"
+                                    spacing: 2
+                                    Label {
+                                        text: "已标注"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMuted
+                                    }
+                                    Label {
+                                        text: root.scanResult ? (root.scanResult.labelCount || 0) : "0"
+                                        font.pixelSize: Theme.fontSizeLarge
+                                        font.bold: true
+                                        font.family: Theme.fontFamily
+                                        color: Theme.accentSuccess
+                                    }
+                                }
+
+                                // 未标注
+                                ColumnLayout {
+                                    visible: root.scanResult && root.scanResult.detectedFormat !== "anomaly_unsupervised"
+                                    spacing: 2
+                                    Label {
+                                        text: "未标注"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMuted
+                                    }
+                                    Label {
+                                        text: root.scanResult ? (root.scanResult.unmatchedImagesCount || 0) : "0"
+                                        font.pixelSize: Theme.fontSizeLarge
+                                        font.bold: true
+                                        font.family: Theme.fontFamily
+                                        color: root.scanResult && root.scanResult.unmatchedImagesCount > 0 ? Theme.accentWarning : Theme.textPrimary
+                                    }
+                                }
+
+                                // 异常检测统计
+                                ColumnLayout {
+                                    visible: root.scanResult && root.scanResult.detectedFormat === "anomaly_unsupervised"
+                                    spacing: 2
+                                    Label {
+                                        text: "正常训练集"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMuted
+                                    }
+                                    Label {
+                                        text: root.scanResult && root.scanResult.layoutStats ? root.scanResult.layoutStats.trainGood : "0"
+                                        font.pixelSize: Theme.fontSizeLarge
+                                        font.bold: true
+                                        font.family: Theme.fontFamily
+                                        color: Theme.accentSuccess
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    visible: root.scanResult && root.scanResult.detectedFormat === "anomaly_unsupervised" && root.scanResult.layoutStats && root.scanResult.layoutStats.testDefective > 0
+                                    spacing: 2
+                                    Label {
+                                        text: "异常测试集"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMuted
+                                    }
+                                    Label {
+                                        text: root.scanResult && root.scanResult.layoutStats ? root.scanResult.layoutStats.testDefective : "0"
+                                        font.pixelSize: Theme.fontSizeLarge
+                                        font.bold: true
+                                        font.family: Theme.fontFamily
+                                        color: Theme.accentError
+                                    }
+                                }
+                            }
+                        }
+
+                        // 类别列表（目标检测格式）
+                        Rectangle {
+                            visible: root.scanResult && root.scanResult.detectedFormat !== "anomaly_unsupervised" && root.scanResult.classIds && root.scanResult.classIds.length > 0
+                            Layout.fillWidth: true
+                            implicitHeight: classFlow.implicitHeight + 24
+                            color: Theme.bgInput
+                            radius: Theme.radiusNormal
+
+                            ColumnLayout {
+                                id: classFlow
+                                anchors.fill: parent
+                                anchors.margins: Theme.spacingNormal
+                                spacing: Theme.spacingSmall
+
+                                Label {
+                                    text: "类别探测 (" + (root.scanResult && root.scanResult.classIds ? root.scanResult.classIds.length : 0) + "类)"
+                                    font.pixelSize: Theme.fontSizeNormal
+                                    font.bold: true
+                                    font.family: Theme.fontFamily
+                                    color: Theme.textPrimary
+                                }
+
+                                Flow {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.spacingSmall
+
+                                    Repeater {
+                                        model: root.scanResult && root.scanResult.classIds ? root.scanResult.classIds : []
+
+                                        Rectangle {
+                                            width: classTagText.implicitWidth + 16
+                                            height: 24
+                                            radius: Theme.radiusSmall
+                                            color: Theme.classColor(index)
+
+                                            Label {
+                                                id: classTagText
+                                                anchors.centerIn: parent
+                                                text: {
+                                                    var classes = root.scanResult ? root.scanResult.classes : {}
+                                                    var name = classes[modelData] || ("class_" + modelData)
+                                                    return modelData + ": " + name
+                                                }
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamily
+                                                color: "#FFFFFF"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 错误提示
+                        Rectangle {
+                            visible: root.scanResult && root.scanResult.error && root.scanResult.error.length > 0
+                            Layout.fillWidth: true
+                            height: 48
+                            color: "#2D1518"
+                            radius: Theme.radiusSmall
+                            border.color: Theme.accentError
+                            border.width: 1
+
+                            Label {
+                                anchors.fill: parent
+                                anchors.margins: Theme.spacingNormal
+                                text: root.scanResult ? root.scanResult.error : ""
+                                font.pixelSize: Theme.fontSizeNormal
+                                font.family: Theme.fontFamily
+                                color: Theme.accentError
+                                wrapMode: Text.WordWrap
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+
+                        // 数据集名称 + 确认导入
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.spacingNormal
+
+                            Label {
+                                text: "数据集名称"
+                                font.pixelSize: Theme.fontSizeNormal
+                                font.family: Theme.fontFamily
+                                color: Theme.textPrimary
+                            }
+
+                            TextField {
+                                id: datasetNameField
+                                Layout.fillWidth: true
+                                placeholderText: "输入数据集名称"
+                                color: Theme.textPrimary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeNormal
+                                text: root.scanResult ? extractFolderName(root.selectedFolderPath) : ""
+                                background: Rectangle {
+                                    color: Theme.bgInput
+                                    radius: Theme.radiusSmall
+                                    border.color: datasetNameField.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                                    border.width: 1
+                                }
+                            }
+
+                            Button {
+                                text: "确认导入"
+                                highlighted: true
+                                enabled: root.scanResult
+                                         && root.scanResult.isValid
+                                         && datasetNameField.text.trim().length > 0
+                                         && !root.isScanning
+                                font.family: Theme.fontFamily
+                                onClicked: {
+                                    var dsId = datasetService.importDatasetV2(
+                                        appController.currentProjectId,
+                                        datasetNameField.text.trim(),
+                                        root.selectedFolderPath,
+                                        root.scanResult.detectedFormat,
+                                        true
+                                    )
+                                    if (dsId) {
+                                        datasetModel.refresh()
+                                        root.scanResult = null
+                                        folderPathField.clear()
+                                        datasetNameField.clear()
+                                        root.selectedFolderPath = ""
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 已导入数据集列表
+            Label {
+                visible: appController.projectOpen
+                text: "已导入数据集"
+                font.pixelSize: Theme.fontSizeLarge
                 font.bold: true
+                font.family: Theme.fontFamily
                 color: Theme.textPrimary
             }
 
-            Item { Layout.fillWidth: true }
+            ListView {
+                visible: appController.projectOpen
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.minimumHeight: 200
+                clip: true
+                model: datasetModel
+                spacing: Theme.spacingSmall
 
-            Button {
-                text: "刷新"
-                onClicked: datasetModel.refresh()
-            }
-        }
+                delegate: Rectangle {
+                    width: ListView.view.width
+                    height: 72
+                    color: index % 2 === 0 ? Theme.bgCard : Theme.bgInput
+                    radius: Theme.radiusNormal
 
-        // 提示
-        Label {
-            visible: !appController.projectOpen
-            text: "请先打开一个项目再导入数据"
-            font.pixelSize: 14
-            color: Theme.accentError
-            Layout.fillWidth: true
-        }
+                    // 悬浮效果
+                    property bool hovered: mouseArea.containsMouse
+                    Behavior on y { NumberAnimation { duration: 100 } }
 
-        // 导入表单
-        Rectangle {
-            visible: appController.projectOpen
-            Layout.fillWidth: true
-            Layout.preferredHeight: 340
-            color: Theme.bgCard
-            radius: 8
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: Theme.spacingNormal
+                        spacing: Theme.spacingNormal
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 16
-                spacing: 12
-
-                // 格式选择
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    Label { text: "标签格式"; color: Theme.textPrimary; font.pixelSize: 13; Layout.preferredWidth: 80 }
-                    ComboBox {
-                        id: formatCombo
-                        model: ["YOLO TXT", "COCO JSON"]
-                        currentIndex: 0
-                        Layout.fillWidth: true
-
-                        contentItem: Label {
-                            text: formatCombo.displayText
-                            color: Theme.textPrimary
-                            font.pixelSize: 13
-                            verticalAlignment: Text.AlignVCenter
-                            leftPadding: 8
-                        }
-
-                        background: Rectangle {
-                            color: Theme.bgInput
-                            radius: 4
-                            border.color: formatCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
-                            border.width: 1
-                        }
-
-                        popup: Popup {
-                            y: formatCombo.height
-                            width: formatCombo.width
-                            implicitHeight: contentItem.implicitHeight
-                            padding: 1
-
-                            contentItem: ListView {
-                                clip: true
-                                implicitHeight: contentHeight
-                                model: formatCombo.popup.visible ? formatCombo.delegateModel : null
-                                currentIndex: formatCombo.highlightedIndex
+                        Column {
+                            Layout.fillWidth: true
+                            Label {
+                                text: model.name
+                                font.bold: true
+                                font.pixelSize: Theme.fontSizeNormal
+                                font.family: Theme.fontFamily
+                                color: Theme.textPrimary
                             }
-
-                            background: Rectangle {
-                                color: Theme.bgPrimary
-                                border.color: Theme.borderNormal
-                                radius: 4
+                            Label {
+                                text: model.imageRoot
+                                font.pixelSize: Theme.fontSizeCaption
+                                font.family: Theme.fontFamily
+                                color: Theme.textMuted
+                                elide: Text.ElideMiddle
+                                width: parent.width
                             }
                         }
 
-                        delegate: ItemDelegate {
-                            width: formatCombo.width
-                            contentItem: Label {
-                                text: modelData
-                                color: highlighted ? Theme.accentPrimary : Theme.textPrimary
-                                font.pixelSize: 13
-                                verticalAlignment: Text.AlignVCenter
+                        // 格式徽章
+                        Rectangle {
+                            visible: model.format && model.format.length > 0
+                            width: formatText.implicitWidth + 12
+                            height: 20
+                            radius: Theme.radiusSmall
+                            color: {
+                                if (model.format === "yolo_txt") return Theme.accentPrimary
+                                if (model.format === "coco_json") return Theme.accentSecondary
+                                if (model.format === "anomaly_unsupervised") return Theme.accentWarning
+                                return Theme.textMuted
                             }
-                            highlighted: formatCombo.highlightedIndex === index
-                            background: Rectangle {
-                                color: highlighted ? Theme.bgInput : Theme.bgPrimary
+
+                            Label {
+                                id: formatText
+                                anchors.centerIn: parent
+                                text: model.format || ""
+                                font.pixelSize: 10
+                                font.family: Theme.fontFamily
+                                color: "#FFFFFF"
+                            }
+                        }
+
+                        Rectangle {
+                            width: 12
+                            height: 12
+                            radius: 6
+                            color: model.importStatus === "completed" ? Theme.accentSuccess :
+                                   model.importStatus === "failed" ? Theme.accentError : Theme.accentWarning
+                        }
+
+                        Label {
+                            text: model.sampleCount + " 张"
+                            font.pixelSize: Theme.fontSizeCaption
+                            font.family: Theme.fontFamily
+                            color: Theme.textSecondary
+                        }
+
+                        Label {
+                            text: model.importStatus
+                            font.pixelSize: Theme.fontSizeCaption
+                            font.family: Theme.fontFamily
+                            color: Theme.textMuted
+                        }
+
+                        Button {
+                            text: "删除"
+                            font.family: Theme.fontFamily
+                            onClicked: {
+                                datasetService.deleteDataset(model.datasetId)
+                                datasetModel.refresh()
                             }
                         }
                     }
-                }
 
-                // 数据集名称
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    Label { text: "数据集名称"; color: Theme.textPrimary; font.pixelSize: 13; Layout.preferredWidth: 80 }
-                    TextField {
-                        id: datasetNameField
-                        Layout.fillWidth: true
-                        placeholderText: "输入数据集名称"
-                        color: Theme.textPrimary
-                        background: Rectangle { color: Theme.bgInput; radius: 4; border.color: datasetNameField.activeFocus ? Theme.accentPrimary : Theme.borderNormal; border.width: 1 }
-                    }
-                }
-
-                // 图片目录
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    Label { text: "图片目录"; color: Theme.textPrimary; font.pixelSize: 13; Layout.preferredWidth: 80 }
-                    TextField {
-                        id: imageDirField
-                        Layout.fillWidth: true
-                        placeholderText: "选择图片目录 (images/)"
-                        color: Theme.textPrimary
-                        background: Rectangle { color: Theme.bgInput; radius: 4; border.color: imageDirField.activeFocus ? Theme.accentPrimary : Theme.borderNormal; border.width: 1 }
-                    }
-                    Button {
-                        text: "浏览"
-                        onClicked: imageFolderDialog.open()
-                    }
-                }
-
-                // 标签目录（YOLO TXT 模式）
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    visible: formatCombo.currentIndex === 0
-                    Label { text: "标签目录"; color: Theme.textPrimary; font.pixelSize: 13; Layout.preferredWidth: 80 }
-                    TextField {
-                        id: labelDirField
-                        Layout.fillWidth: true
-                        placeholderText: "选择标签目录 (labels/)"
-                        color: Theme.textPrimary
-                        background: Rectangle { color: Theme.bgInput; radius: 4; border.color: labelDirField.activeFocus ? Theme.accentPrimary : Theme.borderNormal; border.width: 1 }
-                    }
-                    Button {
-                        text: "浏览"
-                        onClicked: labelFolderDialog.open()
-                    }
-                }
-
-                // JSON 标签文件（COCO JSON 模式）
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    visible: formatCombo.currentIndex === 1
-                    Label { text: "JSON文件"; color: Theme.textPrimary; font.pixelSize: 13; Layout.preferredWidth: 80 }
-                    TextField {
-                        id: jsonLabelField
-                        Layout.fillWidth: true
-                        placeholderText: "选择 COCO JSON 标签文件"
-                        color: Theme.textPrimary
-                        background: Rectangle { color: Theme.bgInput; radius: 4; border.color: jsonLabelField.activeFocus ? Theme.accentPrimary : Theme.borderNormal; border.width: 1 }
-                    }
-                    Button {
-                        text: "浏览"
-                        onClicked: jsonFileDialog.open()
-                    }
-                }
-
-                // 导入按钮
-                Button {
-                    text: "开始导入"
-                    highlighted: true
-                    enabled: {
-                        if (!datasetNameField.text.trim() || !imageDirField.text.trim()) return false
-                        if (formatCombo.currentIndex === 0 && !labelDirField.text.trim()) return false
-                        if (formatCombo.currentIndex === 1 && !jsonLabelField.text.trim()) return false
-                        return true
-                    }
-                    onClicked: {
-                        var dsId = ""
-                        if (formatCombo.currentIndex === 0) {
-                            // YOLO TXT 格式
-                            dsId = datasetService.importDataset(
-                                appController.currentProjectId,
-                                datasetNameField.text.trim(),
-                                imageDirField.text.trim(),
-                                labelDirField.text.trim()
-                            )
-                        } else {
-                            // COCO JSON 格式
-                            dsId = datasetService.importDatasetJson(
-                                appController.currentProjectId,
-                                datasetNameField.text.trim(),
-                                imageDirField.text.trim(),
-                                jsonLabelField.text.trim()
-                            )
-                        }
-                        if (dsId) {
-                            datasetModel.refresh()
-                            datasetNameField.clear()
-                            imageDirField.clear()
-                            labelDirField.clear()
-                            jsonLabelField.clear()
-                        }
-                    }
-                }
-            }
-        }
-
-        // 已导入数据集列表
-        Label {
-            visible: appController.projectOpen
-            text: "已导入数据集"
-            font.pixelSize: 16
-            font.bold: true
-            color: Theme.textPrimary
-        }
-
-        ListView {
-            visible: appController.projectOpen
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
-            model: datasetModel
-            spacing: 8
-
-            delegate: Rectangle {
-                width: ListView.view.width
-                height: 72
-                color: Theme.bgInput
-                radius: 8
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 12
-
-                    Column {
-                        Layout.fillWidth: true
-                        Label { text: model.name; font.bold: true; color: Theme.textPrimary; font.pixelSize: 14 }
-                        Label { text: model.imageRoot; color: Theme.textMuted; font.pixelSize: 11; elide: Text.ElideMiddle; width: parent.width }
-                    }
-
-                    Rectangle {
-                        width: 12; height: 12; radius: 6
-                        color: model.importStatus === "completed" ? Theme.accentSuccess :
-                               model.importStatus === "failed" ? Theme.accentError : Theme.accentWarning
-                    }
-
-                    Label { text: model.sampleCount + " 张"; color: Theme.textSecondary; font.pixelSize: 12 }
-                    Label { text: model.importStatus; color: Theme.textMuted; font.pixelSize: 11 }
-
-                    Button {
-                        text: "删除"
-                        onClicked: {
-                            datasetService.deleteDataset(model.datasetId)
-                            datasetModel.refresh()
-                        }
+                    MouseArea {
+                        id: mouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.NoButton
                     }
                 }
             }
         }
     }
 
-    // 图片目录选择对话框
+    // 文件夹选择对话框
     FolderDialog {
-        id: imageFolderDialog
+        id: folderDialog
         onAccepted: {
             var path = selectedFolder.toString()
             if (path.startsWith("file:///")) path = path.substring(8)
             else if (path.startsWith("file://")) path = path.substring(7)
-            imageDirField.text = decodeURIComponent(path)
+            folderPathField.text = decodeURIComponent(path)
+            root.selectedFolderPath = folderPathField.text
+            startScan()
         }
     }
 
-    // 标签目录选择对话框（YOLO TXT 模式）
-    FolderDialog {
-        id: labelFolderDialog
-        onAccepted: {
-            var path = selectedFolder.toString()
-            if (path.startsWith("file:///")) path = path.substring(8)
-            else if (path.startsWith("file://")) path = path.substring(7)
-            labelDirField.text = decodeURIComponent(path)
+    // 扫描触发函数
+    function startScan() {
+        if (!folderPathField.text.trim()) return
+        root.isScanning = true
+        root.scanResult = null
+        root.selectedFolderPath = folderPathField.text.trim()
+        // 使用 ImportScanner 的 scanFolder 方法
+        root.scanResult = datasetService.scanFolder(root.selectedFolderPath)
+        root.isScanning = false
+        // 自动填充数据集名称
+        if (root.scanResult && root.scanResult.isValid) {
+            datasetNameField.text = extractFolderName(root.selectedFolderPath)
         }
     }
 
-    // JSON 标签文件选择对话框（COCO JSON 模式）
-    FileDialog {
-        id: jsonFileDialog
-        title: "选择 COCO JSON 标签文件"
-        nameFilters: ["JSON 文件 (*.json)", "所有文件 (*)"]
-        onAccepted: {
-            var path = selectedFile.toString()
-            if (path.startsWith("file:///")) path = path.substring(8)
-            else if (path.startsWith("file://")) path = path.substring(7)
-            jsonLabelField.text = decodeURIComponent(path)
-        }
+    // 从路径提取文件夹名
+    function extractFolderName(path) {
+        if (!path) return ""
+        var normalized = path.replace(/\\/g, "/")
+        var parts = normalized.split("/")
+        var name = parts[parts.length - 1]
+        if (!name && parts.length > 1) name = parts[parts.length - 2]
+        return name || "dataset"
     }
 }

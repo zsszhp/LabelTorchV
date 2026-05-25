@@ -31,6 +31,7 @@
 #include "InferenceService.h"
 #include "AssistedLabelService.h"
 #include "AnomalyService.h"
+#include "AnomalyDetector.h"
 #include "ExportService.h"
 #include "Database.h"
 #include "utils/Log.h"
@@ -166,6 +167,7 @@ int main(int argc, char *argv[])
     InferenceService inferenceService;
     AssistedLabelService assistedLabelService;
     AnomalyService anomalyService;
+    AnomalyDetector anomalyDetector;
     ExportService exportService;
 
     QString pythonExec = QStringLiteral("C:/A/anaconda/envs/labeltorch/python.exe");
@@ -211,6 +213,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("inferenceService", &inferenceService);
     engine.rootContext()->setContextProperty("assistedLabelService", &assistedLabelService);
     engine.rootContext()->setContextProperty("anomalyService", &anomalyService);
+    engine.rootContext()->setContextProperty("anomalyDetector", &anomalyDetector);
     engine.rootContext()->setContextProperty("exportService", &exportService);
 
     const QUrl url(QStringLiteral("qrc:/qt/qml/LabelTorch/Shell/qml/Main.qml"));

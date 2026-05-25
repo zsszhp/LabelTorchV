@@ -3,6 +3,7 @@
 #include "ipc/IpcClient.h"
 #include "utils/Log.h"
 #include "SnapshotService.h"
+#include "MetricService.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -89,11 +90,25 @@ void TrainingService::handleTrainingEvent(const QVariantMap &event)
         updateRunStatus(taskId, QStringLiteral("running"));
     } else if (eventType == QStringLiteral("task.progress")) {
         // 训练进度事件，转发给QML层
+        int epoch = payload[QStringLiteral("epoch")].toInt();
+        QVariantMap metrics = payload[QStringLiteral("metrics")].toMap();
+
         emit trainingProgress(taskId,
-                               payload[QStringLiteral("epoch")].toInt(),
+                               epoch,
                                payload[QStringLiteral("total_epochs")].toInt(),
                                payload[QStringLiteral("loss")].toDouble(),
-                               payload[QStringLiteral("metrics")].toMap());
+                               metrics);
+
+        // 持久化指标到 run_metrics 表
+        QVariantMap allMetrics = metrics;
+        double lossVal = payload[QStringLiteral("loss")].toDouble();
+        if (lossVal != 0.0 || payload.contains(QStringLiteral("loss"))) {
+            allMetrics[QStringLiteral("loss")] = lossVal;
+        }
+        if (!allMetrics.isEmpty() && epoch > 0) {
+            MetricService metricService;
+            metricService.storeEpochMetrics(taskId, epoch, allMetrics);
+        }
     }
 }
 

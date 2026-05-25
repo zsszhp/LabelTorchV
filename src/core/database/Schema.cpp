@@ -152,6 +152,16 @@ QStringList Schema::createTableStatements()
         "  event_type TEXT NOT NULL,"
         "  payload_json TEXT,"
         "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+        ")",
+
+        // 训练指标表（每 epoch 记录）
+        "CREATE TABLE IF NOT EXISTS run_metrics ("
+        "  id TEXT PRIMARY KEY,"
+        "  run_id TEXT NOT NULL REFERENCES training_runs(id),"
+        "  epoch INTEGER NOT NULL,"
+        "  metric_name TEXT NOT NULL,"
+        "  metric_value REAL NOT NULL,"
+        "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
         ")"
     };
 }

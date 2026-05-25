@@ -540,3 +540,104 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
     ltInfo(LT_LOG_TRAINING()) << "Snapshot prepared physically at:" << snapshotDir;
     return yamlPath;
 }
+
+QString SnapshotService::prepareAnomalySnapshotDir(const QString &snapshotId)
+{
+    ltInfo(LT_LOG_TRAINING()) << "Preparing anomaly detection snapshot directory for" << snapshotId;
+    auto db = Database::instance().database();
+    if (!db.isOpen()) {
+        ltError(LT_LOG_TRAINING()) << "Database not open";
+        return {};
+    }
+
+    // 1. 获取快照信息
+    QSqlQuery snapQuery(db);
+    snapQuery.prepare("SELECT dataset_id, sample_manifest_json FROM dataset_snapshots WHERE id = ?");
+    snapQuery.addBindValue(snapshotId);
+    if (!snapQuery.exec() || !snapQuery.next()) {
+        ltError(LT_LOG_TRAINING()) << "Snapshot not found:" << snapshotId;
+        return {};
+    }
+
+    QString datasetId = snapQuery.value(0).toString();
+    QString manifestJson = snapQuery.value(1).toString();
+
+    // 2. 获取项目根路径
+    QSqlQuery datasetQuery(db);
+    datasetQuery.prepare("SELECT project_id FROM datasets WHERE id = ?");
+    datasetQuery.addBindValue(datasetId);
+    if (!datasetQuery.exec() || !datasetQuery.next()) {
+        ltError(LT_LOG_TRAINING()) << "Dataset not found:" << datasetId;
+        return {};
+    }
+    QString projectId = datasetQuery.value(0).toString();
+
+    QSqlQuery projectQuery(db);
+    projectQuery.prepare("SELECT root_path FROM projects WHERE id = ?");
+    projectQuery.addBindValue(projectId);
+    if (!projectQuery.exec() || !projectQuery.next()) {
+        ltError(LT_LOG_TRAINING()) << "Project not found:" << projectId;
+        return {};
+    }
+    QString projectRoot = projectQuery.value(0).toString();
+
+    // 3. 创建快照目录结构（Anomalib 规范）
+    QString cacheDir = projectRoot + QStringLiteral("/cache/snapshots");
+    QString snapshotDir = cacheDir + QStringLiteral("/") + snapshotId;
+
+    QDir dir;
+    if (!dir.mkpath(snapshotDir + QStringLiteral("/train/good")) ||
+        !dir.mkpath(snapshotDir + QStringLiteral("/test/good")) ||
+        !dir.mkpath(snapshotDir + QStringLiteral("/test/defective"))) {
+        ltError(LT_LOG_TRAINING()) << "Failed to create anomaly snapshot directories:" << snapshotDir;
+        return {};
+    }
+
+    // 4. 查询样本并按 validation_status 和 split 分类复制
+    QSqlQuery sampleQuery(db);
+    sampleQuery.prepare("SELECT image_path, validation_status, split FROM dataset_samples "
+                        "WHERE dataset_id = ? AND validation_status IN ('good', 'defective')");
+    sampleQuery.addBindValue(datasetId);
+
+    if (!sampleQuery.exec()) {
+        ltError(LT_LOG_TRAINING()) << "Failed to query samples for anomaly snapshot:" << sampleQuery.lastError().text();
+        return {};
+    }
+
+    int copiedCount = 0;
+    while (sampleQuery.next()) {
+        QString srcImg = sampleQuery.value(0).toString();
+        QString validationStatus = sampleQuery.value(1).toString();
+        QString split = sampleQuery.value(2).toString();
+
+        if (srcImg.isEmpty()) continue;
+
+        QFileInfo imgInfo(srcImg);
+        QString destSubDir;
+
+        if (split == QStringLiteral("train") && validationStatus == QStringLiteral("good")) {
+            destSubDir = QStringLiteral("/train/good/");
+        } else if (split == QStringLiteral("test") && validationStatus == QStringLiteral("good")) {
+            destSubDir = QStringLiteral("/test/good/");
+        } else if (split == QStringLiteral("test") && validationStatus == QStringLiteral("defective")) {
+            destSubDir = QStringLiteral("/test/defective/");
+        } else {
+            // 默认：正常样本放 train/good
+            destSubDir = QStringLiteral("/train/good/");
+        }
+
+        QString dstImg = snapshotDir + destSubDir + imgInfo.fileName();
+        if (QFile::exists(dstImg)) {
+            QFile::remove(dstImg);
+        }
+        if (QFile::copy(srcImg, dstImg)) {
+            copiedCount++;
+        } else {
+            ltWarning(LT_LOG_TRAINING()) << "Failed to copy image:" << srcImg << "to" << dstImg;
+        }
+    }
+
+    ltInfo(LT_LOG_TRAINING()) << "Anomaly snapshot prepared at:" << snapshotDir
+                              << "copied" << copiedCount << "images";
+    return snapshotDir;
+}
