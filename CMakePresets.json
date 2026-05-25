@@ -14,59 +14,33 @@
             },
             "environment": {
                 "VSCMD_ARG_TGT_ARCH": "x64",
-                "PATH": "$env:PATH;C:\\Qt\\Tools\\CMake_64\\bin;C:\\Qt\\Tools\\Ninja;C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+                "PATH": "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64;C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64;$env:PATH",
+                "INCLUDE": "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.26100.0\\um;C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.26100.0\\ucrt;C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.26100.0\\shared;C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include;C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\atlmfc\\include",
+                "LIB": "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.26100.0\\um\\x64;C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.26100.0\\ucrt\\x64;C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\lib\\x64;C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\atlmfc\\lib\\x64"
             }
         },
         {
             "name": "x64-debug",
             "displayName": "x64 Debug",
-            "description": "MSVC 2022 x64 Debug 多配置构建",
+            "description": "MSVC 2022 x64 Debug 构建 (NMake JOM)",
             "inherits": "msvc-base",
-            "generator": "Ninja Multi-Config",
+            "generator": "NMake Makefiles JOM",
             "binaryDir": "${sourceDir}/out/build/x64-debug",
             "cacheVariables": {
-                "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
-                "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
-                "CMAKE_CONFIGURATION_TYPES": "Debug"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_MAKE_PROGRAM": "C:/Qt/Tools/QtCreator/bin/jom/jom.exe"
             }
         },
         {
             "name": "x64-release",
             "displayName": "x64 Release",
-            "description": "MSVC 2022 x64 Release 多配置构建",
+            "description": "MSVC 2022 x64 Release 构建 (NMake JOM)",
             "inherits": "msvc-base",
-            "generator": "Ninja Multi-Config",
+            "generator": "NMake Makefiles JOM",
             "binaryDir": "${sourceDir}/out/build/x64-release",
             "cacheVariables": {
-                "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
-                "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
-                "CMAKE_CONFIGURATION_TYPES": "Release"
-            }
-        },
-        {
-            "name": "msvc2022-debug",
-            "displayName": "MSVC 2022 Debug (Ninja)",
-            "description": "使用MSVC 2022 + Ninja的单配置 Debug 构建",
-            "inherits": "msvc-base",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/out/build/msvc2022-debug",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
-                "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe"
-            }
-        },
-        {
-            "name": "msvc2022-release",
-            "displayName": "MSVC 2022 Release (Ninja)",
-            "description": "使用MSVC 2022 + Ninja的单配置 Release 构建",
-            "inherits": "msvc-base",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/out/build/msvc2022-release",
-            "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
-                "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe"
+                "CMAKE_MAKE_PROGRAM": "C:/Qt/Tools/QtCreator/bin/jom/jom.exe"
             }
         },
         {
@@ -99,21 +73,11 @@
     "buildPresets": [
         {
             "name": "x64-debug",
-            "configurePreset": "x64-debug",
-            "configuration": "Debug"
+            "configurePreset": "x64-debug"
         },
         {
             "name": "x64-release",
-            "configurePreset": "x64-release",
-            "configuration": "Release"
-        },
-        {
-            "name": "msvc2022-debug",
-            "configurePreset": "msvc2022-debug"
-        },
-        {
-            "name": "msvc2022-release",
-            "configurePreset": "msvc2022-release"
+            "configurePreset": "x64-release"
         },
         {
             "name": "mingw-debug",
@@ -127,21 +91,11 @@
     "testPresets": [
         {
             "name": "x64-debug",
-            "configurePreset": "x64-debug",
-            "configuration": "Debug"
+            "configurePreset": "x64-debug"
         },
         {
             "name": "x64-release",
-            "configurePreset": "x64-release",
-            "configuration": "Release"
-        },
-        {
-            "name": "msvc2022-debug",
-            "configurePreset": "msvc2022-debug"
-        },
-        {
-            "name": "msvc2022-release",
-            "configurePreset": "msvc2022-release"
+            "configurePreset": "x64-release"
         }
     ]
 }

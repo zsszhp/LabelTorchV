@@ -845,9 +845,11 @@ QVariantMap ImportScanner::detectNestedYoloLayout(const QString &folderPath)
 
         // 检查是否有 JSON 标签
         bool hasJsonLabels = false;
+        QString jsonLabelPath;
         for (const auto &fi : labelFiles) {
             if (fi.suffix().toLower() == QStringLiteral("json")) {
                 hasJsonLabels = true;
+                jsonLabelPath = fi.absoluteFilePath();
                 break;
             }
         }
@@ -855,7 +857,69 @@ QVariantMap ImportScanner::detectNestedYoloLayout(const QString &folderPath)
         if (hasJsonLabels) {
             // COCO JSON 格式
             result["detectedFormat"] = QStringLiteral("coco_json");
-            result["labelDirOrPath"] = labelsPath;
+            result["labelDirOrPath"] = jsonLabelPath;
+
+            QVariantMap jsonResult = parseJsonLabelFile(jsonLabelPath);
+            if (jsonResult["valid"].toBool()) {
+                QSet<int> jsonClassIds = jsonResult["classIds"].value<QSet<int>>();
+                QVariantMap categories = jsonResult["categories"].toMap();
+                QMap<int, QVariantMap> imagesMap = jsonResult["images"].value<QMap<int, QVariantMap>>();
+                QMultiMap<int, QVariantMap> annotationsMap = jsonResult["annotations"].value<QMultiMap<int, QVariantMap>>();
+
+                QSet<QString> imageFileNames;
+                for (const auto &fi : imageFiles) {
+                    imageFileNames.insert(fi.fileName());
+                }
+
+                int labelCount = 0;
+                int unmatchedImages = 0;
+                QSet<QString> matchedImageFiles;
+
+                for (auto it = imagesMap.constBegin(); it != imagesMap.constEnd(); ++it) {
+                    QString fileName = it.value()["file_name"].toString();
+                    if (imageFileNames.contains(fileName)) {
+                        matchedImageFiles.insert(fileName);
+                        if (annotationsMap.contains(it.key())) {
+                            labelCount++;
+                        }
+                    }
+                }
+
+                for (const auto &fi : imageFiles) {
+                    if (!matchedImageFiles.contains(fi.fileName())) {
+                        unmatchedImages++;
+                    }
+                }
+
+                QVariantList classIdList;
+                QList<int> sortedIds = jsonClassIds.values();
+                std::sort(sortedIds.begin(), sortedIds.end());
+                for (int cid : sortedIds) {
+                    classIdList.append(cid);
+                }
+
+                result["isValid"] = true;
+                result["imageDir"] = imagesPath;
+                result["imageCount"] = imageFiles.size();
+                result["labelCount"] = labelCount;
+                result["unmatchedImagesCount"] = unmatchedImages;
+                result["classIds"] = classIdList;
+                result["classes"] = categories;
+
+                ltInfo(LT_LOG_DATASET()) << "Nested COCO JSON layout detected and parsed successfully: images=" << imageFiles.size()
+                                         << "labeled=" << labelCount
+                                         << "classes=" << classIdList.size();
+                return result;
+            } else {
+                result["isValid"] = true;
+                result["imageDir"] = imagesPath;
+                result["imageCount"] = imageFiles.size();
+                result["labelCount"] = 0;
+                result["unmatchedImagesCount"] = imageFiles.size();
+                result["classIds"] = QVariantList();
+                result["classes"] = QVariantMap();
+                return result;
+            }
         } else {
             // YOLO TXT 格式
             result["detectedFormat"] = QStringLiteral("yolo_txt");
@@ -948,8 +1012,79 @@ QVariantMap ImportScanner::detectFlatLayout(const QString &folderPath)
     int labelCount = 0;
 
     if (hasJsonLabels) {
+        // 查找第一个 JSON 标签文件
+        QString jsonLabelPath;
+        for (const auto &fi : labelFiles) {
+            if (fi.suffix().toLower() == QStringLiteral("json")) {
+                jsonLabelPath = fi.absoluteFilePath();
+                break;
+            }
+        }
+
         result["detectedFormat"] = QStringLiteral("coco_json");
-        result["labelDirOrPath"] = folderPath;
+        result["labelDirOrPath"] = jsonLabelPath;
+
+        QVariantMap jsonResult = parseJsonLabelFile(jsonLabelPath);
+        if (jsonResult["valid"].toBool()) {
+            QSet<int> jsonClassIds = jsonResult["classIds"].value<QSet<int>>();
+            QVariantMap categories = jsonResult["categories"].toMap();
+            QMap<int, QVariantMap> imagesMap = jsonResult["images"].value<QMap<int, QVariantMap>>();
+            QMultiMap<int, QVariantMap> annotationsMap = jsonResult["annotations"].value<QMultiMap<int, QVariantMap>>();
+
+            QSet<QString> imageFileNames;
+            for (const auto &fi : imageFiles) {
+                imageFileNames.insert(fi.fileName());
+            }
+
+            int labelCount = 0;
+            int unmatchedImages = 0;
+            QSet<QString> matchedImageFiles;
+
+            for (auto it = imagesMap.constBegin(); it != imagesMap.constEnd(); ++it) {
+                QString fileName = it.value()["file_name"].toString();
+                if (imageFileNames.contains(fileName)) {
+                    matchedImageFiles.insert(fileName);
+                    if (annotationsMap.contains(it.key())) {
+                        labelCount++;
+                    }
+                }
+            }
+
+            for (const auto &fi : imageFiles) {
+                if (!matchedImageFiles.contains(fi.fileName())) {
+                    unmatchedImages++;
+                }
+            }
+
+            QVariantList classIdList;
+            QList<int> sortedIds = jsonClassIds.values();
+            std::sort(sortedIds.begin(), sortedIds.end());
+            for (int cid : sortedIds) {
+                classIdList.append(cid);
+            }
+
+            result["isValid"] = true;
+            result["imageDir"] = folderPath;
+            result["imageCount"] = imageFiles.size();
+            result["labelCount"] = labelCount;
+            result["unmatchedImagesCount"] = unmatchedImages;
+            result["classIds"] = classIdList;
+            result["classes"] = categories;
+
+            ltInfo(LT_LOG_DATASET()) << "Flat COCO JSON layout detected and parsed successfully: images=" << imageFiles.size()
+                                     << "labeled=" << labelCount
+                                     << "classes=" << classIdList.size();
+            return result;
+        } else {
+            result["isValid"] = true;
+            result["imageDir"] = folderPath;
+            result["imageCount"] = imageFiles.size();
+            result["labelCount"] = 0;
+            result["unmatchedImagesCount"] = imageFiles.size();
+            result["classIds"] = QVariantList();
+            result["classes"] = QVariantMap();
+            return result;
+        }
     } else {
         // 检查是否有 TXT 标签
         bool hasTxtLabels = false;

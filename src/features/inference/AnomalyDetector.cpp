@@ -178,13 +178,14 @@ QVariantMap AnomalyDetector::infer(const QString &imagePath)
                                      Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 
         std::vector<float> inputData(m_impl->inputWidth * m_impl->inputHeight * 3);
+        int channelStride = m_impl->inputWidth * m_impl->inputHeight;
         for (int y = 0; y < m_impl->inputHeight; ++y) {
             for (int x = 0; x < m_impl->inputWidth; ++x) {
                 QRgb pixel = resized.pixel(x, y);
-                int idx = (y * m_impl->inputWidth + x) * 3;
-                inputData[idx + 0] = (static_cast<float>(qRed(pixel)) / 255.0f - m_impl->normalizationMean[0]) / m_impl->normalizationStd[0];
-                inputData[idx + 1] = (static_cast<float>(qGreen(pixel)) / 255.0f - m_impl->normalizationMean[1]) / m_impl->normalizationStd[1];
-                inputData[idx + 2] = (static_cast<float>(qBlue(pixel)) / 255.0f - m_impl->normalizationMean[2]) / m_impl->normalizationStd[2];
+                int pixelIdx = y * m_impl->inputWidth + x;
+                inputData[pixelIdx] = (static_cast<float>(qRed(pixel)) / 255.0f - m_impl->normalizationMean[0]) / m_impl->normalizationStd[0];
+                inputData[pixelIdx + channelStride] = (static_cast<float>(qGreen(pixel)) / 255.0f - m_impl->normalizationMean[1]) / m_impl->normalizationStd[1];
+                inputData[pixelIdx + 2 * channelStride] = (static_cast<float>(qBlue(pixel)) / 255.0f - m_impl->normalizationMean[2]) / m_impl->normalizationStd[2];
             }
         }
 
@@ -304,22 +305,12 @@ QImage AnomalyDetector::createHeatmapImage(const std::vector<float> &anomalyMap,
     float maxVal = *std::max_element(anomalyMap.begin(), anomalyMap.end());
     if (maxVal <= 0.0f) maxVal = 1.0f;
 
-    // 创建归一化后的灰度图
-    QImage grayImage(width, height, QImage::Format_Grayscale8);
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            int idx = y * width + x;
-            float normalized = std::min(1.0f, std::max(0.0f, anomalyMap[idx] / maxVal));
-            grayImage.setPixel(x, y, static_cast<uchar>(normalized * 255.0f));
-        }
-    }
-
     // 应用伪彩映射（JET colormap 近似）
     QImage colorImage(width, height, QImage::Format_RGB888);
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
-            int gray = qGray(grayImage.pixel(x, y));
-            float val = static_cast<float>(gray) / 255.0f;
+            int idx = y * width + x;
+            float val = std::min(1.0f, std::max(0.0f, anomalyMap[idx] / maxVal));
 
             int r, g, b;
             if (val < 0.25f) {

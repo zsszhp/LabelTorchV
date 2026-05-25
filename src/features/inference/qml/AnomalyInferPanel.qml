@@ -582,7 +582,7 @@ Rectangle {
         title: "选择图片"
         nameFilters: ["图片文件 (*.png *.jpg *.jpeg *.bmp *.tiff)", "所有文件 (*)"]
         onAccepted: {
-            var path = fileDialogHelper.urlToPath(imageFileDialog.fileUrl);
+            var path = fileDialogHelper.urlToPath(imageFileDialog.selectedFile);
             root.currentImagePath = path;
         }
     }
