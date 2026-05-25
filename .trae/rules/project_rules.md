@@ -7,9 +7,9 @@
 详细架构见 CLAUDE.md
 
 ## 命令
-- 配置：`cmake --preset msvc2022-release`
-- 构建：`cmake --build --preset msvc2022-release`
-- 测试C++：`ctest --preset msvc2022-release`
+- 配置：`cmake --preset x64-release`
+- 构建：`cmake --build --preset x64-release`
+- 测试C++：`ctest --preset x64-release`
 - 测试Python：`cd backend && python -m pytest tests/`
 - Lint：`cd backend && python -m ruff check .`
 

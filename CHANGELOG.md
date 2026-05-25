@@ -1,55 +1,64 @@
 # CHANGELOG
 
-## v1.0.0 (2026-05-10)
+## v0.1.0 (开发中)
 
-### Phase 0: Platform Foundation
-- Project management (create/open/delete/recent list)
-- SQLite database with 13 core tables and migration mechanism
-- YOLO txt data import with validation and class schema extraction
-- Class mapping with preview, execution, and history tracking
-- Annotation engine with geometry kernel, canvas rendering, and interaction
-- Annotation save state machine with revision tracking
-- IPC protocol with Python backend (JSON-RPC over stdin/stdout)
-- Ultralytics training adapter with async execution
-- Task scheduling and global status management
+### 基础设施
+- SQLite 数据库单例，14 张核心表，WAL 模式，自动迁移机制
+- IPC 通信层：QProcess 管理 Python 后端，stdin/stdout JSON-RPC 协议
+- 日志系统：分模块日志（lt.core/lt.ipc/lt.db/lt.project/...）
+- 项目文件系统管理（ProjectFs）
+- 应用设置封装（AppSettings）
+- UUID 生成工具（Id）
+- JSON 序列化工具（JsonHelper）
+- 缩略图缓存与多线程生成（ThumbnailCache + ThumbnailGenerator）
 
-### Phase 1: Detection Closed Loop
-- Data snapshot service with train/val split
-- Training workbench with config panel and log viewer
-- Model version registry with metrics and tag management
-- Inference service with assisted labeling and candidate review
-- Incremental training with parent version lineage
-- pt/onnx export with verification
+### 项目管理
+- 项目 CRUD（创建/打开/删除/最近项目列表）
+- 任务类型支持（detect/obb/classify/anomaly）
+- 类别体系版本管理（TaxonomyService + TaxonomyModel）
 
-### Phase 2: Training Enhancement
-- AMP support with UI toggle
-- Resume training (checkpoint detection + continuation)
-- Multi-version experiment comparison (horizontal + vertical)
-- Data quality analysis (sample stats, class distribution, anomaly detection)
+### 数据集
+- YOLO txt 格式数据导入，自动扫描匹配
+- 数据集浏览与统计（缩略图网格、类别分布）
+- 类别映射服务（源schema→目标taxonomy映射）
+- 导入扫描器（文件夹扫描、格式自动探测）
 
-### Phase 3: OBB Version
-- OBB annotation editing with RotatedBox geometry
-- DOTA format YOLO txt read/write
-- HBB/OBB mode switching
-- OBB data validation and class mapping
-- yolov8_obb model family training
-- OBB dataset detection (isOBBDataset)
+### 标注引擎（框架已搭建，MVP 阶段不启用）
+- 几何内核（AxisAlignedBox / RotatedBox / Polygon）
+- YOLO txt 标签读写（YoloTxtReader / YoloTxtWriter，原子写入）
+- 画布控制器框架（CanvasController / InteractionManager / RenderLayer）
+- 标注修订追踪框架
 
-### Phase 4: Active Learning
-- Low-confidence sample collection with configurable threshold
-- False positive/negative queue management
-- Hard-case queue with priority sorting (FN > low-conf > FP)
-- Priority review prompts and annotation navigation
+### 训练
+- 数据快照服务（不可变快照、train/val 划分、物理目录准备）
+- 训练任务生命周期管理（draft→running→succeeded/failed/stopped）
+- Ultralytics 训练适配器（yolov5/yolov8/yolov8_obb/yolov8_cls/yolov10/yolov11）
+- 训练适配器插件注册机制（TrainingAdapterRegistry）
+- 训练配置面板与实时日志查看
 
-### Phase 5: Multi-Task Platform
-- Classification task support (single-label/multi-label)
-- Anomaly detection task support (normal/anomalous labeling)
-- Multi-task unified workbench with task type switching
-- Task-type-aware annotation and training panels
+### 模型管理
+- 模型版本注册与血缘追踪
+- 版本标签管理（baseline/best/production）
+- 指标查询与对比服务
 
-### Phase 6: Mature Product
-- Plugin-based trainer registry (TrainingAdapterRegistry)
-- Windows deployment scripts (windeployqt + Python venv)
-- CPU green package build script
-- Environment self-check on first launch
-- Chinese and English README
+### 推理
+- 批量推理服务（YOLO 单张/批量）
+- 异常检测推理服务与检测器封装
+- 辅助标注审核服务框架
+- 主动学习服务框架（低置信/误检/漏检/难例队列）
+
+### 导出
+- 模型导出服务（pt/onnx/tflite/engine）
+- 导出产物验证（ONNX Runtime / TorchScript 校验）
+
+### Python 后端
+- IpcServer 主循环（stdin/stdout JSON-RPC, asyncio）
+- 命令处理器：environment / training / inference / export / anomaly / active_learning
+- 训练适配器：UltralyticsAdapter + AnomalibAdapter（可选依赖）
+- 数据集划分工具
+
+### QML 界面
+- 主窗口：可折叠导航栏 + StackLayout + 日志面板
+- 深靛蓝+粉红强调色主题系统（Theme.qml）
+- 7 个功能页面（项目/类别/数据集/标注/训练/模型/导出）
+- 状态栏、任务面板、日志面板

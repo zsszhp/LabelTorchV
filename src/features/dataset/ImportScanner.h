@@ -7,6 +7,7 @@
 #include <QVariantList>
 #include <QSet>
 #include <QMap>
+#include <QDir>
 
 class ImportScanner : public QObject
 {

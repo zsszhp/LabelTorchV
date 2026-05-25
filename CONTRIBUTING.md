@@ -4,17 +4,19 @@ Thank you for your interest in contributing to LabelTorch!
 
 ## Development Setup
 
-1. **Prerequisites**: Qt 6.11+, MSVC 2022, CMake 3.21+, Python 3.11+
+1. **Prerequisites**: Qt 6.11+, MSVC 2022, CMake 3.22+, Python 3.11+
 2. **Clone**: `git clone <repo-url>`
-3. **Build**: `cmake --preset msvc2022-debug && cmake --build --preset msvc2022-debug`
-4. **Test**: `cd out/build/msvc2022-debug && ctest --output-on-failure`
+3. **Build**: `cmake --preset msvc2022-release && cmake --build --preset msvc2022-release`
+4. **Test C++**: `ctest --preset msvc2022-release`
+5. **Test Python**: `cd backend && python -m pytest tests/`
+6. **Lint Python**: `cd backend && python -m ruff check .`
 
 ## Code Style
 
 - **C++**: Follow Qt coding conventions, use Q_INVOKABLE for QML-exposed methods
-- **QML**: Catppuccin Mocha dark theme, consistent component structure
-- **Python**: PEP 8, type hints where practical
-- **Commits**: Use `[PhaseX.Y]` prefix, describe changes in Chinese
+- **QML**: Use Theme.qml design tokens (colors, fonts, spacing), no hardcoded values
+- **Python**: PEP 8, async/await pattern, type hints where practical
+- **Commits**: Use `<type>: <中文描述>` format (feat/fix/refactor/docs/test/perf/style/chore/ci)
 
 ## Architecture
 
@@ -23,13 +25,15 @@ Thank you for your interest in contributing to LabelTorch!
 - Database access via `Database::instance().database()` singleton
 - IPC via JSON-RPC over stdin/stdout to Python backend
 - Training adapters follow the `TrainingAdapter` base class pattern
+- All IDs use UUID (`Id::generate()`), Service dependencies injected via `setXxx()`
+- Logging via `ltInfo(LT_LOG_XXX())`, never `qDebug()`
 
-## Pull Request Process
+## Git Workflow
 
-1. Create a feature branch from `main`
-2. Make changes with clear commit messages
-3. Ensure all tests pass (`ctest --output-on-failure`)
-4. Submit PR with description of changes
+- Single developer, only `main` branch, no feature branches
+- Each commit must push to both GitHub and Gitee
+- Commit format: `<type>: <中文描述>`
+- Version tags: `v{major}.{minor}.{patch}`
 
 ## Reporting Issues
 

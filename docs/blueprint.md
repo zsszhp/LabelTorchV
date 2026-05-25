@@ -101,7 +101,7 @@ v5.0.0  成熟发布版
 8. 模型导出（pt 复制、ONNX 导出配置与验证）
 9. 绿色安装包（解压即用，环境一体化）
 
-**不包含**：标注功能、辅助标注、增量训练、多模型支持、OBB、数据快照
+**不包含**：标注功能、辅助标注、增量训练、多模型支持（v5/v10/v11）、OBB
 
 **验收标准**：
 - [ ] 从零创建项目，导入 100+ 图片数据集，训练 5 epoch，导出 pt 和 onnx
@@ -232,12 +232,12 @@ v5.0.0  成熟发布版
 
 | 版本 | 新增表 |
 |------|--------|
-| v0.1.0 | `app_config`, `projects`, `datasets`, `dataset_samples`, `taxonomies`, `training_runs`, `model_versions`, `export_artifacts` |
-| v0.2.0 | `anomaly_training_configs`, `anomaly_model_versions` |
+| v0.1.0 | `projects`, `taxonomies`, `datasets`, `dataset_samples`, `imported_label_schemas`, `class_mapping_revisions`, `annotation_revisions`, `dataset_snapshots`, `training_runs`, `model_versions`, `assisted_label_batches`, `export_artifacts`, `task_events`, `run_metrics` |
+| v0.2.0 | 异常检测相关扩展表（按需新增） |
 | v1.0.0 | — |
-| v1.1.0 | `assisted_label_batches` |
-| v1.2.0 | `dataset_snapshots`, `class_mapping_revisions`, `annotation_revisions`, `imported_label_schemas` |
-| v2.0.0 | `task_events` |
+| v1.1.0 | （已在v0.1.0中实现） |
+| v1.2.0 | （已在v0.1.0中实现） |
+| v2.0.0 | （已在v0.1.0中实现） |
 
 ---
 
