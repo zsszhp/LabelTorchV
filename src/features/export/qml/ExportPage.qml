@@ -1,4 +1,4 @@
-// ExportPage.qml - Export Center
+// ExportPage.qml - 导出中心
 import QtQuick
 import QtQuick.Controls
 import LabelTorch.Shell
@@ -31,7 +31,7 @@ Item {
         anchors.margins: 12
         spacing: 12
 
-        // Left panel: Export configuration
+        // 左侧面板：导出配置
         Rectangle {
             Layout.preferredWidth: 400
             Layout.fillHeight: true
@@ -43,21 +43,21 @@ Item {
                 anchors.margins: 12
                 spacing: 8
 
-                // Section title
+                // 区域标题
                 Label {
-                    text: "Export Model"
+                    text: "导出模型"
                     color: Theme.accentPrimary
                     font.pixelSize: 16
                     font.bold: true
                 }
 
-                // Model version selector
+                    // 模型版本选择器
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
 
                     Label {
-                        text: "Model Version:"
+                        text: "模型版本:"
                         color: Theme.textPrimary
                         font.pixelSize: 13
                         Layout.preferredWidth: 100
@@ -72,7 +72,7 @@ Item {
                         displayText: currentIndex >= 0 ?
                             modelVersionModel.data(modelVersionModel.index(currentIndex, 0), 257) ?
                             modelVersionModel.data(modelVersionModel.index(currentIndex, 0), 257).substring(0, 8) + "..." :
-                            "Select version" : "Select version"
+                            "选择版本" : "选择版本"
 
                         contentItem: Label {
                             text: versionCombo.displayText
@@ -132,13 +132,13 @@ Item {
                     }
                 }
 
-                // Format selector
+                    // 格式选择器
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
 
                     Label {
-                        text: "Format:"
+                        text: "导出格式:"
                         color: Theme.textPrimary
                         font.pixelSize: 13
                         Layout.preferredWidth: 100
@@ -202,14 +202,14 @@ Item {
                     }
                 }
 
-                // ONNX config panel (visible only when format=onnx)
+                // ONNX 配置面板（仅格式为 onnx 时可见）
                 OnnxConfigPanel {
                     id: onnxConfigPanel
                     Layout.fillWidth: true
                     visible: formatCombo.currentText === "onnx"
                 }
 
-                // Format info for non-ONNX formats
+                // 非 ONNX 格式的提示信息
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 40
@@ -221,9 +221,9 @@ Item {
                         anchors.centerIn: parent
                         text: {
                             switch (formatCombo.currentText) {
-                            case "pt": return "PyTorch .pt format - no additional options"
-                            case "tflite": return "TensorFlow Lite format - no additional options"
-                            case "engine": return "TensorRT Engine format - no additional options"
+                            case "pt": return "PyTorch .pt 格式 - 无额外选项"
+                            case "tflite": return "TensorFlow Lite 格式 - 无额外选项"
+                            case "engine": return "TensorRT Engine 格式 - 无额外选项"
                             default: return ""
                             }
                         }
@@ -235,10 +235,10 @@ Item {
 
                 Item { Layout.fillHeight: true }
 
-                // Export button
+                // 导出按钮
                 Button {
                     id: exportBtn
-                    text: "Start Export"
+                    text: "开始导出"
                     highlighted: true
                     enabled: versionCombo.currentIndex >= 0 && selectedVersionId !== ""
                     Layout.fillWidth: true
@@ -267,17 +267,17 @@ Item {
                         }
                         var artifactId = exportService.exportModel(selectedVersionId, format, optionsJson)
                         if (artifactId !== "") {
-                            statusLabel.text = "Export started: " + artifactId.substring(0, 8) + "..."
+                            statusLabel.text = "导出已启动:" + artifactId.substring(0, 8) + "..."
                             statusLabel.color = Theme.accentSuccess
                             refreshExports()
                         } else {
-                            statusLabel.text = "Failed to start export"
+                            statusLabel.text = "导出启动失败"
                             statusLabel.color = Theme.accentError
                         }
                     }
                 }
 
-                // Status label
+                    // 状态标签
                 Label {
                     id: statusLabel
                     Layout.fillWidth: true
@@ -289,7 +289,7 @@ Item {
             }
         }
 
-        // Right panel: Export history
+        // 右侧面板：导出历史
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -301,12 +301,12 @@ Item {
                 anchors.margins: 12
                 spacing: 8
 
-                // Header
+                // 标题栏
                 RowLayout {
                     Layout.fillWidth: true
 
                     Label {
-                        text: "Export History"
+                        text: "导出历史"
                         color: Theme.accentPrimary
                         font.pixelSize: 16
                         font.bold: true
@@ -315,13 +315,13 @@ Item {
                     Item { Layout.fillWidth: true }
 
                     Label {
-                        text: exportHistory.length + " artifacts"
+                        text: exportHistory.length + " 个产物"
                         color: Theme.textMuted
                         font.pixelSize: 12
                     }
 
                     Button {
-                        text: "Refresh"
+                        text: "刷新"
                         flat: true
                         palette.buttonText: Theme.accentPrimary
                         font.pixelSize: 12
@@ -329,17 +329,17 @@ Item {
                     }
                 }
 
-                // Version info label
+                // 版本信息标签
                 Label {
                     Layout.fillWidth: true
                     visible: selectedVersionId !== ""
-                    text: "Showing exports for version: " + selectedVersionId.substring(0, 8) + "..."
+                    text: "当前版本的导出记录:" + selectedVersionId.substring(0, 8) + "..."
                     color: Theme.textSecondary
                     font.pixelSize: 12
                     font.family: "monospace"
                 }
 
-                // Export list
+                // 导出列表
                 ListView {
                     id: exportList
                     Layout.fillWidth: true
@@ -352,8 +352,8 @@ Item {
                         anchors.centerIn: parent
                         visible: exportList.count === 0
                         text: selectedVersionId === "" ?
-                            "Select a model version to view exports" :
-                            "No exports yet for this version"
+                            "选择一个模型版本查看导出记录" :
+                            "该版本暂无导出记录"
                         color: Theme.textMuted
                         font.pixelSize: 14
                         horizontalAlignment: Text.AlignHCenter
@@ -371,7 +371,7 @@ Item {
                             anchors.rightMargin: 12
                             spacing: 12
 
-                            // Status indicator dot
+                            // 状态指示圆点
                             Rectangle {
                                 width: 10
                                 height: 10
@@ -388,7 +388,7 @@ Item {
                                 }
                             }
 
-                            // Artifact info
+                            // 产物信息
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 2
@@ -404,7 +404,7 @@ Item {
                                         font.family: "monospace"
                                     }
 
-                                    // Format badge
+                                    // 格式标签
                                     Rectangle {
                                         Layout.preferredHeight: 20
                                         Layout.preferredWidth: formatBadgeText.implicitWidth + 12
@@ -423,7 +423,7 @@ Item {
                                         }
                                     }
 
-                                    // Status badge
+                                    // 状态标签
                                     Rectangle {
                                         Layout.preferredHeight: 20
                                         Layout.preferredWidth: statusBadgeText.implicitWidth + 12
@@ -472,7 +472,7 @@ Item {
                                     Item { Layout.fillWidth: true }
                                 }
 
-                                // Output path
+                                // 输出路径
                                 Label {
                                     Layout.fillWidth: true
                                     text: modelData.outputPath || "N/A"
@@ -482,7 +482,7 @@ Item {
                                     elide: Text.ElideMiddle
                                 }
 
-                                // Timestamp
+                                // 时间戳
                                 Label {
                                     text: modelData.createdAt || "N/A"
                                     color: Theme.textMuted
@@ -490,9 +490,9 @@ Item {
                                 }
                             }
 
-                            // Verify button (only for succeeded exports)
+                            // 验证按钮（仅对已成功的导出可见）
                             Button {
-                                text: "Verify"
+                                text: "验证"
                                 visible: modelData.status === "succeeded"
                                 flat: true
                                 Layout.preferredWidth: 64
@@ -516,11 +516,11 @@ Item {
 
                                 onClicked: {
                                     if (exportService.verifyExport(modelData.id)) {
-                                        statusLabel.text = "Verification started for " + modelData.id.substring(0, 8) + "..."
+                                        statusLabel.text = "验证已启动:" + modelData.id.substring(0, 8) + "..."
                                         statusLabel.color = Theme.accentWarning
                                         refreshExports()
                                     } else {
-                                        statusLabel.text = "Failed to start verification"
+                                        statusLabel.text = "验证启动失败"
                                         statusLabel.color = Theme.accentError
                                     }
                                 }

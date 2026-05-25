@@ -239,9 +239,9 @@ Item {
                     radius: 6
                     color: delegateMouseArea.containsMouse ? "#313244" : "#252536"
                     border.color: Qt.rgba(
-                        parseInt(getPriorityColor(model.reason).substring(1, 3), 16) / 255,
-                        parseInt(getPriorityColor(model.reason).substring(3, 5), 16) / 255,
-                        parseInt(getPriorityColor(model.reason).substring(5, 7), 16) / 255,
+                        (parseInt(getPriorityColor(model.reason).substring(1, 3), 16) || 0) / 255,
+                        (parseInt(getPriorityColor(model.reason).substring(3, 5), 16) || 0) / 255,
+                        (parseInt(getPriorityColor(model.reason).substring(5, 7), 16) || 0) / 255,
                         0.3
                     )
                     border.width: 1
@@ -274,9 +274,9 @@ Item {
                             width: reasonLabel.implicitWidth + 12
                             radius: 4
                             color: Qt.rgba(
-                                parseInt(getPriorityColor(model.reason).substring(1, 3), 16) / 255,
-                                parseInt(getPriorityColor(model.reason).substring(3, 5), 16) / 255,
-                                parseInt(getPriorityColor(model.reason).substring(5, 7), 16) / 255,
+                                (parseInt(getPriorityColor(model.reason).substring(1, 3), 16) || 0) / 255,
+                                (parseInt(getPriorityColor(model.reason).substring(3, 5), 16) || 0) / 255,
+                                (parseInt(getPriorityColor(model.reason).substring(5, 7), 16) || 0) / 255,
                                 0.15
                             )
                             border.color: getPriorityColor(model.reason)
@@ -317,8 +317,8 @@ Item {
                         // Confidence score
                         Label {
                             visible: model.reason !== "false_negative"
-                            text: "conf: " + parseFloat(model.confidence).toFixed(3)
-                            color: parseFloat(model.confidence) < 0.2 ? "#f38ba8" : "#f9e2af"
+                            text: "conf: " + (parseFloat(model.confidence) || 0).toFixed(3)
+                            color: (parseFloat(model.confidence) || 0) < 0.2 ? "#f38ba8" : "#f9e2af"
                             font.pixelSize: 11
                             font.family: "monospace"
                         }

@@ -26,6 +26,7 @@ constexpr const char *CMD_TRAIN_STATUS = "train.status";
 constexpr const char *CMD_INFERENCE_RUN = "inference.run";
 constexpr const char *CMD_EXPORT_RUN = "export.run";
 constexpr const char *CMD_ARTIFACT_VERIFY = "artifact.verify";
+constexpr const char *CMD_ANOMALY_INFER = "anomaly.infer";
 
 // 事件类型
 constexpr const char *EVENT_TASK_STARTED = "task.started";

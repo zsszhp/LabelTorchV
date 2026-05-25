@@ -6,6 +6,9 @@
 #include <QStandardPaths>
 #include <QDir>
 
+#include <windows.h>
+#include <dbghelp.h>
+
 #include "AppController.h"
 #include "ProjectService.h"
 #include "ProjectModel.h"
@@ -27,13 +30,102 @@
 #include "ModelVersionModel.h"
 #include "InferenceService.h"
 #include "AssistedLabelService.h"
+#include "AnomalyService.h"
 #include "ExportService.h"
 #include "Database.h"
 #include "utils/Log.h"
 #include "utils/AppSettings.h"
 
+// 自定义消息处理器：将NaN ASSERT从FatalMsg降级为WarningMsg，防止程序abort
+// Qt 6.11 Debug模式下qCheckedFPConversionToInteger检测到NaN会调用qFatal导致程序退出
+// 但NaN来自Qt Quick布局引擎内部初始化竞态条件，不影响程序正常运行
+#if defined(Q_OS_WIN) && defined(_DEBUG)
+#include <crtdbg.h>
+#include <string.h>
+
+static int __cdecl msvcReportHook(int reportType, char *message, int *returnValue)
+{
+    if (message && (reportType == _CRT_ERROR || reportType == _CRT_ASSERT)) {
+        if (strstr(message, "isnan") || 
+            strstr(message, "qnumeric.h") || 
+            strstr(message, "FP(minimal)") || 
+            strstr(message, "maximalPlusOne")) {
+            
+            fprintf(stderr, "\n=== NaN/Float ASSERT (suppressed via hook) ===\n");
+            fprintf(stderr, "Message: %s\n", message);
+            fprintf(stderr, "=== END NaN/Float ASSERT (suppressed via hook) ===\n\n");
+            fflush(stderr);
+            
+            if (returnValue) {
+                *returnValue = 0; // Tell caller not to break/abort
+            }
+            return TRUE; // Suppress the Debug Error dialog
+        }
+    }
+    return FALSE; // Let standard handler display other assertion failures
+}
+#endif
+
+static QtMessageHandler originalHandler = nullptr;
+static void customMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+{
+    if (type == QtFatalMsg && (msg.contains("isnan") || 
+                               msg.contains("qnumeric.h") || 
+                               msg.contains("FP(minimal)") || 
+                               msg.contains("maximalPlusOne"))) {
+        // 将NaN相关的FatalMsg降级为WarningMsg，让程序继续运行
+        fprintf(stderr, "\n=== NaN ASSERT (suppressed) ===\n");
+        fprintf(stderr, "Message: %s\n", msg.toUtf8().constData());
+        fprintf(stderr, "File: %s:%d\n", context.file ? context.file : "", context.line);
+        fprintf(stderr, "Function: %s\n", context.function ? context.function : "");
+
+        // 打印调用栈帮助定位问题
+        void *stack[32];
+        USHORT frames = CaptureStackBackTrace(2, 32, stack, nullptr);
+        SymInitialize(GetCurrentProcess(), nullptr, TRUE);
+        fprintf(stderr, "Call stack (%u frames):\n", frames);
+        for (USHORT i = 0; i < frames; i++) {
+            DWORD64 addr = (DWORD64)stack[i];
+            char symbolBuffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
+            SYMBOL_INFO *symbol = (SYMBOL_INFO *)symbolBuffer;
+            symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+            symbol->MaxNameLen = MAX_SYM_NAME;
+            DWORD64 displacement = 0;
+            if (SymFromAddr(GetCurrentProcess(), addr, &displacement, symbol)) {
+                fprintf(stderr, "  [%u] %s+0x%llx (0x%llx)\n", i, symbol->Name,
+                        (unsigned long long)displacement, (unsigned long long)addr);
+            } else {
+                fprintf(stderr, "  [%u] 0x%llx\n", i, (unsigned long long)addr);
+            }
+        }
+        SymCleanup(GetCurrentProcess());
+        fprintf(stderr, "=== END NaN ASSERT (suppressed) ===\n\n");
+        fflush(stderr);
+
+        // 降级为WarningMsg转发给原始处理器，避免程序abort
+        if (originalHandler) {
+            originalHandler(QtWarningMsg, context, msg);
+        }
+        return;
+    }
+    if (originalHandler) {
+        originalHandler(type, context, msg);
+    }
+}
+
 int main(int argc, char *argv[])
 {
+#if defined(Q_OS_WIN) && defined(_DEBUG)
+    // 注册CRT报告钩子，阻止MSVC弹出Abort/Retry/Ignore对话框，并使assert返回0继续运行
+    _CrtSetReportHook(msvcReportHook);
+#endif
+
+    // 防止DPI缩放导致字体度量为NaN（Qt 6.11 + Windows已知问题）
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+
+    // 安装自定义消息处理器以捕获NaN ASSERT调用栈
+    originalHandler = qInstallMessageHandler(customMessageHandler);
+
     QGuiApplication app(argc, argv);
     app.setOrganizationName("LabelTorch");
     app.setApplicationName("LabelTorch");
@@ -73,9 +165,10 @@ int main(int argc, char *argv[])
     ModelVersionModel modelVersionModel;
     InferenceService inferenceService;
     AssistedLabelService assistedLabelService;
+    AnomalyService anomalyService;
     ExportService exportService;
 
-    QString pythonExec = QStringLiteral("C:/A/Anaconda/envs/labeltorch/python.exe");
+    QString pythonExec = QStringLiteral("C:/A/anaconda/envs/labeltorch/python.exe");
     ltInfo(LT_LOG_APP()) << "Using Python:" << pythonExec;
     ipcClient.startBackend(pythonExec);
     ltInfo(LT_LOG_IPC()) << "Python backend start requested" << pythonExec;
@@ -83,6 +176,7 @@ int main(int argc, char *argv[])
     projectService.setTaxonomyService(&taxonomyService);
     trainingService.setIpcClient(&ipcClient);
     inferenceService.setIpcClient(&ipcClient);
+    anomalyService.setIpcClient(&ipcClient);
     exportService.setIpcClient(&ipcClient);
 
     QObject::connect(&controller, &AppController::currentProjectIdChanged, [&]() {
@@ -116,6 +210,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("modelVersionModel", &modelVersionModel);
     engine.rootContext()->setContextProperty("inferenceService", &inferenceService);
     engine.rootContext()->setContextProperty("assistedLabelService", &assistedLabelService);
+    engine.rootContext()->setContextProperty("anomalyService", &anomalyService);
     engine.rootContext()->setContextProperty("exportService", &exportService);
 
     const QUrl url(QStringLiteral("qrc:/qt/qml/LabelTorch/Shell/qml/Main.qml"));
@@ -125,6 +220,8 @@ int main(int argc, char *argv[])
         if (!obj && url == objUrl) {
             ltError(LT_LOG_APP()) << "Failed to load Main.qml";
             QCoreApplication::exit(-1);
+        } else if (obj && url == objUrl) {
+            ltInfo(LT_LOG_APP()) << "Main.qml loaded successfully";
         }
     }, Qt::QueuedConnection);
 

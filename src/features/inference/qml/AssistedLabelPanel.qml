@@ -458,7 +458,7 @@ Item {
                         }
 
                         valueFromText: function(text) {
-                            return Math.round(parseFloat(text) * 100)
+                            return Math.round(parseFloat(text) * 100) || 50
                         }
 
                         background: Rectangle {
@@ -548,8 +548,8 @@ Item {
                     Layout.fillWidth: true
                     visible: confidenceStats.totalCandidates > 0
                     text: "Low-conf: " + confidenceStats.lowConfCount + " / " + confidenceStats.totalCandidates +
-                          "  |  Avg conf: " + parseFloat(confidenceStats.averageConfidence).toFixed(3) +
-                          "  |  Threshold: " + parseFloat(confidenceStats.threshold).toFixed(2)
+                          "  |  Avg conf: " + (parseFloat(confidenceStats.averageConfidence) || 0).toFixed(3) +
+                          "  |  Threshold: " + (parseFloat(confidenceStats.threshold) || 0).toFixed(2)
                     color: confidenceStats.lowConfCount > 0 ? "#f9e2af" : "#a6e3a1"
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
@@ -756,7 +756,7 @@ Item {
                             }
 
                             Label {
-                                text: "conf:" + parseFloat(model.confThreshold).toFixed(2)
+                                text: "conf:" + (parseFloat(model.confThreshold) || 0).toFixed(2)
                                 color: "#6c7086"
                                 font.pixelSize: 11
                             }
@@ -1001,17 +1001,17 @@ Item {
                             }
 
                             Label {
-                                text: "conf: " + parseFloat(model.confidence).toFixed(3)
-                                color: parseFloat(model.confidence) >= 0.5 ? "#a6e3a1" : "#f9e2af"
+                                text: "conf: " + (parseFloat(model.confidence) || 0).toFixed(3)
+                                color: (parseFloat(model.confidence) || 0) >= 0.5 ? "#a6e3a1" : "#f9e2af"
                                 font.pixelSize: 11
                                 font.family: "monospace"
                             }
 
                             Label {
-                                text: "[" + parseFloat(model.cx).toFixed(2) + ", " +
-                                      parseFloat(model.cy).toFixed(2) + ", " +
-                                      parseFloat(model.w).toFixed(2) + ", " +
-                                      parseFloat(model.h).toFixed(2) + "]"
+                                text: "[" + (parseFloat(model.cx) || 0).toFixed(2) + ", " +
+                                      (parseFloat(model.cy) || 0).toFixed(2) + ", " +
+                                      (parseFloat(model.w) || 0).toFixed(2) + ", " +
+                                      (parseFloat(model.h) || 0).toFixed(2) + "]"
                                 color: "#6c7086"
                                 font.pixelSize: 10
                                 font.family: "monospace"

@@ -108,8 +108,8 @@ Dialog {
                         }
 
                         Label {
-                            text: root.candidate ? parseFloat(root.candidate.confidence).toFixed(3) : "N/A"
-                            color: root.candidate && root.candidate.confidence >= 0.5 ? "#a6e3a1" : "#f9e2af"
+                            text: root.candidate ? (parseFloat(root.candidate.confidence) || 0).toFixed(3) : "N/A"
+                            color: root.candidate && (parseFloat(root.candidate.confidence) || 0) >= 0.5 ? "#a6e3a1" : "#f9e2af"
                             font.pixelSize: 13
                             font.bold: true
                             font.family: "monospace"
@@ -127,10 +127,10 @@ Dialog {
 
                         Label {
                             text: root.candidate ?
-                                "cx=" + parseFloat(root.candidate.cx).toFixed(3) +
-                                " cy=" + parseFloat(root.candidate.cy).toFixed(3) +
-                                " w=" + parseFloat(root.candidate.w).toFixed(3) +
-                                " h=" + parseFloat(root.candidate.h).toFixed(3) : "N/A"
+                                "cx=" + (parseFloat(root.candidate.cx) || 0).toFixed(3) +
+                                " cy=" + (parseFloat(root.candidate.cy) || 0).toFixed(3) +
+                                " w=" + (parseFloat(root.candidate.w) || 0).toFixed(3) +
+                                " h=" + (parseFloat(root.candidate.h) || 0).toFixed(3) : "N/A"
                             color: "#6c7086"
                             font.pixelSize: 12
                             font.family: "monospace"

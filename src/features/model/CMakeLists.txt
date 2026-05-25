@@ -4,6 +4,7 @@
 qt_add_qml_module(labeltorch_model
     URI LabelTorch.Model
     STATIC
+    RESOURCE_PREFIX /qt/qml
     QML_FILES
         qml/ModelPage.qml
         qml/MetricChart.qml

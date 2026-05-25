@@ -179,7 +179,7 @@ Item {
                             height: 10
                             radius: 5
                             color: {
-                                var conf = parseFloat(model.confidence)
+                                var conf = parseFloat(model.confidence) || 0
                                 if (conf < 0.1) return "#f38ba8"
                                 if (conf < 0.2) return "#fab387"
                                 return "#f9e2af"
@@ -206,18 +206,18 @@ Item {
 
                         // Confidence score
                         Label {
-                            text: "conf: " + parseFloat(model.confidence).toFixed(3)
-                            color: parseFloat(model.confidence) < 0.2 ? "#f38ba8" : "#f9e2af"
+                            text: "conf: " + (parseFloat(model.confidence) || 0).toFixed(3)
+                            color: (parseFloat(model.confidence) || 0) < 0.2 ? "#f38ba8" : "#f9e2af"
                             font.pixelSize: 11
                             font.family: "monospace"
                         }
 
                         // Box coordinates
                         Label {
-                            text: "[" + parseFloat(model.cx).toFixed(2) + ", " +
-                                  parseFloat(model.cy).toFixed(2) + ", " +
-                                  parseFloat(model.w).toFixed(2) + ", " +
-                                  parseFloat(model.h).toFixed(2) + "]"
+                            text: "[" + (parseFloat(model.cx) || 0).toFixed(2) + ", " +
+                                  (parseFloat(model.cy) || 0).toFixed(2) + ", " +
+                                  (parseFloat(model.w) || 0).toFixed(2) + ", " +
+                                  (parseFloat(model.h) || 0).toFixed(2) + "]"
                             color: "#6c7086"
                             font.pixelSize: 10
                             font.family: "monospace"

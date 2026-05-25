@@ -1,6 +1,7 @@
 qt_add_qml_module(labeltorch_dataset
     URI LabelTorch.Dataset
     STATIC
+    RESOURCE_PREFIX /qt/qml
     QML_FILES
         qml/ImportPage.qml
         qml/ClassMappingPage.qml

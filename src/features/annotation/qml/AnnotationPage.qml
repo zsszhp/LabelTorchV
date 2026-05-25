@@ -259,9 +259,10 @@ Item {
                         var className = annotationModel.data(idx, 257) // ClassNameRole
                         var selected = annotationModel.data(idx, 264)  // IsSelectedRole
 
-                        if (cx === undefined || cy === undefined) continue
+                        if (cx === undefined || cy === undefined || w === undefined || h === undefined) continue
 
-                        var color = colors2[classIdx % colors2.length]
+                        var colorIdx = classIdx !== undefined ? classIdx : 0
+                        var color = colors2[colorIdx % colors2.length]
 
                         // Center in canvas coordinates
                         var canvasCx = canvasController.imageToCanvasX(cx)
@@ -364,11 +365,11 @@ Item {
                         if (newZoom < 0.1) newZoom = 0.1
                         if (newZoom > 20) newZoom = 20
 
-                        // Zoom toward mouse position
                         var mx = wheel.x
                         var my = wheel.y
-                        canvasController.panX = mx - (mx - canvasController.panX) * (newZoom / canvasController.zoom)
-                        canvasController.panY = my - (my - canvasController.panY) * (newZoom / canvasController.zoom)
+                        var currentZoom = canvasController.zoom > 0 ? canvasController.zoom : 1.0
+                        canvasController.panX = mx - (mx - canvasController.panX) * (newZoom / currentZoom)
+                        canvasController.panY = my - (my - canvasController.panY) * (newZoom / currentZoom)
                         canvasController.zoom = newZoom
                         annotationCanvas.requestPaint()
                     }
@@ -701,7 +702,7 @@ Item {
                     GridView {
                         id: classGrid
                         Layout.fillWidth: true
-                        implicitHeight: Math.min(cellHeight * Math.ceil(taxonomyModel.rowCount / Math.max(1, Math.floor(width / cellWidth))), 200)
+                        implicitHeight: Math.min(cellHeight * Math.ceil(taxonomyModel.rowCount / Math.max(1, Math.floor((width || 0) / cellWidth) || 1)), 200)
                         cellWidth: 90
                         cellHeight: 36
                         clip: true

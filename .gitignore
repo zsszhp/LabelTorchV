@@ -5,6 +5,8 @@
 .comate
 .monkeycode
 .trae
+.ai_context.md
+.codegraph/
 
 # IDE
 .vs
@@ -119,6 +121,13 @@ deploy/
 # Logs
 *.log
 **/logs/
+log.txt
+stderr.txt
+stdout.txt
+
+# Temporary project files
+1CMakeLists.txt
+TODO/
 
 # Environment and secrets
 **/.env

@@ -2,6 +2,7 @@
 #include "Database.h"
 #include "ipc/IpcClient.h"
 #include "utils/Log.h"
+#include "SnapshotService.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -80,10 +81,19 @@ void TrainingService::handleTrainingEvent(const QVariantMap &event)
                 }
             }
         }
+    } else if (eventType == QStringLiteral("task.stopped")) {
+        updateRunStatus(taskId, QStringLiteral("stopped"));
     } else if (eventType == QStringLiteral("task.failed")) {
         updateRunStatus(taskId, QStringLiteral("failed"));
     } else if (eventType == QStringLiteral("task.started")) {
         updateRunStatus(taskId, QStringLiteral("running"));
+    } else if (eventType == QStringLiteral("task.progress")) {
+        // 训练进度事件，转发给QML层
+        emit trainingProgress(taskId,
+                               payload[QStringLiteral("epoch")].toInt(),
+                               payload[QStringLiteral("total_epochs")].toInt(),
+                               payload[QStringLiteral("loss")].toDouble(),
+                               payload[QStringLiteral("metrics")].toMap());
     }
 }
 
@@ -135,13 +145,31 @@ bool TrainingService::startTraining(const QString &runId)
 
     // Check current status - only draft can transition to running
     QSqlQuery checkQuery(db);
-    checkQuery.prepare("SELECT status FROM training_runs WHERE id = ?");
+    checkQuery.prepare("SELECT status, snapshot_id, project_id FROM training_runs WHERE id = ?");
     checkQuery.addBindValue(runId);
     if (!checkQuery.exec() || !checkQuery.next()) return false;
 
     QString currentStatus = checkQuery.value(0).toString();
     if (currentStatus != "draft") {
         ltWarning(LT_LOG_TRAINING()) << "Cannot start training run in status:" << currentStatus;
+        return false;
+    }
+
+    QString snapshotId = checkQuery.value(1).toString();
+    QString projectId = checkQuery.value(2).toString();
+
+    // Query project root_path
+    QSqlQuery projectQuery(db);
+    projectQuery.prepare("SELECT root_path FROM projects WHERE id = ?");
+    projectQuery.addBindValue(projectId);
+    if (!projectQuery.exec() || !projectQuery.next()) return false;
+    QString projectRoot = projectQuery.value(0).toString();
+
+    // Prepare physical snapshot folders and write data.yaml
+    SnapshotService snapshotService;
+    QString dataYamlPath = snapshotService.prepareSnapshotPhysicalDir(snapshotId);
+    if (dataYamlPath.isEmpty()) {
+        ltError(LT_LOG_TRAINING()) << "Failed to prepare snapshot directories for run:" << runId;
         return false;
     }
 
@@ -180,8 +208,16 @@ bool TrainingService::startTraining(const QString &runId)
             QJsonObject payload;
             payload["run_id"] = runId;
             payload["snapshot_id"] = runQuery.value(0).toString();
-            payload["config"] = QJsonDocument::fromJson(
+            
+            QJsonObject configObj = QJsonDocument::fromJson(
                 runQuery.value(1).toString().toUtf8()).object();
+            
+            // Inject dynamically generated data_yaml and directories
+            configObj["data_yaml"] = dataYamlPath;
+            configObj["project_dir"] = projectRoot + "/models";
+            configObj["run_name"] = runId;
+            
+            payload["config"] = configObj;
             m_ipcClient->sendRequest("train.start", payload);
         }
     }
@@ -365,6 +401,6 @@ QStringList TrainingService::listAdapters()
 {
     ltTrace(LT_LOG_TRAINING());
     QStringList result;
-    result << QStringLiteral("ultralytics");
+    result << QStringLiteral("ultralytics") << QStringLiteral("anomalib");
     return result;
 }

@@ -1,6 +1,7 @@
 qt_add_qml_module(labeltorch_shell
     URI LabelTorch.Shell
     STATIC
+    RESOURCE_PREFIX /qt/qml
     QML_FILES
         qml/Main.qml
         qml/NavTree.qml

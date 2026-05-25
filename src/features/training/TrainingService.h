@@ -82,11 +82,22 @@ public:
 
 signals:
     /**
-     * @brief Emitted when a training run's status changes.
-     * @param runId The run ID.
-     * @param status The new status.
+     * @brief 训练运行状态变更信号
+     * @param runId 运行ID
+     * @param status 新状态
      */
     void runStatusChanged(const QString &runId, const QString &status);
+
+    /**
+     * @brief 训练进度更新信号（每个epoch触发）
+     * @param runId 运行ID
+     * @param epoch 当前epoch
+     * @param totalEpochs 总epoch数
+     * @param loss 当前loss值
+     * @param metrics 当前epoch指标
+     */
+    void trainingProgress(const QString &runId, int epoch, int totalEpochs,
+                           double loss, const QVariantMap &metrics);
 
 private:
     IpcClient *m_ipcClient = nullptr;

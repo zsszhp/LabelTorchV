@@ -12,21 +12,14 @@ logger = logging.getLogger(__name__)
 
 async def handle_run(payload: dict) -> dict:
     """
-    执行模型导出
-
-    payload:
-        artifact_id: 导出产物ID
-        model_version_id: 模型版本ID
-        weight_path: 模型权重文件路径 (best.pt / last.pt)
-        format: 导出格式 (pt / onnx / torchscript / openvino / engine)
-        output_path: 输出路径
-        options: 导出选项 (imgsz, opset, dynamic, simplify, etc.)
+    执行模型导出，根据选定的 adapter 进行动态导出
     """
     artifact_id = payload.get("artifact_id", "")
     weight_path = payload.get("weight_path", "")
     export_format = payload.get("format", "onnx")
     output_path = payload.get("output_path", "")
     options = payload.get("options", {})
+    adapter_name = payload.get("adapter", "ultralytics")
 
     if not weight_path:
         return {"status": "failed", "error": "Missing weight_path"}
@@ -35,39 +28,44 @@ async def handle_run(payload: dict) -> dict:
         return {"status": "failed", "error": f"Weight file not found: {weight_path}"}
 
     try:
-        from ultralytics import YOLO
+        from ..adapters.registry import TrainingAdapterRegistry, register_builtin_adapters
+        register_builtin_adapters()
 
-        model = YOLO(weight_path)
+        adapter_class = TrainingAdapterRegistry.get(adapter_name)
+        if adapter_class is None:
+            return {"status": "failed", "error": f"Unknown adapter: {adapter_name}"}
 
-        loop = asyncio.get_event_loop()
-        export_path = await loop.run_in_executor(
-            None,
-            lambda: model.export(
-                format=export_format,
-                imgsz=options.get("imgsz", 640),
-                opset=options.get("opset", 13),
-                dynamic=options.get("dynamic", True),
-                simplify=options.get("simplify", True),
-                half=options.get("half", False),
-                int8=options.get("int8", False),
-            )
-        )
+        adapter = adapter_class()
+        
+        # 异步调用 adapter 的导出接口
+        result = await adapter.export_model(weight_path, export_format, options)
+        
+        if result.get("status") == "succeeded":
+            export_path_str = result.get("export_path", "")
+            
+            # 若输出路径与导出临时路径不同，拷贝至最终 output_path 目录
+            if output_path and export_path_str and os.path.abspath(export_path_str) != os.path.abspath(output_path):
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                import shutil
+                shutil.copy2(export_path_str, output_path)
+                export_path_str = output_path
+                
+            file_size = os.path.getsize(export_path_str) if os.path.isfile(export_path_str) else 0
+            
+            return {
+                "status": "succeeded",
+                "artifact_id": artifact_id,
+                "export_path": export_path_str,
+                "format": export_format,
+                "file_size_bytes": file_size,
+            }
+        else:
+            return {
+                "status": "failed",
+                "artifact_id": artifact_id,
+                "error": result.get("error", "Export failed"),
+            }
 
-        export_path_str = str(export_path)
-        file_size = os.path.getsize(export_path_str) if os.path.isfile(export_path_str) else 0
-
-        logger.info(f"Export completed: {export_path_str} ({file_size} bytes)")
-
-        return {
-            "status": "succeeded",
-            "artifact_id": artifact_id,
-            "export_path": export_path_str,
-            "format": export_format,
-            "file_size_bytes": file_size,
-        }
-
-    except ImportError:
-        return {"status": "failed", "error": "Ultralytics is not installed"}
     except Exception as e:
         logger.error(f"Export failed: {e}")
         return {"status": "failed", "artifact_id": artifact_id, "error": str(e)}

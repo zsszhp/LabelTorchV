@@ -67,7 +67,7 @@ prepare_package() {
         windows)
             # 复制 Windows 构建产物
             if [ -d "out/build/msvc2022-debug" ]; then
-                cp -R out/build/msvc2022-debug/labeltorch.exe "${data_dir}/" || log_warn "labeltorch.exe 未找到"
+                cp -R out/build/msvc2022-debug/LabelTorchV.exe "${data_dir}/" || log_warn "LabelTorchV.exe 未找到"
                 cp -R out/build/msvc2022-debug/*.dll "${data_dir}/" 2>/dev/null || log_warn "DLL 文件未找到"
                 cp -R out/build/msvc2022-debug/LabelTorch "${data_dir}/" 2>/dev/null || log_warn "QML 模块未找到"
             else
@@ -101,9 +101,9 @@ prepare_package() {
 
         linux)
             # 复制 Linux 构建产物
-            if [ -d "build-linux/src/labeltorch" ]; then
-                cp build-linux/src/labeltorch "${data_dir}/"
-                chmod +x "${data_dir}/labeltorch"
+            if [ -d "build-linux/src/LabelTorchV" ]; then
+                cp build-linux/src/LabelTorchV "${data_dir}/"
+                chmod +x "${data_dir}/LabelTorchV"
             else
                 log_warn "Linux 构建目录未找到"
             fi

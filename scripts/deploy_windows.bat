@@ -18,10 +18,10 @@ if exist %DEPLOY_DIR% rmdir /s /q %DEPLOY_DIR%
 mkdir %DEPLOY_DIR%
 
 REM Copy executable
-copy out\build\msvc2022-release\labeltorch.exe %DEPLOY_DIR%\
+copy out\build\msvc2022-release\LabelTorchV.exe %DEPLOY_DIR%\
 
 REM Run windeployqt
-F:\A\QT\6.11.0\msvc2022_64\bin\windeployqt.exe %DEPLOY_DIR%\labeltorch.exe --release --no-translations --no-opengl-sw
+F:\A\QT\6.11.0\msvc2022_64\bin\windeployqt.exe %DEPLOY_DIR%\LabelTorchV.exe --release --no-translations --no-opengl-sw
 
 REM Copy Python backend
 mkdir %DEPLOY_DIR%\backend

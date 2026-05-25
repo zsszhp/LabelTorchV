@@ -28,10 +28,10 @@ cmake --preset $buildPreset
 cmake --build --preset $buildPreset
 
 Write-Host "[3/6] Copying executable..." -ForegroundColor Yellow
-Copy-Item -Path "$buildDir/labeltorch.exe" -Destination $deployDir
+Copy-Item -Path "$buildDir/LabelTorchV.exe" -Destination $deployDir
 
 Write-Host "[4/6] Running windeployqt..." -ForegroundColor Yellow
-& "$qtPath/bin/windeployqt.exe" "$deployDir/labeltorch.exe" --release --no-translations --no-opengl-sw
+& "$qtPath/bin/windeployqt.exe" "$deployDir/LabelTorchV.exe" --release --no-translations --no-opengl-sw
 
 Write-Host "[5/6] Copying Python environment..." -ForegroundColor Yellow
 $pythonDest = "$deployDir/python"
@@ -52,9 +52,9 @@ $launcherContent = @'
 @echo off
 set PATH=%~dp0;%~dp0python;%~dp0python\Scripts;%PATH%
 set PYTHONPATH=%~dp0backend
-start labeltorch.exe
+start LabelTorchV.exe
 '@
-$launcherContent | Out-File -FilePath "$deployDir/start_labeltorch.bat" -Encoding ASCII
+$launcherContent | Out-File -FilePath "$deployDir/start_LabelTorchV.bat" -Encoding ASCII
 
 # Create README
 $readmeContent = @"
@@ -66,7 +66,7 @@ Features:
 - Train YOLO models
 - Export models (pt/onnx)
 
-Run start_labeltorch.bat to launch
+Run start_LabelTorchV.bat to launch
 "@
 $readmeContent | Out-File -FilePath "$deployDir/README.txt" -Encoding UTF8
 

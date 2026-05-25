@@ -44,6 +44,12 @@ class TrainingAdapterRegistry:
 def register_builtin_adapters():
     """Register all built-in training adapters."""
     from .ultralytics_adapter import UltralyticsAdapter
-    
+
     TrainingAdapterRegistry.register("ultralytics", UltralyticsAdapter)
-    # Additional built-in adapters can be registered here
+
+    # 异常检测适配器（可选依赖，anomalib未安装时跳过）
+    try:
+        from .anomalib_adapter import AnomalibAdapter
+        TrainingAdapterRegistry.register("anomalib", AnomalibAdapter)
+    except ImportError:
+        logger.debug("anomalib not installed, skipping AnomalibAdapter registration")

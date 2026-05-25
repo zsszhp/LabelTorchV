@@ -1,4 +1,4 @@
-// ModelPage.qml - Version Center
+// ModelPage.qml - 版本中心
 import QtQuick
 import QtQuick.Controls
 import LabelTorch.Shell
@@ -22,14 +22,14 @@ Item {
         anchors.margins: 12
         spacing: 8
 
-        // Tab bar
+        // 标签栏
         TabBar {
             id: modelTabBar
             Layout.fillWidth: true
             background: Rectangle { color: "transparent" }
 
             TabButton {
-                text: "Versions"
+                text: "版本列表"
                 font.pixelSize: 13
                 width: implicitWidth + 24
 
@@ -49,7 +49,7 @@ Item {
             }
 
             TabButton {
-                text: "Compare"
+                text: "版本对比"
                 font.pixelSize: 13
                 width: implicitWidth + 24
 
@@ -69,17 +69,17 @@ Item {
             }
         }
 
-        // Stack layout for tab content
+        // 标签页内容堆叠布局
         StackLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: modelTabBar.currentIndex
 
-            // Tab 0: Versions (original content)
+            // 标签页0：版本列表
             RowLayout {
                 spacing: 12
 
-                // Left panel: Version list
+                // 左侧面板：版本列表
                 Rectangle {
                     Layout.preferredWidth: 400
                     Layout.fillHeight: true
@@ -91,12 +91,12 @@ Item {
                         anchors.margins: 12
                         spacing: 8
 
-                        // Header
+                        // 标题栏
                         RowLayout {
                             Layout.fillWidth: true
 
                             Label {
-                                text: "Model Versions"
+                                text: "模型版本"
                                 color: Theme.accentPrimary
                                 font.pixelSize: 16
                                 font.bold: true
@@ -105,13 +105,13 @@ Item {
                             Item { Layout.fillWidth: true }
 
                             Label {
-                                text: modelVersionModel.count + " versions"
+                                text: modelVersionModel.count + " 个版本"
                                 color: Theme.textMuted
                                 font.pixelSize: 12
                             }
 
                             Button {
-                                text: "Refresh"
+                                text: "刷新"
                                 flat: true
                                 palette.buttonText: Theme.accentPrimary
                                 font.pixelSize: 12
@@ -119,7 +119,7 @@ Item {
                             }
                         }
 
-                        // Version list
+                        // 版本列表
                         ListView {
                             id: versionList
                             Layout.fillWidth: true
@@ -131,7 +131,7 @@ Item {
                             Label {
                                 anchors.centerIn: parent
                                 visible: versionList.count === 0
-                                text: "No model versions yet\nComplete a training run to register a version"
+                                text: "暂无模型版本\n完成训练后将自动注册版本"
                                 color: Theme.textMuted
                                 font.pixelSize: 14
                                 horizontalAlignment: Text.AlignHCenter
@@ -268,7 +268,7 @@ Item {
                     }
                 }
 
-                // Right panel: Version details + metrics
+                // 右侧面板：版本详情与指标
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -280,25 +280,25 @@ Item {
                         anchors.margins: 12
                         spacing: 8
 
-                        // Empty state label
+                        // 空状态提示
                         Label {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             visible: selectedVersionId === ""
-                            text: "Select a model version to view details"
+                            text: "选择一个模型版本查看详情"
                             color: Theme.textMuted
                             font.pixelSize: 14
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
 
-                        // Version details header
+                        // 版本详情标题
                         RowLayout {
                             Layout.fillWidth: true
                             visible: selectedVersionId !== ""
 
                             Label {
-                                text: "Version Details"
+                                text: "版本详情"
                                 color: Theme.accentPrimary
                                 font.pixelSize: 16
                                 font.bold: true
@@ -308,7 +308,7 @@ Item {
 
                             Button {
                                 visible: selectedVersionId !== ""
-                                text: "Delete"
+                                text: "删除"
                                 flat: true
                                 palette.buttonText: Theme.accentError
                                 font.pixelSize: 12
@@ -323,7 +323,7 @@ Item {
                             }
                         }
 
-                        // Version info
+                        // 版本信息
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 120
@@ -350,7 +350,7 @@ Item {
                                 }
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Label { text: "Run ID:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
+                                    Label { text: "运行ID:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: selectedVersion ? selectedVersion.runId || "N/A" : "N/A"
                                         color: Theme.textPrimary
@@ -362,7 +362,7 @@ Item {
                                 }
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Label { text: "Best Weights:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
+                                    Label { text: "最佳权重:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: selectedVersion ? selectedVersion.bestWeightPath || "N/A" : "N/A"
                                         color: Theme.accentSuccess
@@ -374,7 +374,7 @@ Item {
                                 }
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Label { text: "Last Weights:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
+                                    Label { text: "最新权重:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: selectedVersion ? selectedVersion.lastWeightPath || "N/A" : "N/A"
                                         color: Theme.textSecondary
@@ -386,12 +386,12 @@ Item {
                                 }
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Label { text: "Parent:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
+                                    Label { text: "父版本:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: {
-                                            if (!selectedVersion) return "None"
+                                            if (!selectedVersion) return "无"
                                             var pv = selectedVersion.parentVersionId
-                                            if (!pv || pv === "") return "None"
+                                            if (!pv || pv === "") return "无"
                                             return pv.substring(0, 8) + "..."
                                         }
                                         color: Theme.accentPrimary
@@ -402,20 +402,20 @@ Item {
                             }
                         }
 
-                        // Tag management
+                        // 标签管理
                         RowLayout {
                             Layout.fillWidth: true
                             visible: selectedVersionId !== ""
                             spacing: 8
 
                             Label {
-                                text: "Tags:"
+                                text: "标签:"
                                 color: Theme.textPrimary
                                 font.pixelSize: 13
                             }
 
                             Button {
-                                text: "Baseline"
+                                text: "基线"
                                 flat: true
                                 palette.buttonText: Theme.accentPrimary
                                 font.pixelSize: 11
@@ -428,7 +428,7 @@ Item {
                             }
 
                             Button {
-                                text: "Best-so-far"
+                                text: "最佳"
                                 flat: true
                                 palette.buttonText: Theme.accentSuccess
                                 font.pixelSize: 11
@@ -441,7 +441,7 @@ Item {
                             }
 
                             Button {
-                                text: "Production"
+                                text: "生产"
                                 flat: true
                                 palette.buttonText: Theme.accentWarning
                                 font.pixelSize: 11
@@ -456,7 +456,7 @@ Item {
                             Item { Layout.fillWidth: true }
 
                             Button {
-                                text: "Clear Tags"
+                                text: "清除标签"
                                 flat: true
                                 palette.buttonText: Theme.accentError
                                 font.pixelSize: 11
@@ -471,7 +471,7 @@ Item {
                             }
                         }
 
-                        // Lineage chain visualization
+                        // 版本谱系可视化
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: lineageContent.height + 16
@@ -488,7 +488,7 @@ Item {
                                 spacing: 4
 
                                 Label {
-                                    text: "Version Lineage"
+                                    text: "版本谱系"
                                     color: Theme.accentPrimary
                                     font.pixelSize: 12
                                     font.bold: true
@@ -525,14 +525,14 @@ Item {
                                             }
                                             depth++
                                         }
-                                        if (chain.length <= 1) return "No parent (root version)"
+                                        if (chain.length <= 1) return "无父版本（根版本）"
                                         return chain.reverse().join(" -> ")
                                     }
                                 }
                             }
                         }
 
-                        // Metrics display
+                        // 指标展示
                         MetricChart {
                             id: metricChart
                             Layout.fillWidth: true
@@ -543,7 +543,7 @@ Item {
                 }
             }
 
-            // Tab 1: Compare
+            // 标签页1：版本对比
             ComparePage {
                 currentProjectId: root.currentProjectId
             }

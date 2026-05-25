@@ -5,6 +5,7 @@
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QJsonObject>
 
 class IpcClient;
 
@@ -83,6 +84,9 @@ signals:
      * @param status The new status.
      */
     void exportStatusChanged(const QString &artifactId, const QString &status);
+
+private slots:
+    void handleIpcResponse(const QJsonObject &response);
 
 private:
     IpcClient *m_ipcClient = nullptr;

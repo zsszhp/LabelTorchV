@@ -85,7 +85,7 @@ Item {
                             Label {
                                 text: {
                                     var val = modelData.value
-                                    if (typeof val === 'number') {
+                                    if (typeof val === 'number' && isFinite(val)) {
                                         return val.toFixed(4)
                                     }
                                     return String(val)

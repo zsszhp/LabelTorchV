@@ -26,15 +26,19 @@ Item {
         switch (taskType) {
             case "detect":
                 configPanel.modelFamily = "yolov8"
+                configPanel.adapter = "ultralytics"
                 break
             case "obb":
                 configPanel.modelFamily = "yolov8_obb"
+                configPanel.adapter = "ultralytics"
                 break
             case "classify":
                 configPanel.modelFamily = "yolov8_cls"
+                configPanel.adapter = "ultralytics"
                 break
             case "anomaly":
                 configPanel.modelFamily = "anomaly"
+                configPanel.adapter = "anomalib"
                 break
         }
     }
@@ -71,21 +75,21 @@ Item {
                 anchors.margins: 12
                 spacing: 8
 
-                // Section title
+                // 区域标题
                 Label {
-                    text: "New Training Run"
+                    text: "新建训练任务"
                     color: Theme.accentPrimary
                     font.pixelSize: 16
                     font.bold: true
                 }
 
-                // Dataset snapshot selector
+                // 数据快照选择器
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
 
                     Label {
-                        text: "Snapshot:"
+                        text: "数据快照:"
                         color: Theme.textPrimary
                         font.pixelSize: 13
                         Layout.preferredWidth: 72
@@ -100,7 +104,7 @@ Item {
                         displayText: currentIndex >= 0 ?
                             snapshotModel.data(snapshotModel.index(currentIndex, 0), 257) ?
                             snapshotModel.data(snapshotModel.index(currentIndex, 0), 257).substring(0, 8) + "..." :
-                            "Select snapshot" : "Select snapshot"
+                            "选择数据快照" : "选择数据快照"
 
                         contentItem: Label {
                             text: snapshotCombo.displayText
@@ -140,7 +144,7 @@ Item {
                         delegate: ItemDelegate {
                             width: snapshotCombo.width
                             contentItem: Label {
-                                text: model.snapshotId.substring(0, 8) + "... (" + model.sampleCount + " samples, train:" + model.trainCount + " val:" + model.valCount + ")"
+                                text: model.snapshotId.substring(0, 8) + "... (" + model.sampleCount + " 样本, train:" + model.trainCount + " val:" + model.valCount + ")"
                                 color: highlighted ? Theme.accentPrimary : Theme.textPrimary
                                 font.pixelSize: 12
                                 font.family: "monospace"
@@ -178,13 +182,13 @@ Item {
                     }
                 }
 
-                // Adapter selector
+                // 适配器选择器
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
 
                     Label {
-                        text: "Adapter:"
+                        text: "训练适配器:"
                         color: Theme.textPrimary
                         font.pixelSize: 13
                         Layout.preferredWidth: 72
@@ -196,7 +200,7 @@ Item {
                         model: trainingService.listAdapters()
                         currentIndex: {
                             var adapters = trainingService.listAdapters()
-                            var idx = adapters.indexOf("ultralytics")
+                            var idx = adapters.indexOf(configPanel.adapter)
                             return idx >= 0 ? idx : 0
                         }
 
@@ -262,26 +266,26 @@ Item {
                     Layout.fillHeight: true
                 }
 
-                // OBB task type indicator
+                // OBB任务类型指示器
                 Label {
                     id: taskTypeIndicator
                     Layout.fillWidth: true
                     visible: configPanel.modelFamily === "yolov8_obb"
-                    text: "[OBB] Oriented Bounding Box training mode"
+                    text: "[OBB] 旋转边界框训练模式"
                     color: Theme.accentWarning
                     font.pixelSize: 11
                     font.bold: true
                     wrapMode: Text.WordWrap
                 }
 
-                // Action buttons
+                // 操作按钮
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
 
                     Button {
                         id: startBtn
-                        text: "Start Training"
+                        text: "开始训练"
                         highlighted: true
                         enabled: snapshotCombo.currentIndex >= 0 && currentRunStatus !== "running"
                         Layout.fillWidth: true
@@ -310,7 +314,7 @@ Item {
                             if (runId !== "") {
                                 currentRunId = runId
                                 currentRunStatus = "draft"
-                                statusLabel.text = "Run created: " + runId.substring(0, 8) + "..."
+                                statusLabel.text = "训练任务已创建:" + runId.substring(0, 8) + "..."
                                 statusLabel.color = Theme.accentSuccess
                                 logView.clear()
                                 logView.appendLog("[LabelTorch] Training run created: " + runId)
@@ -318,14 +322,14 @@ Item {
                                 if (trainingService.startTraining(runId)) {
                                     currentRunStatus = "running"
                                     trainingModel.refresh()
-                                    statusLabel.text = "Training started: " + runId.substring(0, 8) + "..."
+                                    statusLabel.text = "训练已启动:" + runId.substring(0, 8) + "..."
                                 } else {
-                                    statusLabel.text = "Failed to start training"
+                                    statusLabel.text = "训练启动失败"
                                     statusLabel.color = Theme.accentError
                                     logView.appendLog("[LabelTorch] ERROR: Failed to start training")
                                 }
                             } else {
-                                statusLabel.text = "Failed to create training run"
+                                statusLabel.text = "创建训练任务失败"
                                 statusLabel.color = Theme.accentError
                             }
                         }
@@ -333,7 +337,7 @@ Item {
 
                     Button {
                         id: stopBtn
-                        text: "Stop"
+                        text: "停止"
                         enabled: currentRunStatus === "running"
                         Layout.preferredWidth: 80
 
@@ -362,7 +366,7 @@ Item {
                     }
                 }
 
-                // Status label
+                // 状态标签
                 Label {
                     id: statusLabel
                     Layout.fillWidth: true
@@ -374,7 +378,7 @@ Item {
             }
         }
 
-        // Right panel: Log viewer + Run history
+        // 右侧面板：日志查看器 + 运行历史
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -386,7 +390,7 @@ Item {
                 anchors.margins: 12
                 spacing: 8
 
-                // Tab bar for Log / History
+                // 日志/历史选项卡
                 TabBar {
                     id: rightTabs
                     Layout.fillWidth: true
@@ -394,7 +398,7 @@ Item {
                     background: Rectangle { color: "transparent" }
 
                     TabButton {
-                        text: "Training Log"
+                        text: "训练日志"
                         font.pixelSize: 13
 
                         contentItem: Label {
@@ -412,7 +416,7 @@ Item {
                     }
 
                     TabButton {
-                        text: "Run History"
+                        text: "运行历史"
                         font.pixelSize: 13
 
                         contentItem: Label {
@@ -430,18 +434,18 @@ Item {
                     }
                 }
 
-                // Stack layout
+                // 堆叠布局
                 StackLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     currentIndex: rightTabs.currentIndex
 
-                    // Tab 0: Log viewer
+                    // 选项卡0：日志查看器
                     LogView {
                         id: logView
                     }
 
-                    // Tab 1: Run history
+                    // 选项卡1：运行历史
                     ListView {
                         id: runHistoryList
                         clip: true
@@ -451,7 +455,7 @@ Item {
                         Label {
                             anchors.centerIn: parent
                             visible: runHistoryList.count === 0
-                            text: "No training runs yet"
+                            text: "暂无训练记录"
                             color: Theme.textMuted
                             font.pixelSize: 14
                         }
@@ -470,7 +474,7 @@ Item {
                                 anchors.rightMargin: 12
                                 spacing: 12
 
-                                // Status indicator dot
+                                // 状态指示圆点
                                 Rectangle {
                                     width: 10
                                     height: 10
@@ -487,7 +491,7 @@ Item {
                                     }
                                 }
 
-                                // Run ID
+                                // 运行ID
                                 Label {
                                     text: model.runId.substring(0, 8) + "..."
                                     color: Theme.accentPrimary
@@ -496,7 +500,7 @@ Item {
                                     Layout.preferredWidth: 80
                                 }
 
-                                // Status badge
+                                // 状态徽章
                                 Rectangle {
                                     Layout.preferredHeight: 22
                                     Layout.preferredWidth: statusBadgeText.implicitWidth + 16
@@ -542,20 +546,20 @@ Item {
                                     }
                                 }
 
-                                // Snapshot ID
+                                // 快照ID
                                 Label {
-                                    text: "Snapshot: " + model.snapshotId.substring(0, 8) + "..."
+                                    text: "数据快照: " + model.snapshotId.substring(0, 8) + "..."
                                     color: Theme.textSecondary
                                     font.pixelSize: 12
                                 }
 
-                                // Time info
+                                // 时间信息
                                 Label {
                                     text: {
                                         if (model.startedAt && model.startedAt !== "") {
                                             return model.startedAt
                                         }
-                                        return "Not started"
+                                        return "未开始"
                                     }
                                     color: Theme.textMuted
                                     font.pixelSize: 11
@@ -563,9 +567,9 @@ Item {
 
                                 Item { Layout.fillWidth: true }
 
-                                // Delete button (only for draft/cancelled/failed)
+                                // 删除按钮（仅草稿/已取消/失败状态可用）
                                 Button {
-                                    text: "Delete"
+                                    text: "删除"
                                     flat: true
                                     visible: model.status === "draft" || model.status === "cancelled" || model.status === "failed"
                                     palette.buttonText: Theme.accentError

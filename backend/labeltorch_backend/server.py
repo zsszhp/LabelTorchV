@@ -21,15 +21,17 @@ export = None
 
 def _import_handlers():
     """延迟导入处理器模块"""
-    global environment, training, inference, export
+    global environment, training, inference, export, anomaly
     from .handlers import environment as env_module
     from .handlers import training as train_module
     from .handlers import inference as inf_module
     from .handlers import export as exp_module
+    from .handlers import anomaly as anomaly_module
     environment = env_module
     training = train_module
     inference = inf_module
     export = exp_module
+    anomaly = anomaly_module
 
 
 class IpcServer:
@@ -47,6 +49,7 @@ class IpcServer:
             "inference.run": inference.handle_run,
             "export.run": export.handle_run,
             "artifact.verify": export.handle_verify,
+            "anomaly.infer": anomaly.handle_infer,
             "shutdown": self._handle_shutdown,
         }
         self.running = True

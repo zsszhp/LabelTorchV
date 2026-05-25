@@ -28,6 +28,7 @@
         {
             "name": "msvc2022-debug",
             "displayName": "MSVC 2022 Debug",
+            "description": "使用MSVC 2022 v145工具集(14.51) + Ninja的Debug构建",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/out/build/msvc2022-debug",
             "cacheVariables": {
@@ -44,6 +45,7 @@
         {
             "name": "msvc2022-release",
             "displayName": "MSVC 2022 Release",
+            "description": "使用MSVC 2022 v145工具集(14.51) + Ninja的Release构建",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/out/build/msvc2022-release",
             "cacheVariables": {
@@ -59,14 +61,6 @@
         }
     ],
     "buildPresets": [
-        {
-            "name": "mingw-debug",
-            "configurePreset": "mingw-debug"
-        },
-        {
-            "name": "mingw-release",
-            "configurePreset": "mingw-release"
-        },
         {
             "name": "msvc2022-debug",
             "configurePreset": "msvc2022-debug"

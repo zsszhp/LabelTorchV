@@ -29,6 +29,27 @@ async def handle_start(payload: dict) -> dict:
                 "error": f"Unknown adapter: {adapter_name}. Available: {TrainingAdapterRegistry.list_adapters()}"}
 
     adapter = adapter_class()
+
+    # 设置epoch回调，通过IPC推送进度事件
+    server = get_server()
+    def on_epoch_end(epoch_data: dict):
+        """每个epoch结束时通过IPC推送进度"""
+        try:
+            server.send_event("task.progress", task_id, {
+                "task_id": task_id,
+                "epoch": epoch_data.get("epoch", 0),
+                "total_epochs": epoch_data.get("total_epochs", 0),
+                "loss": epoch_data.get("loss", 0),
+                "mAP50": epoch_data.get("mAP50(B)", epoch_data.get("mAP50", 0)),
+                "mAP50-95": epoch_data.get("mAP50-95(B)", epoch_data.get("mAP50-95", 0)),
+                "precision": epoch_data.get("precision(B)", epoch_data.get("precision", 0)),
+                "recall": epoch_data.get("recall(B)", epoch_data.get("recall", 0)),
+            })
+        except Exception as e:
+            logger.warning(f"Failed to send epoch event: {e}")
+
+    adapter._on_epoch_end = on_epoch_end
+
     _active_tasks[task_id] = adapter
 
     asyncio.create_task(_run_training(task_id, adapter, config))
@@ -49,7 +70,8 @@ async def _run_training(task_id: str, adapter, config: dict):
         result = await adapter.start_training(config)
 
         if result.get("status") == "succeeded":
-            run_dir = config.get("run_dir", "")
+            # 优先使用adapter返回的run_dir，否则从config获取
+            run_dir = result.get("run_dir", "") or config.get("run_dir", "")
             best_weight = _find_best_weight(run_dir)
             last_weight = _find_last_weight(run_dir)
             metrics = await adapter.collect_metrics(run_dir) if run_dir else {}
@@ -62,6 +84,18 @@ async def _run_training(task_id: str, adapter, config: dict):
                 "last_weight_path": last_weight,
                 "run_dir": run_dir,
                 "metrics": metrics.get("metrics", {}),
+            })
+        elif result.get("status") == "stopped":
+            # 用户手动停止训练
+            run_dir = result.get("run_dir", "") or config.get("run_dir", "")
+            best_weight = _find_best_weight(run_dir)
+            last_weight = _find_last_weight(run_dir)
+
+            server.send_event("task.stopped", task_id, {
+                "task_id": task_id,
+                "best_weight_path": best_weight,
+                "last_weight_path": last_weight,
+                "run_dir": run_dir,
             })
         else:
             server.send_event("task.failed", task_id, {
@@ -80,19 +114,39 @@ async def _run_training(task_id: str, adapter, config: dict):
 
 
 def _find_best_weight(run_dir: str) -> str:
-    """查找训练产出的best.pt"""
+    """查找训练产出的最佳权重文件（支持 YOLO best.pt 和 anomalib .ckpt）"""
     if not run_dir:
         return ""
+    # YOLO 格式: weights/best.pt
     best_path = os.path.join(run_dir, "weights", "best.pt")
-    return best_path if os.path.isfile(best_path) else ""
+    if os.path.isfile(best_path):
+        return best_path
+    # anomalib 格式: 递归查找包含 "best" 的 .ckpt 文件
+    import glob
+    ckpt_files = glob.glob(os.path.join(run_dir, "**", "*best*.ckpt"), recursive=True)
+    if ckpt_files:
+        return ckpt_files[0]
+    # 兜底：查找任意 .ckpt 文件
+    ckpt_files = glob.glob(os.path.join(run_dir, "**", "*.ckpt"), recursive=True)
+    if ckpt_files:
+        return ckpt_files[-1]
+    return ""
 
 
 def _find_last_weight(run_dir: str) -> str:
-    """查找训练产出的last.pt"""
+    """查找训练产出的最新权重文件（支持 YOLO last.pt 和 anomalib .ckpt）"""
     if not run_dir:
         return ""
+    # YOLO 格式: weights/last.pt
     last_path = os.path.join(run_dir, "weights", "last.pt")
-    return last_path if os.path.isfile(last_path) else ""
+    if os.path.isfile(last_path):
+        return last_path
+    # anomalib 格式: 递归查找包含 "last" 的 .ckpt 文件
+    import glob
+    ckpt_files = glob.glob(os.path.join(run_dir, "**", "*last*.ckpt"), recursive=True)
+    if ckpt_files:
+        return ckpt_files[0]
+    return ""
 
 
 async def handle_stop(payload: dict) -> dict:

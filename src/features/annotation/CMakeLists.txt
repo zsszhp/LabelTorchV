@@ -4,6 +4,7 @@
 qt_add_qml_module(labeltorch_annotation
     URI LabelTorch.Annotation
     STATIC
+    RESOURCE_PREFIX /qt/qml
     QML_FILES
         qml/AnnotationPage.qml
         qml/AnnotCanvas.qml

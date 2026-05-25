@@ -63,7 +63,7 @@ Item {
                 }
 
                 valueFromText: function(text) {
-                    return Math.round(parseFloat(text) * 100)
+                    return Math.round(parseFloat(text) * 100) || 80
                 }
             }
 

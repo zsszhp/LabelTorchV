@@ -1,4 +1,4 @@
-// ImportPage.qml - YOLO txt 数据导入页面
+// ImportPage.qml - 数据导入页面（支持 YOLO txt 和 COCO JSON 格式）
 import QtQuick
 import QtQuick.Controls
 import LabelTorch.Shell
@@ -45,7 +45,7 @@ Item {
         Rectangle {
             visible: appController.projectOpen
             Layout.fillWidth: true
-            Layout.preferredHeight: 280
+            Layout.preferredHeight: 340
             color: Theme.bgCard
             radius: 8
 
@@ -54,18 +54,73 @@ Item {
                 anchors.margins: 16
                 spacing: 12
 
-                Label {
-                    text: "YOLO txt 格式导入"
-                    font.pixelSize: 16
-                    font.bold: true
-                    color: Theme.textPrimary
+                // 格式选择
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    Label { text: "标签格式"; color: Theme.textPrimary; font.pixelSize: 13; Layout.preferredWidth: 80 }
+                    ComboBox {
+                        id: formatCombo
+                        model: ["YOLO TXT", "COCO JSON"]
+                        currentIndex: 0
+                        Layout.fillWidth: true
+
+                        contentItem: Label {
+                            text: formatCombo.displayText
+                            color: Theme.textPrimary
+                            font.pixelSize: 13
+                            verticalAlignment: Text.AlignVCenter
+                            leftPadding: 8
+                        }
+
+                        background: Rectangle {
+                            color: Theme.bgInput
+                            radius: 4
+                            border.color: formatCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                            border.width: 1
+                        }
+
+                        popup: Popup {
+                            y: formatCombo.height
+                            width: formatCombo.width
+                            implicitHeight: contentItem.implicitHeight
+                            padding: 1
+
+                            contentItem: ListView {
+                                clip: true
+                                implicitHeight: contentHeight
+                                model: formatCombo.popup.visible ? formatCombo.delegateModel : null
+                                currentIndex: formatCombo.highlightedIndex
+                            }
+
+                            background: Rectangle {
+                                color: Theme.bgPrimary
+                                border.color: Theme.borderNormal
+                                radius: 4
+                            }
+                        }
+
+                        delegate: ItemDelegate {
+                            width: formatCombo.width
+                            contentItem: Label {
+                                text: modelData
+                                color: highlighted ? Theme.accentPrimary : Theme.textPrimary
+                                font.pixelSize: 13
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            highlighted: formatCombo.highlightedIndex === index
+                            background: Rectangle {
+                                color: highlighted ? Theme.bgInput : Theme.bgPrimary
+                            }
+                        }
+                    }
                 }
 
                 // 数据集名称
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
-                    Label { text: "数据集名称"; color: Theme.textPrimary; Layout.preferredWidth: 80 }
+                    Label { text: "数据集名称"; color: Theme.textPrimary; font.pixelSize: 13; Layout.preferredWidth: 80 }
                     TextField {
                         id: datasetNameField
                         Layout.fillWidth: true
@@ -79,7 +134,7 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
-                    Label { text: "图片目录"; color: Theme.textPrimary; Layout.preferredWidth: 80 }
+                    Label { text: "图片目录"; color: Theme.textPrimary; font.pixelSize: 13; Layout.preferredWidth: 80 }
                     TextField {
                         id: imageDirField
                         Layout.fillWidth: true
@@ -93,11 +148,12 @@ Item {
                     }
                 }
 
-                // 标签目录
+                // 标签目录（YOLO TXT 模式）
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
-                    Label { text: "标签目录"; color: Theme.textPrimary; Layout.preferredWidth: 80 }
+                    visible: formatCombo.currentIndex === 0
+                    Label { text: "标签目录"; color: Theme.textPrimary; font.pixelSize: 13; Layout.preferredWidth: 80 }
                     TextField {
                         id: labelDirField
                         Layout.fillWidth: true
@@ -111,23 +167,60 @@ Item {
                     }
                 }
 
+                // JSON 标签文件（COCO JSON 模式）
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    visible: formatCombo.currentIndex === 1
+                    Label { text: "JSON文件"; color: Theme.textPrimary; font.pixelSize: 13; Layout.preferredWidth: 80 }
+                    TextField {
+                        id: jsonLabelField
+                        Layout.fillWidth: true
+                        placeholderText: "选择 COCO JSON 标签文件"
+                        color: Theme.textPrimary
+                        background: Rectangle { color: Theme.bgInput; radius: 4; border.color: jsonLabelField.activeFocus ? Theme.accentPrimary : Theme.borderNormal; border.width: 1 }
+                    }
+                    Button {
+                        text: "浏览"
+                        onClicked: jsonFileDialog.open()
+                    }
+                }
+
                 // 导入按钮
                 Button {
                     text: "开始导入"
                     highlighted: true
-                    enabled: datasetNameField.text.trim() && imageDirField.text.trim() && labelDirField.text.trim()
+                    enabled: {
+                        if (!datasetNameField.text.trim() || !imageDirField.text.trim()) return false
+                        if (formatCombo.currentIndex === 0 && !labelDirField.text.trim()) return false
+                        if (formatCombo.currentIndex === 1 && !jsonLabelField.text.trim()) return false
+                        return true
+                    }
                     onClicked: {
-                        var dsId = datasetService.importDataset(
-                            appController.currentProjectId,
-                            datasetNameField.text.trim(),
-                            imageDirField.text.trim(),
-                            labelDirField.text.trim()
-                        )
+                        var dsId = ""
+                        if (formatCombo.currentIndex === 0) {
+                            // YOLO TXT 格式
+                            dsId = datasetService.importDataset(
+                                appController.currentProjectId,
+                                datasetNameField.text.trim(),
+                                imageDirField.text.trim(),
+                                labelDirField.text.trim()
+                            )
+                        } else {
+                            // COCO JSON 格式
+                            dsId = datasetService.importDatasetJson(
+                                appController.currentProjectId,
+                                datasetNameField.text.trim(),
+                                imageDirField.text.trim(),
+                                jsonLabelField.text.trim()
+                            )
+                        }
                         if (dsId) {
                             datasetModel.refresh()
                             datasetNameField.clear()
                             imageDirField.clear()
                             labelDirField.clear()
+                            jsonLabelField.clear()
                         }
                     }
                 }
@@ -189,13 +282,38 @@ Item {
         }
     }
 
+    // 图片目录选择对话框
     FolderDialog {
         id: imageFolderDialog
-        onSelectedFolderChanged: imageDirField.text = selectedFolder
+        onAccepted: {
+            var path = selectedFolder.toString()
+            if (path.startsWith("file:///")) path = path.substring(8)
+            else if (path.startsWith("file://")) path = path.substring(7)
+            imageDirField.text = decodeURIComponent(path)
+        }
     }
 
+    // 标签目录选择对话框（YOLO TXT 模式）
     FolderDialog {
         id: labelFolderDialog
-        onSelectedFolderChanged: labelDirField.text = selectedFolder
+        onAccepted: {
+            var path = selectedFolder.toString()
+            if (path.startsWith("file:///")) path = path.substring(8)
+            else if (path.startsWith("file://")) path = path.substring(7)
+            labelDirField.text = decodeURIComponent(path)
+        }
+    }
+
+    // JSON 标签文件选择对话框（COCO JSON 模式）
+    FileDialog {
+        id: jsonFileDialog
+        title: "选择 COCO JSON 标签文件"
+        nameFilters: ["JSON 文件 (*.json)", "所有文件 (*)"]
+        onAccepted: {
+            var path = selectedFile.toString()
+            if (path.startsWith("file:///")) path = path.substring(8)
+            else if (path.startsWith("file://")) path = path.substring(7)
+            jsonLabelField.text = decodeURIComponent(path)
+        }
     }
 }

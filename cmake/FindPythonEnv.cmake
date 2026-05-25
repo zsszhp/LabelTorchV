@@ -1,7 +1,7 @@
 # FindPythonEnv.cmake
 # 查找 labeltorch conda 环境中的 Python 解释器
 
-set(LABELTORCH_PYTHON_ENV "F:/A/anaconda/envs/labeltorch")
+set(LABELTORCH_PYTHON_ENV "C:/A/anaconda/envs/labeltorch")
 
 find_program(LABELTORCH_PYTHON_EXECUTABLE
     NAMES python python3

@@ -17,23 +17,23 @@ Component.prototype.createOperations = function()
     // 添加桌面快捷方式（Windows）
     if (systemInfo.productType === "windows") {
         component.addOperation("CreateShortcut",
-            "@TargetDir@/labeltorch.exe",
+            "@TargetDir@/LabelTorchV.exe",
             "@DesktopDir@/标炬.lnk",
             "workingDirectory=@TargetDir@",
-            "iconPath=@TargetDir@/labeltorch.exe",
+            "iconPath=@TargetDir@/LabelTorchV.exe",
             "description=标炬工业缺陷检测软件");
 
         // 添加开始菜单快捷方式
         component.addOperation("CreateShortcut",
-            "@TargetDir@/labeltorch.exe",
+            "@TargetDir@/LabelTorchV.exe",
             "@StartMenuDir@/标炬/标炬.lnk",
             "workingDirectory=@TargetDir@",
-            "iconPath=@TargetDir@/labeltorch.exe",
+            "iconPath=@TargetDir@/LabelTorchV.exe",
             "description=标炬工业缺陷检测软件");
 
         // 创建启动脚本
         component.addOperation("CreateShortcut",
-            "@TargetDir@/labeltorch.exe",
+            "@TargetDir@/LabelTorchV.exe",
             "@TargetDir@/启动标炬.bat",
             "workingDirectory=@TargetDir@");
     }
@@ -49,7 +49,7 @@ Component.prototype.createOperations = function()
     // Linux
     if (systemInfo.productType === "linux") {
         component.addOperation("CreateShortcut",
-            "@TargetDir@/labeltorch",
+            "@TargetDir@/LabelTorchV",
             "@HomeDir@/Desktop/标炬",
             "workingDirectory=@TargetDir@",
             "iconPath=@TargetDir@/labeltorch.svg");

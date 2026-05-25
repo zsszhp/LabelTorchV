@@ -18,14 +18,14 @@ REM Move deployed files
 move deploy\LabelTorch\* %DEPLOY_DIR%\
 
 REM Create launcher script
-echo @echo off > %DEPLOY_DIR%\start_labeltorch.bat
-echo start labeltorch.exe >> %DEPLOY_DIR%\start_labeltorch.bat
+echo @echo off > %DEPLOY_DIR%\start_LabelTorchV.bat
+echo start LabelTorchV.exe >> %DEPLOY_DIR%\start_LabelTorchV.bat
 
 REM Create README
 echo LabelTorch v1.0.0 (CPU) > %DEPLOY_DIR%\README.txt
 echo Industrial Defect Detection Software >> %DEPLOY_DIR%\README.txt
 echo. >> %DEPLOY_DIR%\README.txt
-echo Run start_labeltorch.bat to launch >> %DEPLOY_DIR%\README.txt
+echo Run start_LabelTorchV.bat to launch >> %DEPLOY_DIR%\README.txt
 
 REM Create zip archive
 cd deploy

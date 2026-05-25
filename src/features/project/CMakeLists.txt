@@ -4,6 +4,7 @@
 qt_add_qml_module(labeltorch_project
     URI LabelTorch.Project
     STATIC
+    RESOURCE_PREFIX /qt/qml
     QML_FILES
         qml/ProjectPage.qml
         qml/ProjectCard.qml

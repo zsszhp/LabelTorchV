@@ -13,6 +13,9 @@
 #include <QDateTime>
 #include <QFile>
 #include <QTextStream>
+#include <QDir>
+#include <QFileInfo>
+#include <random>
 
 SnapshotService::SnapshotService(QObject *parent) : QObject(parent)
 {
@@ -379,4 +382,161 @@ bool SnapshotService::isOBBDataset(const QString &datasetId)
                               << "result:" << isOBB;
 
     return isOBB;
+}
+
+QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
+{
+    ltInfo(LT_LOG_TRAINING()) << "Preparing snapshot physical directory for" << snapshotId;
+    auto db = Database::instance().database();
+    if (!db.isOpen()) {
+        ltError(LT_LOG_TRAINING()) << "Database not open";
+        return {};
+    }
+
+    // 1. Get snapshot details
+    QSqlQuery snapQuery(db);
+    snapQuery.prepare("SELECT dataset_id, split_manifest_json, taxonomy_version FROM dataset_snapshots WHERE id = ?");
+    snapQuery.addBindValue(snapshotId);
+    if (!snapQuery.exec() || !snapQuery.next()) {
+        ltError(LT_LOG_TRAINING()) << "Snapshot not found in database:" << snapshotId;
+        return {};
+    }
+
+    QString datasetId = snapQuery.value(0).toString();
+    QString splitManifestJson = snapQuery.value(1).toString();
+    QString taxonomyVersion = snapQuery.value(2).toString();
+
+    // 2. Get project root path
+    QSqlQuery datasetQuery(db);
+    datasetQuery.prepare("SELECT project_id FROM datasets WHERE id = ?");
+    datasetQuery.addBindValue(datasetId);
+    if (!datasetQuery.exec() || !datasetQuery.next()) {
+        ltError(LT_LOG_TRAINING()) << "Dataset not found for snapshot:" << datasetId;
+        return {};
+    }
+    QString projectId = datasetQuery.value(0).toString();
+
+    QSqlQuery projectQuery(db);
+    projectQuery.prepare("SELECT root_path FROM projects WHERE id = ?");
+    projectQuery.addBindValue(projectId);
+    if (!projectQuery.exec() || !projectQuery.next()) {
+        ltError(LT_LOG_TRAINING()) << "Project not found for dataset:" << projectId;
+        return {};
+    }
+    QString projectRoot = projectQuery.value(0).toString();
+
+    // 3. Define target snapshot directory
+    QString cacheDir = projectRoot + QStringLiteral("/cache/snapshots");
+    QString snapshotDir = cacheDir + QStringLiteral("/") + snapshotId;
+
+    QDir dir;
+    if (!dir.mkpath(snapshotDir + QStringLiteral("/images/train")) ||
+        !dir.mkpath(snapshotDir + QStringLiteral("/images/val")) ||
+        !dir.mkpath(snapshotDir + QStringLiteral("/labels/train")) ||
+        !dir.mkpath(snapshotDir + QStringLiteral("/labels/val"))) {
+        ltError(LT_LOG_TRAINING()) << "Failed to create physical folders for snapshot:" << snapshotDir;
+        return {};
+    }
+
+    // 4. Parse split manifest
+    QJsonParseError parseError;
+    QJsonDocument splitDoc = QJsonDocument::fromJson(splitManifestJson.toUtf8(), &parseError);
+    if (parseError.error != QJsonParseError::NoError) {
+        ltError(LT_LOG_TRAINING()) << "Failed to parse split manifest JSON:" << parseError.errorString();
+        return {};
+    }
+
+    QJsonObject splitObj = splitDoc.object();
+    QJsonArray trainSamples = splitObj[QStringLiteral("train")].toArray();
+    QJsonArray valSamples = splitObj[QStringLiteral("val")].toArray();
+
+    auto copySamples = [&](const QJsonArray &samples, const QString &splitName) -> bool {
+        for (const auto &val : samples) {
+            QString sampleId = val.toString();
+            QSqlQuery sampleQuery(db);
+            sampleQuery.prepare("SELECT image_path, label_path FROM dataset_samples WHERE id = ?");
+            sampleQuery.addBindValue(sampleId);
+            if (!sampleQuery.exec() || !sampleQuery.next()) {
+                ltWarning(LT_LOG_TRAINING()) << "Sample not found during snapshot preparation:" << sampleId;
+                continue;
+            }
+
+            QString srcImg = sampleQuery.value(0).toString();
+            QString srcLbl = sampleQuery.value(1).toString();
+
+            QFileInfo imgInfo(srcImg);
+            QString dstImg = snapshotDir + QStringLiteral("/images/") + splitName + QStringLiteral("/") + imgInfo.fileName();
+            
+            if (QFile::exists(dstImg)) {
+                QFile::remove(dstImg);
+            }
+            if (!QFile::copy(srcImg, dstImg)) {
+                ltError(LT_LOG_TRAINING()) << "Failed to copy image from" << srcImg << "to" << dstImg;
+                return false;
+            }
+
+            if (!srcLbl.isEmpty()) {
+                QFileInfo lblInfo(srcLbl);
+                QString dstLbl = snapshotDir + QStringLiteral("/labels/") + splitName + QStringLiteral("/") + lblInfo.fileName();
+                if (QFile::exists(dstLbl)) {
+                    QFile::remove(dstLbl);
+                }
+                if (QFile::exists(srcLbl)) {
+                    QFile::copy(srcLbl, dstLbl);
+                } else {
+                    QFile file(dstLbl);
+                    file.open(QIODevice::WriteOnly);
+                    file.close();
+                }
+            }
+        }
+        return true;
+    };
+
+    if (!copySamples(trainSamples, QStringLiteral("train")) ||
+        !copySamples(valSamples, QStringLiteral("val"))) {
+        return {};
+    }
+
+    // 5. Query taxonomy classes
+    QStringList classes;
+    QStringList parts = taxonomyVersion.split(QChar(':'));
+    if (parts.size() >= 2) {
+        QString taxonomyId = parts[0];
+        QSqlQuery taxQuery(db);
+        taxQuery.prepare("SELECT class_definitions_json FROM taxonomies WHERE id = ?");
+        taxQuery.addBindValue(taxonomyId);
+        if (taxQuery.exec() && taxQuery.next()) {
+            QJsonDocument classDoc = QJsonDocument::fromJson(taxQuery.value(0).toString().toUtf8());
+            for (const auto &val : classDoc.array()) {
+                classes.append(val.toString());
+            }
+        }
+    }
+
+    if (classes.isEmpty()) {
+        classes.append(QStringLiteral("defect"));
+    }
+
+    // 6. Write data.yaml
+    QString yamlPath = snapshotDir + QStringLiteral("/data.yaml");
+    QFile yamlFile(yamlPath);
+    if (!yamlFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        ltError(LT_LOG_TRAINING()) << "Failed to create data.yaml file at" << yamlPath;
+        return {};
+    }
+
+    QTextStream out(&yamlFile);
+    out << "path: " << QDir(snapshotDir).absolutePath() << "\n";
+    out << "train: images/train\n";
+    out << "val: images/val\n";
+    out << "nc: " << classes.size() << "\n";
+    out << "names:\n";
+    for (int i = 0; i < classes.size(); ++i) {
+        out << "  " << i << ": " << classes[i] << "\n";
+    }
+    yamlFile.close();
+
+    ltInfo(LT_LOG_TRAINING()) << "Snapshot prepared physically at:" << snapshotDir;
+    return yamlPath;
 }

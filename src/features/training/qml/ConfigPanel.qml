@@ -51,19 +51,19 @@ Rectangle {
         spacing: 8
 
         Label {
-            text: "Training Parameters"
+            text: "训练参数"
             color: Theme.accentPrimary
             font.pixelSize: 14
             font.bold: true
         }
 
-        // Model family selector
+        // 模型系列选择器
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
 
             Label {
-                text: "Model:"
+                text: "模型:"
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
@@ -126,13 +126,13 @@ Rectangle {
             }
         }
 
-        // Training type selector
+        // 训练类型选择器
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
 
             Label {
-                text: "Type:"
+                text: "类型:"
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
@@ -140,7 +140,7 @@ Rectangle {
 
             ComboBox {
                 id: trainingTypeCombo
-                model: ["From Scratch", "Pretrained", "Incremental"]
+                model: ["从头训练", "预训练", "增量训练"]
                 currentIndex: 0
                 Layout.fillWidth: true
 
@@ -195,14 +195,14 @@ Rectangle {
             }
         }
 
-        // Parent model version selector (for incremental training)
+        // 父模型版本选择器（增量训练时使用）
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
             visible: trainingTypeCombo.currentIndex === 2
 
             Label {
-                text: "Parent:"
+                text: "父版本:"
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
@@ -218,7 +218,7 @@ Rectangle {
                 contentItem: Label {
                     text: parentVersionCombo.currentIndex >= 0 ?
                         parentVersionCombo.currentValue.substring(0, 8) + "..." :
-                        "Select parent version"
+                        "选择父版本"
                     color: Theme.textPrimary
                     font.pixelSize: 13
                     font.family: "monospace"
@@ -270,13 +270,13 @@ Rectangle {
             }
         }
 
-        // Image size
+        // 图片尺寸
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
 
             Label {
-                text: "Image Size:"
+                text: "图片尺寸:"
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
@@ -292,7 +292,7 @@ Rectangle {
                 Layout.fillWidth: true
 
                 textFromValue: function(value) { return value }
-                valueFromText: function(text) { return parseInt(text) }
+                valueFromText: function(text) { return parseInt(text) || 640 }
 
                 contentItem: Label {
                     text: imgSizeSpin.textFromValue(imgSizeSpin.value, imgSizeSpin.locale)
@@ -343,13 +343,13 @@ Rectangle {
             }
         }
 
-        // Batch size
+        // 批大小
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
 
             Label {
-                text: "Batch:"
+                text: "批大小:"
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
@@ -401,13 +401,13 @@ Rectangle {
             }
         }
 
-        // Epochs
+        // 训练轮数
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
 
             Label {
-                text: "Epochs:"
+                text: "训练轮数:"
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
@@ -459,13 +459,13 @@ Rectangle {
             }
         }
 
-        // Patience (early stopping)
+        // 早停耐心值
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
 
             Label {
-                text: "Patience:"
+                text: "早停耐心:"
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
@@ -517,13 +517,13 @@ Rectangle {
             }
         }
 
-        // Workers
+        // 工作线程
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
 
             Label {
-                text: "Workers:"
+                text: "工作线程:"
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
@@ -575,13 +575,13 @@ Rectangle {
             }
         }
 
-        // AMP toggle
+        // 混合精度开关
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
 
             Label {
-                text: "AMP:"
+                text: "混合精度:"
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
@@ -612,13 +612,13 @@ Rectangle {
             }
         }
 
-        // Resume toggle
+        // 继续训练开关
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
 
             Label {
-                text: "Resume:"
+                text: "继续训练:"
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
@@ -649,13 +649,13 @@ Rectangle {
             }
         }
 
-        // Device selector
+        // 设备选择器
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
 
             Label {
-                text: "Device:"
+                text: "设备:"
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 80

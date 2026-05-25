@@ -42,7 +42,7 @@ GroupBox {
             StatCard {
                 Layout.fillWidth: true
                 title: "平均置信度"
-                value: stats.avg_confidence ? (stats.avg_confidence * 100).toFixed(1) + "%" : "N/A"
+                value: stats.avg_confidence !== undefined && stats.avg_confidence !== null ? ((parseFloat(stats.avg_confidence) || 0) * 100).toFixed(1) + "%" : "N/A"
                 icon: "🎯"
             }
 

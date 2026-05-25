@@ -4,6 +4,7 @@
 qt_add_qml_module(labeltorch_export
     URI LabelTorch.Export
     STATIC
+    RESOURCE_PREFIX /qt/qml
     QML_FILES
         qml/ExportPage.qml
         qml/OnnxConfigPanel.qml

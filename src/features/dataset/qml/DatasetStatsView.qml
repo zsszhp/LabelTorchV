@@ -207,7 +207,7 @@ Item {
                                     color: Theme.bgInput
 
                                     Rectangle {
-                                        width: parent.width * (modelData.count / maxCount())
+                                        width: parent.width * ((modelData.count || 0) / maxCount())
                                         height: parent.height
                                         radius: 3
                                         color: barColor(index)

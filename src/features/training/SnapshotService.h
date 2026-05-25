@@ -81,6 +81,13 @@ public:
      * @return true if the dataset uses OBB format, false if HBB or undetermined.
      */
     Q_INVOKABLE bool isOBBDataset(const QString &datasetId);
+
+    /**
+     * @brief Prepare a physical directory for a snapshot, copy files and generate data.yaml.
+     * @param snapshotId The snapshot ID.
+     * @return The path to data.yaml on success, or empty string on failure.
+     */
+    Q_INVOKABLE QString prepareSnapshotPhysicalDir(const QString &snapshotId);
 };
 
 #endif // SNAPSHOTSERVICE_H

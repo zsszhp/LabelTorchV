@@ -19,6 +19,11 @@ void ExportService::setIpcClient(IpcClient *client)
 {
     ltTrace(LT_LOG_EXPORT()) << "client=" << client;
     m_ipcClient = client;
+
+    if (m_ipcClient) {
+        connect(m_ipcClient, &IpcClient::responseReceived,
+                this, &ExportService::handleIpcResponse);
+    }
 }
 
 QString ExportService::exportModel(const QString &modelVersionId,
@@ -32,24 +37,32 @@ QString ExportService::exportModel(const QString &modelVersionId,
     auto db = Database::instance().database();
     if (!db.isOpen()) return {};
 
-    // Validate model version exists
+    // 查询 model_version, 关联获取 task_type
     QSqlQuery checkVersion(db);
-    checkVersion.prepare("SELECT id, best_weight_path FROM model_versions WHERE id = ?");
+    checkVersion.prepare(
+        "SELECT m.best_weight_path, p.task_type, p.root_path FROM model_versions m "
+        "JOIN training_runs r ON m.run_id = r.id "
+        "JOIN projects p ON r.project_id = p.id "
+        "WHERE m.id = ?"
+    );
     checkVersion.addBindValue(modelVersionId);
     if (!checkVersion.exec() || !checkVersion.next()) {
         ltError(LT_LOG_EXPORT()) << "Model version not found:" << modelVersionId;
         return {};
     }
 
-    QString bestWeightPath = checkVersion.value(1).toString();
+    QString bestWeightPath = checkVersion.value(0).toString();
+    QString taskType = checkVersion.value(1).toString();
+    QString projectRoot = checkVersion.value(2).toString();
 
-    // Validate format
+    // 默认判定适配器类型
+    QString adapter = (taskType == QStringLiteral("anomaly")) ? QStringLiteral("anomalib") : QStringLiteral("ultralytics");
+
     if (format != "pt" && format != "onnx" && format != "tflite" && format != "engine") {
         ltWarning(LT_LOG_EXPORT()) << "Invalid export format:" << format;
         return {};
     }
 
-    // Validate optionsJson is valid JSON (or empty)
     QString validatedOptionsJson = optionsJson;
     if (!optionsJson.isEmpty()) {
         QJsonParseError parseError;
@@ -64,7 +77,7 @@ QString ExportService::exportModel(const QString &modelVersionId,
 
     QString artifactId = QUuid::createUuid().toString(QUuid::WithoutBraces);
 
-    // Build output path based on format
+    // 组装最终导出文件名
     QString outputPath = bestWeightPath;
     if (!outputPath.isEmpty()) {
         int dotPos = outputPath.lastIndexOf('.');
@@ -74,10 +87,9 @@ QString ExportService::exportModel(const QString &modelVersionId,
             outputPath += "." + format;
         }
     } else {
-        outputPath = "export_" + artifactId.left(8) + "." + format;
+        outputPath = projectRoot + "/exports/export_" + artifactId.left(8) + "." + format;
     }
 
-    // Build options_snapshot_json with status field for state machine
     QJsonObject optionsObj = QJsonDocument::fromJson(validatedOptionsJson.toUtf8()).object();
     optionsObj["status"] = "pending";
     QString snapshotJson = QString::fromUtf8(
@@ -94,14 +106,14 @@ QString ExportService::exportModel(const QString &modelVersionId,
     query.addBindValue(format);
     query.addBindValue(snapshotJson);
     query.addBindValue(outputPath);
-    query.addBindValue(""); // validation_result empty initially
+    query.addBindValue(""); 
 
     if (!query.exec()) {
         ltError(LT_LOG_EXPORT()) << "Failed to create export artifact:" << query.lastError().text();
         return {};
     }
 
-    // Send export.run via IpcClient if available
+    // 发送 IPC 导出指令
     if (m_ipcClient) {
         QJsonObject payload;
         payload["artifact_id"] = artifactId;
@@ -109,16 +121,14 @@ QString ExportService::exportModel(const QString &modelVersionId,
         payload["format"] = format;
         payload["weight_path"] = bestWeightPath;
         payload["output_path"] = outputPath;
+        payload["adapter"] = adapter; // 传入正确适配器
         payload["options"] = QJsonDocument::fromJson(validatedOptionsJson.toUtf8()).object();
         m_ipcClient->sendRequest("export.run", payload);
     }
 
-    // Transition to running status
     updateExportStatus(artifactId, "running");
-
     ltInfo(LT_LOG_EXPORT()) << "Created export artifact:" << artifactId
-                            << "format:" << format
-                            << "modelVersion:" << modelVersionId;
+                            << "format:" << format << "adapter:" << adapter;
     emit exportStatusChanged(artifactId, "pending");
     return artifactId;
 }
@@ -304,4 +314,58 @@ bool ExportService::updateExportStatus(const QString &artifactId, const QString 
     ltInfo(LT_LOG_EXPORT()) << "Export status updated:" << artifactId << "->" << status;
     emit exportStatusChanged(artifactId, status);
     return true;
+}
+
+void ExportService::handleIpcResponse(const QJsonObject &response)
+{
+    QString command = response[QStringLiteral("command")].toString();
+    bool success = response[QStringLiteral("success")].toBool();
+    QJsonObject result = response[QStringLiteral("result")].toObject();
+
+    if (command == QStringLiteral("export.run")) {
+        QString artifactId = result[QStringLiteral("artifact_id")].toString();
+        if (artifactId.isEmpty()) {
+            artifactId = response[QStringLiteral("request_id")].toString();
+        }
+        QString status = result[QStringLiteral("status")].toString();
+
+        if (success && status == QStringLiteral("succeeded")) {
+            QString exportPath = result[QStringLiteral("export_path")].toString();
+            int fileSize = result[QStringLiteral("file_size_bytes")].toInt();
+
+            // 更新 output_path 
+            auto db = Database::instance().database();
+            QSqlQuery updateQuery(db);
+            updateQuery.prepare("UPDATE export_artifacts SET output_path = ? WHERE id = ?");
+            updateQuery.addBindValue(exportPath);
+            updateQuery.addBindValue(artifactId);
+            updateQuery.exec();
+
+            updateExportStatus(artifactId, QStringLiteral("succeeded"));
+            ltInfo(LT_LOG_EXPORT()) << "Export succeeded for artifact:" << artifactId << "path:" << exportPath;
+        } else {
+            updateExportStatus(artifactId, QStringLiteral("failed"));
+            QString error = result.contains("error") ? result["error"].toString() : 
+                            response[QStringLiteral("error")].toObject()[QStringLiteral("message")].toString();
+            ltError(LT_LOG_EXPORT()) << "Export failed for artifact:" << artifactId << "error:" << error;
+        }
+    } else if (command == QStringLiteral("artifact.verify")) {
+        QString artifactId = result[QStringLiteral("artifact_id")].toString();
+        if (success) {
+            QString validationResult = QString::fromUtf8(QJsonDocument(result).toJson(QJsonDocument::Compact));
+            auto db = Database::instance().database();
+            QSqlQuery updateQuery(db);
+            updateQuery.prepare("UPDATE export_artifacts SET validation_result = ? WHERE id = ?");
+            updateQuery.addBindValue(validationResult);
+            updateQuery.addBindValue(artifactId);
+            updateQuery.exec();
+
+            updateExportStatus(artifactId, QStringLiteral("succeeded"));
+            ltInfo(LT_LOG_EXPORT()) << "Validation succeeded for artifact:" << artifactId;
+        } else {
+            updateExportStatus(artifactId, QStringLiteral("failed"));
+            QString error = response[QStringLiteral("error")].toObject()[QStringLiteral("message")].toString();
+            ltError(LT_LOG_EXPORT()) << "Validation failed for artifact:" << artifactId << "error:" << error;
+        }
+    }
 }

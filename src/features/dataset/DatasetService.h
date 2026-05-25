@@ -32,6 +32,21 @@ public:
                                       const QString &imageDir, const QString &labelDir);
 
     /**
+     * @brief Import a dataset from COCO JSON format.
+     *
+     * Reads a COCO JSON label file, matches images by file_name,
+     * converts COCO bbox to YOLO format, and stores samples.
+     *
+     * @param projectId The project this dataset belongs to.
+     * @param name Human-readable dataset name.
+     * @param imageDir Directory containing image files.
+     * @param jsonLabelPath Path to the COCO JSON label file.
+     * @return Dataset ID on success, empty string on failure.
+     */
+    Q_INVOKABLE QString importDatasetJson(const QString &projectId, const QString &name,
+                                           const QString &imageDir, const QString &jsonLabelPath);
+
+    /**
      * @brief List all datasets for a project.
      * @param projectId The project to list datasets for.
      * @return QVariantList of QVariantMap entries with dataset fields.
@@ -94,6 +109,7 @@ private:
     bool updateImportStatus(const QString &datasetId, const QString &status);
     bool insertSamples(const QString &datasetId, const QVariantList &samples);
     bool extractAndStoreSchema(const QString &datasetId, const QVariantList &samples);
+    bool extractAndStoreSchemaFromCategories(const QString &datasetId, const QVariantMap &categories);
 
     ImportScanner *m_scanner;
 };

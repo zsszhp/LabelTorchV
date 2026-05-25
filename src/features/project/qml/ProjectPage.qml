@@ -189,22 +189,21 @@ Item {
         }
 
         standardButtons: Dialog.Yes | Dialog.No
-        onYes: {
+        onAccepted: {
             if (projectId) {
                 projectService.deleteProject(projectId)
                 projectModel.refresh()
                 projectId = ""
             }
         }
-        onNo: projectId = ""
+        onRejected: projectId = ""
     }
 
-    FileDialog {
+    FolderDialog {
         id: folderDialog
         title: "选择项目目录"
-        currentFolder: "file:///C:/"
         onAccepted: {
-            var path = folderDialog.selectedFile.toString()
+            var path = folderDialog.selectedFolder.toString()
             if (path.startsWith("file:///")) path = path.substring(8)
             else if (path.startsWith("file://")) path = path.substring(7)
             projectPathField.text = decodeURIComponent(path)

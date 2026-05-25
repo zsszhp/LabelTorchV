@@ -4,6 +4,7 @@
 qt_add_qml_module(labeltorch_inference
     URI LabelTorch.Inference
     STATIC
+    RESOURCE_PREFIX /qt/qml
     QML_FILES
         qml/AssistedLabelPanel.qml
         qml/ReviewDialog.qml
@@ -11,6 +12,7 @@ qt_add_qml_module(labeltorch_inference
         qml/HardCaseQueue.qml
         qml/ActiveLearningPage.qml
         qml/QueueStatsPanel.qml
+        qml/AnomalyInferPanel.qml
     SOURCES
         InferenceService.h
         InferenceService.cpp
@@ -18,6 +20,8 @@ qt_add_qml_module(labeltorch_inference
         AssistedLabelService.cpp
         ActiveLearningService.h
         ActiveLearningService.cpp
+        AnomalyService.h
+        AnomalyService.cpp
 )
 
 target_include_directories(labeltorch_inference PRIVATE

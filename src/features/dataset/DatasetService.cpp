@@ -11,6 +11,8 @@
 #include <QSet>
 #include <QFile>
 #include <QTextStream>
+#include <QDir>
+#include <QFileInfo>
 #include <algorithm>
 #include <cmath>
 
@@ -902,5 +904,213 @@ bool DatasetService::updateClassName(const QString &taxonomyId, int classId, con
 
     ltInfo(LT_LOG_DATASET()) << "updateClassName completed for taxonomy" << taxonomyId
                              << "class" << classId << "->" << name;
+    return true;
+}
+
+QString DatasetService::importDatasetJson(const QString &projectId, const QString &name,
+                                           const QString &imageDir, const QString &jsonLabelPath)
+{
+    ltTrace(LT_LOG_DATASET()) << "importDatasetJson projectId=" << projectId << "name=" << name
+                              << "imageDir=" << imageDir << "jsonLabelPath=" << jsonLabelPath;
+
+    if (projectId.isEmpty() || name.isEmpty() || imageDir.isEmpty() || jsonLabelPath.isEmpty()) {
+        ltWarning(LT_LOG_DATASET()) << "importDatasetJson: missing required parameters";
+        return {};
+    }
+
+    ltInfo(LT_LOG_DATASET()) << "JSON import start: name=" << name
+                             << "imageDir=" << imageDir << "jsonLabelPath=" << jsonLabelPath;
+
+    // 步骤1: 创建数据集记录，格式为 coco_json
+    QString datasetId = Id::generate();
+
+    QSqlQuery query(Database::instance().database());
+    query.prepare("INSERT INTO datasets (id, project_id, name, image_root, label_root, format, sample_count, import_status) "
+                  "VALUES (?, ?, ?, ?, ?, 'coco_json', 0, 'scanning')");
+    query.addBindValue(datasetId);
+    query.addBindValue(projectId);
+    query.addBindValue(name);
+    query.addBindValue(imageDir);
+    query.addBindValue(jsonLabelPath);
+
+    if (!query.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to create dataset record:" << query.lastError().text();
+        return {};
+    }
+
+    // 步骤2: 使用 ImportScanner 的 JSON 扫描流程
+    QFileInfo jsonFi(jsonLabelPath);
+    QString labelDir = jsonFi.absolutePath();
+
+    QVariantMap scanResult = m_scanner->scan(imageDir, labelDir);
+
+    if (scanResult.contains("error")) {
+        ltError(LT_LOG_DATASET()) << "JSON scan failed:" << scanResult["error"].toString();
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return {};
+    }
+
+    int matched = scanResult["matched"].toInt();
+    QVariantList samples = scanResult["samples"].toList();
+
+    // 过滤出有效样本
+    QVariantList matchedSamples;
+    for (const auto &s : samples) {
+        QVariantMap sample = s.toMap();
+        QString status = sample["status"].toString();
+        if (status == QStringLiteral("matched") || status == QStringLiteral("invalid_label")) {
+            matchedSamples.append(sample);
+        }
+    }
+
+    // 步骤3: 更新状态为导入中
+    if (!updateImportStatus(datasetId, QStringLiteral("importing"))) {
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return {};
+    }
+
+    // 步骤4: 为 JSON 导入的样本生成 YOLO txt 标签文件
+    QSqlQuery projectQuery(Database::instance().database());
+    projectQuery.prepare("SELECT root_path FROM projects WHERE id = ?");
+    projectQuery.addBindValue(projectId);
+    QString projectRoot;
+    if (projectQuery.exec() && projectQuery.next()) {
+        projectRoot = projectQuery.value(0).toString();
+    }
+
+    for (auto &s : matchedSamples) {
+        QVariantMap sample = s.toMap();
+        QVariantList annotations = sample["annotations"].toList();
+
+        if (annotations.isEmpty()) continue;
+
+        // 为每个样本生成 YOLO txt 标签文件
+        QString stem = sample["stem"].toString();
+        QString labelOutputDir = projectRoot + "/cache/labels/" + datasetId;
+        QDir().mkpath(labelOutputDir);
+        QString labelOutputPath = labelOutputDir + "/" + stem + ".txt";
+
+        QFile labelFile(labelOutputPath);
+        if (labelFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream out(&labelFile);
+            for (const auto &ann : annotations) {
+                QVariantMap annMap = ann.toMap();
+                int catId = annMap["category_id"].toInt();
+                double cx = annMap["cx"].toDouble();
+                double cy = annMap["cy"].toDouble();
+                double w = annMap["w"].toDouble();
+                double h = annMap["h"].toDouble();
+                out << catId << " " << cx << " " << cy << " " << w << " " << h << "\n";
+            }
+            labelFile.close();
+
+            // 更新样本的 labelPath 为生成的 YOLO txt 文件
+            QVariantMap updatedSample = sample;
+            updatedSample["labelPath"] = labelOutputPath;
+            s = updatedSample;
+        }
+    }
+
+    // 步骤5: 插入样本到数据库
+    if (!insertSamples(datasetId, matchedSamples)) {
+        ltError(LT_LOG_DATASET()) << "Failed to insert samples from JSON import";
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return {};
+    }
+
+    // 步骤6: 提取并存储类别体系（使用 JSON 中的 categories）
+    QVariantMap categories = scanResult["categories"].toMap();
+    if (!categories.isEmpty()) {
+        if (!extractAndStoreSchemaFromCategories(datasetId, categories)) {
+            ltWarning(LT_LOG_DATASET()) << "Failed to extract schema from categories, falling back";
+            extractAndStoreSchema(datasetId, matchedSamples);
+        }
+    } else {
+        extractAndStoreSchema(datasetId, matchedSamples);
+    }
+
+    // 步骤7: 更新样本数和最终状态
+    QSqlQuery updateQuery(Database::instance().database());
+    updateQuery.prepare("UPDATE datasets SET sample_count = ?, import_status = 'completed' WHERE id = ?");
+    updateQuery.addBindValue(matchedSamples.size());
+    updateQuery.addBindValue(datasetId);
+
+    if (!updateQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to finalize dataset:" << updateQuery.lastError().text();
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return {};
+    }
+
+    ltInfo(LT_LOG_DATASET()) << "JSON import completed:" << datasetId
+                             << "with" << matchedSamples.size() << "samples";
+    return datasetId;
+}
+
+bool DatasetService::extractAndStoreSchemaFromCategories(const QString &datasetId, const QVariantMap &categories)
+{
+    ltTrace(LT_LOG_DATASET()) << "extractAndStoreSchemaFromCategories datasetId=" << datasetId
+                              << "categories count=" << categories.size();
+
+    if (categories.isEmpty()) return false;
+
+    // 从 categories 映射中提取类别信息
+    QMap<int, QString> categoryMap;
+    QList<int> sortedIds;
+
+    for (auto it = categories.constBegin(); it != categories.constEnd(); ++it) {
+        bool ok = false;
+        int catId = it.key().toInt(&ok);
+        if (ok && catId >= 0) {
+            categoryMap[catId] = it.value().toString();
+            sortedIds.append(catId);
+        }
+    }
+
+    if (sortedIds.isEmpty()) return false;
+
+    std::sort(sortedIds.begin(), sortedIds.end());
+
+    // 构建类别名称数组（按 ID 顺序填充，空缺位置用 class_N 填充）
+    int maxId = sortedIds.last();
+    QStringList classNames;
+    for (int i = 0; i <= maxId; ++i) {
+        if (categoryMap.contains(i)) {
+            classNames.append(categoryMap[i]);
+        } else {
+            classNames.append(QStringLiteral("class_%1").arg(i));
+        }
+    }
+
+    // 构建类别顺序数组
+    QVariantList classOrder;
+    for (int cid : sortedIds) {
+        classOrder.append(cid);
+    }
+
+    QJsonArray classNamesArray;
+    for (const auto &name : classNames) classNamesArray.append(name);
+    QString classNamesJson = QJsonDocument(classNamesArray).toJson(QJsonDocument::Compact);
+
+    QJsonArray classOrderArray;
+    for (const auto &idx : classOrder) classOrderArray.append(idx.toInt());
+    QString classOrderJson = QJsonDocument(classOrderArray).toJson(QJsonDocument::Compact);
+
+    QString schemaId = Id::generate();
+    QSqlQuery query(Database::instance().database());
+    query.prepare("INSERT INTO imported_label_schemas "
+                  "(id, dataset_id, raw_class_names_json, raw_class_order_json, source_format) "
+                  "VALUES (?, ?, ?, ?, 'coco_json')");
+    query.addBindValue(schemaId);
+    query.addBindValue(datasetId);
+    query.addBindValue(classNamesJson);
+    query.addBindValue(classOrderJson);
+
+    if (!query.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to insert label schema from categories:" << query.lastError().text();
+        return false;
+    }
+
+    ltDebug(LT_LOG_DATASET()) << "Extracted schema from categories with" << classNames.size()
+                              << "class names, category IDs:" << sortedIds;
     return true;
 }
