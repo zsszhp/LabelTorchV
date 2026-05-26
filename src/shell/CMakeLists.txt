@@ -8,6 +8,11 @@ qt_add_qml_module(labeltorch_shell
         qml/StatusBar.qml
         qml/TaskPanel.qml
         qml/LogPanel.qml
-        qml/Theme.qml
+    RESOURCES
+        qml/icons/sidebar-collapse.svg
+        qml/icons/sidebar-expand.svg
 )
-set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON TRUE)
+
+target_link_libraries(labeltorch_shell PUBLIC
+    labeltorch_theme
+)

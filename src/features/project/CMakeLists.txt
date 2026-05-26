@@ -21,8 +21,13 @@ qt_add_qml_module(labeltorch_project
         TaxonomyModel.cpp
 )
 
+target_include_directories(labeltorch_project PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
 target_link_libraries(labeltorch_project PUBLIC
     labeltorch_core
+    labeltorch_theme
     Qt6::Quick
     Qt6::QuickDialogs2
 )

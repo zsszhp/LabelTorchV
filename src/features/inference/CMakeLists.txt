@@ -26,12 +26,12 @@ qt_add_qml_module(labeltorch_inference
         AnomalyDetector.cpp
 )
 
-target_include_directories(labeltorch_inference PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/core/database
-    ${CMAKE_SOURCE_DIR}/src/core/ipc
+target_include_directories(labeltorch_inference PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_link_libraries(labeltorch_inference PUBLIC
     labeltorch_core
+    labeltorch_theme
     Qt6::Quick
 )

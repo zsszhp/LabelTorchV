@@ -23,13 +23,15 @@ constexpr const char *CMD_DATASET_VALIDATE = "dataset.validate";
 constexpr const char *CMD_TRAIN_START = "train.start";
 constexpr const char *CMD_TRAIN_STOP = "train.stop";
 constexpr const char *CMD_TRAIN_STATUS = "train.status";
+constexpr const char *CMD_TRAIN_LIST_ADAPTERS = "train.list_adapters";
+constexpr const char *CMD_TRAIN_DATA_SPLIT = "train.data_split";
 constexpr const char *CMD_INFERENCE_RUN = "inference.run";
 constexpr const char *CMD_EXPORT_RUN = "export.run";
 constexpr const char *CMD_ARTIFACT_VERIFY = "artifact.verify";
 constexpr const char *CMD_ANOMALY_INFER = "anomaly.infer";
-    constexpr const char *CMD_TRAINING_START = "training.start";
-    constexpr const char *CMD_TRAINING_PARSE_LOGS = "training.parse_logs";
-    constexpr const char *CMD_ACTIVE_LEARNING_RUN = "active_learning.run";
+constexpr const char *CMD_AL_COLLECT_LOW_CONF = "active_learning.collect_low_conf";
+constexpr const char *CMD_AL_PRIORITIZE_QUEUE = "active_learning.prioritize_queue";
+constexpr const char *CMD_AL_QUEUE_STATS = "active_learning.queue_stats";
 
 // 事件类型
 constexpr const char *EVENT_TASK_STARTED = "task.started";
@@ -38,6 +40,7 @@ constexpr const char *EVENT_TASK_LOG = "task.log";
 constexpr const char *EVENT_TASK_WARNING = "task.warning";
 constexpr const char *EVENT_TASK_FAILED = "task.failed";
 constexpr const char *EVENT_TASK_SUCCEEDED = "task.succeeded";
+constexpr const char *EVENT_TASK_STOPPED = "task.stopped";
 
 // 构建请求消息
 QJsonObject createRequest(const QString &requestId, const QString &command, const QJsonObject &payload = {});

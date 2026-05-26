@@ -21,17 +21,19 @@ export = None
 
 def _import_handlers():
     """延迟导入处理器模块"""
-    global environment, training, inference, export, anomaly
+    global environment, training, inference, export, anomaly, active_learning
     from .handlers import environment as env_module
     from .handlers import training as train_module
     from .handlers import inference as inf_module
     from .handlers import export as exp_module
     from .handlers import anomaly as anomaly_module
+    from .handlers import active_learning as al_module
     environment = env_module
     training = train_module
     inference = inf_module
     export = exp_module
     anomaly = anomaly_module
+    active_learning = al_module
 
 
 class IpcServer:
@@ -39,6 +41,9 @@ class IpcServer:
 
     def __init__(self):
         _import_handlers()
+        # 启动时注册所有内置训练适配器（仅注册一次）
+        from .adapters.registry import register_builtin_adapters
+        register_builtin_adapters()
         self.handlers = {
             "environment.check": environment.handle_check,
             "train.start": training.handle_start,
@@ -50,6 +55,9 @@ class IpcServer:
             "export.run": export.handle_run,
             "artifact.verify": export.handle_verify,
             "anomaly.infer": anomaly.handle_infer,
+            "active_learning.collect_low_conf": active_learning.handle_collect_low_conf,
+            "active_learning.prioritize_queue": active_learning.handle_prioritize_queue,
+            "active_learning.queue_stats": active_learning.handle_queue_stats,
             "shutdown": self._handle_shutdown,
         }
         self.running = True
@@ -84,7 +92,6 @@ class IpcServer:
 
     async def _handle_message(self, message: dict):
         """处理收到的IPC消息"""
-        msg_type = message.get("type", "")
         request_id = message.get("request_id", "")
         command = message.get("command", "")
         payload = message.get("payload", {})
@@ -101,7 +108,15 @@ class IpcServer:
 
         try:
             result = await handler(payload)
-            response = create_response(request_id, True, result=result, command=command)
+            # 检查handler返回的status字段，将业务层错误转换为IPC层失败响应
+            if isinstance(result, dict) and result.get("status") == "failed":
+                response = create_response(
+                    request_id, False,
+                    error={"code": "HANDLER_ERROR", "message": result.get("error", "Unknown error"), "recoverable": True},
+                    command=command
+                )
+            else:
+                response = create_response(request_id, True, result=result, command=command)
             self._send(response)
         except Exception as e:
             logger.error(f"Handler error for {command}: {e}")

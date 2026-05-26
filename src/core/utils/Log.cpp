@@ -105,7 +105,7 @@ void init(const QString &logDir)
     originalHandler = qInstallMessageHandler(logMessageHandler);
 
     // Default: enable info level and above for all categories
-    QLoggingCategory::setFilterRules(QStringLiteral("lt.*=true\nqt.*=false"));
+    QLoggingCategory::setFilterRules(QStringLiteral("lt.*=true\nqt.*=true"));
 
     qInfo() << "=== LabelTorch logging initialized ===";
     qInfo() << "Log file:" << filePath;

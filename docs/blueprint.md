@@ -1,6 +1,6 @@
 # 标炬（LabelTorch）产品蓝图
 
-> 版本：2.0 | 更新日期：2026-05-18
+> 版本：2.1 | 更新日期：2026-05-26
 
 ---
 
@@ -29,6 +29,8 @@
 
 ## 二、架构概览
 
+> 技术选型、目录结构、IPC 协议、数据库 Schema 等详细信息见 `CLAUDE.md`。
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │                   桌面前端 (C++/Qt/QML)               │
@@ -55,18 +57,6 @@
          │                    │
     SQLite 元数据        本地文件系统
 ```
-
-### 技术选型
-
-| 层次 | 技术 | 职责 |
-|------|------|------|
-| 桌面前端 | Qt 6.11 + QML + C++17 | UI、标注引擎、几何渲染 |
-| 训练后端 | Python 3.11 + Ultralytics | 训练、推理、导出 |
-| 进程通信 | stdin/stdout JSON-RPC | 前后端解耦 |
-| 元数据 | SQLite 3（WAL） | 项目、数据集、训练记录 |
-| 构建 | CMake / Ninja / MSVC 2022 | C++ 编译 |
-| 打包 | windeployqt + embed Python | 绿色免安装包 |
-| CUDA | 12.1 | PyTorch 运行时 |
 
 ---
 
@@ -228,20 +218,7 @@ v5.0.0  成熟发布版
 
 ---
 
-## 四、数据库分阶段建表计划
-
-| 版本 | 新增表 |
-|------|--------|
-| v0.1.0 | `projects`, `taxonomies`, `datasets`, `dataset_samples`, `imported_label_schemas`, `class_mapping_revisions`, `annotation_revisions`, `dataset_snapshots`, `training_runs`, `model_versions`, `assisted_label_batches`, `export_artifacts`, `task_events`, `run_metrics` |
-| v0.2.0 | 异常检测相关扩展表（按需新增） |
-| v1.0.0 | — |
-| v1.1.0 | （已在v0.1.0中实现） |
-| v1.2.0 | （已在v0.1.0中实现） |
-| v2.0.0 | （已在v0.1.0中实现） |
-
----
-
-## 五、质量红线
+## 四、质量红线
 
 1. **零闪退** - 任何异常必须被捕获并优雅处理，绝不允许程序崩溃
 2. **训练不中断** - 训练过程中主界面必须保持响应，Python 后端异常不影响前端
@@ -251,7 +228,7 @@ v5.0.0  成熟发布版
 
 ---
 
-## 六、发布规范
+## 五、发布规范
 
 1. 每个版本发布 git tag（格式：v{major}.{minor}.{patch}）
 2. 每个版本发布 GitHub/Gitee Release
@@ -261,7 +238,7 @@ v5.0.0  成熟发布版
 
 ---
 
-## 七、参考项目
+## 六、参考项目
 
 | 优先级 | 项目 | 用途 |
 |--------|------|------|

@@ -1,7 +1,7 @@
 // ClassMappingPage.qml - 类别映射页面
 import QtQuick
 import QtQuick.Controls
-import LabelTorch.Shell
+import LabelTorch.Theme
 import QtQuick.Layouts
 
 Item {

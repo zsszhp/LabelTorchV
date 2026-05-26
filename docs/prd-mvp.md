@@ -1,6 +1,6 @@
 # 标炬（LabelTorch）MVP 产品需求文档
 
-> 版本：v0.1.0 | 更新日期：2026-05-18
+> 版本：v0.1.0 | 更新日期：2026-05-26
 
 ---
 
@@ -31,6 +31,8 @@
 - 断点续训
 - AMP
 - OBB 训练
+- 异常检测推理
+- 主动学习
 
 ---
 
@@ -186,6 +188,10 @@
 
 ## 五、IPC 契约（MVP 必要命令）
 
+> 完整 IPC 协议定义（消息格式、事件类型、IpcClient 机制）见 `CLAUDE.md` 第六章。
+
+### MVP 必要命令
+
 | 命令 | 方向 | 说明 |
 |------|------|------|
 | `environment.check` | C++→Python | 检查运行环境 |
@@ -195,14 +201,10 @@
 | `train.list_adapters` | C++→Python | 列出已注册的训练适配器 |
 | `train.data_split` | C++→Python | 数据集划分 |
 | `inference.run` | C++→Python | YOLO模型推理 |
-| `anomaly.infer` | C++→Python | 异常检测推理 |
 | `export.run` | C++→Python | 执行模型导出 |
 | `artifact.verify` | C++→Python | 验证导出产物 |
-| `active_learning.collect_low_conf` | C++→Python | 低置信度样本收集 |
-| `active_learning.prioritize_queue` | C++→Python | 队列优先级排序 |
-| `active_learning.queue_stats` | C++→Python | 队列统计 |
 
-### 事件流
+### MVP 事件流
 
 | 事件 | 说明 |
 |------|------|
@@ -212,29 +214,15 @@
 | `task.warning` | 任务警告 |
 | `task.failed` | 任务失败 |
 | `task.succeeded` | 任务成功 |
+| `task.stopped` | 用户手动停止 |
+
+> **注意**：`anomaly.infer`、`active_learning.*` 等命令属于后续版本（v0.2.0/v4.0.0），不在 MVP 范围内。
 
 ---
 
-## 六、数据库 Schema（14张核心表）
+## 六、数据库 Schema
 
-> 以下为当前实际使用的数据库表结构，详细DDL见 `src/core/database/Schema.h` 和 `Schema.cpp`。
-
-| 表名 | 用途 |
-|------|------|
-| `projects` | 项目信息（id, name, root_path, task_type, default_device, default_model_family） |
-| `taxonomies` | 类别体系定义（id, project_id, name, version, class_definitions_json） |
-| `datasets` | 数据集元信息（id, project_id, name, image_root, label_root, format, sample_count, import_status） |
-| `dataset_samples` | 样本记录（id, dataset_id, image_path, label_path, width, height, hash, validation_status, split） |
-| `imported_label_schemas` | 导入时原始标签schema |
-| `class_mapping_revisions` | 类别映射修订记录 |
-| `annotation_revisions` | 标注修订记录（undo/audit） |
-| `dataset_snapshots` | 数据快照（不可变） |
-| `training_runs` | 训练运行记录（id, project_id, snapshot_id, config_snapshot_json, status, log_uri） |
-| `model_versions` | 模型版本（id, run_id, parent_model_version_id, best_weight_path, last_weight_path, metrics_snapshot_json） |
-| `assisted_label_batches` | 辅助标注批次 |
-| `export_artifacts` | 导出产物记录（id, model_version_id, format, options_snapshot_json, output_path, validation_result） |
-| `task_events` | 任务事件审计日志 |
-| `run_metrics` | 训练指标（每epoch） |
+> 14张核心表的详细 DDL 和字段说明见 `CLAUDE.md` 第七章及 `src/core/database/Schema.h`。
 
 ---
 
@@ -242,39 +230,39 @@
 
 ### 阶段 1：修复与验证（基于现有代码）
 
-| 任务 | 说明 | 优先级 |
-|------|------|--------|
-| T-01 | 修复 DatasetService 链接错误（appendImport/resplitDataset 未实现） | P0 |
-| T-02 | 修复 ExportService IPC 事件监听缺失 | P0 |
-| T-03 | 修复 IpcClient 请求超时和重连机制 | P1 |
-| T-04 | 完善 Python 后端训练进度事件推送 | P0 |
-| T-05 | CMake 构建验证与修复 | P0 |
+| 任务 | 说明 | 优先级 | 状态 |
+|------|------|--------|------|
+| T-01 | 修复 DatasetService 链接错误（appendImport/resplitDataset 未实现） | P0 | ✅ 已完成 |
+| T-02 | 修复 ExportService IPC 事件监听缺失 | P0 | ✅ 已完成 |
+| T-03 | 修复 IpcClient 请求超时和重连机制 | P1 | ✅ 已完成 |
+| T-04 | 完善 Python 后端训练进度事件推送 | P0 | ✅ 已完成 |
+| T-05 | CMake 构建验证与修复 | P0 | ✅ 已完成 |
 
 ### 阶段 2：核心功能完善
 
-| 任务 | 说明 | 优先级 |
-|------|------|--------|
-| T-06 | 完善数据导入流程（事务批量插入、进度回调） | P0 |
-| T-07 | 完善训练工作流（数据划分→训练→结果注册） | P0 |
-| T-08 | 完善导出工作流（导出→验证→状态更新） | P0 |
-| T-09 | 完善模型版本管理（列表、详情、标签） | P0 |
+| 任务 | 说明 | 优先级 | 状态 |
+|------|------|--------|------|
+| T-06 | 完善数据导入流程（事务批量插入、进度回调） | P0 | ✅ 已完成 |
+| T-07 | 完善训练工作流（数据划分→训练→结果注册） | P0 | ✅ 已完成 |
+| T-08 | 完善导出工作流（导出→验证→状态更新） | P0 | ✅ 已完成 |
+| T-09 | 完善模型版本管理（列表、详情、标签） | P0 | ✅ 已完成 |
 
 ### 阶段 3：集成测试与修复
 
-| 任务 | 说明 | 优先级 |
-|------|------|--------|
-| T-10 | 端到端测试：创建项目→导入→训练→导出 | P0 |
-| T-11 | 异常场景测试（GPU不可用、空数据集、训练中断） | P0 |
-| T-12 | 稳定性测试（长时间训练、大量数据导入） | P1 |
+| 任务 | 说明 | 优先级 | 状态 |
+|------|------|--------|------|
+| T-10 | 端到端测试：创建项目→导入→训练→导出 | P0 | 🔄 进行中 |
+| T-11 | 异常场景测试（GPU不可用、空数据集、训练中断） | P0 | ⬜ 待开始 |
+| T-12 | 稳定性测试（长时间训练、大量数据导入） | P1 | ⬜ 待开始 |
 
 ### 阶段 4：打包与发布
 
-| 任务 | 说明 | 优先级 |
-|------|------|--------|
-| T-13 | windeployqt 部署 Qt 依赖 | P0 |
-| T-14 | 嵌入 Python 环境与依赖 | P0 |
-| T-15 | 创建绿色包（7z 压缩） | P0 |
-| T-16 | Git tag + Release 发布 | P0 |
+| 任务 | 说明 | 优先级 | 状态 |
+|------|------|--------|------|
+| T-13 | windeployqt 部署 Qt 依赖 | P0 | ⬜ 待开始 |
+| T-14 | 嵌入 Python 环境与依赖 | P0 | ⬜ 待开始 |
+| T-15 | 创建绿色包（7z 压缩） | P0 | ⬜ 待开始 |
+| T-16 | Git tag + Release 发布 | P0 | ⬜ 待开始 |
 
 ---
 

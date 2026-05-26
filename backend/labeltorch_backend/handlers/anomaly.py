@@ -7,9 +7,6 @@
 import asyncio
 import logging
 import os
-import tempfile
-
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +117,7 @@ def _infer_sync(engine, model, weight_path, image_paths, imgsz=256):
                         pred_result["pred_label"] = "anomalous" if pred.pred_label else "normal"
                     if hasattr(pred, 'anomaly_map'):
                         # 保存异常热力图
+                        import numpy as np
                         anomaly_map = pred.anomaly_map
                         if hasattr(anomaly_map, 'cpu'):
                             anomaly_map = anomaly_map.cpu().numpy()
@@ -141,8 +139,9 @@ def _infer_sync(engine, model, weight_path, image_paths, imgsz=256):
     return results
 
 
-def _save_anomaly_map(anomaly_map: np.ndarray, image_path: str) -> str:
+def _save_anomaly_map(anomaly_map, image_path: str) -> str:
     """保存异常热力图到文件"""
+    import numpy as np
     try:
         import cv2
 

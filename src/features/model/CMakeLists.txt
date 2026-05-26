@@ -18,11 +18,12 @@ qt_add_qml_module(labeltorch_model
         ModelVersionModel.cpp
 )
 
-target_link_libraries(labeltorch_model PUBLIC
-    labeltorch_core
-    Qt6::Quick
+target_include_directories(labeltorch_model PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_include_directories(labeltorch_model PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/core/database
+target_link_libraries(labeltorch_model PUBLIC
+    labeltorch_core
+    labeltorch_theme
+    Qt6::Quick
 )

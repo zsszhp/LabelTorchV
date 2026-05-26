@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import LabelTorch.Theme
 
 Item {
     id: root

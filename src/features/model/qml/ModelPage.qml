@@ -1,7 +1,7 @@
 // ModelPage.qml - 版本中心
 import QtQuick
 import QtQuick.Controls
-import LabelTorch.Shell
+import LabelTorch.Theme
 import QtQuick.Layouts
 
 Item {

@@ -4,7 +4,12 @@ TrainingAdapter 抽象基类
 定义训练后端的统一接口，任何训练框架必须实现此接口
 """
 from abc import ABC, abstractmethod
-from typing import Any
+
+
+class StopTrainingException(Exception):
+    """训练停止异常，用于中断训练线程"""
+
+    pass
 
 
 class TrainingAdapter(ABC):
@@ -44,3 +49,11 @@ class TrainingAdapter(ABC):
     async def export_model(self, weight_path: str, format: str, options: dict) -> dict:
         """导出模型"""
         pass
+
+    def get_status(self) -> dict:
+        """获取当前训练状态（子类可覆盖）"""
+        return {"status": "unknown"}
+
+    def set_epoch_callback(self, callback):
+        """设置epoch结束回调（子类可覆盖）"""
+        self._on_epoch_end = callback

@@ -15,9 +15,7 @@ _active_tasks = {}
 
 async def handle_start(payload: dict) -> dict:
     """启动训练任务"""
-    from ..adapters.registry import TrainingAdapterRegistry, register_builtin_adapters
-
-    register_builtin_adapters()
+    from ..adapters.registry import TrainingAdapterRegistry
 
     task_id = payload.get("run_id", payload.get("task_id", "unknown"))
     config = payload.get("config", {})
@@ -48,7 +46,7 @@ async def handle_start(payload: dict) -> dict:
         except Exception as e:
             logger.warning(f"Failed to send epoch event: {e}")
 
-    adapter._on_epoch_end = on_epoch_end
+    adapter.set_epoch_callback(on_epoch_end)
 
     _active_tasks[task_id] = adapter
 
@@ -170,8 +168,7 @@ async def handle_status(payload: dict) -> dict:
 
 async def handle_list_adapters(payload: dict) -> dict:
     """列出所有已注册的训练适配器"""
-    from ..adapters.registry import TrainingAdapterRegistry, register_builtin_adapters
-    register_builtin_adapters()
+    from ..adapters.registry import TrainingAdapterRegistry
     return {"adapters": TrainingAdapterRegistry.list_adapters()}
 
 

@@ -10,9 +10,9 @@ $packageName = "LabelTorch-Green-v0.1.0"
 $scriptPath = $PSScriptRoot
 $rootDir = Resolve-Path "$scriptPath/.."
 $deployDir = "$rootDir/deploy/$packageName"
-$buildPreset = "mingw-release"
-$qtPath = "C:\Qt\6.11.1\mingw_64"
-$pythonEnv = "C:\A\Anaconda\envs\labeltorch"
+$buildPreset = "msvc2022-release"
+$qtPath = "C:\Qt\6.11.1\msvc2022_64"
+$pythonEnv = "C:\A\anaconda\envs\labeltorch"
 $buildDir = "$rootDir/out/build/$buildPreset"
 
 Write-Host "[1/6] Cleaning previous build..." -ForegroundColor Yellow
@@ -46,6 +46,13 @@ Copy-Item -Path "$pythonEnv/conda-meta" -Destination $pythonDest -Recurse
 Write-Host "[6/6] Copying backend and creating launcher..." -ForegroundColor Yellow
 New-Item -Path "$deployDir/backend" -ItemType Directory | Out-Null
 Copy-Item -Path "$rootDir/backend/labeltorch_backend" -Destination "$deployDir/backend" -Recurse
+
+# Copy QML modules
+$qmlDir = "$buildDir/LabelTorch"
+if (Test-Path $qmlDir) {
+    New-Item -Path "$deployDir/LabelTorch" -ItemType Directory -Force | Out-Null
+    Copy-Item -Path "$qmlDir/*" -Destination "$deployDir/LabelTorch" -Recurse
+}
 
 # Create launcher script
 $launcherContent = @'

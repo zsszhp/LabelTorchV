@@ -31,8 +31,13 @@ qt_add_qml_module(labeltorch_annotation
         AnnotationModel.cpp
 )
 
+target_include_directories(labeltorch_annotation PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
 target_link_libraries(labeltorch_annotation PUBLIC
     labeltorch_core
+    labeltorch_theme
     Qt6::Quick
     Qt6::Sql
 )

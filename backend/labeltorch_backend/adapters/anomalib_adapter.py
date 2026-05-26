@@ -8,7 +8,7 @@ import logging
 import os
 import threading
 from typing import Callable, Optional
-from .base import TrainingAdapter
+from .base import TrainingAdapter, StopTrainingException
 
 logger = logging.getLogger(__name__)
 
@@ -522,8 +522,3 @@ class AnomalibAdapter(TrainingAdapter):
     def get_status(self) -> dict:
         """获取当前训练状态"""
         return {"status": self._status, "metrics": self._metrics}
-
-
-class StopTrainingException(Exception):
-    """训练停止异常"""
-    pass

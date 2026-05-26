@@ -1,7 +1,7 @@
 // DatasetStatsView.qml - 数据统计视图
 import QtQuick
 import QtQuick.Controls
-import LabelTorch.Shell
+import LabelTorch.Theme
 import QtQuick.Layouts
 
 Item {

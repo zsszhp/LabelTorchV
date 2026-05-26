@@ -12,10 +12,31 @@ add_library(labeltorch_core STATIC
 
 target_include_directories(labeltorch_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/database
+    ${CMAKE_CURRENT_SOURCE_DIR}/filesystem
+    ${CMAKE_CURRENT_SOURCE_DIR}/ipc
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/cache
 )
 
 target_link_libraries(labeltorch_core PUBLIC
     Qt6::Core
     Qt6::Gui
     Qt6::Sql
+)
+
+# ==================== Precompiled Headers (PCH) ====================
+target_precompile_headers(labeltorch_core PRIVATE
+    <QDateTime>
+    <QDir>
+    <QFile>
+    <QTextStream>
+    <QMutex>
+    <QMutexLocker>
+    <QStandardPaths>
+    <QLoggingCategory>
+    <QDebug>
+    <QString>
+    <QList>
+    <QMap>
 )

@@ -1,7 +1,7 @@
 // ExportPage.qml - 导出中心
 import QtQuick
 import QtQuick.Controls
-import LabelTorch.Shell
+import LabelTorch.Theme
 import QtQuick.Layouts
 
 Item {

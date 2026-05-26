@@ -2,7 +2,7 @@
 // 支持实时双图表（Loss + 精度指标）、可折叠参数面板、适配器自适应配置
 import QtQuick
 import QtQuick.Controls
-import LabelTorch.Shell
+import LabelTorch.Theme
 import QtQuick.Layouts
 
 Item {

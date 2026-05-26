@@ -19,8 +19,13 @@ qt_add_qml_module(labeltorch_dataset
         DatasetModel.cpp
 )
 
+target_include_directories(labeltorch_dataset PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
 target_link_libraries(labeltorch_dataset PUBLIC
     labeltorch_core
+    labeltorch_theme
     Qt6::Quick
     Qt6::QuickDialogs2
     Qt6::Sql

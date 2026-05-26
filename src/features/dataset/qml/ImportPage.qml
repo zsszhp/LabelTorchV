@@ -3,7 +3,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import LabelTorch.Shell
+import LabelTorch.Theme
 import QtQuick.Dialogs
 
 Item {

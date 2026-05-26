@@ -6,6 +6,8 @@ qt_add_executable(${EXECUTABLE_NAME}
 
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE
     labeltorch_core
+    labeltorch_theme
+    labeltorch_themeplugin
     labeltorch_shell
     labeltorch_shellplugin
     labeltorch_project
@@ -31,19 +33,6 @@ target_link_libraries(${EXECUTABLE_NAME} PRIVATE
     dbghelp
 )
 
-target_include_directories(${EXECUTABLE_NAME} PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/features/project
-    ${CMAKE_SOURCE_DIR}/src/features/dataset
-    ${CMAKE_SOURCE_DIR}/src/features/annotation
-    ${CMAKE_SOURCE_DIR}/src/features/annotation/canvas
-    ${CMAKE_SOURCE_DIR}/src/features/training
-    ${CMAKE_SOURCE_DIR}/src/features/model
-    ${CMAKE_SOURCE_DIR}/src/features/inference
-    ${CMAKE_SOURCE_DIR}/src/features/export
-    ${CMAKE_SOURCE_DIR}/src/core/database
-    ${CMAKE_SOURCE_DIR}/src/core/utils
-)
-
 if(WIN32)
     target_compile_definitions(${EXECUTABLE_NAME} PRIVATE NOMINMAX)
     target_compile_options(${EXECUTABLE_NAME} PRIVATE /FS /MP)
@@ -55,14 +44,16 @@ if(WIN32)
         )
     endif()
 
-    # windeployqt — automatically copy Qt runtime DLLs next to the executable
-    find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${Qt6_DIR}/../../../bin")
+    # windeployqt — automatically copy Qt runtime DLLs and compiler runtimes next to the executable
+    find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${QT_INSTALL_BINS}")
 
     if(WINDEPLOYQT_EXECUTABLE)
         add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
             COMMAND "${WINDEPLOYQT_EXECUTABLE}"
                 --no-translations
                 --no-opengl-sw
+                --compiler-runtime
+                --qmldir "${CMAKE_SOURCE_DIR}/src/theme"
                 --qmldir "${CMAKE_SOURCE_DIR}/src/shell/qml"
                 --qmldir "${CMAKE_SOURCE_DIR}/src/features/project/qml"
                 --qmldir "${CMAKE_SOURCE_DIR}/src/features/dataset/qml"
@@ -77,27 +68,20 @@ if(WIN32)
     else()
         message(WARNING "windeployqt not found - Qt runtime DLLs will not be deployed")
     endif()
-
-    # 手动复制MSVC运行时DLL（windeployqt --compiler-runtime在Debug模式下可能不部署）
-    if(MSVC)
-        get_filename_component(MSVC_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
-        set(MSVC_RUNTIME_DLLS
-            vcruntime140.dll
-            vcruntime140_1.dll
-            msvcp140.dll
-            msvcp140_1.dll
-            msvcp140_2.dll
-            msvcp140_codecvt_ids.dll
-        )
-        foreach(DLL ${MSVC_RUNTIME_DLLS})
-            if(EXISTS "${MSVC_BIN_DIR}/${DLL}")
-                add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
-                    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-                        "${MSVC_BIN_DIR}/${DLL}"
-                        "$<TARGET_FILE_DIR:${EXECUTABLE_NAME}>"
-                    COMMENT "Copying MSVC runtime: ${DLL}"
-                )
-            endif()
-        endforeach()
-    endif()
 endif()
+
+# ==================== Precompiled Headers (PCH) ====================
+target_precompile_headers(${EXECUTABLE_NAME} PRIVATE
+    <QGuiApplication>
+    <QQmlApplicationEngine>
+    <QQmlContext>
+    <QQuickStyle>
+    <QIcon>
+    <QStandardPaths>
+    <QDir>
+    <QString>
+    <QList>
+    <QMap>
+    <QDebug>
+    <QObject>
+)

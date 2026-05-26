@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import LabelTorch.Shell
+import LabelTorch.Theme
 
 ApplicationWindow {
     id: root
@@ -415,7 +416,7 @@ ApplicationWindow {
         LogPanel {
             id: logPanel
             Layout.fillWidth: true
-            Layout.preferredHeight: collapsed ? 28 : Theme.logPanelHeight
+            Layout.preferredHeight: logPanel.collapsed ? 28 : Theme.logPanelHeight
         }
     }
 

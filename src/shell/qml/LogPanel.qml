@@ -1,10 +1,13 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import LabelTorch.Theme
 
 Rectangle {
     id: root
-    color: Theme.bgTertiary
+    color: Qt.alpha(Theme.bgPrimary, Theme.glassOpacity)
+    border.color: Theme.border
+    border.width: 1
 
     property alias logText: logArea.text
     property bool autoScroll: true
@@ -31,45 +34,52 @@ Rectangle {
         anchors.fill: parent
         spacing: 0
 
+        // 顶栏
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 28
+            Layout.preferredHeight: 32
             color: Theme.bgSecondary
-            radius: 0
+            border.color: Theme.border
+            border.width: 1
 
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 8
-                spacing: 8
+                anchors.leftMargin: Theme.spacingLarge
+                anchors.rightMargin: Theme.spacingNormal
+                spacing: Theme.spacingNormal
 
                 Label {
-                    text: "\u25B2 日志"
-                    color: Theme.textSecondary
+                    text: "⌨ LOG PANEL"
+                    color: Theme.accentPrimary
                     font.pixelSize: Theme.fontSizeSmall
                     font.bold: true
+                    font.family: Theme.fontFamilyMono
                 }
 
                 Item { Layout.fillWidth: true }
 
                 Label {
-                    text: autoScroll ? "自动滚动" : "手动"
+                    text: autoScroll ? "SCROLL ACTIVE" : "SCROLL MANUAL"
                     color: autoScroll ? Theme.accentSuccess : Theme.textMuted
-                    font.pixelSize: Theme.fontSizeSmall
+                    font.pixelSize: Theme.fontSizeCaption
+                    font.bold: true
+                    font.family: Theme.fontFamilyMono
                 }
 
                 Button {
-                    text: "清除"
+                    text: "CLEAR"
                     flat: true
-                    font.pixelSize: Theme.fontSizeSmall
-                    palette.buttonText: Theme.textMuted
+                    font.pixelSize: Theme.fontSizeCaption
+                    font.family: Theme.fontFamilyMono
+                    palette.buttonText: Theme.textSecondary
                     onClicked: root.clear()
                 }
 
                 Button {
-                    text: collapsed ? "展开" : "折叠"
+                    text: collapsed ? "EXPAND ▲" : "COLLAPSE ▼"
                     flat: true
-                    font.pixelSize: Theme.fontSizeSmall
+                    font.pixelSize: Theme.fontSizeCaption
+                    font.family: Theme.fontFamilyMono
                     palette.buttonText: Theme.accentPrimary
                     onClicked: {
                         collapsed = !collapsed
@@ -83,6 +93,7 @@ Rectangle {
             }
         }
 
+        // 内容区
         Flickable {
             id: logFlickable
             Layout.fillWidth: true
@@ -91,6 +102,10 @@ Rectangle {
             clip: true
             contentWidth: logArea.width
             contentHeight: logArea.height
+            leftMargin: Theme.spacingLarge
+            topMargin: Theme.spacingNormal
+            rightMargin: Theme.spacingLarge
+            bottomMargin: Theme.spacingNormal
 
             ScrollBar.vertical: ScrollBar {
                 active: true

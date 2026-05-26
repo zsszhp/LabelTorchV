@@ -1,7 +1,7 @@
 // ConfigPanel.qml - Training parameter configuration panel
 import QtQuick
 import QtQuick.Controls
-import LabelTorch.Shell
+import LabelTorch.Theme
 import QtQuick.Layouts
 
 Rectangle {

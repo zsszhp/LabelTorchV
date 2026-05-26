@@ -1,7 +1,7 @@
 // LogView.qml - Training log viewer with auto-scroll
 import QtQuick
 import QtQuick.Controls
-import LabelTorch.Shell
+import LabelTorch.Theme
 import QtQuick.Layouts
 
 Rectangle {

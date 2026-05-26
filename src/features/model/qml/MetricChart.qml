@@ -1,7 +1,7 @@
 // MetricChart.qml - Metrics display (text-based, chart rendering deferred)
 import QtQuick
 import QtQuick.Controls
-import LabelTorch.Shell
+import LabelTorch.Theme
 import QtQuick.Layouts
 
 Item {

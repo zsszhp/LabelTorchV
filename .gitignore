@@ -6,10 +6,15 @@
 .monkeycode
 .trae
 .ai_context.md
+.ai_recent_changes.txt
 .codegraph/
 
 # IDE
 .vs
+
+# Third-party tools (install system-wide, not in project)
+tools/
+
 # Reference projects (large repos, cloned locally)
 reference/*/
 !reference/README.md

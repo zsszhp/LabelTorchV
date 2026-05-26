@@ -1,7 +1,4 @@
 cmake_minimum_required(VERSION 3.22.1)
-# 直接设置环境变量为浅色
-set(ENV{QT_QPA_PLATFORMTHEME} "fusion")
-set(ENV{QT_QPA_THEME} "light")
 
 set(EXECUTABLE_NAME LabelTorchV)
 
@@ -14,6 +11,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_DISABLE_FIND_PACKAGE_WrapVulkanHeaders ON)
+
+add_definitions(-DWIN32_LEAN_AND_MEAN)
 
 # 自定义CMake模块路径
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")

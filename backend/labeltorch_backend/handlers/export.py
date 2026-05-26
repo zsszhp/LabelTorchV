@@ -3,7 +3,6 @@
 
 支持 pt/onnx 导出，以及导出产物验证
 """
-import asyncio
 import logging
 import os
 
@@ -28,8 +27,7 @@ async def handle_run(payload: dict) -> dict:
         return {"status": "failed", "error": f"Weight file not found: {weight_path}"}
 
     try:
-        from ..adapters.registry import TrainingAdapterRegistry, register_builtin_adapters
-        register_builtin_adapters()
+        from ..adapters.registry import TrainingAdapterRegistry
 
         adapter_class = TrainingAdapterRegistry.get(adapter_name)
         if adapter_class is None:
@@ -80,7 +78,7 @@ async def handle_verify(payload: dict) -> dict:
         artifact_path: 导出产物文件路径
         format: 导出格式
     """
-    artifact_id = payload.get("artifact_id", "")
+    _artifact_id = payload.get("artifact_id", "")
     artifact_path = payload.get("output_path", "") or payload.get("artifact_path", "")
     artifact_format = payload.get("format", "onnx")
 
@@ -170,8 +168,7 @@ async def _verify_torchscript(artifact_path: str) -> dict:
         import torch
 
         model = torch.jit.load(artifact_path, map_location="cpu")
-
-        code = model.code
+        _code = model.code
         del model
 
         return {

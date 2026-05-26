@@ -1,7 +1,7 @@
 // AnnotationPage.qml - 标注工作台
 import QtQuick
 import QtQuick.Controls
-import LabelTorch.Shell
+import LabelTorch.Theme
 import QtQuick.Layouts
 
 Item {

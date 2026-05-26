@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import LabelTorch.Theme
 
 /// <summary>
 /// 主动学习主页面

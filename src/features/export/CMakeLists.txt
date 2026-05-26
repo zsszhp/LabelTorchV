@@ -13,11 +13,12 @@ qt_add_qml_module(labeltorch_export
         ExportService.cpp
 )
 
-target_link_libraries(labeltorch_export PUBLIC
-    labeltorch_core
-    Qt6::Quick
+target_include_directories(labeltorch_export PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_include_directories(labeltorch_export PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/core/database
+target_link_libraries(labeltorch_export PUBLIC
+    labeltorch_core
+    labeltorch_theme
+    Qt6::Quick
 )

@@ -4,13 +4,11 @@ Ultralytics 训练适配器
 封装 Ultralytics YOLO 训练/推理/导出 API
 """
 import asyncio
-import json
 import logging
 import os
 import threading
-from pathlib import Path
-from typing import Any, Callable, Optional
-from .base import TrainingAdapter
+from typing import Callable, Optional
+from .base import TrainingAdapter, StopTrainingException
 
 logger = logging.getLogger(__name__)
 
@@ -375,8 +373,3 @@ class UltralyticsAdapter(TrainingAdapter):
     def get_status(self) -> dict:
         """获取当前训练状态"""
         return {"status": self._status, "metrics": self._metrics}
-
-
-class StopTrainingException(Exception):
-    """训练停止异常，用于中断训练线程"""
-    pass

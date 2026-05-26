@@ -1,7 +1,7 @@
-import QtQuick 2.15
-import QtQuick.Controls 2.15
-import QtQuick.Layouts 1.15
-import LabelTorch.Theme 1.0
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import LabelTorch.Theme
 
 /**
  * 异常检测推理面板 V2

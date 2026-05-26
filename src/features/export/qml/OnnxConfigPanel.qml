@@ -1,7 +1,7 @@
 // OnnxConfigPanel.qml - ONNX export options
 import QtQuick
 import QtQuick.Controls
-import LabelTorch.Shell
+import LabelTorch.Theme
 import QtQuick.Layouts
 
 Rectangle {

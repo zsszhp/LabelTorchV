@@ -1,7 +1,7 @@
 // SnapshotPage.qml - 数据快照管理
 import QtQuick
 import QtQuick.Controls
-import LabelTorch.Shell
+import LabelTorch.Theme
 import QtQuick.Layouts
 import QtQuick.Dialogs
 

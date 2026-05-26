@@ -2,14 +2,15 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import LabelTorch.Theme
 
 Item {
     id: root
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 24
-        spacing: 16
+        anchors.margins: Theme.spacingXLarge
+        spacing: Theme.spacingLarge
 
         // 标题栏
         RowLayout {
@@ -17,17 +18,19 @@ Item {
 
             Label {
                 text: "类别体系"
-                font.pixelSize: 24
+                font.pixelSize: Theme.fontSizeTitle
                 font.bold: true
-                color: "#cdd6f4"
+                font.family: Theme.fontFamily
+                color: Theme.textPrimary
             }
 
             Item { Layout.fillWidth: true }
 
             Label {
                 text: taxonomyModel.taxonomyId ? "版本: v" + taxonomyService.getTaxonomyVersion(taxonomyModel.taxonomyId) : ""
-                font.pixelSize: 13
-                color: "#a6adc8"
+                font.pixelSize: Theme.fontSizeNormal
+                font.family: Theme.fontFamily
+                color: Theme.textSecondary
             }
         }
 
@@ -35,8 +38,9 @@ Item {
         Label {
             visible: !taxonomyModel.taxonomyId
             text: "请先打开一个项目以管理类别体系"
-            font.pixelSize: 14
-            color: "#a6adc8"
+            font.pixelSize: Theme.fontSizeSubheading
+            font.family: Theme.fontFamily
+            color: Theme.textSecondary
             Layout.fillWidth: true
         }
 
@@ -45,30 +49,31 @@ Item {
             visible: taxonomyModel.taxonomyId
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: "#181825"
-            radius: 8
+            color: Theme.bgCard
+            radius: Theme.radiusNormal
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 12
-                spacing: 8
+                anchors.margins: Theme.spacingNormal
+                spacing: Theme.spacingNormal
 
                 // 添加类别行
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 8
+                    spacing: Theme.spacingNormal
 
                     TextField {
                         id: newClassField
                         Layout.fillWidth: true
                         placeholderText: "输入类别名称..."
-                        color: "#cdd6f4"
-                        font.pixelSize: 14
+                        color: Theme.textPrimary
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.family: Theme.fontFamily
 
                         background: Rectangle {
-                            color: "#313244"
-                            radius: 4
-                            border.color: newClassField.activeFocus ? "#89b4fa" : "#45475a"
+                            color: Theme.bgInput
+                            radius: Theme.radiusSmall
+                            border.color: newClassField.activeFocus ? Theme.accentPrimary : Theme.borderNormal
                             border.width: 1
                         }
 
@@ -78,6 +83,7 @@ Item {
                     Button {
                         id: addClassBtn
                         text: "添加"
+                        font.family: Theme.fontFamily
                         onClicked: {
                             if (newClassField.text.trim()) {
                                 taxonomyModel.addClass(newClassField.text.trim())
@@ -94,32 +100,33 @@ Item {
                     Layout.fillHeight: true
                     clip: true
                     model: taxonomyModel
-                    spacing: 4
+                    spacing: Theme.spacingTiny
 
                     delegate: Rectangle {
                         width: classListView.width
                         height: 40
-                        color: mouseArea.containsMouse ? "#313244" : "#1e1e2e"
-                        radius: 4
+                        color: mouseArea.containsMouse ? Theme.bgHover : Theme.bgTertiary
+                        radius: Theme.radiusSmall
 
                         RowLayout {
                             anchors.fill: parent
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: 12
-                            spacing: 8
+                            anchors.leftMargin: Theme.spacingNormal
+                            anchors.rightMargin: Theme.spacingNormal
+                            spacing: Theme.spacingNormal
 
                             // 类别序号
                             Rectangle {
                                 width: 28
                                 height: 28
-                                radius: 4
-                                color: "#45475a"
+                                radius: Theme.radiusSmall
+                                color: Theme.borderNormal
 
                                 Label {
                                     anchors.centerIn: parent
                                     text: model.classIndex
-                                    font.pixelSize: 12
-                                    color: "#cdd6f4"
+                                    font.pixelSize: Theme.fontSizeCaption
+                                    font.family: Theme.fontFamily
+                                    color: Theme.textPrimary
                                 }
                             }
 
@@ -128,8 +135,9 @@ Item {
                                 id: classLabel
                                 Layout.fillWidth: true
                                 text: model.className
-                                font.pixelSize: 14
-                                color: "#cdd6f4"
+                                font.pixelSize: Theme.fontSizeNormal
+                                font.family: Theme.fontFamily
+                                color: Theme.textPrimary
                                 visible: !editLoader.active
                             }
 
@@ -140,14 +148,15 @@ Item {
 
                                 sourceComponent: TextField {
                                     text: model.className
-                                    color: "#cdd6f4"
-                                    font.pixelSize: 14
+                                    color: Theme.textPrimary
+                                    font.pixelSize: Theme.fontSizeNormal
+                                    font.family: Theme.fontFamily
                                     horizontalAlignment: TextInput.AlignLeft
 
                                     background: Rectangle {
-                                        color: "#313244"
-                                        radius: 4
-                                        border.color: "#89b4fa"
+                                        color: Theme.bgInput
+                                        radius: Theme.radiusSmall
+                                        border.color: Theme.accentPrimary
                                         border.width: 1
                                     }
 
@@ -165,17 +174,17 @@ Item {
 
                             ToolButton {
                                 text: "\u270F"
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fontSizeNormal
                                 onClicked: editLoader.active = true
 
                                 background: Rectangle {
-                                    color: parent.hovered ? "#45475a" : "transparent"
-                                    radius: 4
+                                    color: parent.hovered ? Theme.bgHover : "transparent"
+                                    radius: Theme.radiusSmall
                                 }
                                 contentItem: Label {
                                     text: parent.text
                                     font.pixelSize: parent.font.pixelSize
-                                    color: "#89b4fa"
+                                    color: Theme.accentPrimary
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }
@@ -183,17 +192,17 @@ Item {
 
                             ToolButton {
                                 text: "\u2715"
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fontSizeNormal
                                 onClicked: taxonomyModel.removeClass(model.classIndex)
 
                                 background: Rectangle {
-                                    color: parent.hovered ? "#45475a" : "transparent"
-                                    radius: 4
+                                    color: parent.hovered ? Theme.bgHover : "transparent"
+                                    radius: Theme.radiusSmall
                                 }
                                 contentItem: Label {
                                     text: parent.text
                                     font.pixelSize: parent.font.pixelSize
-                                    color: "#f38ba8"
+                                    color: Theme.accentError
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }
@@ -213,8 +222,9 @@ Item {
                 Label {
                     Layout.fillWidth: true
                     text: "共 " + taxonomyModel.rowCount() + " 个类别"
-                    font.pixelSize: 12
-                    color: "#6c7086"
+                    font.pixelSize: Theme.fontSizeCaption
+                    font.family: Theme.fontFamily
+                    color: Theme.textMuted
                 }
             }
         }

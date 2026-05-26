@@ -25,9 +25,6 @@ target_link_libraries(test_labelio PRIVATE
     labeltorch_annotation
     Qt6::Test
 )
-target_include_directories(test_labelio PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/features/annotation
-)
 add_test(NAME LabelIOTest COMMAND test_labelio)
 
 # 几何内核测试
@@ -38,9 +35,6 @@ target_link_libraries(test_geometry PRIVATE
     labeltorch_core
     labeltorch_annotation
     Qt6::Test
-)
-target_include_directories(test_geometry PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/features/annotation
 )
 add_test(NAME GeometryTest COMMAND test_geometry)
 
@@ -64,12 +58,6 @@ target_link_libraries(test_taxonomy PRIVATE
     Qt6::Test
     Qt6::Sql
 )
-target_include_directories(test_taxonomy PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/features/project
-    ${CMAKE_SOURCE_DIR}/src/core/database
-    ${CMAKE_SOURCE_DIR}/src/core/filesystem
-    ${CMAKE_SOURCE_DIR}/src/core/utils
-)
 add_test(NAME TaxonomyTest COMMAND test_taxonomy)
 
 # 快照测试
@@ -81,10 +69,6 @@ target_link_libraries(test_snapshot PRIVATE
     labeltorch_training
     Qt6::Test
     Qt6::Sql
-)
-target_include_directories(test_snapshot PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/features/training
-    ${CMAKE_SOURCE_DIR}/src/core/database
 )
 add_test(NAME SnapshotTest COMMAND test_snapshot)
 
@@ -98,11 +82,6 @@ target_link_libraries(test_training PRIVATE
     Qt6::Test
     Qt6::Sql
 )
-target_include_directories(test_training PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/features/training
-    ${CMAKE_SOURCE_DIR}/src/core/database
-    ${CMAKE_SOURCE_DIR}/src/core/ipc
-)
 add_test(NAME TrainingTest COMMAND test_training)
 
 # 模型服务测试
@@ -114,10 +93,6 @@ target_link_libraries(test_model PRIVATE
     labeltorch_model
     Qt6::Test
     Qt6::Sql
-)
-target_include_directories(test_model PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/features/model
-    ${CMAKE_SOURCE_DIR}/src/core/database
 )
 add_test(NAME ModelTest COMMAND test_model)
 
@@ -132,12 +107,6 @@ target_link_libraries(test_inference PRIVATE
     Qt6::Test
     Qt6::Sql
 )
-target_include_directories(test_inference PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/features/inference
-    ${CMAKE_SOURCE_DIR}/src/features/model
-    ${CMAKE_SOURCE_DIR}/src/core/database
-    ${CMAKE_SOURCE_DIR}/src/core/ipc
-)
 add_test(NAME InferenceTest COMMAND test_inference)
 
 # 导出服务测试
@@ -150,11 +119,5 @@ target_link_libraries(test_export PRIVATE
     labeltorch_model
     Qt6::Test
     Qt6::Sql
-)
-target_include_directories(test_export PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/features/export
-    ${CMAKE_SOURCE_DIR}/src/features/model
-    ${CMAKE_SOURCE_DIR}/src/core/database
-    ${CMAKE_SOURCE_DIR}/src/core/ipc
 )
 add_test(NAME ExportTest COMMAND test_export)
