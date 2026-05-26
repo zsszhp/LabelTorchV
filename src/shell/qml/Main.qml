@@ -283,6 +283,7 @@ ApplicationWindow {
                                     Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
 
                                     SequentialAnimation on opacity {
+                                        running: parent.visible
                                         loops: Animation.Infinite
                                         NumberAnimation { from: 1.0; to: 0.3; duration: 1000; easing.type: Easing.InOutQuad }
                                         NumberAnimation { from: 0.3; to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
@@ -366,6 +367,7 @@ ApplicationWindow {
 
             // === 主内容区 ===
             StackLayout {
+                id: contentStack
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 currentIndex: {
@@ -381,32 +383,56 @@ ApplicationWindow {
                     }
                 }
 
+                property var pageSources: [
+                    "qrc:/qt/qml/LabelTorch/Project/qml/ProjectPage.qml",
+                    "qrc:/qt/qml/LabelTorch/Project/qml/TaxonomyPage.qml",
+                    "qrc:/qt/qml/LabelTorch/Dataset/qml/ImportPage.qml",
+                    "qrc:/qt/qml/LabelTorch/Annotation/qml/AnnotationPage.qml",
+                    "qrc:/qt/qml/LabelTorch/Training/qml/TrainingPage.qml",
+                    "qrc:/qt/qml/LabelTorch/Model/qml/ModelPage.qml",
+                    "qrc:/qt/qml/LabelTorch/Export/qml/ExportPage.qml"
+                ]
+
+                // 记录各页面是否已加载过，已加载的页面保留不卸载
+                property var loadedFlags: [true, false, false, false, false, false, false]
+
+                onCurrentIndexChanged: {
+                    if (currentIndex >= 0 && currentIndex < pageSources.length) {
+                        var loader = itemAt(currentIndex)
+                        if (loader && !loader.source.toString() && !loadedFlags[currentIndex]) {
+                            loader.source = pageSources[currentIndex]
+                            loadedFlags[currentIndex] = true
+                        }
+                    }
+                }
+
                 Loader {
-                    source: "qrc:/qt/qml/LabelTorch/Project/qml/ProjectPage.qml"
+                    property bool wasLoaded: false
+                    source: contentStack.pageSources[0]
                     onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
                 }
                 Loader {
-                    source: "qrc:/qt/qml/LabelTorch/Project/qml/TaxonomyPage.qml"
+                    property bool wasLoaded: false
                     onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
                 }
                 Loader {
-                    source: "qrc:/qt/qml/LabelTorch/Dataset/qml/ImportPage.qml"
+                    property bool wasLoaded: false
                     onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
                 }
                 Loader {
-                    source: "qrc:/qt/qml/LabelTorch/Annotation/qml/AnnotationPage.qml"
+                    property bool wasLoaded: false
                     onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
                 }
                 Loader {
-                    source: "qrc:/qt/qml/LabelTorch/Training/qml/TrainingPage.qml"
+                    property bool wasLoaded: false
                     onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
                 }
                 Loader {
-                    source: "qrc:/qt/qml/LabelTorch/Model/qml/ModelPage.qml"
+                    property bool wasLoaded: false
                     onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
                 }
                 Loader {
-                    source: "qrc:/qt/qml/LabelTorch/Export/qml/ExportPage.qml"
+                    property bool wasLoaded: false
                     onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
                 }
             }

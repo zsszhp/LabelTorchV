@@ -70,6 +70,15 @@ static int __cdecl msvcReportHook(int reportType, char *message, int *returnValu
 static QtMessageHandler originalHandler = nullptr;
 static void customMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
+    // 过滤Qt内部高频调试日志，避免刷屏
+    if (type == QtDebugMsg) {
+        if (msg.contains("qt.scenegraph") ||
+            msg.contains("qt.qpa.") ||
+            msg.contains("qt.qml.binding")) {
+            return;
+        }
+    }
+
     if (type == QtFatalMsg && (msg.contains("isnan") || 
                                msg.contains("qnumeric.h") || 
                                msg.contains("FP(minimal)") || 

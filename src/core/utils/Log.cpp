@@ -104,8 +104,9 @@ void init(const QString &logDir)
     // Install custom message handler
     originalHandler = qInstallMessageHandler(logMessageHandler);
 
-    // Default: enable info level and above for all categories
-    QLoggingCategory::setFilterRules(QStringLiteral("lt.*=true\nqt.*=true"));
+    // 启用应用自身类别(lt.*)，禁用Qt内部高频调试输出（scenegraph/qpa/binding等）
+    QLoggingCategory::setFilterRules(
+        QStringLiteral("lt.*=true\nqt.*.debug=false\nqt.scenegraph.*=false"));
 
     qInfo() << "=== LabelTorch logging initialized ===";
     qInfo() << "Log file:" << filePath;
