@@ -29,6 +29,7 @@ QVariant DatasetModel::data(const QModelIndex &index, int role) const
         case SampleCountRole: return d.sampleCount;
         case ImportStatusRole: return d.importStatus;
         case CreatedAtRole:   return d.createdAt;
+        case FormatRole:      return d.format;
         default:              return {};
     }
 }
@@ -43,7 +44,8 @@ QHash<int, QByteArray> DatasetModel::roleNames() const
         {ImageRootRole,    "imageRoot"},
         {SampleCountRole,  "sampleCount"},
         {ImportStatusRole, "importStatus"},
-        {CreatedAtRole,    "createdAt"}
+        {CreatedAtRole,    "createdAt"},
+        {FormatRole,       "format"}
     };
 }
 
@@ -66,10 +68,10 @@ void DatasetModel::refresh()
     QSqlQuery query(Database::instance().database());
 
     if (m_projectId.isEmpty()) {
-        query.prepare("SELECT id, name, image_root, sample_count, import_status, created_at "
+        query.prepare("SELECT id, name, image_root, sample_count, import_status, created_at, format "
                       "FROM datasets ORDER BY created_at DESC");
     } else {
-        query.prepare("SELECT id, name, image_root, sample_count, import_status, created_at "
+        query.prepare("SELECT id, name, image_root, sample_count, import_status, created_at, format "
                       "FROM datasets WHERE project_id = ? ORDER BY created_at DESC");
         query.addBindValue(m_projectId);
     }
@@ -86,6 +88,7 @@ void DatasetModel::refresh()
             d.sampleCount = query.value(3).toInt();
             d.importStatus = query.value(4).toString();
             d.createdAt = query.value(5).toString();
+            d.format = query.value(6).toString();
             m_datasets.append(d);
         }
     } else {

@@ -141,6 +141,9 @@ int main(int argc, char *argv[])
     app.setApplicationName("LabelTorch");
     app.setApplicationVersion("0.1.0");
 
+    // 设置应用图标，任务栏和窗口标题栏显示
+    app.setWindowIcon(QIcon(QStringLiteral(":/icons/labeltorch.png")));
+
     Log::init();
     ltInfo(LT_LOG_APP()) << "Application starting" << "version" << app.applicationVersion()
                          << "Qt" << QT_VERSION_STR;

@@ -8,6 +8,7 @@
 #include <QSet>
 #include <QMap>
 #include <QDir>
+#include <QFileInfoList>
 
 class ImportScanner : public QObject
 {
@@ -20,9 +21,10 @@ public:
      * @brief 扫描指定图片和标签目录中的图像-标签对
      *
      * 自动检测标签格式：COCO JSON (.json) 优先于 YOLO txt (.txt)
+     * 支持递归子目录扫描，标签目录可为空（无标签导入场景）
      *
      * @param imageDir 图片目录
-     * @param labelDir 标签目录
+     * @param labelDir 标签目录（可为空）
      * @return QVariantMap 包含 total, matched, unmatchedImages, unmatchedLabels,
      *         samples, categories 等键
      */
@@ -38,7 +40,7 @@ public:
      *
      * @param folderPath 用户选中的文件夹绝对路径
      * @return QVariantMap 包含：
-     *         - "detectedFormat": QString ("yolo_txt" | "coco_json" | "anomaly_unsupervised")
+     *         - "detectedFormat": QString ("yolo_txt" | "coco_json" | "anomaly_unsupervised" | "image_only")
      *         - "imageDir": QString (实际图片扫描基准路径)
      *         - "labelDirOrPath": QString (实际标签文件夹或 JSON 文件绝对路径)
      *         - "imageCount": int (探测到的有效图片总数)
@@ -54,6 +56,25 @@ public:
      * @brief 验证单行 OBB 标签（9个值：class_id x1 y1 x2 y2 x3 y3 x4 y4）
      */
     static QVariantMap validateOBBLine(const QString &line);
+
+    /**
+     * @brief 递归收集目录下所有图片文件
+     * @param dir 目标目录
+     * @param recursive 是否递归子目录
+     * @return QFileInfoList 图片文件列表
+     */
+    QFileInfoList collectImageFiles(const QDir &dir, bool recursive = true);
+
+    /**
+     * @brief 递归收集目录下所有标签文件
+     * @param dir 目标目录
+     * @param recursive 是否递归子目录
+     * @return QFileInfoList 标签文件列表
+     */
+    QFileInfoList collectLabelFiles(const QDir &dir, bool recursive = true);
+
+    static bool isImageFile(const QString &fileName);
+    static bool isLabelFile(const QString &fileName);
 
 signals:
     void scanProgress(int current, int total);
@@ -76,22 +97,6 @@ private:
     QVariantMap scanWithJsonLabels(const QString &imageDir, const QString &labelDir);
 
     /**
-     * @brief 递归收集目录下所有图片文件
-     * @param dir 目标目录
-     * @param recursive 是否递归子目录
-     * @return QFileInfoList 图片文件列表
-     */
-    QFileInfoList collectImageFiles(const QDir &dir, bool recursive = true);
-
-    /**
-     * @brief 递归收集目录下所有标签文件
-     * @param dir 目标目录
-     * @param recursive 是否递归子目录
-     * @return QFileInfoList 标签文件列表
-     */
-    QFileInfoList collectLabelFiles(const QDir &dir, bool recursive = true);
-
-    /**
      * @brief 探测 Anomalib 异常检测目录结构
      * @param folderPath 根目录
      * @return QVariantMap 探测结果，包含 detectedFormat, imageCount 等
@@ -111,9 +116,6 @@ private:
      * @return QVariantMap 探测结果
      */
     QVariantMap detectFlatLayout(const QString &folderPath);
-
-    static bool isImageFile(const QString &fileName);
-    static bool isLabelFile(const QString &fileName);
 };
 
 #endif // IMPORTSCANNER_H

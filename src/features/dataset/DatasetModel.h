@@ -19,7 +19,8 @@ public:
         ImageRootRole,
         SampleCountRole,
         ImportStatusRole,
-        CreatedAtRole
+        CreatedAtRole,
+        FormatRole
     };
 
     int rowCount(const QModelIndex &parent = {}) const override;
@@ -42,6 +43,7 @@ private:
         int sampleCount;
         QString importStatus;
         QString createdAt;
+        QString format;
     };
 
     QString m_projectId;

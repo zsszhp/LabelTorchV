@@ -4,6 +4,18 @@ qt_add_executable(${EXECUTABLE_NAME}
     AppController.cpp
 )
 
+# Windows应用图标资源（.rc文件嵌入exe，资源管理器/任务栏显示）
+if(WIN32)
+    target_sources(${EXECUTABLE_NAME} PRIVATE app.rc)
+endif()
+
+# Qt资源文件（QML窗口图标）
+qt_add_resources(${EXECUTABLE_NAME} app_icons
+    PREFIX /icons
+    FILES
+        icons/labeltorch.png
+)
+
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE
     labeltorch_core
     labeltorch_theme

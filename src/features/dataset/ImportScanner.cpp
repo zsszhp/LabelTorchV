@@ -23,67 +23,58 @@ QVariantMap ImportScanner::scan(const QString &imageDir, const QString &labelDir
     QVariantList samples;
 
     QDir imgDir(imageDir);
-    QDir lblDir(labelDir);
 
     if (!imgDir.exists()) {
-        ltError(LT_LOG_DATASET()) << "Image directory does not exist:" << imageDir;
+        ltError(LT_LOG_DATASET()) << "图片目录不存在:" << imageDir;
         result["total"] = 0;
         result["matched"] = 0;
         result["unmatchedImages"] = 0;
         result["unmatchedLabels"] = 0;
         result["samples"] = samples;
-        result["error"] = QStringLiteral("Image directory does not exist: %1").arg(imageDir);
+        result["error"] = QStringLiteral("图片目录不存在: %1").arg(imageDir);
         emit scanCompleted();
         return result;
     }
 
-    if (!lblDir.exists()) {
-        ltError(LT_LOG_DATASET()) << "Label directory does not exist:" << labelDir;
-        result["total"] = 0;
-        result["matched"] = 0;
-        result["unmatchedImages"] = 0;
-        result["unmatchedLabels"] = 0;
-        result["samples"] = samples;
-        result["error"] = QStringLiteral("Label directory does not exist: %1").arg(labelDir);
-        emit scanCompleted();
-        return result;
-    }
+    // 标签目录可以为空（无标签导入场景：异常检测或待标注数据）
+    bool hasLabelDir = !labelDir.isEmpty() && QDir(labelDir).exists();
 
-    ltInfo(LT_LOG_DATASET()) << "Scan start: imageDir=" << imageDir << "labelDir=" << labelDir;
+    ltInfo(LT_LOG_DATASET()) << "扫描开始: imageDir=" << imageDir
+                             << "labelDir=" << labelDir
+                             << "hasLabelDir=" << hasLabelDir;
 
     // 检测标签目录中是否存在 JSON 文件，优先使用 JSON 格式
-    QFileInfoList labelFiles = lblDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
     bool hasJsonLabels = false;
-    for (const auto &fi : labelFiles) {
-        if (fi.suffix().toLower() == QStringLiteral("json")) {
-            hasJsonLabels = true;
-            break;
+    QFileInfoList labelFiles;
+    if (hasLabelDir) {
+        labelFiles = collectLabelFiles(QDir(labelDir), true);
+        for (const auto &fi : labelFiles) {
+            if (fi.suffix().toLower() == QStringLiteral("json")) {
+                hasJsonLabels = true;
+                break;
+            }
         }
     }
 
     // 如果存在 JSON 标签文件，优先使用 JSON 扫描流程
     if (hasJsonLabels) {
-        ltInfo(LT_LOG_DATASET()) << "Detected JSON label files, using COCO JSON scan flow";
+        ltInfo(LT_LOG_DATASET()) << "检测到 JSON 标签文件，使用 COCO JSON 扫描流程";
         QVariantMap jsonResult = scanWithJsonLabels(imageDir, labelDir);
         emit scanCompleted();
         return jsonResult;
     }
 
-    // 以下为原有 YOLO txt 扫描流程
-
-    // Collect image files by stem
-    QFileInfoList imageFiles = imgDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    // 以下为 YOLO txt 扫描流程（递归收集图片和标签文件）
+    QFileInfoList imageFiles = collectImageFiles(imgDir, true);
     QMap<QString, QFileInfo> imageByStem;
     for (const auto &fi : imageFiles) {
-        if (isImageFile(fi.fileName())) {
-            imageByStem[fi.completeBaseName()] = fi;
-        }
+        imageByStem[fi.completeBaseName()] = fi;
     }
 
-    // Collect label files by stem（复用上方已获取的 labelFiles 列表）
+    // 收集标签文件（递归）
     QMap<QString, QFileInfo> labelByStem;
     for (const auto &fi : labelFiles) {
-        if (isLabelFile(fi.fileName())) {
+        if (fi.suffix().toLower() == QStringLiteral("txt")) {
             labelByStem[fi.completeBaseName()] = fi;
         }
     }
@@ -95,7 +86,7 @@ QVariantMap ImportScanner::scan(const QString &imageDir, const QString &labelDir
     int unmatchedImages = 0;
     int unmatchedLabels = 0;
 
-    // Build the combined set of all stems
+    // 合并所有 stem
     QSet<QString> allStems;
     for (const auto &stem : imageByStem.keys()) allStems.insert(stem);
     for (const auto &stem : labelByStem.keys()) allStems.insert(stem);
@@ -122,7 +113,7 @@ QVariantMap ImportScanner::scan(const QString &imageDir, const QString &labelDir
         if (hasImage && hasLabel) {
             matched++;
 
-            // Parse the label file
+            // 解析标签文件
             QSet<int> classIds;
             QStringList parseErrors;
             bool valid = parseLabelFile(labelByStem[stem].absoluteFilePath(), classIds, parseErrors);
@@ -140,9 +131,11 @@ QVariantMap ImportScanner::scan(const QString &imageDir, const QString &labelDir
                 sample["errors"] = parseErrors;
             }
         } else if (hasImage) {
+            // 有图片无标签：仍为有效样本（可用于异常检测或待标注数据）
             unmatchedImages++;
             sample["status"] = QStringLiteral("unmatched_image");
-            sample["valid"] = false;
+            sample["valid"] = true;
+            sample["classIds"] = QVariantList();
         } else {
             unmatchedLabels++;
             sample["status"] = QStringLiteral("unmatched_label");
@@ -158,9 +151,9 @@ QVariantMap ImportScanner::scan(const QString &imageDir, const QString &labelDir
     result["unmatchedLabels"] = unmatchedLabels;
     result["samples"] = samples;
 
-    ltInfo(LT_LOG_DATASET()) << "Scan completed - matched:" << matched
-                             << "unmatched images:" << unmatchedImages
-                             << "unmatched labels:" << unmatchedLabels;
+    ltInfo(LT_LOG_DATASET()) << "扫描完成 - 匹配:" << matched
+                             << "无标签图片:" << unmatchedImages
+                             << "无图片标签:" << unmatchedLabels;
 
     emit scanCompleted();
     return result;
@@ -172,8 +165,8 @@ bool ImportScanner::parseLabelFile(const QString &filePath, QSet<int> &classIds,
 
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        errors.append(QStringLiteral("Cannot open file"));
-        ltWarning(LT_LOG_DATASET()) << "parseLabelFile: cannot open file:" << filePath;
+        errors.append(QStringLiteral("无法打开文件"));
+        ltWarning(LT_LOG_DATASET()) << "parseLabelFile: 无法打开文件:" << filePath;
         return false;
     }
 
@@ -188,30 +181,33 @@ bool ImportScanner::parseLabelFile(const QString &filePath, QSet<int> &classIds,
         if (line.isEmpty()) continue;
 
         QStringList parts = line.split(QChar(' '), Qt::SkipEmptyParts);
-        if (parts.size() != 5) {
-            errors.append(QStringLiteral("Line %1: expected 5 values, got %2")
+
+        // 支持 HBB 格式（5值: class_id cx cy w h）和 OBB 格式（9值: class_id x1 y1 x2 y2 x3 y3 x4 y4）
+        if (parts.size() != 5 && parts.size() != 9) {
+            errors.append(QStringLiteral("第 %1 行: 期望5值(HBB)或9值(OBB)，实际%2个值")
                               .arg(lineNumber).arg(parts.size()));
             allValid = false;
             continue;
         }
 
-        // Parse class_id (must be non-negative integer)
+        // 解析 class_id（必须为非负整数）
         bool ok = false;
         int classId = parts[0].toInt(&ok);
         if (!ok || classId < 0) {
-            errors.append(QStringLiteral("Line %1: invalid class_id '%2'")
+            errors.append(QStringLiteral("第 %1 行: 无效的 class_id '%2'")
                               .arg(lineNumber).arg(parts[0]));
             allValid = false;
             continue;
         }
 
-        // Parse cx, cy, w, h (must be floats in [0, 1])
+        // 验证坐标值（必须在 [0, 1] 范围内）
         bool coordsValid = true;
-        for (int i = 1; i < 5; ++i) {
+        int coordCount = parts.size() - 1;
+        for (int i = 1; i <= coordCount; ++i) {
             bool convOk = false;
             double val = parts[i].toDouble(&convOk);
             if (!convOk || val < 0.0 || val > 1.0) {
-                errors.append(QStringLiteral("Line %1: coordinate '%2' out of range [0,1]")
+                errors.append(QStringLiteral("第 %1 行: 坐标 '%2' 超出范围 [0,1]")
                                   .arg(lineNumber).arg(parts[i]));
                 coordsValid = false;
                 allValid = false;
@@ -280,7 +276,13 @@ bool ImportScanner::isImageFile(const QString &fileName)
     return ext == QStringLiteral("jpg")
         || ext == QStringLiteral("jpeg")
         || ext == QStringLiteral("png")
-        || ext == QStringLiteral("bmp");
+        || ext == QStringLiteral("bmp")
+        || ext == QStringLiteral("tif")
+        || ext == QStringLiteral("tiff")
+        || ext == QStringLiteral("webp")
+        || ext == QStringLiteral("pbm")
+        || ext == QStringLiteral("pgm")
+        || ext == QStringLiteral("ppm");
 }
 
 bool ImportScanner::isLabelFile(const QString &fileName)
@@ -501,19 +503,16 @@ QVariantMap ImportScanner::scanWithJsonLabels(const QString &imageDir, const QSt
     QDir imgDir(imageDir);
     QDir lblDir(labelDir);
 
-    // 收集图片文件，按文件名建立索引（用于 JSON 中的 file_name 匹配）
-    QFileInfoList imageFiles = imgDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    // 递归收集图片文件，按文件名建立索引（用于 JSON 中的 file_name 匹配）
+    QFileInfoList imageFiles = collectImageFiles(imgDir, true);
     QMap<QString, QFileInfo> imageByFileName;
     for (const auto &fi : imageFiles) {
-        if (isImageFile(fi.fileName())) {
-            // 使用文件名（不含路径）作为 key，支持跨目录匹配
-            imageByFileName[fi.fileName()] = fi;
-        }
+        imageByFileName[fi.fileName()] = fi;
     }
 
-    // 查找标签目录中的所有 JSON 文件
+    // 递归查找标签目录中的所有 JSON 文件
     QFileInfoList jsonFiles;
-    QFileInfoList allLabelFiles = lblDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    QFileInfoList allLabelFiles = collectLabelFiles(lblDir, true);
     for (const auto &fi : allLabelFiles) {
         if (fi.suffix().toLower() == QStringLiteral("json")) {
             jsonFiles.append(fi);

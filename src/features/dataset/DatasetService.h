@@ -66,6 +66,23 @@ public:
                                         bool autoMergeClasses = true);
 
     /**
+     * @brief 分别指定图片和标签路径导入数据集
+     *
+     * 支持图片和标签在不同目录的场景，按文件名 stem 自动匹配。
+     * 如果只提供图片路径不提供标签路径，则导入为无标签数据集。
+     *
+     * @param projectId 当前项目 ID
+     * @param datasetName 数据集名称
+     * @param imageDir 图片目录路径
+     * @param labelDir 标签目录路径（可为空，表示无标签导入）
+     * @return 导入成功返回 datasetId (UUID)，失败返回空字符串
+     */
+    Q_INVOKABLE QString importDatasetSeparate(const QString &projectId,
+                                               const QString &datasetName,
+                                               const QString &imageDir,
+                                               const QString &labelDir);
+
+    /**
      * @brief List all datasets for a project.
      * @param projectId The project to list datasets for.
      * @return QVariantList of QVariantMap entries with dataset fields.
@@ -130,6 +147,14 @@ public:
      * @return QVariantMap 探测结果
      */
     Q_INVOKABLE QVariantMap scanFolder(const QString &folderPath);
+
+    /**
+     * @brief 分别指定图片和标签路径进行扫描匹配
+     * @param imageDir 图片目录路径
+     * @param labelDir 标签目录路径
+     * @return QVariantMap 扫描结果，包含 detectedFormat/imageCount/labelCount 等
+     */
+    Q_INVOKABLE QVariantMap scanSeparate(const QString &imageDir, const QString &labelDir);
 
 private:
     bool updateImportStatus(const QString &datasetId, const QString &status);
