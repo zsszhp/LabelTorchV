@@ -138,9 +138,9 @@ Item {
                         }
 
                         background: Rectangle {
-                            color: "#313244"
+                            color: Theme.bgHover
                             radius: 4
-                            border.color: modelVersionCombo.activeFocus ? "#89b4fa" : "#45475a"
+                            border.color: modelVersionCombo.activeFocus ? "#89b4fa" : Theme.textDisabled
                             border.width: 1
                         }
 
@@ -159,7 +159,7 @@ Item {
 
                             background: Rectangle {
                                 color: "#1e1e2e"
-                                border.color: "#45475a"
+                                border.color: Theme.textDisabled
                                 radius: 4
                             }
                         }
@@ -175,7 +175,7 @@ Item {
                             }
                             highlighted: modelVersionCombo.highlightedIndex === index
                             background: Rectangle {
-                                color: highlighted ? "#313244" : "#1e1e2e"
+                                color: highlighted ? Theme.bgHover : "#1e1e2e"
                             }
                         }
                     }
@@ -207,7 +207,7 @@ Item {
                             width: confSlider.availableWidth
                             height: 4
                             radius: 2
-                            color: "#313244"
+                            color: Theme.bgHover
 
                             Rectangle {
                                 width: confSlider.visualPosition * parent.width
@@ -262,7 +262,7 @@ Item {
                             width: iouSlider.availableWidth
                             height: 4
                             radius: 2
-                            color: "#313244"
+                            color: Theme.bgHover
 
                             Rectangle {
                                 width: iouSlider.visualPosition * parent.width
@@ -318,9 +318,9 @@ Item {
                         }
 
                         background: Rectangle {
-                            color: "#313244"
+                            color: Theme.bgHover
                             radius: 4
-                            border.color: scopeCombo.activeFocus ? "#89b4fa" : "#45475a"
+                            border.color: scopeCombo.activeFocus ? "#89b4fa" : Theme.textDisabled
                             border.width: 1
                         }
 
@@ -339,7 +339,7 @@ Item {
 
                             background: Rectangle {
                                 color: "#1e1e2e"
-                                border.color: "#45475a"
+                                border.color: Theme.textDisabled
                                 radius: 4
                             }
                         }
@@ -354,7 +354,7 @@ Item {
                             }
                             highlighted: scopeCombo.highlightedIndex === index
                             background: Rectangle {
-                                color: highlighted ? "#313244" : "#1e1e2e"
+                                color: highlighted ? Theme.bgHover : "#1e1e2e"
                             }
                         }
                     }
@@ -368,7 +368,7 @@ Item {
                     enabled: modelVersionCombo.currentIndex >= 0 && currentDatasetId !== ""
 
                     background: Rectangle {
-                        color: parent.enabled ? (parent.pressed ? "#74c7a0" : "#a6e3a1") : "#45475a"
+                        color: parent.enabled ? (parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess) : Theme.textDisabled
                         radius: 6
                         implicitHeight: 36
                     }
@@ -394,11 +394,11 @@ Item {
                         )
                         if (batchId !== "") {
                             statusLabel.text = "Batch created: " + batchId.substring(0, 8) + "..."
-                            statusLabel.color = "#a6e3a1"
+                            statusLabel.color = Theme.accentSuccess
                             refreshBatches()
                         } else {
                             statusLabel.text = "Failed to create batch"
-                            statusLabel.color = "#f38ba8"
+                            statusLabel.color = Theme.accentError
                         }
                     }
                 }
@@ -408,7 +408,7 @@ Item {
                     id: statusLabel
                     Layout.fillWidth: true
                     text: ""
-                    color: "#a6e3a1"
+                    color: Theme.accentSuccess
                     font.pixelSize: 12
                     wrapMode: Text.WordWrap
                 }
@@ -417,7 +417,7 @@ Item {
                 Rectangle {
                     Layout.fillWidth: true
                     height: 1
-                    color: "#313244"
+                    color: Theme.bgHover
                 }
 
                 // Low-Confidence Feedback Loop section
@@ -463,9 +463,9 @@ Item {
                         }
 
                         background: Rectangle {
-                            color: "#313244"
+                            color: Theme.bgHover
                             radius: 4
-                            border.color: lowConfThresholdSpin.activeFocus ? "#f9e2af" : "#45475a"
+                            border.color: lowConfThresholdSpin.activeFocus ? "#f9e2af" : Theme.textDisabled
                             border.width: 1
                         }
 
@@ -482,8 +482,8 @@ Item {
                             x: parent.width - width
                             height: parent.height / 2
                             width: 28
-                            color: lowConfThresholdSpin.up.pressed ? "#45475a" : "#313244"
-                            border.color: "#45475a"
+                            color: lowConfThresholdSpin.up.pressed ? Theme.textDisabled : Theme.bgHover
+                            border.color: Theme.textDisabled
                             border.width: 1
 
                             Label {
@@ -502,8 +502,8 @@ Item {
                             y: parent.height / 2
                             height: parent.height / 2
                             width: 28
-                            color: lowConfThresholdSpin.down.pressed ? "#45475a" : "#313244"
-                            border.color: "#45475a"
+                            color: lowConfThresholdSpin.down.pressed ? Theme.textDisabled : Theme.bgHover
+                            border.color: Theme.textDisabled
                             border.width: 1
 
                             Label {
@@ -526,7 +526,7 @@ Item {
                         enabled: selectedBatchId !== ""
 
                         background: Rectangle {
-                            color: parent.enabled ? (parent.pressed ? "#e0cb85" : "#f9e2af") : "#45475a"
+                            color: parent.enabled ? (parent.pressed ? "#e0cb85" : "#f9e2af") : Theme.textDisabled
                             radius: 6
                         }
 
@@ -551,7 +551,7 @@ Item {
                     text: "Low-conf: " + confidenceStats.lowConfCount + " / " + confidenceStats.totalCandidates +
                           "  |  Avg conf: " + (parseFloat(confidenceStats.averageConfidence) || 0).toFixed(3) +
                           "  |  Threshold: " + (parseFloat(confidenceStats.threshold) || 0).toFixed(2)
-                    color: confidenceStats.lowConfCount > 0 ? "#f9e2af" : "#a6e3a1"
+                    color: confidenceStats.lowConfCount > 0 ? "#f9e2af" : Theme.accentSuccess
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
                 }
@@ -581,7 +581,7 @@ Item {
                 Rectangle {
                     Layout.fillWidth: true
                     height: 1
-                    color: "#313244"
+                    color: Theme.bgHover
                 }
 
                 // Hard-Case Review section
@@ -604,7 +604,7 @@ Item {
                         enabled: selectedBatchId !== ""
 
                         background: Rectangle {
-                            color: parent.enabled ? (parent.pressed ? "#b07ce0" : "#cba6f7") : "#45475a"
+                            color: parent.enabled ? (parent.pressed ? "#b07ce0" : "#cba6f7") : Theme.textDisabled
                             radius: 6
                         }
 
@@ -671,7 +671,7 @@ Item {
                 Rectangle {
                     Layout.fillWidth: true
                     height: 1
-                    color: "#313244"
+                    color: Theme.bgHover
                 }
 
                 // Batch list header
@@ -717,7 +717,7 @@ Item {
                         width: batchList.width
                         height: 48
                         radius: 6
-                        color: batchMouseArea.containsMouse ? "#313244" : "#252536"
+                        color: batchMouseArea.containsMouse ? Theme.bgHover : Theme.bgSecondary
                         border.color: model.id === selectedBatchId ? "#89b4fa" : "transparent"
                         border.width: model.id === selectedBatchId ? 1 : 0
 
@@ -734,10 +734,10 @@ Item {
                                 radius: 4
                                 color: {
                                     switch (model.status) {
-                                    case "completed": return "#a6e3a1"
+                                    case "completed": return Theme.accentSuccess
                                     case "running": return "#f9e2af"
                                     case "cancelled": return "#6c7086"
-                                    case "failed": return "#f38ba8"
+                                    case "failed": return Theme.accentError
                                     default: return "#89b4fa"
                                     }
                                 }
@@ -769,7 +769,7 @@ Item {
                                 text: "Cancel"
                                 flat: true
                                 visible: model.status === "pending" || model.status === "running"
-                                palette.buttonText: "#f38ba8"
+                                palette.buttonText: Theme.accentError
                                 font.pixelSize: 11
                                 onClicked: {
                                     inferenceService.cancelBatch(model.id)
@@ -853,11 +853,11 @@ Item {
                             width: batchConfThresholdSlider.availableWidth
                             height: 4
                             radius: 2
-                            color: "#313244"
+                            color: Theme.bgHover
                             Rectangle {
                                 width: batchConfThresholdSlider.visualPosition * parent.width
                                 height: parent.height
-                                color: "#a6e3a1"
+                                color: Theme.accentSuccess
                                 radius: 2
                             }
                         }
@@ -868,7 +868,7 @@ Item {
                             width: 14
                             height: 14
                             radius: 7
-                            color: batchConfThresholdSlider.pressed ? "#7fd491" : "#a6e3a1"
+                            color: batchConfThresholdSlider.pressed ? "#7fd491" : Theme.accentSuccess
                         }
                     }
 
@@ -885,7 +885,7 @@ Item {
                         Layout.preferredHeight: 28
 
                         background: Rectangle {
-                            color: parent.pressed ? "#74c7a0" : "#a6e3a1"
+                            color: parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess
                             radius: 4
                         }
 
@@ -907,7 +907,7 @@ Item {
                     Rectangle {
                         width: 1
                         height: 20
-                        color: "#313244"
+                        color: Theme.bgHover
                     }
 
                     Button {
@@ -915,7 +915,7 @@ Item {
                         Layout.preferredHeight: 28
 
                         background: Rectangle {
-                            color: parent.pressed ? "#d6758e" : "#f38ba8"
+                            color: parent.pressed ? Qt.darker(Theme.accentError, 1.2) : Theme.accentError
                             radius: 4
                         }
 
@@ -969,7 +969,7 @@ Item {
                             case "confirmed": return "#a6e3a115"
                             case "rejected": return "#f38ba815"
                             case "edited": return "#f9e2af15"
-                            default: return "#252536"
+                            default: return Theme.bgSecondary
                             }
                         }
 
@@ -986,8 +986,8 @@ Item {
                                 radius: 4
                                 color: {
                                     switch (model.state) {
-                                    case "confirmed": return "#a6e3a1"
-                                    case "rejected": return "#f38ba8"
+                                    case "confirmed": return Theme.accentSuccess
+                                    case "rejected": return Theme.accentError
                                     case "edited": return "#f9e2af"
                                     default: return "#89b4fa"
                                     }
@@ -1003,7 +1003,7 @@ Item {
 
                             Label {
                                 text: "conf: " + (parseFloat(model.confidence) || 0).toFixed(3)
-                                color: (parseFloat(model.confidence) || 0) >= 0.5 ? "#a6e3a1" : "#f9e2af"
+                                color: (parseFloat(model.confidence) || 0) >= 0.5 ? Theme.accentSuccess : "#f9e2af"
                                 font.pixelSize: 11
                                 font.family: "monospace"
                             }
@@ -1028,7 +1028,7 @@ Item {
                                 Layout.preferredWidth: 60
 
                                 background: Rectangle {
-                                    color: parent.pressed ? "#74c7a0" : "#a6e3a1"
+                                    color: parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess
                                     radius: 3
                                 }
 
@@ -1054,7 +1054,7 @@ Item {
                                 Layout.preferredWidth: 52
 
                                 background: Rectangle {
-                                    color: parent.pressed ? "#d6758e" : "#f38ba8"
+                                    color: parent.pressed ? Qt.darker(Theme.accentError, 1.2) : Theme.accentError
                                     radius: 3
                                 }
 
@@ -1084,15 +1084,15 @@ Item {
                                     case "confirmed": return "#a6e3a130"
                                     case "rejected": return "#f38ba830"
                                     case "edited": return "#f9e2af30"
-                                    default: return "#45475a"
+                                    default: return Theme.textDisabled
                                     }
                                 }
                                 border.color: {
                                     switch (model.state) {
-                                    case "confirmed": return "#a6e3a1"
-                                    case "rejected": return "#f38ba8"
+                                    case "confirmed": return Theme.accentSuccess
+                                    case "rejected": return Theme.accentError
                                     case "edited": return "#f9e2af"
-                                    default: return "#45475a"
+                                    default: return Theme.textDisabled
                                     }
                                 }
                                 border.width: 1
@@ -1103,8 +1103,8 @@ Item {
                                     text: model.state
                                     color: {
                                         switch (model.state) {
-                                        case "confirmed": return "#a6e3a1"
-                                        case "rejected": return "#f38ba8"
+                                        case "confirmed": return Theme.accentSuccess
+                                        case "rejected": return Theme.accentError
                                         case "edited": return "#f9e2af"
                                         default: return "#6c7086"
                                         }

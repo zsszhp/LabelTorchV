@@ -21,7 +21,7 @@ Dialog {
     palette.windowText: "#cdd6f4"
     palette.base: "#181825"
     palette.text: "#cdd6f4"
-    palette.button: "#313244"
+    palette.button: Theme.bgHover
     palette.buttonText: "#cdd6f4"
     palette.highlight: "#89b4fa"
     palette.highlightedText: "#1e1e2e"
@@ -29,7 +29,7 @@ Dialog {
     background: Rectangle {
         color: "#1e1e2e"
         radius: 8
-        border.color: "#313244"
+        border.color: Theme.bgHover
         border.width: 1
     }
 
@@ -61,7 +61,7 @@ Dialog {
                 Layout.preferredHeight: 200
                 color: "#181825"
                 radius: 6
-                border.color: "#313244"
+                border.color: Theme.bgHover
                 border.width: 1
 
                 Label {
@@ -110,7 +110,7 @@ Dialog {
 
                         Label {
                             text: root.candidate ? (parseFloat(root.candidate.confidence) || 0).toFixed(3) : "N/A"
-                            color: root.candidate && (parseFloat(root.candidate.confidence) || 0) >= 0.5 ? "#a6e3a1" : "#f9e2af"
+                            color: root.candidate && (parseFloat(root.candidate.confidence) || 0) >= 0.5 ? Theme.accentSuccess : "#f9e2af"
                             font.pixelSize: 13
                             font.bold: true
                             font.family: "monospace"
@@ -161,8 +161,8 @@ Dialog {
                             }
                             border.color: {
                                 switch (root.candidate ? root.candidate.state : "") {
-                                case "confirmed": return "#a6e3a1"
-                                case "rejected": return "#f38ba8"
+                                case "confirmed": return Theme.accentSuccess
+                                case "rejected": return Theme.accentError
                                 case "edited": return "#f9e2af"
                                 default: return "#89b4fa"
                                 }
@@ -175,8 +175,8 @@ Dialog {
                                 text: root.candidate ? root.candidate.state : "pending"
                                 color: {
                                     switch (root.candidate ? root.candidate.state : "") {
-                                    case "confirmed": return "#a6e3a1"
-                                    case "rejected": return "#f38ba8"
+                                    case "confirmed": return Theme.accentSuccess
+                                    case "rejected": return Theme.accentError
                                     case "edited": return "#f9e2af"
                                     default: return "#89b4fa"
                                     }
@@ -209,7 +209,7 @@ Dialog {
                 Layout.preferredHeight: 34
 
                 background: Rectangle {
-                    color: parent.pressed ? "#74c7a0" : "#a6e3a1"
+                    color: parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess
                     radius: 6
                 }
 
@@ -238,7 +238,7 @@ Dialog {
                 Layout.preferredHeight: 34
 
                 background: Rectangle {
-                    color: parent.pressed ? "#d6758e" : "#f38ba8"
+                    color: parent.pressed ? Qt.darker(Theme.accentError, 1.2) : Theme.accentError
                     radius: 6
                 }
 

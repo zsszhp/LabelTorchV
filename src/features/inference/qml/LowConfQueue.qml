@@ -76,7 +76,7 @@ Item {
                         width: thresholdSlider.availableWidth
                         height: 4
                         radius: 2
-                        color: "#313244"
+                        color: Theme.bgHover
 
                         Rectangle {
                             width: thresholdSlider.visualPosition * parent.width
@@ -109,7 +109,7 @@ Item {
                     Layout.preferredHeight: 28
 
                     background: Rectangle {
-                        color: parent.pressed ? "#45475a" : "#313244"
+                        color: parent.pressed ? Theme.textDisabled : Theme.bgHover
                         radius: 4
                         border.color: "#f9e2af"
                         border.width: 1
@@ -140,7 +140,7 @@ Item {
             Rectangle {
                 Layout.fillWidth: true
                 height: 1
-                color: "#313244"
+                color: Theme.bgHover
             }
 
             // Queue list
@@ -164,8 +164,8 @@ Item {
                     width: queueList.width
                     height: 52
                     radius: 6
-                    color: delegateMouseArea.containsMouse ? "#313244" : "#252536"
-                    border.color: "#313244"
+                    color: delegateMouseArea.containsMouse ? Theme.bgHover : Theme.bgSecondary
+                    border.color: Theme.bgHover
                     border.width: 1
 
                     RowLayout {
@@ -181,7 +181,7 @@ Item {
                             radius: 5
                             color: {
                                 var conf = parseFloat(model.confidence) || 0
-                                if (conf < 0.1) return "#f38ba8"
+                                if (conf < 0.1) return Theme.accentError
                                 if (conf < 0.2) return "#fab387"
                                 return "#f9e2af"
                             }
@@ -208,7 +208,7 @@ Item {
                         // Confidence score
                         Label {
                             text: "conf: " + (parseFloat(model.confidence) || 0).toFixed(3)
-                            color: (parseFloat(model.confidence) || 0) < 0.2 ? "#f38ba8" : "#f9e2af"
+                            color: (parseFloat(model.confidence) || 0) < 0.2 ? Theme.accentError : "#f9e2af"
                             font.pixelSize: 11
                             font.family: "monospace"
                         }
@@ -233,7 +233,7 @@ Item {
                             Layout.preferredWidth: 70
 
                             background: Rectangle {
-                                color: parent.pressed ? "#74c7a0" : "#a6e3a1"
+                                color: parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess
                                 radius: 4
                             }
 
@@ -261,15 +261,15 @@ Item {
                             Layout.preferredWidth: 64
 
                             background: Rectangle {
-                                color: parent.pressed ? "#45475a" : "#313244"
+                                color: parent.pressed ? Theme.textDisabled : Theme.bgHover
                                 radius: 4
-                                border.color: "#f38ba8"
+                                border.color: Theme.accentError
                                 border.width: 1
                             }
 
                             contentItem: Label {
                                 text: parent.text
-                                color: "#f38ba8"
+                                color: Theme.accentError
                                 font.pixelSize: 10
                                 font.bold: true
                                 horizontalAlignment: Text.AlignHCenter

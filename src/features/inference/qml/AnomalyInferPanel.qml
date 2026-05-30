@@ -587,17 +587,29 @@ Rectangle {
         }
     }
 
-    // 辅助对象：URL 转本地路径
+    // 辅助对象：URL 转本地路径（兼容中文路径和特殊字符）
     QtObject {
         id: fileDialogHelper
         function urlToPath(url) {
-            var path = url.toString();
-            if (path.startsWith("file:///")) {
-                path = path.substring(8);
-            } else if (path.startsWith("file://")) {
-                path = path.substring(7);
+            var s = url.toString()
+            if (s.startsWith("file:///")) {
+                s = s.substring(7)
+                // Windows 路径: /C:/... → C:/...
+                if (s.length >= 3 && s.charAt(0) === "/" && s.charAt(2) === ":") {
+                    var driveLetter = s.charAt(1).toUpperCase()
+                    if (driveLetter >= 'A' && driveLetter <= 'Z') {
+                        s = s.substring(1)
+                    }
+                }
+            } else if (s.startsWith("file://")) {
+                s = s.substring(6)
             }
-            return decodeURIComponent(path);
+            return decodeURIComponent(s)
+        }
+        // 本地路径转 file URL（兼容中文路径）
+        function pathToUrl(path) {
+            if (!path) return ""
+            return "file:///" + path
         }
     }
 

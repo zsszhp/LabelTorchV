@@ -137,7 +137,7 @@ Item {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: "#11111b"
+            color: Theme.bgInput
 
             Canvas {
                 id: annotationCanvas
@@ -980,7 +980,7 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: 24
-                color: "#11111b"
+                color: Theme.bgInput
 
                 RowLayout {
                     anchors.fill: parent

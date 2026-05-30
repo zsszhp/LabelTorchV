@@ -45,7 +45,7 @@ Item {
     }
 
     function getPriorityColor(reason) {
-        if (reason === "false_negative") return "#f38ba8"   // red
+        if (reason === "false_negative") return Theme.accentError   // red
         if (reason === "low_confidence") return "#f9e2af"   // yellow
         if (reason === "false_positive") return "#89b4fa"   // blue
         return "#6c7086"
@@ -108,9 +108,9 @@ Item {
                     }
 
                     background: Rectangle {
-                        color: "#313244"
+                        color: Theme.bgHover
                         radius: 4
-                        border.color: sortCombo.activeFocus ? "#cba6f7" : "#45475a"
+                        border.color: sortCombo.activeFocus ? "#cba6f7" : Theme.textDisabled
                         border.width: 1
                     }
 
@@ -129,7 +129,7 @@ Item {
 
                         background: Rectangle {
                             color: "#1e1e2e"
-                            border.color: "#45475a"
+                            border.color: Theme.textDisabled
                             radius: 4
                         }
                     }
@@ -144,7 +144,7 @@ Item {
                         }
                         highlighted: sortCombo.highlightedIndex === index
                         background: Rectangle {
-                            color: highlighted ? "#313244" : "#1e1e2e"
+                            color: highlighted ? Theme.bgHover : "#1e1e2e"
                         }
                     }
 
@@ -159,7 +159,7 @@ Item {
                     Layout.preferredHeight: 28
 
                     background: Rectangle {
-                        color: parent.pressed ? "#45475a" : "#313244"
+                        color: parent.pressed ? Theme.textDisabled : Theme.bgHover
                         radius: 4
                         border.color: "#cba6f7"
                         border.width: 1
@@ -184,7 +184,7 @@ Item {
                 height: 36
                 radius: 6
                 visible: countByReason("false_negative") > 0
-                color: "#f9e2af20"
+                color: "#FBBF2420"
                 border.color: "#f9e2af"
                 border.width: 1
 
@@ -238,7 +238,7 @@ Item {
                     width: hardCaseList.width
                     height: 52
                     radius: 6
-                    color: delegateMouseArea.containsMouse ? "#313244" : "#252536"
+                    color: delegateMouseArea.containsMouse ? Theme.bgHover : Theme.bgSecondary
                     border.color: Qt.rgba(
                         (parseInt(getPriorityColor(model.reason).substring(1, 3), 16) || 0) / 255,
                         (parseInt(getPriorityColor(model.reason).substring(3, 5), 16) || 0) / 255,
@@ -319,7 +319,7 @@ Item {
                         Label {
                             visible: model.reason !== "false_negative"
                             text: "conf: " + (parseFloat(model.confidence) || 0).toFixed(3)
-                            color: (parseFloat(model.confidence) || 0) < 0.2 ? "#f38ba8" : "#f9e2af"
+                            color: (parseFloat(model.confidence) || 0) < 0.2 ? Theme.accentError : "#f9e2af"
                             font.pixelSize: 11
                             font.family: "monospace"
                         }
@@ -381,7 +381,7 @@ Item {
             Rectangle {
                 Layout.fillWidth: true
                 height: 1
-                color: "#313244"
+                color: Theme.bgHover
             }
 
             // Summary stats
@@ -397,12 +397,12 @@ Item {
                         width: 8
                         height: 8
                         radius: 4
-                        color: "#f38ba8"
+                        color: Theme.accentError
                     }
 
                     Label {
                         text: "FN: " + countByReason("false_negative")
-                        color: "#f38ba8"
+                        color: Theme.accentError
                         font.pixelSize: 12
                         font.bold: true
                     }
