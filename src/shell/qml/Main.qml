@@ -1,4 +1,4 @@
-// Main.qml - V2 主布局：左侧可折叠导航栏 + 内容区 + 日志面板
+// Main.qml - V4 主布局：赛博蓝科技风侧边栏 + 内容区 + 日志面板
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -20,8 +20,18 @@ ApplicationWindow {
     property string currentTaskType: "detect"
     property string gpuStatusText: "GPU: 检测中..."
     property color gpuStatusColor: Theme.textMuted
-    property bool sidebarExpanded: true
     property bool hasRunningTraining: false
+
+    ListModel {
+        id: navModel
+        ListElement { pageId: "project"; title: "项目管理"; icon: "project"; needsProject: false }
+        ListElement { pageId: "taxonomy"; title: "类别体系"; icon: "taxonomy"; needsProject: false }
+        ListElement { pageId: "dataset"; title: "数据导入"; icon: "dataset"; needsProject: true }
+        ListElement { pageId: "annotation"; title: "标注工作台"; icon: "annotation"; needsProject: true }
+        ListElement { pageId: "training"; title: "训练工作台"; icon: "training"; needsProject: true }
+        ListElement { pageId: "model"; title: "版本中心"; icon: "model"; needsProject: true }
+        ListElement { pageId: "export"; title: "导出中心"; icon: "export"; needsProject: true }
+    }
 
     Connections {
         target: appController
@@ -54,6 +64,11 @@ ApplicationWindow {
                     logPanel.appendLog("[环境] PyTorch " + (result.torch_version || "?"))
                     logPanel.appendLog("[环境] Ultralytics " + (result.ultralytics_version || "?"))
                     logPanel.appendLog("[环境] CUDA " + (result.cuda_available ? "可用" : "不可用"))
+                }
+            } else {
+                if (cmd === "environment.check") {
+                    gpuStatusText = "GPU: 检测失败"
+                    gpuStatusColor = Theme.accentError
                 }
             }
         }
@@ -109,140 +124,86 @@ ApplicationWindow {
         }
     }
 
-    // 主布局：左侧导航栏 + 内容区 + 日志面板
+    // 主布局：顶部导航栏 + 内容区 + 日志面板
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
 
-        RowLayout {
+        // === 顶部导航栏 ===
+        Rectangle {
+            id: topNavigation
             Layout.fillWidth: true
-            Layout.fillHeight: true
-            spacing: 0
+            Layout.preferredHeight: 64
+            color: Theme.bgSecondary
 
-            // === 左侧可折叠导航栏 ===
+            // 底部霓虹线
             Rectangle {
-                id: sidebar
-                Layout.fillHeight: true
-                Layout.preferredWidth: root.sidebarExpanded ? Theme.sidebarExpandedWidth : Theme.sidebarCollapsedWidth
-                color: Theme.bgSecondary
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Theme.divider
+            }
 
-                Behavior on Layout.preferredWidth {
-                    NumberAnimation { duration: Theme.animDurationSlow; easing.type: Easing.InOutQuad }
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: Theme.spacingLarge
+                anchors.rightMargin: Theme.spacingLarge
+                spacing: Theme.spacingXLarge
+
+                // 左侧 Logo + 标题
+                RowLayout {
+                    spacing: Theme.spacingNormal
+                    Layout.alignment: Qt.AlignVCenter
+
+                    Rectangle {
+                        width: 36
+                        height: 36
+                        radius: Theme.radiusNormal
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: Theme.accentPrimary }
+                            GradientStop { position: 1.0; color: Theme.accentSecondary }
+                        }
+
+                        Label {
+                            anchors.centerIn: parent
+                            text: "LT"
+                            font.pixelSize: 14
+                            font.bold: true
+                            color: "#FFFFFF"
+                            font.family: Theme.fontFamily
+                        }
+                    }
+
+                    Label {
+                        text: "标炬 LabelTorch"
+                        font.pixelSize: Theme.fontSizeLarge
+                        font.bold: true
+                        color: Theme.textPrimary
+                        font.family: Theme.fontFamily
+                    }
                 }
 
-                ColumnLayout {
-                    anchors.fill: parent
-                    spacing: 0
+                // 中间导航项
+                RowLayout {
+                    Layout.fillHeight: true
+                    spacing: Theme.spacingSmall
+                    Layout.alignment: Qt.AlignVCenter
 
-                    // 顶部：Logo + 折叠按钮
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 48
-                        color: "transparent"
-
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: Theme.spacingNormal
-                            anchors.rightMargin: Theme.spacingNormal
-                            spacing: Theme.spacingSmall
-
-                            // 应用图标
-                            Label {
-                                visible: root.sidebarExpanded
-                                text: "标炬"
-                                font.pixelSize: Theme.fontSizeLarge
-                                font.bold: true
-                                color: Theme.accentPrimary
-                                font.family: Theme.fontFamily
-                                Layout.alignment: Qt.AlignVCenter
-                            }
-
-                            Item { Layout.fillWidth: true }
-
-                            // 折叠/展开按钮
-                            ToolButton {
-                                Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
-                                icon.source: root.sidebarExpanded ? "qrc:/qt/qml/LabelTorch/Shell/icons/sidebar-collapse.svg" : "qrc:/qt/qml/LabelTorch/Shell/icons/sidebar-expand.svg"
-                                icon.width: 16
-                                icon.height: 16
-                                icon.color: Theme.textSecondary
-                                onClicked: root.sidebarExpanded = !root.sidebarExpanded
-
-                                ToolTip.visible: hovered
-                                ToolTip.text: root.sidebarExpanded ? "收起侧边栏" : "展开侧边栏"
-                                ToolTip.delay: 500
-                            }
-                        }
-                    }
-
-                    // 分割线
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 1
-                        color: Theme.divider
-                    }
-
-                    // 导航项列表
-                    ListView {
-                        id: navList
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        Layout.topMargin: Theme.spacingSmall
-                        clip: true
-                        spacing: 2
-                        interactive: false
-
-                        model: ListModel {
-                            id: navModel
-                            ListElement { pageId: "project"; title: "项目管理"; icon: "project"; needsProject: false }
-                            ListElement { pageId: "taxonomy"; title: "类别体系"; icon: "taxonomy"; needsProject: false }
-                            ListElement { pageId: "dataset"; title: "数据导入"; icon: "dataset"; needsProject: true }
-                            ListElement { pageId: "annotation"; title: "标注工作台"; icon: "annotation"; needsProject: true }
-                            ListElement { pageId: "training"; title: "训练工作台"; icon: "training"; needsProject: true }
-                            ListElement { pageId: "model"; title: "版本中心"; icon: "model"; needsProject: true }
-                            ListElement { pageId: "export"; title: "导出中心"; icon: "export"; needsProject: true }
-                        }
+                    Repeater {
+                        model: navModel
 
                         delegate: ItemDelegate {
-                            width: ListView.view.width
-                            height: 40
+                            id: navDelegate
+                            Layout.fillHeight: true
+                            implicitWidth: 100
                             enabled: !model.needsProject || appController.projectOpen
-                            highlighted: appController.currentPage === model.pageId
 
-                            background: Rectangle {
-                                color: {
-                                    if (!parent.enabled) return "transparent"
-                                    if (parent.highlighted) return Theme.bgTertiary
-                                    if (parent.hovered) return Theme.bgHover
-                                    return "transparent"
-                                }
-                                // 左侧高亮指示线
-                                Rectangle {
-                                    visible: parent.parent.highlighted
-                                    width: 3
-                                    height: parent.height
-                                    color: Theme.accentPrimary
-                                    radius: 1
-                                }
-                            }
+                            contentItem: ColumnLayout {
+                                anchors.centerIn: parent
+                                spacing: 2
 
-                            contentItem: RowLayout {
-                                spacing: Theme.spacingNormal
-
-                                // 图标占位（使用文字替代SVG图标）
                                 Label {
-                                    Layout.preferredWidth: 24
-                                    Layout.preferredHeight: 24
-                                    Layout.alignment: Qt.AlignVCenter | Qt.AlignHCenter
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    font.pixelSize: 14
-                                    font.family: Theme.fontFamily
-                                    color: {
-                                        if (!enabled) return Theme.textDisabled
-                                        if (highlighted) return Theme.accentPrimary
-                                        return Theme.textSecondary
-                                    }
                                     text: {
                                         switch(model.icon) {
                                             case "project": return "📂"
@@ -255,39 +216,70 @@ ApplicationWindow {
                                             default: return "●"
                                         }
                                     }
-                                }
-
-                                // 导航文字
-                                Label {
-                                    visible: root.sidebarExpanded
-                                    text: model.title
-                                    font.pixelSize: Theme.fontSizeNormal
-                                    font.family: Theme.fontFamily
-                                    font.bold: highlighted
+                                    font.pixelSize: 16
+                                    horizontalAlignment: Text.AlignHCenter
+                                    Layout.alignment: Qt.AlignHCenter
                                     color: {
-                                        if (!enabled) return Theme.textDisabled
-                                        if (highlighted) return Theme.textPrimary
+                                        if (!navDelegate.enabled) return Theme.textDisabled
+                                        if (appController.currentPage === model.pageId) return Theme.accentPrimary
                                         return Theme.textSecondary
                                     }
-                                    Layout.fillWidth: true
-                                    Layout.alignment: Qt.AlignVCenter
                                 }
 
-                                // 训练运行中呼吸态绿色圆点
-                                Rectangle {
-                                    visible: model.pageId === "training" && root.hasRunningTraining && root.sidebarExpanded
-                                    width: 8
-                                    height: 8
-                                    radius: 4
-                                    color: Theme.accentSuccess
-                                    Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
+                                RowLayout {
+                                    spacing: 4
+                                    Layout.alignment: Qt.AlignHCenter
 
-                                    SequentialAnimation on opacity {
-                                        running: parent.visible
-                                        loops: Animation.Infinite
-                                        NumberAnimation { from: 1.0; to: 0.3; duration: 1000; easing.type: Easing.InOutQuad }
-                                        NumberAnimation { from: 0.3; to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
+                                    Label {
+                                        text: model.title
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        font.family: Theme.fontFamily
+                                        font.bold: appController.currentPage === model.pageId
+                                        horizontalAlignment: Text.AlignHCenter
+                                        color: {
+                                            if (!navDelegate.enabled) return Theme.textDisabled
+                                            if (appController.currentPage === model.pageId) return Theme.textPrimary
+                                            return Theme.textSecondary
+                                        }
                                     }
+
+                                    // 训练进行中呼吸态绿色圆点
+                                    Rectangle {
+                                        visible: model.pageId === "training" && root.hasRunningTraining
+                                        width: 6
+                                        height: 6
+                                        radius: 3
+                                        color: Theme.accentSuccess
+                                        Layout.alignment: Qt.AlignVCenter
+
+                                        SequentialAnimation on opacity {
+                                            running: parent.visible
+                                            loops: Animation.Infinite
+                                            NumberAnimation { from: 1.0; to: 0.3; duration: 1000; easing.type: Easing.InOutQuad }
+                                            NumberAnimation { from: 0.3; to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
+                                        }
+                                    }
+                                }
+                            }
+
+                            background: Rectangle {
+                                color: {
+                                    if (!navDelegate.enabled) return "transparent"
+                                    if (appController.currentPage === model.pageId) return Qt.alpha(Theme.accentPrimary, 0.08)
+                                    if (navDelegate.hovered) return Theme.bgHover
+                                    return "transparent"
+                                }
+                                radius: Theme.radiusSmall
+
+                                // 底部霓虹线
+                                Rectangle {
+                                    visible: appController.currentPage === model.pageId
+                                    height: 3
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.bottom: parent.bottom
+                                    color: Theme.accentPrimary
+                                    radius: 1.5
                                 }
                             }
 
@@ -295,77 +287,79 @@ ApplicationWindow {
                                 if (enabled) appController.currentPage = model.pageId
                             }
 
-                            ToolTip.visible: !root.sidebarExpanded && hovered
-                            ToolTip.text: model.title
+                            ToolTip.visible: !enabled && hovered
+                            ToolTip.text: "请先在项目管理中打开一个项目"
                             ToolTip.delay: 300
                         }
                     }
+                }
 
-                    // 底部分割线
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 1
-                        color: Theme.divider
+                Item { Layout.fillWidth: true }
+
+                // 右侧状态与信息
+                RowLayout {
+                    spacing: Theme.spacingLarge
+                    Layout.alignment: Qt.AlignVCenter
+
+                    // 当前打开项目标签
+                    Label {
+                        text: appController.projectOpen ? "当前项目: " + appController.currentProjectName : "未打开项目"
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.family: Theme.fontFamily
+                        color: appController.projectOpen ? Theme.accentPrimary : Theme.textDisabled
+                        font.bold: appController.projectOpen
                     }
 
-                    // 底部：GPU状态与后端连接
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: root.sidebarExpanded ? 56 : 40
-                        color: "transparent"
+                    // GPU状态
+                    RowLayout {
+                        spacing: Theme.spacingSmall
+                        Rectangle {
+                            width: 8
+                            height: 8
+                            radius: 4
+                            color: gpuStatusColor
 
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: Theme.spacingSmall
-                            spacing: 2
-
-                            // GPU 状态
-                            Label {
-                                visible: root.sidebarExpanded
-                                text: gpuStatusText
-                                font.pixelSize: Theme.fontSizeCaption
-                                font.family: Theme.fontFamilyMono
-                                color: gpuStatusColor
-                                Layout.fillWidth: true
-                                elide: Text.ElideRight
+                            SequentialAnimation on opacity {
+                                running: gpuStatusColor === Theme.accentSuccess
+                                loops: Animation.Infinite
+                                NumberAnimation { from: 1.0; to: 0.4; duration: 1000; easing.type: Easing.InOutQuad }
+                                NumberAnimation { from: 0.4; to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
                             }
+                        }
+                        Label {
+                            text: gpuStatusText
+                            font.pixelSize: Theme.fontSizeCaption
+                            font.family: Theme.fontFamily
+                            color: gpuStatusColor
+                        }
+                    }
 
-                            // Python 后端连接状态
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: Theme.spacingSmall
-
-                                Rectangle {
-                                    width: 6
-                                    height: 6
-                                    radius: 3
-                                    color: ipcClient.connected ? Theme.accentSuccess : Theme.accentError
-                                    Layout.alignment: Qt.AlignVCenter
-                                }
-
-                                Label {
-                                    visible: root.sidebarExpanded
-                                    text: ipcClient.connected ? "Python 后端已连接" : "Python 后端未连接"
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    font.family: Theme.fontFamily
-                                    color: ipcClient.connected ? Theme.textSecondary : Theme.textMuted
-                                    Layout.fillWidth: true
-                                    elide: Text.ElideRight
-                                }
-                            }
+                    // Python后端连接
+                    RowLayout {
+                        spacing: Theme.spacingSmall
+                        Rectangle {
+                            width: 8
+                            height: 8
+                            radius: 4
+                            color: ipcClient.connected ? Theme.accentSuccess : Theme.accentError
+                        }
+                        Label {
+                            text: ipcClient.connected ? "后端已就绪" : "后端断开"
+                            font.pixelSize: Theme.fontSizeCaption
+                            font.family: Theme.fontFamily
+                            color: ipcClient.connected ? Theme.textSecondary : Theme.textDisabled
                         }
                     }
                 }
             }
+        }
 
-            // 右侧分割线
-            Rectangle {
-                Layout.fillHeight: true
-                Layout.preferredWidth: 1
-                color: Theme.divider
-            }
+        // === 主内容区与日志面板 ===
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 0
 
-            // === 主内容区 ===
             StackLayout {
                 id: contentStack
                 Layout.fillWidth: true
