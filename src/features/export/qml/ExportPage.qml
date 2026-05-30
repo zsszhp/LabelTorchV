@@ -7,7 +7,7 @@ import QtQuick.Layouts
 Item {
     id: root
 
-    property string currentProjectId: ""
+    property string currentProjectId: appController.currentProjectId
     property string selectedVersionId: ""
     property var exportHistory: []
 
@@ -26,10 +26,63 @@ Item {
         }
     }
 
+    // 监听导出状态变更，自动刷新列表
+    Connections {
+        target: exportService
+        function onExportStatusChanged(artifactId, status) {
+            refreshExports()
+        }
+    }
+
+    // 未打开项目时的空状态提示
+    ColumnLayout {
+        anchors.centerIn: parent
+        visible: currentProjectId === ""
+        spacing: 16
+
+        Label {
+            text: "📦 请先打开一个项目"
+            color: Theme.textSecondary
+            font.pixelSize: Theme.fontSizeTitle
+            font.bold: true
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        Label {
+            text: "完成训练后，在此导出模型"
+            color: Theme.textMuted
+            font.pixelSize: Theme.fontSizeNormal
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        Button {
+            text: "前往项目中心"
+            font.family: Theme.fontFamily
+            Layout.alignment: Qt.AlignHCenter
+            background: Rectangle {
+                color: parent.hovered ? Theme.accentPrimary : Theme.bgTertiary
+                radius: Theme.radiusSmall
+                border.color: Theme.accentPrimary
+                border.width: 1
+                implicitWidth: 140
+                implicitHeight: 36
+            }
+            contentItem: Label {
+                text: parent.text
+                color: Theme.accentPrimary
+                font.pixelSize: Theme.fontSizeNormal
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+            onClicked: appController.currentPageIndex = 0
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         anchors.margins: 12
         spacing: 12
+        visible: currentProjectId !== ""
 
         // 左侧面板：导出配置
         Rectangle {
@@ -214,7 +267,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 40
                     visible: formatCombo.currentText !== "onnx"
-                    color: "#11111b"
+                    color: Theme.bgInput
                     radius: 6
 
                     Label {
@@ -244,7 +297,7 @@ Item {
                     Layout.fillWidth: true
 
                     background: Rectangle {
-                        color: parent.enabled ? (parent.pressed ? "#74c7a0" : Theme.accentSuccess) : Theme.borderNormal
+                        color: parent.enabled ? (parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess) : Theme.borderNormal
                         radius: 6
                         implicitHeight: 40
                     }
@@ -363,7 +416,7 @@ Item {
                         width: exportList.width
                         height: 72
                         radius: 6
-                        color: delegateMouseArea.containsMouse ? Theme.bgInput : "#252536"
+                        color: delegateMouseArea.containsMouse ? Theme.bgInput : Theme.bgSecondary
 
                         RowLayout {
                             anchors.fill: parent
@@ -409,7 +462,7 @@ Item {
                                         Layout.preferredHeight: 20
                                         Layout.preferredWidth: formatBadgeText.implicitWidth + 12
                                         radius: 4
-                                        color: "#89b4fa20"
+                                        color: "#3B9AFF20"
                                         border.color: Theme.accentPrimary
                                         border.width: 1
 
@@ -430,12 +483,12 @@ Item {
                                         radius: 4
                                         color: {
                                             switch (modelData.status) {
-                                            case "pending": return "#89b4fa20"
-                                            case "running": return "#f9e2af20"
-                                            case "verifying": return "#f9e2af20"
-                                            case "succeeded": return "#a6e3a120"
-                                            case "failed": return "#f38ba820"
-                                            default: return "#45475a20"
+                                            case "pending": return "#3B9AFF20"
+                                            case "running": return "#FBBF2420"
+                                            case "verifying": return "#FBBF2420"
+                                            case "succeeded": return "#34D39920"
+                                            case "failed": return "#F8717120"
+                                            default: return "#546E7A20"
                                             }
                                         }
                                         border.color: {
@@ -498,7 +551,7 @@ Item {
                                 Layout.preferredWidth: 64
 
                                 background: Rectangle {
-                                    color: parent.pressed ? "#74c7a0" : "#a6e3a120"
+                                    color: parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : "#34D39920"
                                     radius: 4
                                     border.color: Theme.accentSuccess
                                     border.width: 1

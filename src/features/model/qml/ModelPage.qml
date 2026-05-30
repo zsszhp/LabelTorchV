@@ -7,7 +7,7 @@ import QtQuick.Layouts
 Item {
     id: root
 
-    property string currentProjectId: ""
+    property string currentProjectId: appController.currentProjectId
     property string selectedVersionId: ""
     property var selectedVersion: null
 
@@ -17,10 +17,55 @@ Item {
         selectedVersion = null
     }
 
+    // 未打开项目时的空状态提示
+    ColumnLayout {
+        anchors.centerIn: parent
+        visible: currentProjectId === ""
+        spacing: 16
+
+        Label {
+            text: "🏷️ 请先打开一个项目"
+            color: Theme.textSecondary
+            font.pixelSize: Theme.fontSizeTitle
+            font.bold: true
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        Label {
+            text: "完成训练后，在此管理模型版本"
+            color: Theme.textMuted
+            font.pixelSize: Theme.fontSizeNormal
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        Button {
+            text: "前往项目中心"
+            font.family: Theme.fontFamily
+            Layout.alignment: Qt.AlignHCenter
+            background: Rectangle {
+                color: parent.hovered ? Theme.accentPrimary : Theme.bgTertiary
+                radius: Theme.radiusSmall
+                border.color: Theme.accentPrimary
+                border.width: 1
+                implicitWidth: 140
+                implicitHeight: 36
+            }
+            contentItem: Label {
+                text: parent.text
+                color: Theme.accentPrimary
+                font.pixelSize: Theme.fontSizeNormal
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+            onClicked: appController.currentPageIndex = 0
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 12
         spacing: 8
+        visible: currentProjectId !== ""
 
         // 标签栏
         TabBar {
@@ -141,7 +186,7 @@ Item {
                                 width: versionList.width
                                 height: 72
                                 radius: 6
-                                color: selectedVersionId === model.versionId ? Theme.bgInput : (mouseArea.containsMouse ? "#252536" : Theme.bgPrimary)
+                                color: selectedVersionId === model.versionId ? Theme.bgInput : (mouseArea.containsMouse ? Theme.bgSecondary : Theme.bgPrimary)
                                 border.color: selectedVersionId === model.versionId ? Theme.accentPrimary : "transparent"
                                 border.width: selectedVersionId === model.versionId ? 1 : 0
 
@@ -186,10 +231,10 @@ Item {
                                                     radius: 4
                                                     color: {
                                                         switch(modelData) {
-                                                        case "baseline": return "#89b4fa20"
-                                                        case "best-so-far": return "#a6e3a120"
-                                                        case "production-candidate": return "#f9e2af20"
-                                                        default: return "#45475a20"
+                                                        case "baseline": return "#3B9AFF20"
+                                                        case "best-so-far": return "#34D39920"
+                                                        case "production-candidate": return "#FBBF2420"
+                                                        default: return "#546E7A20"
                                                         }
                                                     }
                                                     border.color: {
@@ -476,7 +521,7 @@ Item {
                             Layout.fillWidth: true
                             Layout.preferredHeight: lineageContent.height + 16
                             visible: selectedVersionId !== ""
-                            color: "#11111b"
+                            color: Theme.bgInput
                             radius: 6
 
                             ColumnLayout {

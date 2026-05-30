@@ -137,7 +137,7 @@ Item {
                         width: versionCheckList.width
                         height: 56
                         radius: 6
-                        color: isChecked ? Theme.bgInput : (checkMouseArea.containsMouse ? "#252536" : Theme.bgPrimary)
+                        color: isChecked ? Theme.bgInput : (checkMouseArea.containsMouse ? Theme.bgSecondary : Theme.bgPrimary)
                         border.color: isChecked ? Theme.accentPrimary : "transparent"
                         border.width: isChecked ? 1 : 0
 
@@ -352,7 +352,7 @@ Item {
                             Rectangle {
                                 width: 140
                                 height: 36
-                                color: "#11111b"
+                                color: Theme.bgInput
                                 radius: 4
 
                                 Label {
@@ -371,7 +371,7 @@ Item {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     height: 36
-                                    color: "#11111b"
+                                    color: Theme.bgInput
                                     radius: 4
 
                                     ColumnLayout {
@@ -464,8 +464,8 @@ Item {
                                                 var maxVal = Math.max.apply(null, values)
                                                 var minVal = Math.min.apply(null, values)
 
-                                                if (numVal === maxVal) return "#a6e3a120"  // green bg for best
-                                                if (numVal === minVal) return "#f38ba820"   // red bg for worst
+                                                if (numVal === maxVal) return "#34D39920"
+                                                if (numVal === minVal) return "#F8717120"
                                                 return Theme.bgPrimary
                                             }
 
@@ -556,7 +556,7 @@ Item {
                                     width: 12
                                     height: 12
                                     radius: 2
-                                    color: "#a6e3a120"
+                                    color: "#34D39920"
                                     border.color: Theme.accentSuccess
                                     border.width: 1
                                 }
@@ -573,7 +573,7 @@ Item {
                                     width: 12
                                     height: 12
                                     radius: 2
-                                    color: "#f38ba820"
+                                    color: "#F8717120"
                                     border.color: Theme.accentError
                                     border.width: 1
                                 }
