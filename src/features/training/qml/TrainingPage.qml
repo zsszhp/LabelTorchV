@@ -8,7 +8,7 @@ import QtQuick.Layouts
 Item {
     id: root
 
-    property string currentProjectId: ""
+    property string currentProjectId: appController.currentProjectId
     property string currentRunId: ""
     property string currentRunStatus: ""
 
@@ -34,7 +34,7 @@ Item {
 
     onCurrentProjectIdChanged: {
         trainingModel.setProjectId(currentProjectId)
-        snapshotModel.setDatasetId("")
+        snapshotModel.setProjectId(currentProjectId)
         runHistoryList.currentIndex = -1
         currentRunId = ""
         currentRunStatus = ""
@@ -142,7 +142,10 @@ Item {
         function onRunStatusChanged(runId, status) {
             if (runId !== currentRunId) return
             currentRunStatus = status
-            if (status === "succeeded") {
+            if (status === "preparing") {
+                statusLabel.text = "正在准备训练数据..."
+                statusLabel.color = Theme.accentWarning
+            } else if (status === "succeeded") {
                 statusLabel.text = "训练完成:" + runId.substring(0, 8) + "..."
                 statusLabel.color = Theme.accentSuccess
             } else if (status === "failed") {
@@ -317,10 +320,55 @@ Item {
         ctx.fillText("Epoch", padL + cW / 2, h - 2)
     }
 
+    // 未打开项目时的空状态提示
+    ColumnLayout {
+        anchors.centerIn: parent
+        visible: currentProjectId === ""
+        spacing: 16
+
+        Label {
+            text: "📋 请先打开一个项目"
+            color: Theme.textSecondary
+            font.pixelSize: Theme.fontSizeTitle
+            font.bold: true
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        Label {
+            text: "在左侧项目中心创建或打开项目后，即可开始训练"
+            color: Theme.textMuted
+            font.pixelSize: Theme.fontSizeNormal
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        Button {
+            text: "前往项目中心"
+            font.family: Theme.fontFamily
+            Layout.alignment: Qt.AlignHCenter
+            background: Rectangle {
+                color: parent.hovered ? Theme.accentPrimary : Theme.bgTertiary
+                radius: Theme.radiusSmall
+                border.color: Theme.accentPrimary
+                border.width: 1
+                implicitWidth: 140
+                implicitHeight: 36
+            }
+            contentItem: Label {
+                text: parent.text
+                color: Theme.accentPrimary
+                font.pixelSize: Theme.fontSizeNormal
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+            onClicked: appController.currentPageIndex = 0
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         anchors.margins: 12
         spacing: 12
+        visible: currentProjectId !== ""
 
         // === 左面板：配置 + 控制 ===
         Rectangle {
@@ -366,60 +414,37 @@ Item {
                             model: snapshotModel
                             textRole: "snapshotId"
                             valueRole: "snapshotId"
-                            displayText: currentIndex >= 0 ?
-                                snapshotModel.data(snapshotModel.index(currentIndex, 0), 257) ?
-                                snapshotModel.data(snapshotModel.index(currentIndex, 0), 257).substring(0, 8) + "..." :
-                                "选择数据快照" : "选择数据快照"
-
-                            contentItem: Label {
-                                text: snapshotCombo.displayText
-                                color: Theme.textPrimary
-                                font.pixelSize: Theme.fontSizeNormal
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: 8
-                            }
-
-                            background: Rectangle {
-                                color: Theme.bgInput
-                                radius: Theme.radiusSmall
-                                border.color: snapshotCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
-                                border.width: 1
-                            }
-
-                            popup: Popup {
-                                y: snapshotCombo.height
-                                width: snapshotCombo.width
-                                implicitHeight: Math.min(contentItem.implicitHeight, 300)
-                                padding: 1
-
-                                contentItem: ListView {
-                                    clip: true
-                                    implicitHeight: contentHeight
-                                    model: snapshotCombo.popup.visible ? snapshotCombo.delegateModel : null
-                                    currentIndex: snapshotCombo.highlightedIndex
-                                }
-
-                                background: Rectangle {
-                                    color: Theme.bgPrimary
-                                    border.color: Theme.borderNormal
-                                    radius: Theme.radiusSmall
-                                }
-                            }
+                            displayText: currentIndex >= 0 && currentValue ?
+                                currentValue.substring(0, 8) + "..." : "选择数据快照"
 
                             delegate: ItemDelegate {
                                 width: snapshotCombo.width
-                                contentItem: Label {
-                                    text: model.snapshotId.substring(0, 8) + "... (" + model.sampleCount + " 样本, train:" + model.trainCount + " val:" + model.valCount + ")"
-                                    color: highlighted ? Theme.accentPrimary : Theme.textPrimary
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    font.family: "monospace"
-                                    verticalAlignment: Text.AlignVCenter
-                                }
+                                text: model.snapshotId.substring(0, 8) + "... (" + model.sampleCount + " 样本, train:" + model.trainCount + " val:" + model.valCount + ")"
+                                font.pixelSize: Theme.fontSizeCaption
+                                font.family: "monospace"
                                 highlighted: snapshotCombo.highlightedIndex === index
-                                background: Rectangle {
-                                    color: highlighted ? Theme.bgInput : Theme.bgPrimary
-                                }
                             }
+                        }
+
+                        // 创建快照按钮
+                        Button {
+                            text: "+ 快照"
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.family: Theme.fontFamily
+                            background: Rectangle {
+                                color: parent.hovered ? Theme.bgHover : Theme.bgTertiary
+                                radius: Theme.radiusSmall
+                                border.color: Theme.accentPrimary
+                                border.width: 1
+                            }
+                            contentItem: Label {
+                                text: parent.text
+                                color: Theme.accentPrimary
+                                font.pixelSize: Theme.fontSizeSmall
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            onClicked: createSnapshotDialog.open()
                         }
                     }
 
@@ -435,11 +460,12 @@ Item {
                         text: {
                             if (snapshotCombo.currentIndex < 0) return ""
                             var idx = snapshotCombo.currentIndex
-                            var count = snapshotModel.data(snapshotModel.index(idx, 0), 259)
-                            var val = snapshotModel.data(snapshotModel.index(idx, 0), 260)
-                            var tax = snapshotModel.data(snapshotModel.index(idx, 0), 261)
-                            if (count === undefined) return ""
-                            return "Train: " + count + " | Val: " + val + " | Taxonomy: " + (tax || "unknown")
+                            var snapId = snapshotModel.data(snapshotModel.index(idx, 0), Qt.UserRole + 1)
+                            var trainCount = snapshotModel.data(snapshotModel.index(idx, 0), Qt.UserRole + 3)
+                            var valCount = snapshotModel.data(snapshotModel.index(idx, 0), Qt.UserRole + 4)
+                            var taxVer = snapshotModel.data(snapshotModel.index(idx, 0), Qt.UserRole + 5)
+                            if (trainCount === undefined) return ""
+                            return "Train: " + trainCount + " | Val: " + valCount + " | Taxonomy: " + (taxVer || "unknown")
                         }
                     }
 
@@ -783,7 +809,7 @@ Item {
                                     delegate: ItemDelegate {
                                         width: parentVersionCombo.width
                                         contentItem: Label {
-                                            text: model.versionId.substring(0, 8) + "... (" + model.bestWeight + ")"
+                                            text: model.versionId.substring(0, 8) + "... (" + model.bestWeightPath + ")"
                                             color: highlighted ? Theme.accentPrimary : Theme.textPrimary
                                             font.pixelSize: Theme.fontSizeCaption
                                             font.family: "monospace"
@@ -1744,11 +1770,11 @@ Item {
                             id: startBtn
                             text: "开始训练"
                             highlighted: true
-                            enabled: snapshotCombo.currentIndex >= 0 && currentRunStatus !== "running"
+                            enabled: snapshotCombo.currentIndex >= 0 && currentRunStatus !== "running" && currentRunStatus !== "preparing"
                             Layout.fillWidth: true
 
                             background: Rectangle {
-                                color: parent.enabled ? (parent.pressed ? "#74c7a0" : Theme.accentSuccess) : Theme.borderNormal
+                                color: parent.enabled ? (parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess) : Theme.borderNormal
                                 radius: 6
                                 implicitHeight: 36
                             }
@@ -1804,7 +1830,7 @@ Item {
                             Layout.preferredWidth: 80
 
                             background: Rectangle {
-                                color: parent.enabled ? (parent.pressed ? "#d6758e" : Theme.accentError) : Theme.borderNormal
+                                color: parent.enabled ? (parent.pressed ? Qt.darker(Theme.accentError, 1.2) : Theme.accentError) : Theme.borderNormal
                                 radius: 6
                                 implicitHeight: 36
                             }
@@ -2129,12 +2155,12 @@ Item {
                                     radius: 4
                                     color: {
                                         switch (model.status) {
-                                        case "running": return "#f9e2af20"
-                                        case "succeeded": return "#a6e3a120"
-                                        case "failed": return "#f38ba820"
-                                        case "cancelled": return "#6c708620"
-                                        case "draft": return "#89b4fa20"
-                                        default: return Theme.borderNormal
+                                        case "running": return "#FBBF2420"
+                                        case "succeeded": return "#34D39920"
+                                        case "failed": return "#F8717120"
+                                        case "cancelled": return "#546E7A20"
+                                        case "draft": return "#3B9AFF20"
+                                        default: return "#546E7A20"
                                         }
                                     }
                                     border.color: {
@@ -2234,6 +2260,278 @@ Item {
                                     rightTabs.currentIndex = 0
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 创建数据快照对话框
+    Dialog {
+        id: createSnapshotDialog
+        title: "创建数据快照"
+        modal: true
+        anchors.centerIn: parent
+        width: 420
+        padding: 16
+
+        onOpened: {
+            // 对话框打开时刷新当前项目的数据集列表
+            datasetModel.setProjectId(currentProjectId)
+            datasetModel.refresh()
+        }
+        background: Rectangle {
+            color: Theme.bgCard
+            border.color: Theme.borderNormal
+            radius: Theme.radiusNormal
+        }
+
+        ColumnLayout {
+            width: parent.width
+            spacing: 12
+
+            Label {
+                text: "从当前项目的数据集创建不可变快照，用于训练。"
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeSmall
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+
+            // 数据集选择
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Label {
+                    text: "数据集:"
+                    color: Theme.textPrimary
+                    font.pixelSize: Theme.fontSizeNormal
+                    Layout.preferredWidth: 72
+                }
+
+                ComboBox {
+                    id: snapshotDatasetCombo
+                    Layout.fillWidth: true
+                    model: datasetModel
+                    textRole: "name"
+                    valueRole: "datasetId"
+
+                    contentItem: Label {
+                        text: datasetModel.rowCount() === 0 ?
+                            "暂无数据集，请先导入" : snapshotDatasetCombo.displayText
+                        color: datasetModel.rowCount() === 0 ?
+                            Theme.textMuted : Theme.textPrimary
+                        font.pixelSize: Theme.fontSizeNormal
+                        verticalAlignment: Text.AlignVCenter
+                        leftPadding: 8
+                    }
+
+                    background: Rectangle {
+                        color: Theme.bgInput
+                        radius: Theme.radiusSmall
+                        border.color: snapshotDatasetCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                        border.width: 1
+                    }
+
+                    delegate: ItemDelegate {
+                        width: snapshotDatasetCombo.width
+                        contentItem: Label {
+                            text: model.name + " (" + model.sampleCount + " 样本)"
+                            color: highlighted ? Theme.accentPrimary : Theme.textPrimary
+                            font.pixelSize: Theme.fontSizeCaption
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        highlighted: snapshotDatasetCombo.highlightedIndex === index
+                        background: Rectangle {
+                            color: highlighted ? Theme.bgInput : Theme.bgPrimary
+                        }
+                    }
+                }
+            }
+
+            // 训练比例
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Label {
+                    text: "训练比例:"
+                    color: Theme.textPrimary
+                    font.pixelSize: Theme.fontSizeNormal
+                    Layout.preferredWidth: 72
+                }
+
+                SpinBox {
+                    id: trainRatioSpin
+                    from: 50
+                    to: 95
+                    value: 80
+                    stepSize: 5
+                    editable: true
+
+                    property real realValue: value / 100.0
+
+                    textFromValue: function(value) {
+                        return value + "%"
+                    }
+
+                    valueFromText: function(text) {
+                        return parseInt(text)
+                    }
+
+                    contentItem: Label {
+                        text: trainRatioSpin.textFromValue(trainRatioSpin.value, trainRatioSpin.locale)
+                        color: Theme.textPrimary
+                        font.pixelSize: Theme.fontSizeNormal
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    up.indicator: Rectangle {
+                        x: trainRatioSpin.mirrored ? 0 : parent.width - width
+                        height: parent.height
+                        implicitWidth: 32
+                        color: trainRatioSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
+                        border.color: Theme.borderNormal
+                        radius: 2
+                        Label { anchors.centerIn: parent; text: "+"; color: Theme.textPrimary; font.pixelSize: 14 }
+                    }
+
+                    down.indicator: Rectangle {
+                        x: trainRatioSpin.mirrored ? parent.width - width : 0
+                        height: parent.height
+                        implicitWidth: 32
+                        color: trainRatioSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
+                        border.color: Theme.borderNormal
+                        radius: 2
+                        Label { anchors.centerIn: parent; text: "-"; color: Theme.textPrimary; font.pixelSize: 14 }
+                    }
+
+                    background: Rectangle {
+                        color: Theme.bgInput
+                        border.color: trainRatioSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                        radius: Theme.radiusSmall
+                    }
+                }
+
+                Label {
+                    text: "（剩余为验证集）"
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSizeCaption
+                }
+            }
+
+            // 划分策略
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Label {
+                    text: "划分策略:"
+                    color: Theme.textPrimary
+                    font.pixelSize: Theme.fontSizeNormal
+                    Layout.preferredWidth: 72
+                }
+
+                ComboBox {
+                    id: splitStrategyCombo
+                    Layout.fillWidth: true
+                    model: ["random", "sequential"]
+                    currentIndex: 0
+
+                    contentItem: Label {
+                        text: splitStrategyCombo.displayText
+                        color: Theme.textPrimary
+                        font.pixelSize: Theme.fontSizeNormal
+                        verticalAlignment: Text.AlignVCenter
+                        leftPadding: 8
+                    }
+
+                    background: Rectangle {
+                        color: Theme.bgInput
+                        radius: Theme.radiusSmall
+                        border.color: splitStrategyCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                        border.width: 1
+                    }
+
+                    delegate: ItemDelegate {
+                        width: splitStrategyCombo.width
+                        contentItem: Label {
+                            text: modelData === "random" ? "随机划分" : "顺序划分"
+                            color: highlighted ? Theme.accentPrimary : Theme.textPrimary
+                            font.pixelSize: Theme.fontSizeNormal
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        highlighted: splitStrategyCombo.highlightedIndex === index
+                        background: Rectangle {
+                            color: highlighted ? Theme.bgInput : Theme.bgPrimary
+                        }
+                    }
+                }
+            }
+
+            // 按钮行
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Item { Layout.fillWidth: true }
+
+                Button {
+                    text: "取消"
+                    font.family: Theme.fontFamily
+                    background: Rectangle {
+                        color: parent.hovered ? Theme.bgHover : Theme.bgTertiary
+                        radius: Theme.radiusSmall
+                    }
+                    contentItem: Label {
+                        text: parent.text
+                        color: Theme.textSecondary
+                        font.pixelSize: Theme.fontSizeNormal
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    onClicked: createSnapshotDialog.reject()
+                }
+
+                Button {
+                    text: "创建快照"
+                    font.family: Theme.fontFamily
+                    background: Rectangle {
+                        color: parent.hovered ? Theme.accentPrimary : Theme.bgTertiary
+                        radius: Theme.radiusSmall
+                        border.color: Theme.accentPrimary
+                        border.width: 1
+                    }
+                    contentItem: Label {
+                        text: parent.text
+                        color: Theme.accentPrimary
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    onClicked: {
+                        var dsId = snapshotDatasetCombo.currentValue
+                        if (!dsId || dsId === "") return
+                        var ratio = trainRatioSpin.realValue
+                        var strategy = splitStrategyCombo.currentText
+                        var snapId = snapshotService.createSnapshot(dsId, ratio, strategy)
+                        if (snapId !== "") {
+                            // 刷新快照列表并自动选中新创建的快照
+                            snapshotModel.setProjectId(currentProjectId)
+                            snapshotModel.refresh()
+                            // 尝试选中新创建的快照
+                            for (var i = 0; i < snapshotModel.rowCount(); i++) {
+                                var sid = snapshotModel.data(snapshotModel.index(i, 0), Qt.UserRole + 1)
+                                if (sid === snapId) {
+                                    snapshotCombo.currentIndex = i
+                                    break
+                                }
+                            }
+                            createSnapshotDialog.accept()
                         }
                     }
                 }

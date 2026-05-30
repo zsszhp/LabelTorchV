@@ -29,6 +29,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     Q_INVOKABLE void setDatasetId(const QString &datasetId);
+    Q_INVOKABLE void setProjectId(const QString &projectId);
     Q_INVOKABLE void refresh();
     int count() const;
 
@@ -38,6 +39,7 @@ signals:
 private:
     QVariantList m_snapshots;
     QString m_datasetId;
+    QString m_projectId;
 };
 
 #endif // SNAPSHOTMODEL_H

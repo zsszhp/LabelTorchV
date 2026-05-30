@@ -11,6 +11,7 @@
 #include <QJsonObject>
 #include <QUuid>
 #include <QDateTime>
+#include <QtConcurrent>
 
 TrainingService::TrainingService(QObject *parent) : QObject(parent)
 {
@@ -158,7 +159,6 @@ bool TrainingService::startTraining(const QString &runId)
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
-    // Check current status - only draft can transition to running
     QSqlQuery checkQuery(db);
     checkQuery.prepare("SELECT status, snapshot_id, project_id FROM training_runs WHERE id = ?");
     checkQuery.addBindValue(runId);
@@ -173,72 +173,85 @@ bool TrainingService::startTraining(const QString &runId)
     QString snapshotId = checkQuery.value(1).toString();
     QString projectId = checkQuery.value(2).toString();
 
-    // Query project root_path
     QSqlQuery projectQuery(db);
     projectQuery.prepare("SELECT root_path FROM projects WHERE id = ?");
     projectQuery.addBindValue(projectId);
     if (!projectQuery.exec() || !projectQuery.next()) return false;
     QString projectRoot = projectQuery.value(0).toString();
 
-    // Prepare physical snapshot folders and write data.yaml
-    SnapshotService snapshotService;
-    QString dataYamlPath = snapshotService.prepareSnapshotPhysicalDir(snapshotId);
-    if (dataYamlPath.isEmpty()) {
-        ltError(LT_LOG_TRAINING()) << "Failed to prepare snapshot directories for run:" << runId;
-        return false;
+    // 立即更新状态为"准备中"，防止用户重复点击
+    {
+        QSqlQuery updateQuery(db);
+        updateQuery.prepare("UPDATE training_runs SET status = 'preparing', started_at = ? WHERE id = ?");
+        updateQuery.addBindValue(QDateTime::currentDateTime().toString(Qt::ISODate));
+        updateQuery.addBindValue(runId);
+        if (!updateQuery.exec()) return false;
     }
+    emit runStatusChanged(runId, "preparing");
 
-    // Capture runtime environment snapshot
-    QJsonObject runtimeEnv;
-    runtimeEnv["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-    runtimeEnv["python_version"] = ""; // Will be populated by backend
-    runtimeEnv["ultralytics_version"] = "";
-    runtimeEnv["torch_version"] = "";
-    runtimeEnv["cuda_available"] = false;
-    QString runtimeEnvJson = QString::fromUtf8(
-        QJsonDocument(runtimeEnv).toJson(QJsonDocument::Compact));
+    // 在后台线程准备物理快照目录（大量文件拷贝，不能在UI线程执行）
+    QString capturedProjectRoot = projectRoot;
+    QtConcurrent::run([this, runId, snapshotId, capturedProjectRoot]() {
+        SnapshotService snapshotService;
+        QString dataYamlPath = snapshotService.prepareSnapshotPhysicalDir(snapshotId);
 
-    // Update status to running, set started_at and runtime env
-    QSqlQuery updateQuery(db);
-    updateQuery.prepare(
-        "UPDATE training_runs SET status = 'running', started_at = ?, "
-        "runtime_env_snapshot_json = ? WHERE id = ?"
-    );
-    updateQuery.addBindValue(QDateTime::currentDateTime().toString(Qt::ISODate));
-    updateQuery.addBindValue(runtimeEnvJson);
-    updateQuery.addBindValue(runId);
+        // 回到UI线程处理结果
+        QMetaObject::invokeMethod(this, [this, runId, snapshotId, dataYamlPath, capturedProjectRoot]() {
+            if (dataYamlPath.isEmpty()) {
+                ltError(LT_LOG_TRAINING()) << "Failed to prepare snapshot directories for run:" << runId;
+                updateRunStatus(runId, "failed");
+                emit runStatusChanged(runId, "failed");
+                return;
+            }
 
-    if (!updateQuery.exec()) {
-        ltError(LT_LOG_TRAINING()) << "Failed to update training run status:" << updateQuery.lastError().text();
-        return false;
-    }
+            auto db = Database::instance().database();
 
-    // Send train.start via IpcClient if available
-    if (m_ipcClient) {
-        // Get the full run details to pass to the backend
-        QSqlQuery runQuery(db);
-        runQuery.prepare("SELECT snapshot_id, config_snapshot_json FROM training_runs WHERE id = ?");
-        runQuery.addBindValue(runId);
-        if (runQuery.exec() && runQuery.next()) {
-            QJsonObject payload;
-            payload["run_id"] = runId;
-            payload["snapshot_id"] = runQuery.value(0).toString();
-            
-            QJsonObject configObj = QJsonDocument::fromJson(
-                runQuery.value(1).toString().toUtf8()).object();
-            
-            // Inject dynamically generated data_yaml and directories
-            configObj["data_yaml"] = dataYamlPath;
-            configObj["project_dir"] = projectRoot + "/models";
-            configObj["run_name"] = runId;
-            
-            payload["config"] = configObj;
-            m_ipcClient->sendRequest("train.start", payload);
-        }
-    }
+            QJsonObject runtimeEnv;
+            runtimeEnv["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+            runtimeEnv["python_version"] = "";
+            runtimeEnv["ultralytics_version"] = "";
+            runtimeEnv["torch_version"] = "";
+            runtimeEnv["cuda_available"] = false;
+            QString runtimeEnvJson = QString::fromUtf8(
+                QJsonDocument(runtimeEnv).toJson(QJsonDocument::Compact));
 
-    ltInfo(LT_LOG_TRAINING()) << "Training run started:" << runId;
-    emit runStatusChanged(runId, "running");
+            QSqlQuery updateQuery(db);
+            updateQuery.prepare(
+                "UPDATE training_runs SET status = 'running', runtime_env_snapshot_json = ? WHERE id = ?");
+            updateQuery.addBindValue(runtimeEnvJson);
+            updateQuery.addBindValue(runId);
+
+            if (!updateQuery.exec()) {
+                ltError(LT_LOG_TRAINING()) << "Failed to update training run status:" << updateQuery.lastError().text();
+                return;
+            }
+
+            if (m_ipcClient) {
+                QSqlQuery runQuery(db);
+                runQuery.prepare("SELECT snapshot_id, config_snapshot_json FROM training_runs WHERE id = ?");
+                runQuery.addBindValue(runId);
+                if (runQuery.exec() && runQuery.next()) {
+                    QJsonObject payload;
+                    payload["run_id"] = runId;
+                    payload["snapshot_id"] = runQuery.value(0).toString();
+
+                    QJsonObject configObj = QJsonDocument::fromJson(
+                        runQuery.value(1).toString().toUtf8()).object();
+
+                    configObj["data_yaml"] = dataYamlPath;
+                    configObj["project_dir"] = capturedProjectRoot + "/models";
+                    configObj["run_name"] = runId;
+
+                    payload["config"] = configObj;
+                    m_ipcClient->sendRequest("train.start", payload);
+                }
+            }
+
+            ltInfo(LT_LOG_TRAINING()) << "Training run started:" << runId;
+            emit runStatusChanged(runId, "running");
+        }, Qt::QueuedConnection);
+    });
+
     return true;
 }
 

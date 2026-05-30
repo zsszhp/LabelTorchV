@@ -57,28 +57,51 @@ void SnapshotModel::setDatasetId(const QString &datasetId)
 {
     ltTrace(LT_LOG_TRAINING()) << "datasetId=" << datasetId;
     m_datasetId = datasetId;
+    m_projectId.clear();
+    refresh();
+}
+
+void SnapshotModel::setProjectId(const QString &projectId)
+{
+    ltTrace(LT_LOG_TRAINING()) << "projectId=" << projectId;
+    m_projectId = projectId;
+    m_datasetId.clear();
     refresh();
 }
 
 void SnapshotModel::refresh()
 {
-    ltTrace(LT_LOG_TRAINING()) << "datasetId=" << m_datasetId;
+    ltTrace(LT_LOG_TRAINING()) << "datasetId=" << m_datasetId << "projectId=" << m_projectId;
 
     beginResetModel();
     m_snapshots.clear();
 
     auto db = Database::instance().database();
-    if (!db.isOpen() || m_datasetId.isEmpty()) {
+    if (!db.isOpen()) {
         endResetModel();
         emit countChanged();
         return;
     }
 
     QSqlQuery query(db);
-    query.prepare("SELECT id, dataset_id, sample_manifest_json, split_manifest_json, "
-                  "taxonomy_version, annotation_revision_boundary, created_at "
-                  "FROM dataset_snapshots WHERE dataset_id = ? ORDER BY created_at DESC");
-    query.addBindValue(m_datasetId);
+
+    if (!m_datasetId.isEmpty()) {
+        query.prepare("SELECT id, dataset_id, sample_manifest_json, split_manifest_json, "
+                      "taxonomy_version, annotation_revision_boundary, created_at "
+                      "FROM dataset_snapshots WHERE dataset_id = ? ORDER BY created_at DESC");
+        query.addBindValue(m_datasetId);
+    } else if (!m_projectId.isEmpty()) {
+        query.prepare("SELECT s.id, s.dataset_id, s.sample_manifest_json, s.split_manifest_json, "
+                      "s.taxonomy_version, s.annotation_revision_boundary, s.created_at "
+                      "FROM dataset_snapshots s "
+                      "JOIN datasets d ON s.dataset_id = d.id "
+                      "WHERE d.project_id = ? ORDER BY s.created_at DESC");
+        query.addBindValue(m_projectId);
+    } else {
+        endResetModel();
+        emit countChanged();
+        return;
+    }
 
     if (query.exec()) {
         while (query.next()) {

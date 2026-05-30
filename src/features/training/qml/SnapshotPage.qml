@@ -129,7 +129,7 @@ Item {
                 width: snapshotList.width
                 height: 64
                 radius: 6
-                color: mouseArea.containsMouse ? Theme.bgInput : "#252536"
+                color: mouseArea.containsMouse ? Theme.bgInput : Theme.bgSecondary
 
                 RowLayout {
                     anchors.fill: parent

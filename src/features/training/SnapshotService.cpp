@@ -33,7 +33,7 @@ QString SnapshotService::createSnapshot(const QString &datasetId,
 
     // 1. Collect all valid sample IDs from the dataset
     QSqlQuery sampleQuery(db);
-    sampleQuery.prepare("SELECT id FROM dataset_samples WHERE dataset_id = ? AND validation_status = 'valid' ORDER BY id");
+    sampleQuery.prepare("SELECT id FROM dataset_samples WHERE dataset_id = ? AND validation_status IN ('valid', 'good', 'defective') ORDER BY id");
     sampleQuery.addBindValue(datasetId);
     if (!sampleQuery.exec()) return {};
 
@@ -329,7 +329,7 @@ bool SnapshotService::isOBBDataset(const QString &datasetId)
     // Query label paths for this dataset
     QSqlQuery query(db);
     query.prepare("SELECT label_path FROM dataset_samples WHERE dataset_id = ? "
-                  "AND label_path IS NOT NULL AND validation_status = 'valid' LIMIT 5");
+                  "AND label_path IS NOT NULL AND validation_status IN ('valid', 'good', 'defective') LIMIT 5");
     query.addBindValue(datasetId);
 
     if (!query.exec()) {

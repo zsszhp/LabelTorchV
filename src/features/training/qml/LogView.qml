@@ -6,7 +6,7 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
-    color: "#11111b"
+    color: Theme.bgInput
     radius: 6
 
     property alias logText: logArea.text
