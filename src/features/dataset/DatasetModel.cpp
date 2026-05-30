@@ -53,31 +53,28 @@ void DatasetModel::setProjectId(const QString &projectId)
 {
     ltTrace(LT_LOG_DATASET()) << "setProjectId projectId=" << projectId;
 
-    if (m_projectId != projectId) {
-        m_projectId = projectId;
-        emit projectIdChanged();
-        ltInfo(LT_LOG_DATASET()) << "Project changed, refreshing dataset model for projectId=" << projectId;
-        refresh();
-    }
+    m_projectId = projectId;
+    emit projectIdChanged();
+    ltInfo(LT_LOG_DATASET()) << "Project changed, refreshing dataset model for projectId=" << projectId;
+    refresh();
 }
 
 void DatasetModel::refresh()
 {
     ltTrace(LT_LOG_DATASET()) << "refresh projectId=" << m_projectId;
 
-    QSqlQuery query(Database::instance().database());
-
-    if (m_projectId.isEmpty()) {
-        query.prepare("SELECT id, name, image_root, sample_count, import_status, created_at, format "
-                      "FROM datasets ORDER BY created_at DESC");
-    } else {
-        query.prepare("SELECT id, name, image_root, sample_count, import_status, created_at, format "
-                      "FROM datasets WHERE project_id = ? ORDER BY created_at DESC");
-        query.addBindValue(m_projectId);
-    }
-
     beginResetModel();
     m_datasets.clear();
+
+    if (m_projectId.isEmpty()) {
+        endResetModel();
+        return;
+    }
+
+    QSqlQuery query(Database::instance().database());
+    query.prepare("SELECT id, name, image_root, sample_count, import_status, created_at, format "
+                  "FROM datasets WHERE project_id = ? ORDER BY created_at DESC");
+    query.addBindValue(m_projectId);
 
     if (query.exec()) {
         while (query.next()) {

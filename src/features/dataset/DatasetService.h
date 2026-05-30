@@ -55,7 +55,8 @@ public:
      * @param projectId 当前项目 ID
      * @param datasetName 数据集名称（默认填充为文件夹名）
      * @param folderPath 选择的文件夹路径
-     * @param detectedFormat 智能探测到的格式标识 ("yolo_txt" | "coco_json" | "anomaly_unsupervised")
+     * @param detectedFormat 智能探测到的格式标识 ("yolo_txt" | "coco_json" | "labelme_json" | "anomaly_unsupervised")
+     * @param labelDirOrPath 标签目录路径或 JSON 文件路径（由 scanFolder 探测结果提供）
      * @param autoMergeClasses 是否自动将探测到的新类别合并入当前项目的分类体系
      * @return 导入成功返回 datasetId (UUID)，失败返回空字符串
      */
@@ -63,6 +64,7 @@ public:
                                         const QString &datasetName,
                                         const QString &folderPath,
                                         const QString &detectedFormat,
+                                        const QString &labelDirOrPath = QString(),
                                         bool autoMergeClasses = true);
 
     /**
@@ -162,6 +164,19 @@ private:
     bool extractAndStoreSchema(const QString &datasetId, const QVariantList &samples);
     bool extractAndStoreSchemaFromCategories(const QString &datasetId, const QVariantMap &categories);
     bool importAnomalyDataset(const QString &datasetId, const QString &folderPath);
+
+    /**
+     * @brief 导入 LabelMe JSON 格式数据集
+     *
+     * LabelMe 格式：每张图片对应一个 JSON 标签文件，包含 shapes 数组
+     * 导入时将 LabelMe 坐标转换为 YOLO 归一化格式并生成 txt 标签文件
+     *
+     * @param datasetId 已创建的数据集 ID
+     * @param imageDir 图片目录
+     * @param labelDir LabelMe JSON 标签目录
+     * @return true 导入成功
+     */
+    bool importLabelMeDataset(const QString &datasetId, const QString &imageDir, const QString &labelDir);
 
     ImportScanner *m_scanner;
 };

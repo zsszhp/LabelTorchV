@@ -76,6 +76,10 @@ public:
     static bool isImageFile(const QString &fileName);
     static bool isLabelFile(const QString &fileName);
 
+    bool isLabelMeJsonFile(const QString &filePath);
+    QVariantMap parseLabelMeJsonFile(const QString &filePath);
+    QVariantMap scanWithLabelMeJsonLabels(const QString &imageDir, const QString &labelDir);
+
 signals:
     void scanProgress(int current, int total);
     void scanCompleted();

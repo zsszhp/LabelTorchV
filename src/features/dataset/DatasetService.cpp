@@ -250,8 +250,8 @@ QVariantMap DatasetService::getSampleStats(const QString &datasetId)
     QSqlQuery countQuery(db);
     countQuery.prepare("SELECT "
                        "  COUNT(*) AS total, "
-                       "  SUM(CASE WHEN validation_status = 'valid' THEN 1 ELSE 0 END) AS valid_count, "
-                       "  SUM(CASE WHEN validation_status != 'valid' OR validation_status IS NULL THEN 1 ELSE 0 END) AS invalid_count, "
+                       "  SUM(CASE WHEN validation_status IN ('valid', 'good', 'defective') THEN 1 ELSE 0 END) AS valid_count, "
+                       "  SUM(CASE WHEN validation_status NOT IN ('valid', 'good', 'defective') OR validation_status IS NULL THEN 1 ELSE 0 END) AS invalid_count, "
                        "  SUM(CASE WHEN label_path IS NOT NULL AND label_path != '' THEN 1 ELSE 0 END) AS labeled_count, "
                        "  SUM(CASE WHEN label_path IS NULL OR label_path = '' THEN 1 ELSE 0 END) AS unlabeled_count "
                        "FROM dataset_samples WHERE dataset_id = ?");
@@ -977,17 +977,27 @@ QVariantMap DatasetService::scanSeparate(const QString &imageDir, const QString 
     // 判断格式
     QString detectedFormat;
     if (hasLabelDir) {
-        // 检测标签格式
+        // 递归检测标签格式
         QDir lblDir(labelDir);
-        QFileInfoList labelFiles = lblDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
-        bool hasJson = false;
+        QFileInfoList labelFiles = m_scanner->collectLabelFiles(lblDir, true);
+        bool hasLabelMeJson = false;
+        bool hasCocoJson = false;
         for (const auto &fi : labelFiles) {
             if (fi.suffix().toLower() == QStringLiteral("json")) {
-                hasJson = true;
-                break;
+                if (m_scanner->isLabelMeJsonFile(fi.absoluteFilePath())) {
+                    hasLabelMeJson = true;
+                } else {
+                    hasCocoJson = true;
+                }
             }
         }
-        detectedFormat = hasJson ? QStringLiteral("coco_json") : QStringLiteral("yolo_txt");
+        if (hasLabelMeJson) {
+            detectedFormat = QStringLiteral("labelme_json");
+        } else if (hasCocoJson) {
+            detectedFormat = QStringLiteral("coco_json");
+        } else {
+            detectedFormat = QStringLiteral("yolo_txt");
+        }
     } else {
         detectedFormat = QStringLiteral("image_only");
     }
@@ -1179,16 +1189,58 @@ QString DatasetService::importDatasetSeparate(const QString &projectId,
     // 判断标签目录是否存在
     bool hasLabelDir = !labelDir.isEmpty() && QDir(labelDir).exists();
 
-    // 检测标签格式：优先检测 JSON，否则 YOLO TXT
+    // 检测标签格式：优先检测 LabelMe JSON，其次 COCO JSON，否则 YOLO TXT
     if (hasLabelDir) {
         QDir lblDir(labelDir);
-        QFileInfoList allFiles = lblDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
-        for (const auto &fi : allFiles) {
+        QFileInfoList allLabelFiles = m_scanner->collectLabelFiles(lblDir, true);
+        bool hasLabelMeJson = false;
+        bool hasCocoJson = false;
+        for (const auto &fi : allLabelFiles) {
             if (fi.suffix().toLower() == QStringLiteral("json")) {
-                // COCO JSON 格式
-                ltInfo(LT_LOG_DATASET()) << "检测到 JSON 标签，使用 COCO JSON 导入流程";
-                return importDatasetJson(projectId, datasetName, imageDir,
-                                         fi.absoluteFilePath());
+                if (m_scanner->isLabelMeJsonFile(fi.absoluteFilePath())) {
+                    hasLabelMeJson = true;
+                } else {
+                    hasCocoJson = true;
+                }
+            }
+        }
+
+        if (hasLabelMeJson) {
+            ltInfo(LT_LOG_DATASET()) << "检测到 LabelMe JSON 标签，使用 LabelMe JSON 导入流程";
+            // 创建数据集记录
+            QString datasetId = Id::generate();
+            QSqlQuery query(Database::instance().database());
+            query.prepare("INSERT INTO datasets (id, project_id, name, image_root, label_root, format, sample_count, import_status) "
+                          "VALUES (?, ?, ?, ?, ?, 'labelme_json', 0, 'scanning')");
+            query.addBindValue(datasetId);
+            query.addBindValue(projectId);
+            query.addBindValue(datasetName);
+            query.addBindValue(imageDir);
+            query.addBindValue(labelDir);
+
+            if (!query.exec()) {
+                ltError(LT_LOG_DATASET()) << "importDatasetSeparate: 创建 LabelMe 数据集记录失败:" << query.lastError().text();
+                return {};
+            }
+
+            if (!importLabelMeDataset(datasetId, imageDir, labelDir)) {
+                ltError(LT_LOG_DATASET()) << "importDatasetSeparate: LabelMe 导入失败";
+                updateImportStatus(datasetId, QStringLiteral("failed"));
+                return {};
+            }
+
+            return datasetId;
+        }
+
+        if (hasCocoJson) {
+            // COCO JSON 格式
+            ltInfo(LT_LOG_DATASET()) << "检测到 COCO JSON 标签，使用 COCO JSON 导入流程";
+            for (const auto &fi : allLabelFiles) {
+                if (fi.suffix().toLower() == QStringLiteral("json")
+                    && !m_scanner->isLabelMeJsonFile(fi.absoluteFilePath())) {
+                    return importDatasetJson(projectId, datasetName, imageDir,
+                                             fi.absoluteFilePath());
+                }
             }
         }
     }
@@ -1201,12 +1253,14 @@ QString DatasetService::importDatasetV2(const QString &projectId,
                                         const QString &datasetName,
                                         const QString &folderPath,
                                         const QString &detectedFormat,
+                                        const QString &labelDirOrPath,
                                         bool autoMergeClasses)
 {
     ltTrace(LT_LOG_DATASET()) << "importDatasetV2 projectId=" << projectId
                               << "datasetName=" << datasetName
                               << "folderPath=" << folderPath
                               << "detectedFormat=" << detectedFormat
+                              << "labelDirOrPath=" << labelDirOrPath
                               << "autoMergeClasses=" << autoMergeClasses;
 
     if (projectId.isEmpty() || datasetName.isEmpty() || folderPath.isEmpty() || detectedFormat.isEmpty()) {
@@ -1216,18 +1270,24 @@ QString DatasetService::importDatasetV2(const QString &projectId,
 
     ltInfo(LT_LOG_DATASET()) << "V2 导入开始: name=" << datasetName
                              << "folderPath=" << folderPath
-                             << "format=" << detectedFormat;
+                             << "format=" << detectedFormat
+                             << "labelDirOrPath=" << labelDirOrPath;
 
     // 根据探测到的格式分发到对应的导入流程
     if (detectedFormat == QStringLiteral("yolo_txt")) {
-        QDir baseDir(folderPath);
-        QString imageDir = baseDir.filePath(QStringLiteral("images"));
-        QString labelDir = baseDir.filePath(QStringLiteral("labels"));
+        QString imageDir = folderPath;
+        QString labelDir = labelDirOrPath;
 
-        // 如果 images 子目录不存在，则直接使用 folderPath
-        if (!QDir(imageDir).exists()) imageDir = folderPath;
-        // 如果 labels 子目录不存在，可能没有标签
-        if (!QDir(labelDir).exists()) labelDir = QString();
+        // 检查 images 子目录
+        QDir baseDir(folderPath);
+        QString imagesSubDir = baseDir.filePath(QStringLiteral("images"));
+        if (QDir(imagesSubDir).exists()) imageDir = imagesSubDir;
+
+        // 如果没有提供标签路径，尝试探测 labels 子目录
+        if (labelDir.isEmpty()) {
+            QString labelsSubDir = baseDir.filePath(QStringLiteral("labels"));
+            if (QDir(labelsSubDir).exists()) labelDir = labelsSubDir;
+        }
 
         ltDebug(LT_LOG_DATASET()) << "importDatasetV2: YOLO txt 分发 imageDir=" << imageDir
                                   << "labelDir=" << labelDir;
@@ -1235,16 +1295,35 @@ QString DatasetService::importDatasetV2(const QString &projectId,
     }
 
     if (detectedFormat == QStringLiteral("coco_json")) {
-        QDir baseDir(folderPath);
-        QString jsonLabelPath;
+        QString jsonLabelPath = labelDirOrPath;
 
-        // 搜索常见的 COCO JSON 文件名
+        // 如果扫描阶段提供了 JSON 路径，直接使用
+        if (!jsonLabelPath.isEmpty() && QFile::exists(jsonLabelPath)) {
+            ltDebug(LT_LOG_DATASET()) << "importDatasetV2: COCO JSON 使用扫描阶段路径:" << jsonLabelPath;
+            QDir baseDir(folderPath);
+            QString imageDir = folderPath;
+            QString imagesSubDir = baseDir.filePath(QStringLiteral("images"));
+            if (QDir(imagesSubDir).exists()) imageDir = imagesSubDir;
+
+            return importDatasetJson(projectId, datasetName, imageDir, jsonLabelPath);
+        }
+
+        // 否则搜索 JSON 文件
+        QDir baseDir(folderPath);
+        QString imageDir = folderPath;
+
+        // 检查 images 子目录
+        QString imagesSubDir = baseDir.filePath(QStringLiteral("images"));
+        if (QDir(imagesSubDir).exists()) imageDir = imagesSubDir;
+
+        // 搜索常见的 COCO JSON 文件名（在根目录和子目录中递归搜索）
         QStringList jsonCandidates = {
             QStringLiteral("annotations.json"),
             QStringLiteral("instances.json"),
             QStringLiteral("coco.json")
         };
 
+        // 先在根目录搜索
         for (const auto &candidate : jsonCandidates) {
             QString path = baseDir.filePath(candidate);
             if (QFile::exists(path)) {
@@ -1253,11 +1332,42 @@ QString DatasetService::importDatasetV2(const QString &projectId,
             }
         }
 
-        // 如果没找到，搜索目录下第一个 JSON 文件
+        // 在 labels 子目录搜索
         if (jsonLabelPath.isEmpty()) {
-            QStringList jsonFiles = baseDir.entryList({QStringLiteral("*.json")}, QDir::Files);
-            if (!jsonFiles.isEmpty()) {
-                jsonLabelPath = baseDir.filePath(jsonFiles.first());
+            QString labelsSubDir = baseDir.filePath(QStringLiteral("labels"));
+            if (QDir(labelsSubDir).exists()) {
+                for (const auto &candidate : jsonCandidates) {
+                    QString path = QDir(labelsSubDir).filePath(candidate);
+                    if (QFile::exists(path)) {
+                        jsonLabelPath = path;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 如果没找到，递归搜索目录下所有 JSON 文件
+        if (jsonLabelPath.isEmpty()) {
+            QFileInfoList allJsonFiles;
+            QDir searchDir(folderPath);
+            QFileInfoList entries = searchDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+            for (const auto &fi : entries) {
+                if (fi.suffix().toLower() == QStringLiteral("json")) {
+                    allJsonFiles.append(fi);
+                }
+            }
+            QFileInfoList subDirs = searchDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+            for (const auto &subDir : subDirs) {
+                QDir sd(subDir.absoluteFilePath());
+                QFileInfoList subEntries = sd.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+                for (const auto &fi : subEntries) {
+                    if (fi.suffix().toLower() == QStringLiteral("json")) {
+                        allJsonFiles.append(fi);
+                    }
+                }
+            }
+            if (!allJsonFiles.isEmpty()) {
+                jsonLabelPath = allJsonFiles.first().absoluteFilePath();
             }
         }
 
@@ -1267,10 +1377,79 @@ QString DatasetService::importDatasetV2(const QString &projectId,
         }
 
         ltDebug(LT_LOG_DATASET()) << "importDatasetV2: COCO JSON 分发 jsonLabelPath=" << jsonLabelPath;
-        return importDatasetJson(projectId, datasetName, folderPath, jsonLabelPath);
+        return importDatasetJson(projectId, datasetName, imageDir, jsonLabelPath);
+    }
+
+    if (detectedFormat == QStringLiteral("labelme_json")) {
+        // LabelMe JSON 格式（每图一个 JSON 文件）
+        QString imageDir = folderPath;
+        QString labelDir = labelDirOrPath;
+
+        // 检查 images 子目录
+        QDir baseDir(folderPath);
+        QString imagesSubDir = baseDir.filePath(QStringLiteral("images"));
+        if (QDir(imagesSubDir).exists()) imageDir = imagesSubDir;
+
+        // 如果没有提供标签路径，尝试探测 labels 子目录
+        if (labelDir.isEmpty()) {
+            QString labelsSubDir = baseDir.filePath(QStringLiteral("labels"));
+            if (QDir(labelsSubDir).exists()) labelDir = labelsSubDir;
+        }
+
+        if (labelDir.isEmpty()) {
+            ltError(LT_LOG_DATASET()) << "importDatasetV2: LabelMe JSON 格式需要标签目录路径";
+            return {};
+        }
+
+        ltDebug(LT_LOG_DATASET()) << "importDatasetV2: LabelMe JSON 分发 imageDir=" << imageDir
+                                  << "labelDir=" << labelDir;
+
+        // 创建数据集记录
+        QString datasetId = Id::generate();
+        QSqlQuery query(Database::instance().database());
+        query.prepare("INSERT INTO datasets (id, project_id, name, image_root, label_root, format, sample_count, import_status) "
+                      "VALUES (?, ?, ?, ?, ?, 'labelme_json', 0, 'scanning')");
+        query.addBindValue(datasetId);
+        query.addBindValue(projectId);
+        query.addBindValue(datasetName);
+        query.addBindValue(imageDir);
+        query.addBindValue(labelDir);
+
+        if (!query.exec()) {
+            ltError(LT_LOG_DATASET()) << "importDatasetV2: 创建 LabelMe 数据集记录失败:" << query.lastError().text();
+            return {};
+        }
+
+        if (!importLabelMeDataset(datasetId, imageDir, labelDir)) {
+            ltError(LT_LOG_DATASET()) << "importDatasetV2: LabelMe 导入失败";
+            updateImportStatus(datasetId, QStringLiteral("failed"));
+            return {};
+        }
+
+        return datasetId;
     }
 
     if (detectedFormat == QStringLiteral("anomaly_unsupervised") || detectedFormat == QStringLiteral("image_only")) {
+        // 获取项目的 task_type
+        QString taskType = QStringLiteral("detect");
+        {
+            QSqlQuery projectQuery(Database::instance().database());
+            projectQuery.prepare("SELECT task_type FROM projects WHERE id = ?");
+            projectQuery.addBindValue(projectId);
+            if (projectQuery.exec() && projectQuery.next()) {
+                taskType = projectQuery.value(0).toString();
+            }
+        }
+
+        // 检查目录结构是否具有 anomaly detection 的 train/good
+        QDir baseDir(folderPath);
+        bool hasTrainGood = QDir(baseDir.filePath(QStringLiteral("train/good"))).exists();
+
+        if (taskType != QStringLiteral("anomaly") || !hasTrainGood) {
+            ltInfo(LT_LOG_DATASET()) << "importDatasetV2: 项目类型不是异常检测，或者缺少 train/good 目录。路由到纯图片导入。";
+            return importDataset(projectId, datasetName, folderPath, QString());
+        }
+
         // 异常检测无监督格式：创建数据集记录后调用专用导入
         QString datasetId = Id::generate();
 
@@ -1482,5 +1661,139 @@ bool DatasetService::extractAndStoreSchemaFromCategories(const QString &datasetI
 
     ltDebug(LT_LOG_DATASET()) << "Extracted schema from categories with" << classNames.size()
                               << "class names, category IDs:" << sortedIds;
+    return true;
+}
+
+bool DatasetService::importLabelMeDataset(const QString &datasetId, const QString &imageDir, const QString &labelDir)
+{
+    ltInfo(LT_LOG_DATASET()) << "importLabelMeDataset datasetId=" << datasetId
+                             << "imageDir=" << imageDir << "labelDir=" << labelDir;
+
+    // 使用 ImportScanner 的 LabelMe JSON 扫描流程
+    QVariantMap scanResult = m_scanner->scanWithLabelMeJsonLabels(imageDir, labelDir);
+
+    if (scanResult.contains("error")) {
+        ltError(LT_LOG_DATASET()) << "importLabelMeDataset: 扫描失败:" << scanResult["error"].toString();
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return false;
+    }
+
+    QVariantList samples = scanResult["samples"].toList();
+
+    // 过滤出有效样本
+    QVariantList matchedSamples;
+    for (const auto &s : samples) {
+        QVariantMap sample = s.toMap();
+        QString status = sample["status"].toString();
+        if (status == QStringLiteral("matched") || status == QStringLiteral("invalid_label")) {
+            matchedSamples.append(sample);
+        }
+    }
+
+    // 更新状态为导入中
+    if (!updateImportStatus(datasetId, QStringLiteral("importing"))) {
+        ltError(LT_LOG_DATASET()) << "importLabelMeDataset: 更新状态为导入中失败";
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return false;
+    }
+
+    // 通过 dataset_id 反查 project_id，再查 project_root 获取项目根目录
+    QString projectRoot;
+    {
+        QSqlQuery dsQuery(Database::instance().database());
+        dsQuery.prepare("SELECT root_path FROM projects WHERE id = "
+                        "(SELECT project_id FROM datasets WHERE id = ?)");
+        dsQuery.addBindValue(datasetId);
+        if (dsQuery.exec() && dsQuery.next()) {
+            projectRoot = dsQuery.value(0).toString();
+        }
+    }
+    if (projectRoot.isEmpty()) {
+        ltError(LT_LOG_DATASET()) << "importLabelMeDataset: 无法获取项目根目录";
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return false;
+    }
+
+    for (auto &s : matchedSamples) {
+        QVariantMap sample = s.toMap();
+        QVariantList annotations = sample["annotations"].toList();
+
+        if (annotations.isEmpty()) continue;
+
+        // 为每个样本生成 YOLO txt 标签文件
+        QString stem = sample["stem"].toString();
+        QString labelOutputDir = projectRoot + "/cache/labels/" + datasetId;
+        QDir().mkpath(labelOutputDir);
+        QString labelOutputPath = labelOutputDir + "/" + stem + ".txt";
+
+        QFile labelFile(labelOutputPath);
+        if (labelFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream out(&labelFile);
+            for (const auto &ann : annotations) {
+                QVariantMap annMap = ann.toMap();
+                int classId = annMap["classId"].toInt();
+                QString shapeType = annMap["shapeType"].toString();
+
+                if (shapeType == QStringLiteral("rectangle") || shapeType == QStringLiteral("polygon")) {
+                    // 矩形/多边形标注：输出 YOLO HBB 格式
+                    if (annMap.contains("cx") && annMap.contains("cy")
+                        && annMap.contains("w") && annMap.contains("h")) {
+                        double cx = annMap["cx"].toDouble();
+                        double cy = annMap["cy"].toDouble();
+                        double w = annMap["w"].toDouble();
+                        double h = annMap["h"].toDouble();
+                        out << classId << " " << cx << " " << cy << " " << w << " " << h << "\n";
+                    }
+                }
+                // 其他 shape_type（polygon/circle 等）可后续扩展
+            }
+            labelFile.close();
+
+            // 更新样本的 labelPath 为生成的 YOLO txt 文件
+            QVariantMap updatedSample = sample;
+            updatedSample["labelPath"] = labelOutputPath;
+            s = updatedSample;
+        }
+    }
+
+    // 插入样本到数据库
+    if (!insertSamples(datasetId, matchedSamples)) {
+        ltError(LT_LOG_DATASET()) << "importLabelMeDataset: 插入样本失败";
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return false;
+    }
+
+    // 提取并存储类别体系（使用 LabelMe JSON 中的 categories）
+    QVariantMap categories = scanResult["categories"].toMap();
+    if (!categories.isEmpty()) {
+        // LabelMe 使用 label -> classId 映射，需要用 labelme_json 作为 source_format
+        if (!extractAndStoreSchemaFromCategories(datasetId, categories)) {
+            ltWarning(LT_LOG_DATASET()) << "importLabelMeDataset: 从 categories 提取类别体系失败，回退到样本提取";
+            extractAndStoreSchema(datasetId, matchedSamples);
+        } else {
+            // 更新 source_format 为 labelme_json
+            QSqlQuery fmtQuery(Database::instance().database());
+            fmtQuery.prepare("UPDATE imported_label_schemas SET source_format = 'labelme_json' WHERE dataset_id = ?");
+            fmtQuery.addBindValue(datasetId);
+            fmtQuery.exec();
+        }
+    } else {
+        extractAndStoreSchema(datasetId, matchedSamples);
+    }
+
+    // 更新样本数和最终状态
+    QSqlQuery updateQuery(Database::instance().database());
+    updateQuery.prepare("UPDATE datasets SET sample_count = ?, import_status = 'completed' WHERE id = ?");
+    updateQuery.addBindValue(matchedSamples.size());
+    updateQuery.addBindValue(datasetId);
+
+    if (!updateQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "importLabelMeDataset: 完成数据集更新失败:" << updateQuery.lastError().text();
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return false;
+    }
+
+    ltInfo(LT_LOG_DATASET()) << "LabelMe 导入完成:" << datasetId
+                             << "共" << matchedSamples.size() << "个样本";
     return true;
 }

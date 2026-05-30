@@ -17,10 +17,74 @@ Item {
     // 导入模式: "auto" = 单目录自动探测, "separate" = 分别指定图片/标签路径
     property string importMode: "auto"
 
+    // 未打开项目时的空状态提示
+    ColumnLayout {
+        anchors.centerIn: parent
+        visible: appController.currentProjectId === ""
+        spacing: 16
+
+        Label {
+            text: "📁 请先打开一个项目"
+            color: Theme.textSecondary
+            font.pixelSize: Theme.fontSizeTitle
+            font.bold: true
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        Label {
+            text: "在左侧项目中心创建或打开项目后，即可导入数据集"
+            color: Theme.textMuted
+            font.pixelSize: Theme.fontSizeNormal
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        Button {
+            text: "前往项目中心"
+            font.family: Theme.fontFamily
+            Layout.alignment: Qt.AlignHCenter
+            background: Rectangle {
+                color: parent.hovered ? Theme.accentPrimary : Theme.bgTertiary
+                radius: Theme.radiusSmall
+                border.color: Theme.accentPrimary
+                border.width: 1
+                implicitWidth: 140
+                implicitHeight: 36
+            }
+            contentItem: Label {
+                text: parent.text
+                color: Theme.accentPrimary
+                font.pixelSize: Theme.fontSizeNormal
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+            onClicked: appController.currentPageIndex = 0
+        }
+    }
+
+    // 按当前项目过滤数据集列表
+    Connections {
+        target: appController
+        function onCurrentProjectIdChanged() {
+            datasetModel.setProjectId(appController.currentProjectId)
+        }
+    }
+
+    Component.onCompleted: {
+        datasetModel.setProjectId(appController.currentProjectId)
+    }
+
+    // 页面激活时刷新数据集列表（解决从其他页面切回时数据不显示的问题）
+    onVisibleChanged: {
+        if (visible && appController.currentProjectId !== "") {
+            datasetModel.setProjectId(appController.currentProjectId)
+        }
+    }
+
     ScrollView {
         anchors.fill: parent
         clip: true
         contentWidth: availableWidth
+        visible: appController.currentProjectId !== ""
 
         ColumnLayout {
             width: Math.max(root.width, 600)
@@ -81,9 +145,20 @@ Item {
                     }
 
                     Button {
+                        id: autoBtn
                         text: "单目录自动探测"
-                        highlighted: root.importMode === "auto"
                         font.family: Theme.fontFamily
+                        font.bold: root.importMode === "auto"
+                        palette.buttonText: root.importMode === "auto" ? "#FFFFFF" : (autoBtn.hovered ? Theme.textPrimary : Theme.textSecondary)
+                        background: Rectangle {
+                            color: {
+                                if (root.importMode === "auto") return Theme.accentPrimary
+                                return autoBtn.hovered ? Theme.bgHover : Theme.bgTertiary
+                            }
+                            radius: Theme.radiusSmall
+                            border.color: root.importMode === "auto" ? Theme.accentPrimary : Theme.border
+                            border.width: 1
+                        }
                         onClicked: {
                             root.importMode = "auto"
                             root.scanResult = null
@@ -91,9 +166,20 @@ Item {
                     }
 
                     Button {
+                        id: sepBtn
                         text: "分别指定图片和标签路径"
-                        highlighted: root.importMode === "separate"
                         font.family: Theme.fontFamily
+                        font.bold: root.importMode === "separate"
+                        palette.buttonText: root.importMode === "separate" ? "#FFFFFF" : (sepBtn.hovered ? Theme.textPrimary : Theme.textSecondary)
+                        background: Rectangle {
+                            color: {
+                                if (root.importMode === "separate") return Theme.accentPrimary
+                                return sepBtn.hovered ? Theme.bgHover : Theme.bgTertiary
+                            }
+                            radius: Theme.radiusSmall
+                            border.color: root.importMode === "separate" ? Theme.accentPrimary : Theme.border
+                            border.width: 1
+                        }
                         onClicked: {
                             root.importMode = "separate"
                             root.scanResult = null
@@ -148,10 +234,7 @@ Item {
                                 }
                                 onDropped: function(drop) {
                                     if (drop.hasUrls) {
-                                        var path = drop.urls[0].toString()
-                                        if (path.startsWith("file:///")) path = path.substring(8)
-                                        else if (path.startsWith("file://")) path = path.substring(7)
-                                        folderPathField.text = decodeURIComponent(path)
+                                        folderPathField.text = urlToPath(drop.urls[0])
                                         root.selectedImagePath = folderPathField.text
                                         startScanAuto()
                                     }
@@ -177,7 +260,7 @@ Item {
                                 }
 
                                 Label {
-                                    text: "支持 YOLO TXT / COCO JSON / Anomalib 异常检测格式"
+                                    text: "支持 YOLO TXT / COCO JSON / LabelMe JSON / Anomalib 异常检测格式"
                                     font.pixelSize: Theme.fontSizeCaption
                                     font.family: Theme.fontFamily
                                     color: Theme.textMuted
@@ -219,10 +302,18 @@ Item {
                             }
 
                             Button {
+                                id: analyzeAutoBtn
                                 text: "分析"
-                                highlighted: true
                                 enabled: folderPathField.text.trim().length > 0 && !root.isScanning
                                 font.family: Theme.fontFamily
+                                font.bold: true
+                                palette.buttonText: enabled ? "#FFFFFF" : Theme.textDisabled
+                                background: Rectangle {
+                                    color: analyzeAutoBtn.enabled ? (analyzeAutoBtn.hovered ? Qt.lighter(Theme.accentPrimary, 1.1) : Theme.accentPrimary) : Theme.bgTertiary
+                                    radius: Theme.radiusSmall
+                                    border.color: analyzeAutoBtn.enabled ? Theme.accentPrimary : Theme.border
+                                    border.width: 1
+                                }
                                 onClicked: startScanAuto()
                             }
                         }
@@ -339,10 +430,18 @@ Item {
                             Item { Layout.fillWidth: true }
 
                             Button {
+                                id: analyzeBtn
                                 text: "分析匹配"
-                                highlighted: true
                                 enabled: imagePathField.text.trim().length > 0 && !root.isScanning
                                 font.family: Theme.fontFamily
+                                font.bold: true
+                                palette.buttonText: enabled ? "#FFFFFF" : Theme.textDisabled
+                                background: Rectangle {
+                                    color: analyzeBtn.enabled ? (analyzeBtn.hovered ? Qt.lighter(Theme.accentPrimary, 1.1) : Theme.accentPrimary) : Theme.bgTertiary
+                                    radius: Theme.radiusSmall
+                                    border.color: analyzeBtn.enabled ? Theme.accentPrimary : Theme.border
+                                    border.width: 1
+                                }
                                 onClicked: startScanSeparate()
                             }
                         }
@@ -396,13 +495,16 @@ Item {
                                 // 格式徽章
                                 Rectangle {
                                     Layout.alignment: Qt.AlignVCenter
-                                    width: formatBadgeText.implicitWidth + 16
-                                    height: 28
+                                    Layout.preferredWidth: formatBadgeText.implicitWidth + 16
+                                    Layout.preferredHeight: 28
+                                    implicitWidth: formatBadgeText.implicitWidth + 16
+                                    implicitHeight: 28
                                     radius: Theme.radiusSmall
                                     color: {
                                         var fmt = root.scanResult ? root.scanResult.detectedFormat : ""
                                         if (fmt === "yolo_txt") return Theme.accentPrimary
                                         if (fmt === "coco_json") return Theme.accentSecondary
+                                        if (fmt === "labelme_json") return "#E67E22"
                                         if (fmt === "anomaly_unsupervised") return Theme.accentWarning
                                         if (fmt === "image_only") return Theme.textMuted
                                         return Theme.textMuted
@@ -415,6 +517,7 @@ Item {
                                             var fmt = root.scanResult ? root.scanResult.detectedFormat : ""
                                             if (fmt === "yolo_txt") return "YOLO 目标检测 (TXT)"
                                             if (fmt === "coco_json") return "COCO 目标检测 (JSON)"
+                                            if (fmt === "labelme_json") return "LabelMe 标注 (JSON)"
                                             if (fmt === "anomaly_unsupervised") return "Anomalib 异常检测"
                                             if (fmt === "image_only") return "纯图片（无标签）"
                                             return "未知格式"
@@ -579,7 +682,7 @@ Item {
                             visible: root.scanResult && root.scanResult.error && root.scanResult.error.length > 0
                             Layout.fillWidth: true
                             height: 48
-                            color: "#2D1518"
+                            color: Theme.bgInput
                             radius: Theme.radiusSmall
                             border.color: Theme.accentError
                             border.width: 1
@@ -625,33 +728,57 @@ Item {
                             }
 
                             Button {
+                                id: confirmImportBtn
                                 text: "确认导入"
-                                highlighted: true
                                 enabled: root.scanResult
                                          && root.scanResult.isValid
                                          && datasetNameField.text.trim().length > 0
                                          && !root.isScanning
                                 font.family: Theme.fontFamily
+                                font.bold: true
+                                palette.buttonText: enabled ? "#FFFFFF" : Theme.textDisabled
+                                background: Rectangle {
+                                    color: confirmImportBtn.enabled ? (confirmImportBtn.hovered ? Qt.lighter(Theme.accentPrimary, 1.1) : Theme.accentPrimary) : Theme.bgTertiary
+                                    radius: Theme.radiusSmall
+                                    border.color: confirmImportBtn.enabled ? Theme.accentPrimary : Theme.border
+                                    border.width: 1
+                                }
                                 onClicked: {
                                     var dsId = ""
+                                    var format = root.scanResult ? root.scanResult.detectedFormat : ""
+                                    var count = root.scanResult ? (root.scanResult.imageCount || 0) : 0
+                                    var name = datasetNameField.text.trim()
+
                                     if (root.importMode === "separate") {
                                         dsId = datasetService.importDatasetSeparate(
                                             appController.currentProjectId,
-                                            datasetNameField.text.trim(),
+                                            name,
                                             root.selectedImagePath,
                                             root.selectedLabelPath
                                         )
                                     } else {
                                         dsId = datasetService.importDatasetV2(
                                             appController.currentProjectId,
-                                            datasetNameField.text.trim(),
+                                            name,
                                             root.selectedImagePath,
-                                            root.scanResult.detectedFormat,
+                                            format,
+                                            root.scanResult.labelDirOrPath ? root.scanResult.labelDirOrPath : "",
                                             true
                                         )
                                     }
-                                    if (dsId) {
+                                    if (dsId && dsId.length > 0) {
                                         datasetModel.refresh()
+                                        
+                                        var formatStr = "未知格式"
+                                        if (format === "yolo_txt") formatStr = "YOLO TXT"
+                                        else if (format === "coco_json") formatStr = "COCO JSON"
+                                        else if (format === "labelme_json") formatStr = "LabelMe JSON"
+                                        else if (format === "anomaly_unsupervised") formatStr = "无监督异常检测"
+                                        else if (format === "image_only") formatStr = "纯图片"
+
+                                        importSuccessMsg.text = "数据集: " + name + "\n格式: " + formatStr + "\n样本数量: " + count + " 张图片"
+                                        importSuccessDialog.open()
+
                                         root.scanResult = null
                                         folderPathField.clear()
                                         imagePathField.clear()
@@ -659,8 +786,20 @@ Item {
                                         datasetNameField.clear()
                                         root.selectedImagePath = ""
                                         root.selectedLabelPath = ""
+                                    } else {
+                                        // 导入失败，显示错误提示
+                                        importErrorLabel.visible = true
+                                        importErrorLabel.text = "导入失败，请检查路径和格式是否正确"
                                     }
                                 }
+                            }
+
+                            Label {
+                                id: importErrorLabel
+                                visible: false
+                                color: Theme.accentError
+                                font.pixelSize: Theme.fontSizeCaption
+                                font.family: Theme.fontFamily
                             }
                         }
                     }
@@ -677,134 +816,152 @@ Item {
                 color: Theme.textPrimary
             }
 
-            ListView {
+            ColumnLayout {
                 visible: appController.projectOpen
                 Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.minimumHeight: 200
-                clip: true
-                model: datasetModel
                 spacing: Theme.spacingSmall
 
-                delegate: Rectangle {
-                    width: ListView.view.width
-                    height: 72
-                    color: index % 2 === 0 ? Theme.bgCard : Theme.bgInput
-                    radius: Theme.radiusNormal
+                Repeater {
+                    model: datasetModel
+                    delegate: Rectangle {
+                        Layout.fillWidth: true
+                        height: 72
+                        color: index % 2 === 0 ? Theme.bgCard : Theme.bgInput
+                        radius: Theme.radiusNormal
 
-                    property bool hovered: mouseArea.containsMouse
+                        property bool hovered: mouseArea.containsMouse
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: Theme.spacingNormal
-                        spacing: Theme.spacingNormal
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: Theme.spacingNormal
+                            spacing: Theme.spacingNormal
 
-                        Column {
-                            Layout.fillWidth: true
-                            Label {
-                                text: model.name
-                                font.bold: true
-                                font.pixelSize: Theme.fontSizeNormal
-                                font.family: Theme.fontFamily
-                                color: Theme.textPrimary
+                            Column {
+                                Layout.fillWidth: true
+                                Label {
+                                    text: model.name
+                                    font.bold: true
+                                    font.pixelSize: Theme.fontSizeNormal
+                                    font.family: Theme.fontFamily
+                                    color: Theme.textPrimary
+                                }
+                                Label {
+                                    text: model.imageRoot
+                                    font.pixelSize: Theme.fontSizeCaption
+                                    font.family: Theme.fontFamily
+                                    color: Theme.textMuted
+                                    elide: Text.ElideMiddle
+                                    width: parent.width
+                                }
                             }
+
+                            // 格式徽章
+                            Rectangle {
+                                visible: model.format && model.format.length > 0
+                                width: formatText.implicitWidth + 12
+                                height: 20
+                                radius: Theme.radiusSmall
+                                color: {
+                                    if (model.format === "yolo_txt") return Theme.accentPrimary
+                                    if (model.format === "coco_json") return Theme.accentSecondary
+                                    if (model.format === "labelme_json") return "#E67E22"
+                                    if (model.format === "anomaly_unsupervised") return Theme.accentWarning
+                                    if (model.format === "image_only") return Theme.textMuted
+                                    return Theme.textMuted
+                                }
+
+                                Label {
+                                    id: formatText
+                                    anchors.centerIn: parent
+                                    text: {
+                                        if (model.format === "yolo_txt") return "YOLO TXT"
+                                        if (model.format === "coco_json") return "COCO JSON"
+                                        if (model.format === "labelme_json") return "LabelMe"
+                                        if (model.format === "anomaly_unsupervised") return "异常检测"
+                                        if (model.format === "image_only") return "纯图片"
+                                        return model.format || ""
+                                    }
+                                    font.pixelSize: 10
+                                    font.family: Theme.fontFamily
+                                    color: "#FFFFFF"
+                                }
+                            }
+
+                            Rectangle {
+                                width: 12
+                                height: 12
+                                radius: 6
+                                color: model.importStatus === "completed" ? Theme.accentSuccess :
+                                       model.importStatus === "failed" ? Theme.accentError : Theme.accentWarning
+                            }
+
                             Label {
-                                text: model.imageRoot
+                                text: model.sampleCount + " 张"
+                                font.pixelSize: Theme.fontSizeCaption
+                                font.family: Theme.fontFamily
+                                color: Theme.textSecondary
+                            }
+
+                            Label {
+                                text: {
+                                    if (model.importStatus === "completed") return "已完成"
+                                    if (model.importStatus === "failed") return "失败"
+                                    if (model.importStatus === "scanning") return "扫描中"
+                                    if (model.importStatus === "importing") return "导入中"
+                                    return model.importStatus
+                                }
                                 font.pixelSize: Theme.fontSizeCaption
                                 font.family: Theme.fontFamily
                                 color: Theme.textMuted
-                                elide: Text.ElideMiddle
-                                width: parent.width
-                            }
-                        }
-
-                        // 格式徽章
-                        Rectangle {
-                            visible: model.format && model.format.length > 0
-                            width: formatText.implicitWidth + 12
-                            height: 20
-                            radius: Theme.radiusSmall
-                            color: {
-                                if (model.format === "yolo_txt") return Theme.accentPrimary
-                                if (model.format === "coco_json") return Theme.accentSecondary
-                                if (model.format === "anomaly_unsupervised") return Theme.accentWarning
-                                if (model.format === "image_only") return Theme.textMuted
-                                return Theme.textMuted
                             }
 
-                            Label {
-                                id: formatText
-                                anchors.centerIn: parent
-                                text: {
-                                    if (model.format === "yolo_txt") return "YOLO TXT"
-                                    if (model.format === "coco_json") return "COCO JSON"
-                                    if (model.format === "anomaly_unsupervised") return "异常检测"
-                                    if (model.format === "image_only") return "纯图片"
-                                    return model.format || ""
-                                }
-                                font.pixelSize: 10
+                            Button {
+                                text: "删除"
                                 font.family: Theme.fontFamily
-                                color: "#FFFFFF"
+                                onClicked: {
+                                    datasetService.deleteDataset(model.datasetId)
+                                    datasetModel.refresh()
+                                }
                             }
                         }
 
-                        Rectangle {
-                            width: 12
-                            height: 12
-                            radius: 6
-                            color: model.importStatus === "completed" ? Theme.accentSuccess :
-                                   model.importStatus === "failed" ? Theme.accentError : Theme.accentWarning
+                        MouseArea {
+                            id: mouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.NoButton
                         }
-
-                        Label {
-                            text: model.sampleCount + " 张"
-                            font.pixelSize: Theme.fontSizeCaption
-                            font.family: Theme.fontFamily
-                            color: Theme.textSecondary
-                        }
-
-                        Label {
-                            text: {
-                                if (model.importStatus === "completed") return "已完成"
-                                if (model.importStatus === "failed") return "失败"
-                                if (model.importStatus === "scanning") return "扫描中"
-                                if (model.importStatus === "importing") return "导入中"
-                                return model.importStatus
-                            }
-                            font.pixelSize: Theme.fontSizeCaption
-                            font.family: Theme.fontFamily
-                            color: Theme.textMuted
-                        }
-
-                        Button {
-                            text: "删除"
-                            font.family: Theme.fontFamily
-                            onClicked: {
-                                datasetService.deleteDataset(model.datasetId)
-                                datasetModel.refresh()
-                            }
-                        }
-                    }
-
-                    MouseArea {
-                        id: mouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.NoButton
                     }
                 }
             }
         }
     }
 
+    // URL 转本地路径工具函数（兼容中文路径和特殊字符）
+    // Windows: file:///C:/Users/... → C:/Users/...
+    // Linux: file:///home/... → /home/...
+    function urlToPath(url) {
+        var s = url.toString()
+        if (s.startsWith("file:///")) {
+            s = s.substring(7)
+            // Windows 路径: /C:/... → C:/...
+            if (s.length >= 3 && s.charAt(0) === "/" && s.charAt(2) === ":") {
+                var driveLetter = s.charAt(1).toUpperCase()
+                if (driveLetter >= 'A' && driveLetter <= 'Z') {
+                    s = s.substring(1)
+                }
+            }
+        } else if (s.startsWith("file://")) {
+            s = s.substring(6)
+        }
+        return decodeURIComponent(s)
+    }
+
     // 文件夹选择对话框（单目录模式）
     FolderDialog {
         id: folderDialog
         onAccepted: {
-            var path = selectedFolder.toString()
-            if (path.startsWith("file:///")) path = path.substring(8)
-            else if (path.startsWith("file://")) path = path.substring(7)
-            folderPathField.text = decodeURIComponent(path)
+            folderPathField.text = urlToPath(selectedFolder)
             root.selectedImagePath = folderPathField.text
             startScanAuto()
         }
@@ -814,10 +971,7 @@ Item {
     FolderDialog {
         id: imageFolderDialog
         onAccepted: {
-            var path = selectedFolder.toString()
-            if (path.startsWith("file:///")) path = path.substring(8)
-            else if (path.startsWith("file://")) path = path.substring(7)
-            imagePathField.text = decodeURIComponent(path)
+            imagePathField.text = urlToPath(selectedFolder)
             root.selectedImagePath = imagePathField.text
         }
     }
@@ -826,10 +980,7 @@ Item {
     FolderDialog {
         id: labelFolderDialog
         onAccepted: {
-            var path = selectedFolder.toString()
-            if (path.startsWith("file:///")) path = path.substring(8)
-            else if (path.startsWith("file://")) path = path.substring(7)
-            labelPathField.text = decodeURIComponent(path)
+            labelPathField.text = urlToPath(selectedFolder)
             root.selectedLabelPath = labelPathField.text
         }
     }
@@ -855,20 +1006,17 @@ Item {
         root.selectedImagePath = imagePathField.text.trim()
         root.selectedLabelPath = labelPathField.text.trim()
 
-        // 使用 scan 方法进行分别路径扫描
-        var scanResult = datasetService.scanFolder(root.selectedImagePath)
+        // 直接使用 scanSeparate 进行分别路径扫描
+        var separateResult = datasetService.scanSeparate(root.selectedImagePath, root.selectedLabelPath)
 
-        // 如果有标签目录，尝试分别路径匹配
-        if (root.selectedLabelPath.length > 0) {
-            // 使用 ImportScanner 的 scan 方法做精确匹配
-            var separateResult = datasetService.scanSeparate(root.selectedImagePath, root.selectedLabelPath)
-            if (separateResult && separateResult.isValid) {
-                root.scanResult = separateResult
-            } else {
-                root.scanResult = scanResult
-            }
+        if (separateResult && separateResult.isValid) {
+            root.scanResult = separateResult
+        } else if (separateResult && separateResult.error && separateResult.error.length > 0) {
+            // 扫描失败，显示错误
+            root.scanResult = separateResult
         } else {
-            // 无标签：标记为纯图片格式
+            // 无标签或纯图片模式
+            var scanResult = datasetService.scanFolder(root.selectedImagePath)
             if (scanResult && scanResult.isValid) {
                 root.scanResult = scanResult
             } else if (scanResult) {
@@ -892,5 +1040,43 @@ Item {
         var name = parts[parts.length - 1]
         if (!name && parts.length > 1) name = parts[parts.length - 2]
         return name || "dataset"
+    }
+
+    // 导入成功提示对话框
+    Dialog {
+        id: importSuccessDialog
+        title: "导入成功"
+        modal: true
+        anchors.centerIn: parent
+        width: 320
+        standardButtons: Dialog.Ok
+
+        background: Rectangle {
+            color: Theme.bgSecondary
+            border.color: Theme.border
+            border.width: 1
+            radius: Theme.radiusLarge
+        }
+
+        ColumnLayout {
+            width: parent.width
+            spacing: Theme.spacingLarge
+
+            Label {
+                text: "🎉 数据集导入成功"
+                font.bold: true
+                color: Theme.accentSuccess
+                font.pixelSize: Theme.fontSizeSubheading
+                font.family: Theme.fontFamily
+            }
+
+            Label {
+                id: importSuccessMsg
+                color: Theme.textSecondary
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                font.family: Theme.fontFamily
+            }
+        }
     }
 }

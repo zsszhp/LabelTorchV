@@ -9,6 +9,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QImageReader>
 
 ImportScanner::ImportScanner(QObject *parent) : QObject(parent)
 {
@@ -45,20 +46,34 @@ QVariantMap ImportScanner::scan(const QString &imageDir, const QString &labelDir
 
     // 检测标签目录中是否存在 JSON 文件，优先使用 JSON 格式
     bool hasJsonLabels = false;
+    bool hasLabelMeJson = false;
+    bool hasCocoJson = false;
     QFileInfoList labelFiles;
     if (hasLabelDir) {
         labelFiles = collectLabelFiles(QDir(labelDir), true);
         for (const auto &fi : labelFiles) {
             if (fi.suffix().toLower() == QStringLiteral("json")) {
                 hasJsonLabels = true;
-                break;
+                if (isLabelMeJsonFile(fi.absoluteFilePath())) {
+                    hasLabelMeJson = true;
+                } else {
+                    hasCocoJson = true;
+                }
             }
         }
     }
 
-    // 如果存在 JSON 标签文件，优先使用 JSON 扫描流程
-    if (hasJsonLabels) {
-        ltInfo(LT_LOG_DATASET()) << "检测到 JSON 标签文件，使用 COCO JSON 扫描流程";
+    // LabelMe JSON 优先（每图一个 JSON 文件，更常见的标注格式）
+    if (hasLabelMeJson) {
+        ltInfo(LT_LOG_DATASET()) << "检测到 LabelMe JSON 标签文件，使用 LabelMe JSON 扫描流程";
+        QVariantMap labelMeResult = scanWithLabelMeJsonLabels(imageDir, labelDir);
+        emit scanCompleted();
+        return labelMeResult;
+    }
+
+    // COCO JSON 格式（单文件包含所有图片和标注）
+    if (hasCocoJson) {
+        ltInfo(LT_LOG_DATASET()) << "检测到 COCO JSON 标签文件，使用 COCO JSON 扫描流程";
         QVariantMap jsonResult = scanWithJsonLabels(imageDir, labelDir);
         emit scanCompleted();
         return jsonResult;
@@ -506,8 +521,10 @@ QVariantMap ImportScanner::scanWithJsonLabels(const QString &imageDir, const QSt
     // 递归收集图片文件，按文件名建立索引（用于 JSON 中的 file_name 匹配）
     QFileInfoList imageFiles = collectImageFiles(imgDir, true);
     QMap<QString, QFileInfo> imageByFileName;
+    QMap<QString, QFileInfo> imageByBaseFileName;
     for (const auto &fi : imageFiles) {
         imageByFileName[fi.fileName()] = fi;
+        imageByBaseFileName[fi.fileName()] = fi;
     }
 
     // 递归查找标签目录中的所有 JSON 文件
@@ -609,12 +626,27 @@ QVariantMap ImportScanner::scanWithJsonLabels(const QString &imageDir, const QSt
         sample["imageId"] = imgId;
 
         // 在图片目录中查找匹配的文件（按 file_name 匹配）
+        // COCO JSON 的 file_name 可能是纯文件名 "img001.jpg" 或含子目录 "train/img001.jpg"
+        QFileInfo matchedImgFi;
+        QString matchKey;
         if (imageByFileName.contains(fileName)) {
-            QFileInfo imgFi = imageByFileName[fileName];
-            sample["imagePath"] = imgFi.absoluteFilePath();
+            // 精确匹配：file_name 与图片文件名一致
+            matchedImgFi = imageByFileName[fileName];
+            matchKey = fileName;
+        } else {
+            // 回退匹配：file_name 含子目录路径时，提取纯文件名匹配
+            QString baseName = QFileInfo(fileName).fileName();
+            if (imageByBaseFileName.contains(baseName)) {
+                matchedImgFi = imageByBaseFileName[baseName];
+                matchKey = baseName;
+            }
+        }
+
+        if (matchedImgFi.exists()) {
+            sample["imagePath"] = matchedImgFi.absoluteFilePath();
             sample["labelPath"] = jsonFiles.first().absoluteFilePath();
-            sample["stem"] = imgFi.completeBaseName();
-            matchedImageFiles.insert(fileName);
+            sample["stem"] = matchedImgFi.completeBaseName();
+            matchedImageFiles.insert(matchKey);
 
             // 收集该图片的所有标注
             QList<QVariantMap> imgAnnotations;
@@ -844,16 +876,92 @@ QVariantMap ImportScanner::detectNestedYoloLayout(const QString &folderPath)
 
         // 检查是否有 JSON 标签
         bool hasJsonLabels = false;
+        bool hasLabelMeJson = false;
         QString jsonLabelPath;
         for (const auto &fi : labelFiles) {
             if (fi.suffix().toLower() == QStringLiteral("json")) {
                 hasJsonLabels = true;
-                jsonLabelPath = fi.absoluteFilePath();
-                break;
+                if (isLabelMeJsonFile(fi.absoluteFilePath())) {
+                    hasLabelMeJson = true;
+                }
+                if (jsonLabelPath.isEmpty()) {
+                    jsonLabelPath = fi.absoluteFilePath();
+                }
             }
         }
 
         if (hasJsonLabels) {
+            if (hasLabelMeJson) {
+                // LabelMe JSON 格式（每图一个 JSON 文件）
+                result["detectedFormat"] = QStringLiteral("labelme_json");
+                result["labelDirOrPath"] = labelsPath;
+
+                // 解析所有 LabelMe JSON 文件获取统计信息
+                int labelCount = 0;
+                QSet<int> classIds;
+                QMap<QString, int> labelToClassId;
+                int nextClassId = 0;
+
+                for (const auto &fi : labelFiles) {
+                    if (fi.suffix().toLower() != QStringLiteral("json")) continue;
+                    if (!isLabelMeJsonFile(fi.absoluteFilePath())) continue;
+
+                    QVariantMap parseResult = parseLabelMeJsonFile(fi.absoluteFilePath());
+                    if (parseResult["valid"].toBool()) {
+                        labelCount++;
+                        QVariantMap localLabelMap = parseResult["labelToClassId"].toMap();
+                        for (auto it = localLabelMap.constBegin(); it != localLabelMap.constEnd(); ++it) {
+                            if (!labelToClassId.contains(it.key())) {
+                                labelToClassId[it.key()] = nextClassId++;
+                            }
+                        }
+                    }
+                }
+
+                for (int cid : labelToClassId.values()) {
+                    classIds.insert(cid);
+                }
+
+                QVariantList classIdList;
+                QList<int> sortedIds = classIds.values();
+                std::sort(sortedIds.begin(), sortedIds.end());
+                for (int cid : sortedIds) {
+                    classIdList.append(cid);
+                }
+
+                QVariantMap categoriesMap;
+                for (auto it = labelToClassId.constBegin(); it != labelToClassId.constEnd(); ++it) {
+                    categoriesMap[QString::number(it.value())] = it.key();
+                }
+
+                int unmatchedImages = 0;
+                QMap<QString, QFileInfo> imageByStem;
+                for (const auto &fi : imageFiles) {
+                    imageByStem[fi.completeBaseName()] = fi;
+                }
+                for (const auto &fi : labelFiles) {
+                    if (fi.suffix().toLower() != QStringLiteral("json")) continue;
+                    if (!isLabelMeJsonFile(fi.absoluteFilePath())) continue;
+                    QString stem = fi.completeBaseName();
+                    if (!imageByStem.contains(stem)) {
+                        unmatchedImages++;
+                    }
+                }
+
+                result["isValid"] = true;
+                result["imageDir"] = imagesPath;
+                result["imageCount"] = imageFiles.size();
+                result["labelCount"] = labelCount;
+                result["unmatchedImagesCount"] = unmatchedImages;
+                result["classIds"] = classIdList;
+                result["classes"] = categoriesMap;
+
+                ltInfo(LT_LOG_DATASET()) << "Nested LabelMe JSON layout detected: images=" << imageFiles.size()
+                                         << "labeled=" << labelCount
+                                         << "classes=" << classIdList.size();
+                return result;
+            }
+
             // COCO JSON 格式
             result["detectedFormat"] = QStringLiteral("coco_json");
             result["labelDirOrPath"] = jsonLabelPath;
@@ -865,6 +973,7 @@ QVariantMap ImportScanner::detectNestedYoloLayout(const QString &folderPath)
                 QMap<int, QVariantMap> imagesMap = jsonResult["images"].value<QMap<int, QVariantMap>>();
                 QMultiMap<int, QVariantMap> annotationsMap = jsonResult["annotations"].value<QMultiMap<int, QVariantMap>>();
 
+                // 建立图片文件名集合（纯文件名），用于匹配 JSON 中的 file_name
                 QSet<QString> imageFileNames;
                 for (const auto &fi : imageFiles) {
                     imageFileNames.insert(fi.fileName());
@@ -876,7 +985,9 @@ QVariantMap ImportScanner::detectNestedYoloLayout(const QString &folderPath)
 
                 for (auto it = imagesMap.constBegin(); it != imagesMap.constEnd(); ++it) {
                     QString fileName = it.value()["file_name"].toString();
-                    if (imageFileNames.contains(fileName)) {
+                    // 支持纯文件名和含子目录路径的 file_name
+                    QString baseFileName = QFileInfo(fileName).fileName();
+                    if (imageFileNames.contains(fileName) || imageFileNames.contains(baseFileName)) {
                         matchedImageFiles.insert(fileName);
                         if (annotationsMap.contains(it.key())) {
                             labelCount++;
@@ -1000,9 +1111,13 @@ QVariantMap ImportScanner::detectFlatLayout(const QString &folderPath)
 
     // 检查是否有 JSON 标签
     bool hasJsonLabels = false;
+    bool hasLabelMeJson = false;
     for (const auto &fi : labelFiles) {
         if (fi.suffix().toLower() == QStringLiteral("json")) {
             hasJsonLabels = true;
+            if (isLabelMeJsonFile(fi.absoluteFilePath())) {
+                hasLabelMeJson = true;
+            }
             break;
         }
     }
@@ -1011,13 +1126,98 @@ QVariantMap ImportScanner::detectFlatLayout(const QString &folderPath)
     int labelCount = 0;
 
     if (hasJsonLabels) {
-        // 查找第一个 JSON 标签文件
+        if (hasLabelMeJson) {
+            // LabelMe JSON 格式（每图一个 JSON 文件）
+            result["detectedFormat"] = QStringLiteral("labelme_json");
+            result["labelDirOrPath"] = folderPath;
+
+            QMap<QString, int> labelToClassId;
+            int nextClassId = 0;
+
+            for (const auto &fi : labelFiles) {
+                if (fi.suffix().toLower() != QStringLiteral("json")) continue;
+                if (!isLabelMeJsonFile(fi.absoluteFilePath())) continue;
+
+                QVariantMap parseResult = parseLabelMeJsonFile(fi.absoluteFilePath());
+                if (parseResult["valid"].toBool()) {
+                    labelCount++;
+                    QVariantMap localLabelMap = parseResult["labelToClassId"].toMap();
+                    for (auto it = localLabelMap.constBegin(); it != localLabelMap.constEnd(); ++it) {
+                        if (!labelToClassId.contains(it.key())) {
+                            labelToClassId[it.key()] = nextClassId++;
+                        }
+                    }
+                }
+            }
+
+            for (int cid : labelToClassId.values()) {
+                classIds.insert(cid);
+            }
+
+            QVariantList classIdList;
+            QList<int> sortedIds = classIds.values();
+            std::sort(sortedIds.begin(), sortedIds.end());
+            for (int cid : sortedIds) {
+                classIdList.append(cid);
+            }
+
+            QVariantMap categoriesMap;
+            for (auto it = labelToClassId.constBegin(); it != labelToClassId.constEnd(); ++it) {
+                categoriesMap[QString::number(it.value())] = it.key();
+            }
+
+            int unmatchedImages = 0;
+            QMap<QString, QFileInfo> imageByStem;
+            for (const auto &fi : imageFiles) {
+                imageByStem[fi.completeBaseName()] = fi;
+            }
+            for (const auto &fi : labelFiles) {
+                if (fi.suffix().toLower() != QStringLiteral("json")) continue;
+                if (!isLabelMeJsonFile(fi.absoluteFilePath())) continue;
+                QString stem = fi.completeBaseName();
+                if (!imageByStem.contains(stem)) {
+                    unmatchedImages++;
+                }
+            }
+
+            result["isValid"] = true;
+            result["imageDir"] = folderPath;
+            result["imageCount"] = imageFiles.size();
+            result["labelCount"] = labelCount;
+            result["unmatchedImagesCount"] = unmatchedImages;
+            result["classIds"] = classIdList;
+            result["classes"] = categoriesMap;
+
+            ltInfo(LT_LOG_DATASET()) << "Flat LabelMe JSON layout detected: images=" << imageFiles.size()
+                                     << "labeled=" << labelCount
+                                     << "classes=" << classIdList.size();
+            return result;
+        }
+
+        // COCO JSON 格式
+        // 查找第一个非 LabelMe 的 JSON 标签文件
         QString jsonLabelPath;
         for (const auto &fi : labelFiles) {
             if (fi.suffix().toLower() == QStringLiteral("json")) {
-                jsonLabelPath = fi.absoluteFilePath();
-                break;
+                if (!isLabelMeJsonFile(fi.absoluteFilePath())) {
+                    jsonLabelPath = fi.absoluteFilePath();
+                    break;
+                }
             }
+        }
+
+        if (jsonLabelPath.isEmpty()) {
+            // 所有 JSON 都是 LabelMe 格式但上面没匹配到（不应该到这里）
+            result["detectedFormat"] = QStringLiteral("labelme_json");
+            result["labelDirOrPath"] = folderPath;
+            result["isValid"] = true;
+            result["imageDir"] = folderPath;
+            result["imageCount"] = imageFiles.size();
+            result["labelCount"] = 0;
+            result["unmatchedImagesCount"] = imageFiles.size();
+            result["classIds"] = QVariantList();
+            result["classes"] = QVariantMap();
+            return result;
         }
 
         result["detectedFormat"] = QStringLiteral("coco_json");
@@ -1030,6 +1230,7 @@ QVariantMap ImportScanner::detectFlatLayout(const QString &folderPath)
             QMap<int, QVariantMap> imagesMap = jsonResult["images"].value<QMap<int, QVariantMap>>();
             QMultiMap<int, QVariantMap> annotationsMap = jsonResult["annotations"].value<QMultiMap<int, QVariantMap>>();
 
+            // 建立图片文件名集合（纯文件名），用于匹配 JSON 中的 file_name
             QSet<QString> imageFileNames;
             for (const auto &fi : imageFiles) {
                 imageFileNames.insert(fi.fileName());
@@ -1041,7 +1242,9 @@ QVariantMap ImportScanner::detectFlatLayout(const QString &folderPath)
 
             for (auto it = imagesMap.constBegin(); it != imagesMap.constEnd(); ++it) {
                 QString fileName = it.value()["file_name"].toString();
-                if (imageFileNames.contains(fileName)) {
+                // 支持纯文件名和含子目录路径的 file_name
+                QString baseFileName = QFileInfo(fileName).fileName();
+                if (imageFileNames.contains(fileName) || imageFileNames.contains(baseFileName)) {
                     matchedImageFiles.insert(fileName);
                     if (annotationsMap.contains(it.key())) {
                         labelCount++;
@@ -1195,6 +1398,435 @@ QFileInfoList ImportScanner::collectLabelFiles(const QDir &dir, bool recursive)
             result.append(collectLabelFiles(QDir(subDir.absoluteFilePath()), true));
         }
     }
+
+    return result;
+}
+
+bool ImportScanner::isLabelMeJsonFile(const QString &filePath)
+{
+    ltTrace(LT_LOG_DATASET()) << "isLabelMeJsonFile filePath=" << filePath;
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return false;
+    }
+
+    QJsonParseError parseError;
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+        return false;
+    }
+
+    QJsonObject root = doc.object();
+    // LabelMe 格式特征：包含 "shapes" 数组和 "imagePath" 字符串
+    return root.contains(QStringLiteral("shapes"))
+           && root[QStringLiteral("shapes")].isArray()
+           && root.contains(QStringLiteral("imagePath"));
+}
+
+QVariantMap ImportScanner::parseLabelMeJsonFile(const QString &filePath)
+{
+    ltTrace(LT_LOG_DATASET()) << "parseLabelMeJsonFile filePath=" << filePath;
+
+    QVariantMap result;
+    QStringList errors;
+    QSet<int> classIds;
+    QVariantList shapesList;
+    QMap<QString, int> labelToClassId;
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        errors.append(QStringLiteral("无法打开文件: %1").arg(filePath));
+        ltWarning(LT_LOG_DATASET()) << "parseLabelMeJsonFile: cannot open file:" << filePath;
+        result["valid"] = false;
+        result["classIds"] = QVariant::fromValue(classIds);
+        result["shapes"] = shapesList;
+        result["errors"] = errors;
+        return result;
+    }
+
+    QJsonParseError parseError;
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError) {
+        errors.append(QStringLiteral("JSON 解析错误: %1").arg(parseError.errorString()));
+        ltWarning(LT_LOG_DATASET()) << "parseLabelMeJsonFile: JSON parse error:" << parseError.errorString();
+        result["valid"] = false;
+        result["classIds"] = QVariant::fromValue(classIds);
+        result["shapes"] = shapesList;
+        result["errors"] = errors;
+        return result;
+    }
+
+    if (!doc.isObject()) {
+        errors.append(QStringLiteral("JSON 根元素不是对象"));
+        ltWarning(LT_LOG_DATASET()) << "parseLabelMeJsonFile: JSON root is not an object";
+        result["valid"] = false;
+        result["classIds"] = QVariant::fromValue(classIds);
+        result["shapes"] = shapesList;
+        result["errors"] = errors;
+        return result;
+    }
+
+    QJsonObject root = doc.object();
+
+    // 提取图片信息
+    QString imagePath = root[QStringLiteral("imagePath")].toString();
+    int imageWidth = root[QStringLiteral("imageWidth")].toInt(0);
+    int imageHeight = root[QStringLiteral("imageHeight")].toInt(0);
+
+    if (imageWidth <= 0 || imageHeight <= 0) {
+        QFileInfo jsonFi(filePath);
+        // Try relative to JSON directory
+        QString absImgPath = jsonFi.dir().absoluteFilePath(imagePath);
+        if (!QFile::exists(absImgPath)) {
+            // Try with JSON base name in same directory
+            QString baseName = jsonFi.completeBaseName();
+            QDir jsonDir = jsonFi.dir();
+            QStringList filters;
+            filters << baseName + ".jpg" << baseName + ".png" << baseName + ".jpeg" << baseName + ".bmp";
+            QFileInfoList list = jsonDir.entryInfoList(filters, QDir::Files);
+            if (!list.isEmpty()) {
+                absImgPath = list.first().absoluteFilePath();
+            }
+        }
+        if (QFile::exists(absImgPath)) {
+            QImageReader reader(absImgPath);
+            QSize size = reader.size();
+            if (size.isValid()) {
+                imageWidth = size.width();
+                imageHeight = size.height();
+            }
+        }
+    }
+
+    result["imagePath"] = imagePath;
+    result["imageWidth"] = imageWidth;
+    result["imageHeight"] = imageHeight;
+
+    // 解析 shapes 数组
+    if (!root.contains(QStringLiteral("shapes")) || !root[QStringLiteral("shapes")].isArray()) {
+        errors.append(QStringLiteral("JSON 中缺少 shapes 数组"));
+        ltWarning(LT_LOG_DATASET()) << "parseLabelMeJsonFile: missing shapes array";
+        result["valid"] = false;
+        result["classIds"] = QVariant::fromValue(classIds);
+        result["shapes"] = shapesList;
+        result["errors"] = errors;
+        return result;
+    }
+
+    QJsonArray shapesArray = root[QStringLiteral("shapes")].toArray();
+    int nextClassId = 0;
+
+    for (const QJsonValue &shapeVal : shapesArray) {
+        if (!shapeVal.isObject()) {
+            errors.append(QStringLiteral("shapes 中包含非对象元素"));
+            continue;
+        }
+
+        QJsonObject shapeObj = shapeVal.toObject();
+        QString label = shapeObj[QStringLiteral("label")].toString();
+        QString shapeType = shapeObj[QStringLiteral("shape_type")].toString();
+        QJsonArray pointsArray = shapeObj[QStringLiteral("points")].toArray();
+
+        // 为每个唯一 label 分配递增的 classId
+        if (!labelToClassId.contains(label)) {
+            labelToClassId[label] = nextClassId++;
+        }
+        int classId = labelToClassId[label];
+        classIds.insert(classId);
+
+        QVariantMap shapeInfo;
+        shapeInfo["label"] = label;
+        shapeInfo["classId"] = classId;
+        shapeInfo["shapeType"] = shapeType;
+
+        // 解析 points 数组
+        QVariantList pointsList;
+        for (const QJsonValue &ptVal : pointsArray) {
+            if (ptVal.isArray()) {
+                QJsonArray ptArray = ptVal.toArray();
+                if (ptArray.size() >= 2) {
+                    QVariantMap pt;
+                    pt["x"] = ptArray[0].toDouble(0.0);
+                    pt["y"] = ptArray[1].toDouble(0.0);
+                    pointsList.append(pt);
+                }
+            }
+        }
+        shapeInfo["points"] = pointsList;
+
+        // 将 LabelMe 坐标转换为 YOLO 归一化格式
+        if (imageWidth > 0 && imageHeight > 0 && pointsList.size() >= 2) {
+            double x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+            bool coordsOk = false;
+
+            if (shapeType == QStringLiteral("rectangle") && pointsList.size() == 2) {
+                x1 = pointsList[0].toMap()["x"].toDouble();
+                y1 = pointsList[0].toMap()["y"].toDouble();
+                x2 = pointsList[1].toMap()["x"].toDouble();
+                y2 = pointsList[1].toMap()["y"].toDouble();
+                coordsOk = true;
+            } else if (shapeType == QStringLiteral("polygon") && pointsList.size() >= 3) {
+                double minX = pointsList[0].toMap()["x"].toDouble();
+                double maxX = minX;
+                double minY = pointsList[0].toMap()["y"].toDouble();
+                double maxY = minY;
+
+                for (int i = 1; i < pointsList.size(); ++i) {
+                    double px = pointsList[i].toMap()["x"].toDouble();
+                    double py = pointsList[i].toMap()["y"].toDouble();
+                    if (px < minX) minX = px;
+                    if (px > maxX) maxX = px;
+                    if (py < minY) minY = py;
+                    if (py > maxY) maxY = py;
+                }
+                x1 = minX;
+                y1 = minY;
+                x2 = maxX;
+                y2 = maxY;
+                coordsOk = true;
+            }
+
+            if (coordsOk) {
+                double bW = qAbs(x2 - x1);
+                double bH = qAbs(y2 - y1);
+
+                if (bW > 0 && bH > 0) {
+                    double cx = ((x1 + x2) / 2.0) / static_cast<double>(imageWidth);
+                    double cy = ((y1 + y2) / 2.0) / static_cast<double>(imageHeight);
+                    double w = bW / static_cast<double>(imageWidth);
+                    double h = bH / static_cast<double>(imageHeight);
+
+                    shapeInfo["cx"] = cx;
+                    shapeInfo["cy"] = cy;
+                    shapeInfo["w"] = w;
+                    shapeInfo["h"] = h;
+                }
+            }
+        }
+
+        shapesList.append(shapeInfo);
+    }
+
+    bool valid = !shapesList.isEmpty();
+
+    // 构建 label -> classId 映射
+    QVariantMap labelMap;
+    for (auto it = labelToClassId.constBegin(); it != labelToClassId.constEnd(); ++it) {
+        labelMap[it.key()] = it.value();
+    }
+
+    result["valid"] = valid;
+    result["classIds"] = QVariant::fromValue(classIds);
+    result["shapes"] = shapesList;
+    result["labelToClassId"] = labelMap;
+    result["errors"] = errors;
+
+    ltDebug(LT_LOG_DATASET()) << "parseLabelMeJsonFile: filePath=" << filePath
+                              << "valid=" << valid
+                              << "shapes=" << shapesList.size()
+                              << "labels=" << labelToClassId.size()
+                              << "errors=" << errors.size();
+
+    return result;
+}
+
+QVariantMap ImportScanner::scanWithLabelMeJsonLabels(const QString &imageDir, const QString &labelDir)
+{
+    ltInfo(LT_LOG_DATASET()) << "scanWithLabelMeJsonLabels imageDir=" << imageDir << "labelDir=" << labelDir;
+
+    QVariantMap result;
+    QVariantList samples;
+
+    QDir imgDir(imageDir);
+    QDir lblDir(labelDir);
+
+    // 递归收集图片文件，按文件名建立索引
+    QFileInfoList imageFiles = collectImageFiles(imgDir, true);
+    QMap<QString, QFileInfo> imageByFileName;
+    QMap<QString, QFileInfo> imageByStem;
+    for (const auto &fi : imageFiles) {
+        imageByFileName[fi.fileName()] = fi;
+        imageByStem[fi.completeBaseName()] = fi;
+    }
+
+    // 递归查找标签目录中的所有 LabelMe JSON 文件
+    QFileInfoList jsonFiles;
+    QFileInfoList allLabelFiles = collectLabelFiles(lblDir, true);
+    for (const auto &fi : allLabelFiles) {
+        if (fi.suffix().toLower() == QStringLiteral("json") && isLabelMeJsonFile(fi.absoluteFilePath())) {
+            jsonFiles.append(fi);
+        }
+    }
+
+    if (jsonFiles.isEmpty()) {
+        ltWarning(LT_LOG_DATASET()) << "scanWithLabelMeJsonLabels: no LabelMe JSON files found in labelDir";
+        result["total"] = 0;
+        result["matched"] = 0;
+        result["unmatchedImages"] = 0;
+        result["unmatchedLabels"] = 0;
+        result["samples"] = samples;
+        result["error"] = QStringLiteral("标签目录中未找到 LabelMe JSON 文件: %1").arg(labelDir);
+        return result;
+    }
+
+    // 合并所有 JSON 文件的解析结果
+    QMap<QString, int> globalLabelToClassId;
+    int nextGlobalClassId = 0;
+    QSet<int> allClassIds;
+    QStringList allErrors;
+    int matched = 0;
+    int unmatchedImages = 0;
+    QSet<QString> matchedImageFiles;
+
+    int processed = 0;
+    int totalEntries = jsonFiles.size() + imageFiles.size();
+
+    for (const auto &jsonFi : jsonFiles) {
+        processed++;
+        emit scanProgress(processed, totalEntries);
+
+        QVariantMap parseResult = parseLabelMeJsonFile(jsonFi.absoluteFilePath());
+
+        if (!parseResult["valid"].toBool()) {
+            QStringList fileErrors = parseResult["errors"].toStringList();
+            for (const auto &err : fileErrors) {
+                allErrors.append(QStringLiteral("[%1] %2").arg(jsonFi.fileName(), err));
+            }
+            continue;
+        }
+
+        // 合并 label -> classId 映射
+        QVariantMap labelMap = parseResult["labelToClassId"].toMap();
+        for (auto it = labelMap.constBegin(); it != labelMap.constEnd(); ++it) {
+            QString label = it.key();
+            if (!globalLabelToClassId.contains(label)) {
+                globalLabelToClassId[label] = nextGlobalClassId++;
+            }
+        }
+
+        // 获取该 JSON 文件对应的图片路径
+        QString jsonImagePath = parseResult["imagePath"].toString();
+        int imageWidth = parseResult["imageWidth"].toInt();
+        int imageHeight = parseResult["imageHeight"].toInt();
+        QVariantList shapes = parseResult["shapes"].toList();
+
+        // 匹配图片文件：优先按 imagePath 匹配，其次按 JSON 文件名 stem 匹配
+        QFileInfo matchedImgFi;
+        QString matchKey;
+
+        if (!jsonImagePath.isEmpty()) {
+            // 从 imagePath 提取纯文件名
+            QString baseFileName = QFileInfo(jsonImagePath).fileName();
+            if (imageByFileName.contains(baseFileName)) {
+                matchedImgFi = imageByFileName[baseFileName];
+                matchKey = baseFileName;
+            }
+        }
+
+        // 回退：按 JSON 文件名 stem 匹配图片
+        if (!matchedImgFi.exists()) {
+            QString jsonStem = jsonFi.completeBaseName();
+            if (imageByStem.contains(jsonStem)) {
+                matchedImgFi = imageByStem[jsonStem];
+                matchKey = matchedImgFi.fileName();
+            }
+        }
+
+        QVariantMap sample;
+        sample["labelPath"] = jsonFi.absoluteFilePath();
+
+        // 重新映射 shapes 中的 classId 为全局 classId
+        QVariantList remappedShapes;
+        QSet<int> imgClassIds;
+        for (const auto &shapeVal : shapes) {
+            QVariantMap shapeMap = shapeVal.toMap();
+            QString label = shapeMap["label"].toString();
+            if (globalLabelToClassId.contains(label)) {
+                int globalId = globalLabelToClassId[label];
+                shapeMap["classId"] = globalId;
+                imgClassIds.insert(globalId);
+            }
+            remappedShapes.append(shapeMap);
+        }
+
+        QVariantList classIdList;
+        QList<int> sortedImgClassIds = imgClassIds.values();
+        std::sort(sortedImgClassIds.begin(), sortedImgClassIds.end());
+        for (int cid : sortedImgClassIds) {
+            classIdList.append(cid);
+            allClassIds.insert(cid);
+        }
+
+        if (matchedImgFi.exists()) {
+            sample["imagePath"] = matchedImgFi.absoluteFilePath();
+            sample["stem"] = matchedImgFi.completeBaseName();
+            sample["status"] = QStringLiteral("matched");
+            sample["valid"] = true;
+            sample["classIds"] = classIdList;
+            sample["annotations"] = remappedShapes;
+            sample["imageWidth"] = imageWidth;
+            sample["imageHeight"] = imageHeight;
+            matchedImageFiles.insert(matchKey);
+            matched++;
+        } else {
+            sample["status"] = QStringLiteral("unmatched_label");
+            sample["valid"] = false;
+            sample["fileName"] = jsonImagePath.isEmpty() ? jsonFi.fileName() : jsonImagePath;
+            sample["classIds"] = classIdList;
+            unmatchedImages++;
+        }
+
+        samples.append(sample);
+    }
+
+    // 统计图片目录中未被 JSON 匹配的图片
+    int unmatchedLabels = 0;
+    for (auto imgIt = imageByFileName.constBegin(); imgIt != imageByFileName.constEnd(); ++imgIt) {
+        if (!matchedImageFiles.contains(imgIt.key())) {
+            processed++;
+            emit scanProgress(processed, totalEntries);
+
+            QVariantMap sample;
+            sample["imagePath"] = imgIt.value().absoluteFilePath();
+            sample["stem"] = imgIt.value().completeBaseName();
+            sample["status"] = QStringLiteral("unmatched_image");
+            sample["valid"] = true;
+            sample["classIds"] = QVariantList();
+            samples.append(sample);
+            unmatchedLabels++;
+        }
+    }
+
+    // 构建 categories 映射（classId -> label）
+    QVariantMap categoriesMap;
+    for (auto it = globalLabelToClassId.constBegin(); it != globalLabelToClassId.constEnd(); ++it) {
+        categoriesMap[QString::number(it.value())] = it.key();
+    }
+
+    QVariantList classIdList;
+    QList<int> sortedIds = allClassIds.values();
+    std::sort(sortedIds.begin(), sortedIds.end());
+    for (int cid : sortedIds) {
+        classIdList.append(cid);
+    }
+
+    result["total"] = jsonFiles.size() + imageFiles.size();
+    result["matched"] = matched;
+    result["unmatchedImages"] = unmatchedImages;
+    result["unmatchedLabels"] = unmatchedLabels;
+    result["samples"] = samples;
+    result["categories"] = categoriesMap;
+    result["classIds"] = classIdList;
+
+    if (!allErrors.isEmpty()) {
+        result["parseErrors"] = allErrors;
+    }
+
+    ltInfo(LT_LOG_DATASET()) << "scanWithLabelMeJsonLabels completed - matched:" << matched
+                             << "unmatched images:" << unmatchedImages
+                             << "unmatched labels:" << unmatchedLabels
+                             << "categories:" << globalLabelToClassId.size();
 
     return result;
 }
