@@ -5,6 +5,7 @@
 #include <QIcon>
 #include <QStandardPaths>
 #include <QDir>
+#include <QWindow>
 
 #include <windows.h>
 #include <dbghelp.h>
@@ -142,7 +143,16 @@ int main(int argc, char *argv[])
     app.setApplicationVersion("0.1.0");
 
     // 设置应用图标，任务栏和窗口标题栏显示
-    app.setWindowIcon(QIcon(QStringLiteral(":/icons/labeltorch.png")));
+    // 使用多尺寸图标确保在不同DPI下都能正确显示
+    QIcon appIcon;
+    appIcon.addFile(QStringLiteral(":/icons/labeltorch_16x16.png"), QSize(16, 16));
+    appIcon.addFile(QStringLiteral(":/icons/labeltorch_24x24.png"), QSize(24, 24));
+    appIcon.addFile(QStringLiteral(":/icons/labeltorch_32x32.png"), QSize(32, 32));
+    appIcon.addFile(QStringLiteral(":/icons/labeltorch_48x48.png"), QSize(48, 48));
+    appIcon.addFile(QStringLiteral(":/icons/labeltorch_64x64.png"), QSize(64, 64));
+    appIcon.addFile(QStringLiteral(":/icons/labeltorch_128x128.png"), QSize(128, 128));
+    appIcon.addFile(QStringLiteral(":/icons/labeltorch_256x256.png"), QSize(256, 256));
+    app.setWindowIcon(appIcon);
 
     Log::init();
     ltInfo(LT_LOG_APP()) << "Application starting" << "version" << app.applicationVersion()
@@ -231,12 +241,16 @@ int main(int argc, char *argv[])
     const QUrl url(QStringLiteral("qrc:/qt/qml/LabelTorch/Shell/qml/Main.qml"));
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
-                     &app, [url](QObject *obj, const QUrl &objUrl) {
+                     &app, [url, &appIcon](QObject *obj, const QUrl &objUrl) {
         if (!obj && url == objUrl) {
             ltError(LT_LOG_APP()) << "Failed to load Main.qml";
             QCoreApplication::exit(-1);
         } else if (obj && url == objUrl) {
             ltInfo(LT_LOG_APP()) << "Main.qml loaded successfully";
+            // 窗口创建后显式设置图标，确保Windows任务栏显示
+            if (auto *window = qobject_cast<QWindow *>(obj)) {
+                window->setIcon(appIcon);
+            }
         }
     }, Qt::QueuedConnection);
 
