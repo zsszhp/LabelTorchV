@@ -1,63 +1,63 @@
-// Theme.qml - V2 核心视觉设计系统 (顶级工业科幻美学版)
+// Theme.qml - V4 核心视觉设计系统 (赛博蓝 · 高端科技 · 高可读性)
 pragma Singleton
 import QtQuick
 
 QtObject {
-    // === 背景色系（深邃太空蓝与冷灰渐变） ===
-    readonly property color bgPrimary: "#06080F"
-    readonly property color bgSecondary: "#0B0E17"
-    readonly property color bgTertiary: "#121625"
-    readonly property color bgCard: "#101422"
-    readonly property color bgHover: "#161C30"
-    readonly property color bgSelected: "#1C243C"
-    readonly property color bgInput: "#090C15"
+    // === 背景色系（赛博蓝灰，亮度 15-25%，告别纯黑） ===
+    readonly property color bgPrimary: "#1A1D2E"
+    readonly property color bgSecondary: "#222639"
+    readonly property color bgTertiary: "#2A2F44"
+    readonly property color bgCard: "#252A3E"
+    readonly property color bgHover: "#343A52"
+    readonly property color bgSelected: "#3B4263"
+    readonly property color bgInput: "#1E2235"
 
-    // === 顶级霓虹强调色（Glow Accent） ===
-    readonly property color accentPrimary: "#FF2A5F"     // AI 极光粉
-    readonly property color accentSecondary: "#8A2BE2"   // 量子跃迁紫
-    readonly property color accentSuccess: "#00F2FE"     // 极光青蓝
-    readonly property color accentWarning: "#FFD700"     // 警示金黄
-    readonly property color accentError: "#FF003C"       // 警告鲜红
-    readonly property color accentPurple: "#8A2BE2"
+    // === 强调色（高饱和度赛博蓝+紫，视觉冲击力强） ===
+    readonly property color accentPrimary: "#4DA6FF"
+    readonly property color accentSecondary: "#B794F6"
+    readonly property color accentSuccess: "#36D399"
+    readonly property color accentWarning: "#FBBF24"
+    readonly property color accentError: "#F87171"
+    readonly property color accentPurple: "#B794F6"
 
     // === 磨砂玻璃通透度 ===
-    readonly property real glassOpacity: 0.85
-    readonly property real glassOpacityLight: 0.60
-    readonly property color glassBorder: "#202538"
-    readonly property color glassBorderGlow: "#40FF2A5F"
+    readonly property real glassOpacity: 0.92
+    readonly property real glassOpacityLight: 0.70
+    readonly property color glassBorder: "#3A4260"
+    readonly property color glassBorderGlow: "#604DA6FF"
 
-    // === 文字色 ===
-    readonly property color textPrimary: "#F5F6F8"
-    readonly property color textSecondary: "#A0A5B5"
-    readonly property color textDisabled: "#4E5265"
-    readonly property color textMuted: "#6B728E"
+    // === 文字色（超高对比度，深色背景上清晰锐利） ===
+    readonly property color textPrimary: "#F5F7FA"
+    readonly property color textSecondary: "#C8CED8"
+    readonly property color textDisabled: "#6B7585"
+    readonly property color textMuted: "#929BA8"
 
     // === 状态色 ===
-    readonly property color statusSuccess: "#00F2FE"
-    readonly property color statusWarning: "#FFD700"
-    readonly property color statusError: "#FF003C"
-    readonly property color statusInfo: "#8A2BE2"
+    readonly property color statusSuccess: "#36D399"
+    readonly property color statusWarning: "#FBBF24"
+    readonly property color statusError: "#F87171"
+    readonly property color statusInfo: "#B794F6"
 
-    // === 边框与分割线 ===
-    readonly property color border: "#181D30"
-    readonly property color borderNormal: "#181D30"
-    readonly property color borderFocus: "#FF2A5F"
-    readonly property color divider: "#141829"
+    // === 边框与分割线（清晰可辨，告别隐身边框） ===
+    readonly property color border: "#3A4260"
+    readonly property color borderNormal: "#3A4260"
+    readonly property color borderFocus: "#4DA6FF"
+    readonly property color divider: "#2E3450"
 
-    readonly property color tagBaseline: "#FF2A5F"
-    readonly property color tagBest: "#00F2FE"
-    readonly property color tagProduction: "#FFD700"
+    readonly property color tagBaseline: "#4DA6FF"
+    readonly property color tagBest: "#36D399"
+    readonly property color tagProduction: "#FBBF24"
 
     // === 字体 ===
     readonly property string fontFamily: "Segoe UI"
     readonly property string fontFamilyMono: "Cascadia Code"
     readonly property int fontSizeCaption: 11
-    readonly property int fontSizeSmall: 11
+    readonly property int fontSizeSmall: 12
     readonly property int fontSizeNormal: 13
-    readonly property int fontSizeSubheading: 14
+    readonly property int fontSizeSubheading: 15
     readonly property int fontSizeLarge: 18
-    readonly property int fontSizeTitle: 18
-    readonly property int fontSizeDisplay: 24
+    readonly property int fontSizeTitle: 20
+    readonly property int fontSizeDisplay: 26
 
     // === 间距 ===
     readonly property int spacingTiny: 2
@@ -73,20 +73,20 @@ QtObject {
 
     // === 动画 ===
     readonly property int animDuration: 200
-    readonly property int animDurationSlow: 250
+    readonly property int animDurationSlow: 300
 
     // === 布局尺寸 ===
-    readonly property int sidebarExpandedWidth: 200
+    readonly property int sidebarExpandedWidth: 220
     readonly property int sidebarCollapsedWidth: 64
     readonly property int statusBarHeight: 40
-    readonly property int logPanelHeight: 160
+    readonly property int logPanelHeight: 180
     readonly property int toolbarHeight: 36
 
-    // === 类别配色 ===
+    // === 类别配色（高饱和度，深色背景上醒目） ===
     readonly property var classColors: [
-        "#FF2A5F", "#00F2FE", "#8A2BE2", "#FFD700",
-        "#FF5722", "#4CAF50", "#00BCD4", "#9C27B0",
-        "#3F51B5", "#E91E63"
+        "#4DA6FF", "#36D399", "#B794F6", "#FBBF24",
+        "#F87171", "#FB923C", "#38BDF8", "#E879F9",
+        "#2DD4BF", "#F472B6"
     ]
 
     function classColor(index) {

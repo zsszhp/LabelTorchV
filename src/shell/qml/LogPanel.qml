@@ -1,3 +1,4 @@
+// LogPanel.qml - V4 日志面板（赛博蓝科技风）
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -5,7 +6,7 @@ import LabelTorch.Theme
 
 Rectangle {
     id: root
-    color: Qt.alpha(Theme.bgPrimary, Theme.glassOpacity)
+    color: Theme.bgSecondary
     border.color: Theme.border
     border.width: 1
 
@@ -38,7 +39,7 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 32
-            color: Theme.bgSecondary
+            color: Theme.bgTertiary
             border.color: Theme.border
             border.width: 1
 
@@ -48,18 +49,27 @@ Rectangle {
                 anchors.rightMargin: Theme.spacingNormal
                 spacing: Theme.spacingNormal
 
+                // 日志图标
+                Rectangle {
+                    width: 8
+                    height: 8
+                    radius: 4
+                    color: Theme.accentPrimary
+                    opacity: 0.8
+                }
+
                 Label {
-                    text: "⌨ LOG PANEL"
+                    text: "日志面板"
                     color: Theme.accentPrimary
                     font.pixelSize: Theme.fontSizeSmall
                     font.bold: true
-                    font.family: Theme.fontFamilyMono
+                    font.family: Theme.fontFamily
                 }
 
                 Item { Layout.fillWidth: true }
 
                 Label {
-                    text: autoScroll ? "SCROLL ACTIVE" : "SCROLL MANUAL"
+                    text: autoScroll ? "自动滚动" : "手动滚动"
                     color: autoScroll ? Theme.accentSuccess : Theme.textMuted
                     font.pixelSize: Theme.fontSizeCaption
                     font.bold: true
@@ -67,19 +77,19 @@ Rectangle {
                 }
 
                 Button {
-                    text: "CLEAR"
+                    text: "清空"
                     flat: true
                     font.pixelSize: Theme.fontSizeCaption
-                    font.family: Theme.fontFamilyMono
+                    font.family: Theme.fontFamily
                     palette.buttonText: Theme.textSecondary
                     onClicked: root.clear()
                 }
 
                 Button {
-                    text: collapsed ? "EXPAND ▲" : "COLLAPSE ▼"
+                    text: collapsed ? "展开 ▲" : "折叠 ▼"
                     flat: true
                     font.pixelSize: Theme.fontSizeCaption
-                    font.family: Theme.fontFamilyMono
+                    font.family: Theme.fontFamily
                     palette.buttonText: Theme.accentPrimary
                     onClicked: {
                         collapsed = !collapsed
