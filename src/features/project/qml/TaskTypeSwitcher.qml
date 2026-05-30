@@ -4,14 +4,13 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import LabelTorch.Theme
 
 RowLayout {
     id: root
 
-    /// Current task type: "detect", "obb", "classify", "anomaly"
     property string taskType: "detect"
 
-    /// Whether the switcher is enabled (e.g. only when a project is open)
     property bool switcherEnabled: true
 
     signal taskTypeSelected(string taskType)
@@ -39,7 +38,7 @@ RowLayout {
         }
 
         background: Rectangle {
-            color: detectBtn.highlighted ? "#89b4fa" : (detectBtn.hovered ? "#45475a" : "#313244")
+            color: detectBtn.highlighted ? Theme.accentPrimary : (detectBtn.hovered ? Theme.bgHover : Theme.bgTertiary)
             radius: 3
         }
 
@@ -47,7 +46,7 @@ RowLayout {
             text: detectBtn.text
             font.pixelSize: 11
             font.bold: detectBtn.highlighted
-            color: detectBtn.highlighted ? "#1e1e2e" : (detectBtn.enabled ? "#cdd6f4" : "#585b70")
+            color: detectBtn.highlighted ? "#FFFFFF" : (detectBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
@@ -74,7 +73,7 @@ RowLayout {
         }
 
         background: Rectangle {
-            color: obbBtn.highlighted ? "#cba6f7" : (obbBtn.hovered ? "#45475a" : "#313244")
+            color: obbBtn.highlighted ? Theme.accentSecondary : (obbBtn.hovered ? Theme.bgHover : Theme.bgTertiary)
             radius: 3
         }
 
@@ -82,7 +81,7 @@ RowLayout {
             text: obbBtn.text
             font.pixelSize: 11
             font.bold: obbBtn.highlighted
-            color: obbBtn.highlighted ? "#1e1e2e" : (obbBtn.enabled ? "#cdd6f4" : "#585b70")
+            color: obbBtn.highlighted ? "#FFFFFF" : (obbBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
@@ -109,7 +108,7 @@ RowLayout {
         }
 
         background: Rectangle {
-            color: classifyBtn.highlighted ? "#a6e3a1" : (classifyBtn.hovered ? "#45475a" : "#313244")
+            color: classifyBtn.highlighted ? Theme.accentSuccess : (classifyBtn.hovered ? Theme.bgHover : Theme.bgTertiary)
             radius: 3
         }
 
@@ -117,7 +116,7 @@ RowLayout {
             text: classifyBtn.text
             font.pixelSize: 11
             font.bold: classifyBtn.highlighted
-            color: classifyBtn.highlighted ? "#1e1e2e" : (classifyBtn.enabled ? "#cdd6f4" : "#585b70")
+            color: classifyBtn.highlighted ? "#FFFFFF" : (classifyBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
@@ -144,7 +143,7 @@ RowLayout {
         }
 
         background: Rectangle {
-            color: anomalyBtn.highlighted ? "#f9e2af" : (anomalyBtn.hovered ? "#45475a" : "#313244")
+            color: anomalyBtn.highlighted ? Theme.accentWarning : (anomalyBtn.hovered ? Theme.bgHover : Theme.bgTertiary)
             radius: 3
         }
 
@@ -152,7 +151,7 @@ RowLayout {
             text: anomalyBtn.text
             font.pixelSize: 11
             font.bold: anomalyBtn.highlighted
-            color: anomalyBtn.highlighted ? "#1e1e2e" : (anomalyBtn.enabled ? "#cdd6f4" : "#585b70")
+            color: anomalyBtn.highlighted ? "#1A1A2E" : (anomalyBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }

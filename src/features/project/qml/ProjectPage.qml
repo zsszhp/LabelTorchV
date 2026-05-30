@@ -1,3 +1,4 @@
+// ProjectPage.qml - V4 项目中心（赛博蓝科技风）
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -7,31 +8,32 @@ import LabelTorch.Theme
 Item {
     id: pageRoot
 
-    // 背景光晕装饰
+    // 背景装饰光晕
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
             GradientStop { position: 0.0; color: Theme.bgPrimary }
-            GradientStop { position: 1.0; color: "#030408" }
+            GradientStop { position: 1.0; color: "#15182A" }
         }
 
+        // 右上角装饰光晕
+        Rectangle {
+            width: 500
+            height: 500
+            radius: 250
+            color: Qt.alpha(Theme.accentPrimary, 0.06)
+            x: parent.width - 300
+            y: -250
+        }
+
+        // 左下角装饰光晕
         Rectangle {
             width: 400
             height: 400
             radius: 200
-            color: Qt.alpha(Theme.accentSecondary, 0.15)
-            x: parent.width - 250
-            y: -150
-            // 模糊效果（底层 QML 可选，直接使用半透明色彩叠加）
-        }
-
-        Rectangle {
-            width: 300
-            height: 300
-            radius: 150
-            color: Qt.alpha(Theme.accentPrimary, 0.10)
-            x: -100
-            y: parent.height - 200
+            color: Qt.alpha(Theme.accentSecondary, 0.05)
+            x: -150
+            y: parent.height - 250
         }
     }
 
@@ -72,7 +74,7 @@ Item {
                 font.bold: true
                 palette.buttonText: Theme.textSecondary
                 background: Rectangle {
-                    color: refreshBtn.hovered ? Theme.bgHover : Theme.bgSecondary
+                    color: refreshBtn.hovered ? Theme.bgHover : Theme.bgTertiary
                     border.color: Theme.border
                     border.width: 1
                     radius: Theme.radiusNormal
@@ -88,10 +90,11 @@ Item {
                 font.bold: true
                 palette.buttonText: "#FFFFFF"
                 background: Rectangle {
-                    color: newProjectBtn.hovered ? Qt.lighter(Theme.accentPrimary, 1.1) : Theme.accentPrimary
+                    gradient: Gradient {
+                        GradientStop { position: 0.0; color: Theme.accentPrimary }
+                        GradientStop { position: 1.0; color: "#2B7AE0" }
+                    }
                     radius: Theme.radiusNormal
-                    // 按钮微光发光效果
-                    layer.enabled: newProjectBtn.hovered
                 }
                 onClicked: newProjectDialog.open()
             }
@@ -110,28 +113,54 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            cellWidth: 320
-            cellHeight: 180
+            cellWidth: 340
+            cellHeight: 200
             model: projectModel
 
+            // 空状态提示
+            Label {
+                anchors.centerIn: parent
+                visible: projectGrid.count === 0
+                text: "还没有项目\n点击「+ 新建项目」开始"
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSizeSubheading
+                font.family: Theme.fontFamily
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+
             delegate: Item {
-                width: 300
-                height: 160
+                width: 320
+                height: 180
 
                 Rectangle {
                     id: cardBg
                     anchors.fill: parent
-                    color: cardMouseArea.containsMouse ? Theme.bgHover : Qt.alpha(Theme.bgCard, Theme.glassOpacity)
+                    color: cardMouseArea.containsMouse ? Theme.bgHover : Theme.bgCard
                     radius: Theme.radiusLarge
                     border.color: {
                         if (appController.currentProjectId === model.projectId) {
                             return Theme.accentPrimary
                         }
-                        return cardMouseArea.containsMouse ? Theme.accentSecondary : Theme.border
+                        return cardMouseArea.containsMouse ? Theme.accentPrimary : Theme.border
                     }
                     border.width: appController.currentProjectId === model.projectId ? 2 : 1
 
-                    // 卡片阴影或发光阴影效果
+                    // 顶部渐变装饰条
+                    Rectangle {
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        height: 3
+                        radius: Theme.radiusLarge
+                        visible: appController.currentProjectId === model.projectId
+                        gradient: Gradient {
+                            orientation: Gradient.Horizontal
+                            GradientStop { position: 0.0; color: Theme.accentPrimary }
+                            GradientStop { position: 1.0; color: Theme.accentSecondary }
+                        }
+                    }
+
                     Behavior on border.color {
                         ColorAnimation { duration: Theme.animDuration }
                     }
@@ -141,23 +170,27 @@ Item {
                         anchors.margins: Theme.spacingLarge
                         spacing: Theme.spacingSmall
 
-                        // 第一行：项目小图标与当前激活标签
+                        // 第一行：项目图标与激活标签
                         RowLayout {
                             Layout.fillWidth: true
 
                             // 装饰性项目首字母图标
                             Rectangle {
-                                width: 36
-                                height: 36
+                                width: 40
+                                height: 40
                                 radius: Theme.radiusNormal
-                                color: appController.currentProjectId === model.projectId ? Qt.alpha(Theme.accentPrimary, 0.2) : Qt.alpha(Theme.textSecondary, 0.1)
+                                gradient: Gradient {
+                                    GradientStop { position: 0.0; color: appController.currentProjectId === model.projectId ? Theme.accentPrimary : Theme.accentSecondary }
+                                    GradientStop { position: 1.0; color: appController.currentProjectId === model.projectId ? "#2B7AE0" : "#7C3AED" }
+                                }
+                                opacity: appController.currentProjectId === model.projectId ? 1.0 : 0.6
 
                                 Label {
                                     anchors.centerIn: parent
                                     text: model.name ? model.name.charAt(0).toUpperCase() : "P"
                                     font.bold: true
                                     font.pixelSize: Theme.fontSizeLarge
-                                    color: appController.currentProjectId === model.projectId ? Theme.accentPrimary : Theme.textPrimary
+                                    color: "#FFFFFF"
                                     font.family: Theme.fontFamily
                                 }
                             }
@@ -172,7 +205,7 @@ Item {
                                 border.width: 1
                                 radius: Theme.radiusSmall
                                 width: 56
-                                height: 20
+                                height: 22
 
                                 Label {
                                     anchors.centerIn: parent
@@ -203,8 +236,8 @@ Item {
                             Label {
                                 text: model.path
                                 color: Theme.textMuted
-                                font.pixelSize: Theme.fontSizeSmall
-                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeCaption
+                                font.family: Theme.fontFamilyMono
                                 Layout.fillWidth: true
                                 elide: Text.ElideMiddle
                             }
@@ -228,27 +261,30 @@ Item {
                             // 打开/进入按钮
                             Button {
                                 id: openBtn
-                                text: appController.currentProjectId === model.projectId ? "已打开" : "打开"
-                                enabled: appController.currentProjectId !== model.projectId
+                                text: appController.currentProjectId === model.projectId ? "当前激活" : "打开项目"
                                 font.pixelSize: Theme.fontSizeSmall
                                 font.family: Theme.fontFamily
                                 font.bold: true
-                                palette.buttonText: enabled ? Theme.textPrimary : Theme.textDisabled
+                                palette.buttonText: appController.currentProjectId === model.projectId ? "#FFFFFF" : (openBtn.hovered ? Theme.textPrimary : Theme.textSecondary)
                                 background: Rectangle {
                                     color: {
-                                        if (!openBtn.enabled) return "transparent"
-                                        return openBtn.hovered ? Theme.accentSecondary : Theme.bgTertiary
+                                        if (appController.currentProjectId === model.projectId) {
+                                            return Theme.accentSuccess
+                                        }
+                                        return openBtn.hovered ? Theme.accentPrimary : Theme.bgTertiary
                                     }
                                     radius: Theme.radiusSmall
-                                    border.color: openBtn.enabled ? Theme.border : "transparent"
+                                    border.color: appController.currentProjectId === model.projectId ? Theme.accentSuccess : (openBtn.hovered ? Theme.accentPrimary : Theme.border)
                                     border.width: 1
                                 }
                                 onClicked: {
-                                    projectService.openProject(model.projectId)
-                                    appController.openProject(model.projectId, model.name)
-                                    var taxonomies = taxonomyService.listTaxonomies(model.projectId)
-                                    if (taxonomies.length > 0) {
-                                        taxonomyModel.taxonomyId = taxonomies[0].id
+                                    if (appController.currentProjectId !== model.projectId) {
+                                        projectService.openProject(model.projectId)
+                                        appController.openProject(model.projectId, model.name)
+                                        var taxonomies = taxonomyService.listTaxonomies(model.projectId)
+                                        if (taxonomies.length > 0) {
+                                            taxonomyModel.taxonomyId = taxonomies[0].id
+                                        }
                                     }
                                 }
                             }
@@ -443,15 +479,32 @@ Item {
         onRejected: projectId = ""
     }
 
+    // URL 转本地路径工具函数（兼容中文路径和特殊字符）
+    // Windows: file:///C:/Users/... → C:/Users/...
+    // Linux: file:///home/... → /home/...
+    function urlToPath(url) {
+        var s = url.toString()
+        if (s.startsWith("file:///")) {
+            s = s.substring(7)
+            // Windows 路径: /C:/... → C:/...
+            if (s.length >= 3 && s.charAt(0) === "/" && s.charAt(2) === ":") {
+                var driveLetter = s.charAt(1).toUpperCase()
+                if (driveLetter >= 'A' && driveLetter <= 'Z') {
+                    s = s.substring(1)
+                }
+            }
+        } else if (s.startsWith("file://")) {
+            s = s.substring(6)
+        }
+        return decodeURIComponent(s)
+    }
+
     // === 文件夹选择 ===
     FolderDialog {
         id: folderDialog
         title: "选择项目存储路径"
         onAccepted: {
-            var path = folderDialog.selectedFolder.toString()
-            if (path.startsWith("file:///")) path = path.substring(8)
-            else if (path.startsWith("file://")) path = path.substring(7)
-            projectPathField.text = decodeURIComponent(path)
+            projectPathField.text = urlToPath(folderDialog.selectedFolder)
         }
     }
 }

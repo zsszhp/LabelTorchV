@@ -1,6 +1,7 @@
 // ProjectCard.qml - 项目卡片组件
 import QtQuick
 import QtQuick.Controls
+import LabelTorch.Theme
 
 Item {
     property string projectName: ""
@@ -9,17 +10,19 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "#313244"
-        radius: 8
+        color: Theme.bgCard
+        radius: Theme.radiusNormal
+        border.color: Theme.border
+        border.width: 1
 
         Column {
             anchors.fill: parent
             anchors.margins: 12
             spacing: 4
 
-            Label { text: projectName; font.bold: true; color: "#cdd6f4"; font.pixelSize: 14 }
-            Label { text: projectPath; color: "#6c7086"; font.pixelSize: 11 }
-            Label { text: lastModified; color: "#6c7086"; font.pixelSize: 11 }
+            Label { text: projectName; font.bold: true; color: Theme.textPrimary; font.pixelSize: Theme.fontSizeNormal; font.family: Theme.fontFamily }
+            Label { text: projectPath; color: Theme.textMuted; font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamilyMono }
+            Label { text: lastModified; color: Theme.textMuted; font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamilyMono }
         }
     }
 }
