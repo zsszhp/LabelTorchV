@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QDir>
 #include <QTemporaryDir>
+#include <QThreadPool>
 #include "Database.h"
 #include "TrainingService.h"
 
@@ -166,6 +167,8 @@ void TestTraining::testStartTraining()
     QVERIFY(!runId.isEmpty());
 
     QVERIFY(service.startTraining(runId));
+    QThreadPool::globalInstance()->waitForDone();
+    QCoreApplication::processEvents();
 
     QVariantMap details = service.getRun(runId);
     QCOMPARE(details["status"].toString(), QString("running"));
@@ -178,6 +181,8 @@ void TestTraining::testStopTraining()
     QString config = R"({"model_family":"yolov8","epochs":5})";
     QString runId = service.createRun(m_projectId, m_snapshotId, config);
     QVERIFY(service.startTraining(runId));
+    QThreadPool::globalInstance()->waitForDone();
+    QCoreApplication::processEvents();
     QVERIFY(service.stopTraining(runId));
 
     QVariantMap details = service.getRun(runId);
@@ -204,6 +209,8 @@ void TestTraining::testDeleteRunningRunFails()
     QString config = R"({"model_family":"yolov8"})";
     QString runId = service.createRun(m_projectId, m_snapshotId, config);
     QVERIFY(service.startTraining(runId));
+    QThreadPool::globalInstance()->waitForDone();
+    QCoreApplication::processEvents();
 
     QVERIFY(!service.deleteRun(runId));
 }
@@ -214,6 +221,8 @@ void TestTraining::testUpdateRunStatus()
     QString config = R"({"model_family":"yolov8"})";
     QString runId = service.createRun(m_projectId, m_snapshotId, config);
     QVERIFY(service.startTraining(runId));
+    QThreadPool::globalInstance()->waitForDone();
+    QCoreApplication::processEvents();
 
     QVERIFY(service.updateRunStatus(runId, "succeeded"));
 

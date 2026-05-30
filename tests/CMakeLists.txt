@@ -11,6 +11,8 @@ add_executable(test_database
 )
 target_link_libraries(test_database PRIVATE
     labeltorch_core
+    labeltorch_dataset
+    labeltorch_project
     Qt6::Test
     Qt6::Sql
 )
