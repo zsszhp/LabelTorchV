@@ -33,7 +33,8 @@ async def handle_check(payload: dict) -> dict:
             result["gpu_name"] = "N/A"
             result["gpu_count"] = 0
             result["gpu_memory_total_mb"] = 0
-    except ImportError:
+    except Exception as e:
+        logger.exception("Failed to import torch or check CUDA")
         result["torch"] = None
         result["cuda_available"] = False
         result["torch_cuda"] = "N/A"
@@ -44,7 +45,7 @@ async def handle_check(payload: dict) -> dict:
     try:
         ultralytics = importlib.import_module("ultralytics")
         result["ultralytics"] = ultralytics.__version__
-    except ImportError:
+    except Exception:
         result["ultralytics"] = None
 
     try:
@@ -52,14 +53,14 @@ async def handle_check(payload: dict) -> dict:
         result["onnxruntime"] = onnxruntime.__version__
         providers = onnxruntime.get_available_providers()
         result["onnxruntime_providers"] = providers
-    except ImportError:
+    except Exception:
         result["onnxruntime"] = None
         result["onnxruntime_providers"] = []
 
     try:
         onnx = importlib.import_module("onnx")
         result["onnx_version"] = onnx.__version__
-    except ImportError:
+    except Exception:
         result["onnx_version"] = None
 
     return result
