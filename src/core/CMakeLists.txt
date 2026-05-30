@@ -23,6 +23,7 @@ target_link_libraries(labeltorch_core PUBLIC
     Qt6::Core
     Qt6::Gui
     Qt6::Sql
+    Qt6::Concurrent
 )
 
 # ==================== Precompiled Headers (PCH) ====================

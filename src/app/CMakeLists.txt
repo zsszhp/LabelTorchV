@@ -9,11 +9,18 @@ if(WIN32)
     target_sources(${EXECUTABLE_NAME} PRIVATE app.rc)
 endif()
 
-# Qt资源文件（QML窗口图标）
+# Qt资源文件（QML窗口图标，多尺寸支持高DPI）
 qt_add_resources(${EXECUTABLE_NAME} app_icons
-    PREFIX /icons
+    PREFIX /
     FILES
         icons/labeltorch.png
+        icons/labeltorch_16x16.png
+        icons/labeltorch_24x24.png
+        icons/labeltorch_32x32.png
+        icons/labeltorch_48x48.png
+        icons/labeltorch_64x64.png
+        icons/labeltorch_128x128.png
+        icons/labeltorch_256x256.png
 )
 
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE

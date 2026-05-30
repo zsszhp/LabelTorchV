@@ -18,7 +18,7 @@ add_definitions(-DWIN32_LEAN_AND_MEAN)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # Qt 6 基础设置
-find_package(Qt6 6.11 REQUIRED COMPONENTS Core Quick QuickControls2 QuickDialogs2 Sql)
+find_package(Qt6 6.11 REQUIRED COMPONENTS Core Quick QuickControls2 QuickDialogs2 Sql Concurrent)
 qt_standard_project_setup(REQUIRES 6.11)
 
 # 启用 QTP0004 策略以消除 QML 模块 OUTPUT_DIRECTORY 警告
