@@ -7,7 +7,10 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+#include "MetricService.h"
+
 class IpcClient;
+class ModelRegistry;
 
 class TrainingService : public QObject
 {
@@ -17,6 +20,7 @@ public:
     explicit TrainingService(QObject *parent = nullptr);
 
     void setIpcClient(IpcClient *client);
+    void setModelRegistry(ModelRegistry *registry);
 
     Q_INVOKABLE void handleTrainingEvent(const QVariantMap &event);
 
@@ -100,7 +104,12 @@ signals:
                            double loss, const QVariantMap &metrics);
 
 private:
+    void onResponseReceived(const QJsonObject &response);
+
     IpcClient *m_ipcClient = nullptr;
+    ModelRegistry *m_modelRegistry = nullptr;
+    MetricService *m_metricService = nullptr;
+    QStringList m_adapters = { QStringLiteral("ultralytics"), QStringLiteral("anomalib") };
 };
 
 #endif // TRAININGSERVICE_H

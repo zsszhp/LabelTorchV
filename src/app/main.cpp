@@ -229,6 +229,7 @@ int main(int argc, char *argv[])
 
     projectService.setTaxonomyService(&taxonomyService);
     trainingService.setIpcClient(&ipcClient);
+    trainingService.setModelRegistry(&modelRegistry);
     inferenceService.setIpcClient(&ipcClient);
     anomalyService.setIpcClient(&ipcClient);
     exportService.setIpcClient(&ipcClient);

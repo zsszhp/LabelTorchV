@@ -131,6 +131,7 @@ void TestTraining::cleanupTestCase()
 void TestTraining::testCreateRun()
 {
     TrainingService service;
+    service.setModelRegistry(nullptr);
     QString config = R"({"model_family":"yolov8","epochs":10,"batch":16})";
     QString runId = service.createRun(m_projectId, m_snapshotId, config);
     QVERIFY(!runId.isEmpty());
@@ -186,7 +187,7 @@ void TestTraining::testStopTraining()
     QVERIFY(service.stopTraining(runId));
 
     QVariantMap details = service.getRun(runId);
-    QCOMPARE(details["status"].toString(), QString("cancelled"));
+    QCOMPARE(details["status"].toString(), QString("stopped"));
     QVERIFY(!details["finishedAt"].toString().isEmpty());
 }
 

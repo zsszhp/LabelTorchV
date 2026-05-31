@@ -1,20 +1,24 @@
 #include "TrainingService.h"
 #include "Database.h"
 #include "ipc/IpcClient.h"
+#include "ipc/IpcProtocol.h"
 #include "utils/Log.h"
 #include "SnapshotService.h"
 #include "MetricService.h"
+#include "ModelRegistry.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QUuid>
 #include <QDateTime>
 #include <QtConcurrent>
 
 TrainingService::TrainingService(QObject *parent) : QObject(parent)
 {
+    m_metricService = new MetricService(this);
     ltTrace(LT_LOG_TRAINING()) << "parent=" << parent;
 }
 
@@ -34,7 +38,25 @@ void TrainingService::setIpcClient(IpcClient *client)
                 handleTrainingEvent(ev);
             }
         });
+
+        connect(m_ipcClient, &IpcClient::responseReceived, this, &TrainingService::onResponseReceived);
+
+        connect(m_ipcClient, &IpcClient::connectedChanged, this, [this]() {
+            if (m_ipcClient && m_ipcClient->connected()) {
+                m_ipcClient->sendRequest(IpcProtocol::CMD_TRAIN_LIST_ADAPTERS, {});
+            }
+        });
+
+        if (m_ipcClient->connected()) {
+            m_ipcClient->sendRequest(IpcProtocol::CMD_TRAIN_LIST_ADAPTERS, {});
+        }
     }
+}
+
+void TrainingService::setModelRegistry(ModelRegistry *registry)
+{
+    ltTrace(LT_LOG_TRAINING()) << "registry=" << registry;
+    m_modelRegistry = registry;
 }
 
 void TrainingService::handleTrainingEvent(const QVariantMap &event)
@@ -62,24 +84,82 @@ void TrainingService::handleTrainingEvent(const QVariantMap &event)
             if (runQuery.exec() && runQuery.next()) {
                 QString projectId = runQuery.value(0).toString();
 
-                QSqlQuery versionQuery(Database::instance().database());
-                QString versionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-                versionQuery.prepare(
-                    "INSERT INTO model_versions (id, run_id, best_weight_path, last_weight_path, "
-                    "metrics_snapshot_json) VALUES (?, ?, ?, ?, ?)"
-                );
-                versionQuery.addBindValue(versionId);
-                versionQuery.addBindValue(taskId);
-                versionQuery.addBindValue(bestWeight);
-                versionQuery.addBindValue(lastWeight);
-                versionQuery.addBindValue(metricsJson);
+                // 通过 ModelRegistry 注册模型版本（统一入口）
+                QString versionId;
+                if (m_modelRegistry) {
+                    versionId = m_modelRegistry->registerModelVersion(
+                        taskId, bestWeight, lastWeight, metricsJson);
+                } else {
+                    // 兜底：直接SQL插入
+                    versionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+                    QSqlQuery versionQuery(Database::instance().database());
+                    versionQuery.prepare(
+                        "INSERT INTO model_versions (id, run_id, best_weight_path, last_weight_path, "
+                        "metrics_snapshot_json) VALUES (?, ?, ?, ?, ?)"
+                    );
+                    versionQuery.addBindValue(versionId);
+                    versionQuery.addBindValue(taskId);
+                    versionQuery.addBindValue(bestWeight);
+                    versionQuery.addBindValue(lastWeight);
+                    versionQuery.addBindValue(metricsJson);
+                    if (!versionQuery.exec()) {
+                        ltError(LT_LOG_TRAINING()) << "Failed to register model version:"
+                                                   << versionQuery.lastError().text();
+                        versionId.clear();
+                    }
+                }
 
-                if (versionQuery.exec()) {
+                if (!versionId.isEmpty()) {
                     ltInfo(LT_LOG_TRAINING()) << "Auto-registered model version:" << versionId
                                               << "for run:" << taskId;
-                } else {
-                    ltError(LT_LOG_TRAINING()) << "Failed to register model version:"
-                                               << versionQuery.lastError().text();
+
+                    // 血缘追踪：查找同项目之前的最佳版本，设为父版本
+                    if (m_modelRegistry) {
+                        QVariantList existingVersions = m_modelRegistry->listModelVersions(projectId);
+                        QString bestPreviousVersionId;
+                        double bestPreviousMap = -1.0;
+
+                        for (const QVariant &v : existingVersions) {
+                            QVariantMap ver = v.toMap();
+                            if (ver[QStringLiteral("id")].toString() == versionId) continue;
+
+                            // 解析指标中的 mAP50-95
+                            QString mJson = ver[QStringLiteral("metricsJson")].toString();
+                            if (!mJson.isEmpty()) {
+                                QJsonObject mObj = QJsonDocument::fromJson(mJson.toUtf8()).object();
+                                double map = mObj.value(QStringLiteral("mAP50-95")).toDouble(-1.0);
+                                if (map > bestPreviousMap) {
+                                    bestPreviousMap = map;
+                                    bestPreviousVersionId = ver[QStringLiteral("id")].toString();
+                                }
+                            }
+                        }
+
+                        // 设置父版本（血缘追踪）
+                        if (!bestPreviousVersionId.isEmpty()) {
+                            m_modelRegistry->setParentVersion(versionId, bestPreviousVersionId);
+                            ltInfo(LT_LOG_TRAINING()) << "Set parent version:" << versionId
+                                                      << "->" << bestPreviousVersionId;
+                        }
+
+                        // 自动标签：首个版本标为 baseline，指标更优则标 best-so-far
+                        if (existingVersions.size() <= 1) {
+                            m_modelRegistry->setTag(versionId, QStringLiteral("baseline"));
+                            m_modelRegistry->setTag(versionId, QStringLiteral("best-so-far"));
+                            ltInfo(LT_LOG_TRAINING()) << "First version, tagged as baseline + best-so-far:" << versionId;
+                        } else {
+                            // 比较当前版本与历史最佳版本的 mAP50-95
+                            double currentMap = metricsObj.value(QStringLiteral("mAP50-95")).toDouble(-1.0);
+                            if (currentMap > bestPreviousMap && bestPreviousMap >= 0) {
+                                // 当前版本更优，移除旧版本的 best-so-far 标签
+                                m_modelRegistry->removeTag(bestPreviousVersionId, QStringLiteral("best-so-far"));
+                                m_modelRegistry->setTag(versionId, QStringLiteral("best-so-far"));
+                                ltInfo(LT_LOG_TRAINING()) << "New best-so-far version:" << versionId
+                                                          << "mAP50-95:" << currentMap
+                                                          << "> previous:" << bestPreviousMap;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -107,8 +187,7 @@ void TrainingService::handleTrainingEvent(const QVariantMap &event)
             allMetrics[QStringLiteral("loss")] = lossVal;
         }
         if (!allMetrics.isEmpty() && epoch > 0) {
-            MetricService metricService;
-            metricService.storeEpochMetrics(taskId, epoch, allMetrics);
+            m_metricService->storeEpochMetrics(taskId, epoch, allMetrics);
         }
     }
 }
@@ -281,10 +360,10 @@ bool TrainingService::stopTraining(const QString &runId)
         m_ipcClient->sendRequest("train.stop", payload);
     }
 
-    // Update status to cancelled, set finished_at
+    // Update status to stopped, set finished_at
     QSqlQuery updateQuery(db);
     updateQuery.prepare(
-        "UPDATE training_runs SET status = 'cancelled', finished_at = ? WHERE id = ?"
+        "UPDATE training_runs SET status = 'stopped', finished_at = ? WHERE id = ?"
     );
     updateQuery.addBindValue(QDateTime::currentDateTime().toString(Qt::ISODate));
     updateQuery.addBindValue(runId);
@@ -295,7 +374,7 @@ bool TrainingService::stopTraining(const QString &runId)
     }
 
     ltInfo(LT_LOG_TRAINING()) << "Training run stopped:" << runId;
-    emit runStatusChanged(runId, "cancelled");
+    emit runStatusChanged(runId, "stopped");
     return true;
 }
 
@@ -371,14 +450,14 @@ bool TrainingService::deleteRun(const QString &runId)
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
-    // Only allow deletion if draft/cancelled/failed
+    // Only allow deletion if draft/stopped/failed/cancelled
     QSqlQuery checkQuery(db);
     checkQuery.prepare("SELECT status FROM training_runs WHERE id = ?");
     checkQuery.addBindValue(runId);
     if (!checkQuery.exec() || !checkQuery.next()) return false;
 
     QString status = checkQuery.value(0).toString();
-    if (status != "draft" && status != "cancelled" && status != "failed") {
+    if (status != "draft" && status != "stopped" && status != "failed" && status != "cancelled") {
         ltWarning(LT_LOG_TRAINING()) << "Cannot delete training run in status:" << status;
         return false;
     }
@@ -404,7 +483,7 @@ bool TrainingService::updateRunStatus(const QString &runId, const QString &statu
     QSqlQuery query(db);
 
     // If transitioning to a terminal state, also set finished_at
-    if (status == "succeeded" || status == "failed" || status == "cancelled") {
+    if (status == "succeeded" || status == "failed" || status == "cancelled" || status == "stopped") {
         query.prepare("UPDATE training_runs SET status = ?, finished_at = ? WHERE id = ?");
         query.addBindValue(status);
         query.addBindValue(QDateTime::currentDateTime().toString(Qt::ISODate));
@@ -425,10 +504,28 @@ bool TrainingService::updateRunStatus(const QString &runId, const QString &statu
     return true;
 }
 
+void TrainingService::onResponseReceived(const QJsonObject &response)
+{
+    QString command = response[QStringLiteral("command")].toString();
+    if (command == IpcProtocol::CMD_TRAIN_LIST_ADAPTERS) {
+        bool success = response[QStringLiteral("success")].toBool();
+        if (success) {
+            QJsonObject result = response[QStringLiteral("result")].toObject();
+            QJsonArray adapters = result[QStringLiteral("adapters")].toArray();
+            if (!adapters.isEmpty()) {
+                QStringList temp;
+                for (const auto &val : adapters) {
+                    temp.append(val.toString());
+                }
+                m_adapters = temp;
+                ltInfo(LT_LOG_TRAINING()) << "Updated training adapters list from backend:" << m_adapters;
+            }
+        }
+    }
+}
+
 QStringList TrainingService::listAdapters()
 {
     ltTrace(LT_LOG_TRAINING());
-    QStringList result;
-    result << QStringLiteral("ultralytics") << QStringLiteral("anomalib");
-    return result;
+    return m_adapters;
 }
