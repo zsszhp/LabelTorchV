@@ -1,4 +1,4 @@
-// LowConfQueue.qml - Low-confidence sample queue browser
+// LowConfQueue.qml - 低置信度样本队列浏览器
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -30,7 +30,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "#1e1e2e"
+        color: Theme.bgPrimary
         radius: 8
 
         ColumnLayout {
@@ -44,8 +44,8 @@ Item {
                 spacing: 12
 
                 Label {
-                    text: "Low-Confidence Queue"
-                    color: "#f9e2af"
+                    text: "低置信度队列"
+                    color: Theme.accentWarning
                     font.pixelSize: 16
                     font.bold: true
                 }
@@ -53,8 +53,8 @@ Item {
                 Item { Layout.fillWidth: true }
 
                 Label {
-                    text: "Threshold:"
-                    color: "#cdd6f4"
+                    text: "阈值："
+                    color: Theme.textPrimary
                     font.pixelSize: 12
                 }
 
@@ -81,7 +81,7 @@ Item {
                         Rectangle {
                             width: thresholdSlider.visualPosition * parent.width
                             height: parent.height
-                            color: "#f9e2af"
+                            color: Theme.accentWarning
                             radius: 2
                         }
                     }
@@ -92,32 +92,32 @@ Item {
                         width: 14
                         height: 14
                         radius: 7
-                        color: thresholdSlider.pressed ? "#e0cb85" : "#f9e2af"
+                        color: thresholdSlider.pressed ? Qt.darker(Theme.accentWarning, 1.15) : Theme.accentWarning
                     }
                 }
 
                 Label {
                     text: thresholdSlider.value.toFixed(2)
-                    color: "#a6adc8"
+                    color: Theme.textMuted
                     font.pixelSize: 12
                     font.family: "monospace"
                     Layout.preferredWidth: 36
                 }
 
                 Button {
-                    text: "Refresh"
+                    text: "刷新"
                     Layout.preferredHeight: 28
 
                     background: Rectangle {
                         color: parent.pressed ? Theme.textDisabled : Theme.bgHover
                         radius: 4
-                        border.color: "#f9e2af"
+                        border.color: Theme.accentWarning
                         border.width: 1
                     }
 
                     contentItem: Label {
                         text: parent.text
-                        color: "#f9e2af"
+                        color: Theme.accentWarning
                         font.pixelSize: 11
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
@@ -131,8 +131,8 @@ Item {
             // Count label
             Label {
                 Layout.fillWidth: true
-                text: queueListModel.count + " low-confidence candidate" + (queueListModel.count !== 1 ? "s" : "") + " found"
-                color: queueListModel.count > 0 ? "#f9e2af" : "#6c7086"
+                text: qsTr("找到 %1 个低置信度候选").arg(queueListModel.count)
+                color: queueListModel.count > 0 ? Theme.accentWarning : Theme.textDisabled
                 font.pixelSize: 12
             }
 
@@ -155,8 +155,8 @@ Item {
                 Label {
                     anchors.centerIn: parent
                     visible: queueList.count === 0
-                    text: batchId === "" ? "Select a batch to view low-confidence samples" : "No low-confidence samples below threshold"
-                    color: "#6c7086"
+                    text: batchId === "" ? "请选择批次以查看低置信度样本" : "当前阈值下无低置信度样本"
+                    color: Theme.textDisabled
                     font.pixelSize: 14
                 }
 
@@ -181,16 +181,15 @@ Item {
                             radius: 5
                             color: {
                                 var conf = parseFloat(model.confidence) || 0
-                                if (conf < 0.1) return Theme.accentError
-                                if (conf < 0.2) return "#fab387"
-                                return "#f9e2af"
+                                if (conf < 0.2) return Theme.accentError
+                                return Theme.accentWarning
                             }
                         }
 
                         // Candidate index (truncated ID)
                         Label {
                             text: "#" + model.candidateIndex
-                            color: "#89b4fa"
+                            color: Theme.accentPrimary
                             font.pixelSize: 12
                             font.family: "monospace"
                             font.bold: true
@@ -199,16 +198,16 @@ Item {
 
                         // Class name
                         Label {
-                            text: model.className || ("Class " + model.classIndex)
-                            color: "#cdd6f4"
+                            text: model.className || ("类别 " + model.classIndex)
+                            color: Theme.textPrimary
                             font.pixelSize: 12
                             Layout.preferredWidth: 100
                         }
 
                         // Confidence score
                         Label {
-                            text: "conf: " + (parseFloat(model.confidence) || 0).toFixed(3)
-                            color: (parseFloat(model.confidence) || 0) < 0.2 ? Theme.accentError : "#f9e2af"
+                            text: "置信度: " + (parseFloat(model.confidence) || 0).toFixed(3)
+                            color: (parseFloat(model.confidence) || 0) < 0.2 ? Theme.accentError : Theme.accentWarning
                             font.pixelSize: 11
                             font.family: "monospace"
                         }
@@ -219,7 +218,7 @@ Item {
                                   (parseFloat(model.cy) || 0).toFixed(2) + ", " +
                                   (parseFloat(model.w) || 0).toFixed(2) + ", " +
                                   (parseFloat(model.h) || 0).toFixed(2) + "]"
-                            color: "#6c7086"
+                            color: Theme.textDisabled
                             font.pixelSize: 10
                             font.family: "monospace"
                         }
@@ -228,7 +227,7 @@ Item {
 
                         // Send to Annotation button
                         Button {
-                            text: "Annotate"
+                            text: "标注"
                             Layout.preferredHeight: 26
                             Layout.preferredWidth: 70
 
@@ -239,7 +238,7 @@ Item {
 
                             contentItem: Label {
                                 text: parent.text
-                                color: "#1e1e2e"
+                                color: Theme.bgPrimary
                                 font.pixelSize: 10
                                 font.bold: true
                                 horizontalAlignment: Text.AlignHCenter
@@ -256,7 +255,7 @@ Item {
 
                         // Dismiss button
                         Button {
-                            text: "Dismiss"
+                            text: "忽略"
                             Layout.preferredHeight: 26
                             Layout.preferredWidth: 64
 

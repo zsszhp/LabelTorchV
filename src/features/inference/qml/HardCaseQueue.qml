@@ -38,17 +38,17 @@ Item {
     }
 
     function getReasonLabel(reason) {
-        if (reason === "false_negative") return "False Negative"
-        if (reason === "low_confidence") return "Low Confidence"
-        if (reason === "false_positive") return "False Positive"
+        if (reason === "false_negative") return "漏检"
+        if (reason === "low_confidence") return "低置信度"
+        if (reason === "false_positive") return "误检"
         return reason
     }
 
     function getPriorityColor(reason) {
-        if (reason === "false_negative") return Theme.accentError   // red
-        if (reason === "low_confidence") return "#f9e2af"   // yellow
-        if (reason === "false_positive") return "#89b4fa"   // blue
-        return "#6c7086"
+        if (reason === "false_negative") return Theme.accentError
+        if (reason === "low_confidence") return Theme.accentWarning
+        if (reason === "false_positive") return Theme.accentPrimary
+        return Theme.textDisabled
     }
 
     function countByReason(reason) {
@@ -65,7 +65,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "#1e1e2e"
+        color: Theme.bgPrimary
         radius: 8
 
         ColumnLayout {
@@ -79,8 +79,8 @@ Item {
                 spacing: 12
 
                 Label {
-                    text: "Hard-Case Queue"
-                    color: "#cba6f7"
+                    text: "难例队列"
+                    color: Theme.accentSecondary
                     font.pixelSize: 16
                     font.bold: true
                 }
@@ -88,8 +88,8 @@ Item {
                 Item { Layout.fillWidth: true }
 
                 Label {
-                    text: "Sort:"
-                    color: "#cdd6f4"
+                    text: "排序："
+                    color: Theme.textPrimary
                     font.pixelSize: 12
                 }
 
@@ -101,7 +101,7 @@ Item {
 
                     contentItem: Label {
                         text: sortCombo.currentText
-                        color: "#cdd6f4"
+                        color: Theme.textPrimary
                         font.pixelSize: 12
                         verticalAlignment: Text.AlignVCenter
                         leftPadding: 8
@@ -110,7 +110,7 @@ Item {
                     background: Rectangle {
                         color: Theme.bgHover
                         radius: 4
-                        border.color: sortCombo.activeFocus ? "#cba6f7" : Theme.textDisabled
+                        border.color: sortCombo.activeFocus ? Theme.accentSecondary : Theme.textDisabled
                         border.width: 1
                     }
 
@@ -128,7 +128,7 @@ Item {
                         }
 
                         background: Rectangle {
-                            color: "#1e1e2e"
+                            color: Theme.bgPrimary
                             border.color: Theme.textDisabled
                             radius: 4
                         }
@@ -138,13 +138,13 @@ Item {
                         width: sortCombo.width
                         contentItem: Label {
                             text: modelData
-                            color: highlighted ? "#cba6f7" : "#cdd6f4"
+                            color: highlighted ? Theme.accentSecondary : Theme.textPrimary
                             font.pixelSize: 12
                             verticalAlignment: Text.AlignVCenter
                         }
                         highlighted: sortCombo.highlightedIndex === index
                         background: Rectangle {
-                            color: highlighted ? Theme.bgHover : "#1e1e2e"
+                            color: highlighted ? Theme.bgHover : Theme.bgPrimary
                         }
                     }
 
@@ -155,19 +155,19 @@ Item {
                 }
 
                 Button {
-                    text: "Refresh"
+                    text: "刷新"
                     Layout.preferredHeight: 28
 
                     background: Rectangle {
                         color: parent.pressed ? Theme.textDisabled : Theme.bgHover
                         radius: 4
-                        border.color: "#cba6f7"
+                        border.color: Theme.accentSecondary
                         border.width: 1
                     }
 
                     contentItem: Label {
                         text: parent.text
-                        color: "#cba6f7"
+                        color: Theme.accentSecondary
                         font.pixelSize: 11
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
@@ -184,8 +184,8 @@ Item {
                 height: 36
                 radius: 6
                 visible: countByReason("false_negative") > 0
-                color: "#FBBF2420"
-                border.color: "#f9e2af"
+                color: Theme.accentWarning
+                border.color: Theme.accentWarning
                 border.width: 1
 
                 RowLayout {
@@ -196,22 +196,22 @@ Item {
 
                     Label {
                         text: "!"
-                        color: "#f9e2af"
+                        color: Theme.accentWarning
                         font.pixelSize: 16
                         font.bold: true
                     }
 
                     Label {
-                        text: countByReason("false_negative") + " false negative(s) need immediate review"
-                        color: "#f9e2af"
+                        text: countByReason("false_negative") + " 个漏检需要立即审核"
+                        color: Theme.accentWarning
                         font.pixelSize: 12
                         font.bold: true
                         Layout.fillWidth: true
                     }
 
                     Label {
-                        text: "Model missed objects in these samples"
-                        color: "#e0cb85"
+                        text: "模型在这些样本中漏检了目标"
+                        color: Theme.accentWarning
                         font.pixelSize: 11
                     }
                 }
@@ -229,8 +229,8 @@ Item {
                 Label {
                     anchors.centerIn: parent
                     visible: hardCaseList.count === 0
-                    text: batchId === "" ? "Select a batch to view hard cases" : "No hard cases found"
-                    color: "#6c7086"
+                    text: batchId === "" ? "选择批次查看难例" : "未发现难例"
+                    color: Theme.textDisabled
                     font.pixelSize: 14
                 }
 
@@ -239,12 +239,10 @@ Item {
                     height: 52
                     radius: 6
                     color: delegateMouseArea.containsMouse ? Theme.bgHover : Theme.bgSecondary
-                    border.color: Qt.rgba(
-                        (parseInt(getPriorityColor(model.reason).substring(1, 3), 16) || 0) / 255,
-                        (parseInt(getPriorityColor(model.reason).substring(3, 5), 16) || 0) / 255,
-                        (parseInt(getPriorityColor(model.reason).substring(5, 7), 16) || 0) / 255,
-                        0.3
-                    )
+                    border.color: {
+                        var pc = getPriorityColor(model.reason)
+                        Qt.rgba(pc.r, pc.g, pc.b, 0.3)
+                    }
                     border.width: 1
 
                     RowLayout {
@@ -274,12 +272,10 @@ Item {
                             height: 22
                             width: reasonLabel.implicitWidth + 12
                             radius: 4
-                            color: Qt.rgba(
-                                (parseInt(getPriorityColor(model.reason).substring(1, 3), 16) || 0) / 255,
-                                (parseInt(getPriorityColor(model.reason).substring(3, 5), 16) || 0) / 255,
-                                (parseInt(getPriorityColor(model.reason).substring(5, 7), 16) || 0) / 255,
-                                0.15
-                            )
+                            color: {
+                                var pc = getPriorityColor(model.reason)
+                                Qt.rgba(pc.r, pc.g, pc.b, 0.15)
+                            }
                             border.color: getPriorityColor(model.reason)
                             border.width: 1
 
@@ -298,9 +294,9 @@ Item {
                             text: {
                                 var sid = model.sampleId || ""
                                 if (sid.length > 12) return sid.substring(0, 12) + "..."
-                                return sid || ("Cand #" + model.candidateIndex)
+                                return sid || ("候选 #" + model.candidateIndex)
                             }
-                            color: "#cdd6f4"
+                            color: Theme.textPrimary
                             font.pixelSize: 12
                             font.family: "monospace"
                             Layout.preferredWidth: 110
@@ -310,7 +306,7 @@ Item {
                         Label {
                             visible: model.reason !== "false_negative" && model.className !== ""
                             text: model.className || ""
-                            color: "#a6adc8"
+                            color: Theme.textMuted
                             font.pixelSize: 11
                             Layout.preferredWidth: 80
                         }
@@ -318,8 +314,8 @@ Item {
                         // Confidence score
                         Label {
                             visible: model.reason !== "false_negative"
-                            text: "conf: " + (parseFloat(model.confidence) || 0).toFixed(3)
-                            color: (parseFloat(model.confidence) || 0) < 0.2 ? Theme.accentError : "#f9e2af"
+                            text: "置信度: " + (parseFloat(model.confidence) || 0).toFixed(3)
+                            color: (parseFloat(model.confidence) || 0) < 0.2 ? Theme.accentError : Theme.accentWarning
                             font.pixelSize: 11
                             font.family: "monospace"
                         }
@@ -327,7 +323,7 @@ Item {
                         // Priority number
                         Label {
                             text: "P" + model.priority
-                            color: "#6c7086"
+                            color: Theme.textDisabled
                             font.pixelSize: 10
                             font.family: "monospace"
                         }
@@ -336,18 +332,18 @@ Item {
 
                         // Review button
                         Button {
-                            text: "Review"
+                            text: "审核"
                             Layout.preferredHeight: 26
                             Layout.preferredWidth: 64
 
                             background: Rectangle {
-                                color: parent.pressed ? "#b07ce0" : "#cba6f7"
+                                color: parent.pressed ? Theme.accentSecondary : Theme.accentSecondary
                                 radius: 4
                             }
 
                             contentItem: Label {
                                 text: parent.text
-                                color: "#1e1e2e"
+                                color: Theme.bgPrimary
                                 font.pixelSize: 10
                                 font.bold: true
                                 horizontalAlignment: Text.AlignHCenter
@@ -401,7 +397,7 @@ Item {
                     }
 
                     Label {
-                        text: "FN: " + countByReason("false_negative")
+                        text: "漏检: " + countByReason("false_negative")
                         color: Theme.accentError
                         font.pixelSize: 12
                         font.bold: true
@@ -416,12 +412,12 @@ Item {
                         width: 8
                         height: 8
                         radius: 4
-                        color: "#f9e2af"
+                        color: Theme.accentWarning
                     }
 
                     Label {
-                        text: "Low-Conf: " + countByReason("low_confidence")
-                        color: "#f9e2af"
+                        text: "低置信度: " + countByReason("low_confidence")
+                        color: Theme.accentWarning
                         font.pixelSize: 12
                         font.bold: true
                     }
@@ -435,12 +431,12 @@ Item {
                         width: 8
                         height: 8
                         radius: 4
-                        color: "#89b4fa"
+                        color: Theme.accentPrimary
                     }
 
                     Label {
-                        text: "FP: " + countByReason("false_positive")
-                        color: "#89b4fa"
+                        text: "误检: " + countByReason("false_positive")
+                        color: Theme.accentPrimary
                         font.pixelSize: 12
                         font.bold: true
                     }
@@ -449,8 +445,8 @@ Item {
                 Item { Layout.fillWidth: true }
 
                 Label {
-                    text: "Total: " + hardCases.length
-                    color: "#cdd6f4"
+                    text: "总计: " + hardCases.length
+                    color: Theme.textPrimary
                     font.pixelSize: 12
                 }
             }

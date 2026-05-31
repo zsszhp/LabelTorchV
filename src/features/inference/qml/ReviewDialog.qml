@@ -7,7 +7,7 @@ import LabelTorch.Theme
 Dialog {
     id: root
 
-    title: "Review Candidate"
+    title: "审核候选结果"
     modal: true
     width: 480
     height: 400
@@ -16,39 +16,38 @@ Dialog {
     property int candidateIndex: -1
     property var candidate: null
 
-    // Catppuccin Mocha palette
-    palette.window: "#1e1e2e"
-    palette.windowText: "#cdd6f4"
-    palette.base: "#181825"
-    palette.text: "#cdd6f4"
-    palette.button: Theme.bgHover
-    palette.buttonText: "#cdd6f4"
-    palette.highlight: "#89b4fa"
-    palette.highlightedText: "#1e1e2e"
+    palette.window: Theme.bgPrimary
+    palette.windowText: Theme.textPrimary
+    palette.base: Theme.bgInput
+    palette.text: Theme.textPrimary
+    palette.button: Theme.bgTertiary
+    palette.buttonText: Theme.textPrimary
+    palette.highlight: Theme.accentPrimary
+    palette.highlightedText: Theme.textPrimary
 
     background: Rectangle {
-        color: "#1e1e2e"
+        color: Theme.bgPrimary
         radius: 8
         border.color: Theme.bgHover
         border.width: 1
     }
 
     header: Rectangle {
-        color: "#181825"
+        color: Theme.bgInput
         height: 44
         radius: 8
 
         Label {
             anchors.centerIn: parent
-            text: "Review Candidate"
-            color: "#89b4fa"
+            text: "审核候选结果"
+            color: Theme.accentPrimary
             font.pixelSize: 15
             font.bold: true
         }
     }
 
     contentItem: Rectangle {
-        color: "#1e1e2e"
+        color: Theme.bgPrimary
 
         ColumnLayout {
             anchors.fill: parent
@@ -59,15 +58,15 @@ Dialog {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 200
-                color: "#181825"
+                color: Theme.bgInput
                 radius: 6
                 border.color: Theme.bgHover
                 border.width: 1
 
                 Label {
                     anchors.centerIn: parent
-                    text: "Image Preview"
-                    color: "#6c7086"
+                    text: "图片预览"
+                    color: Theme.textDisabled
                     font.pixelSize: 14
                 }
             }
@@ -76,7 +75,7 @@ Dialog {
             Rectangle {
                 Layout.fillWidth: true
                 height: 80
-                color: "#181825"
+                color: Theme.bgInput
                 radius: 6
 
                 ColumnLayout {
@@ -88,14 +87,14 @@ Dialog {
                         Layout.fillWidth: true
 
                         Label {
-                            text: "Class:"
-                            color: "#a6adc8"
+                            text: "类别："
+                            color: Theme.textMuted
                             font.pixelSize: 13
                         }
 
                         Label {
                             text: root.candidate ? (root.candidate.className || ("Class " + root.candidate.classIndex)) : "N/A"
-                            color: "#cdd6f4"
+                            color: Theme.textPrimary
                             font.pixelSize: 13
                             font.bold: true
                         }
@@ -103,14 +102,14 @@ Dialog {
                         Item { Layout.fillWidth: true }
 
                         Label {
-                            text: "Confidence:"
-                            color: "#a6adc8"
+                            text: "置信度："
+                            color: Theme.textMuted
                             font.pixelSize: 13
                         }
 
                         Label {
                             text: root.candidate ? (parseFloat(root.candidate.confidence) || 0).toFixed(3) : "N/A"
-                            color: root.candidate && (parseFloat(root.candidate.confidence) || 0) >= 0.5 ? Theme.accentSuccess : "#f9e2af"
+                            color: root.candidate && (parseFloat(root.candidate.confidence) || 0) >= 0.5 ? Theme.accentSuccess : Theme.accentWarning
                             font.pixelSize: 13
                             font.bold: true
                             font.family: "monospace"
@@ -121,8 +120,8 @@ Dialog {
                         Layout.fillWidth: true
 
                         Label {
-                            text: "Box:"
-                            color: "#a6adc8"
+                            text: "边界框："
+                            color: Theme.textMuted
                             font.pixelSize: 13
                         }
 
@@ -132,7 +131,7 @@ Dialog {
                                 " cy=" + (parseFloat(root.candidate.cy) || 0).toFixed(3) +
                                 " w=" + (parseFloat(root.candidate.w) || 0).toFixed(3) +
                                 " h=" + (parseFloat(root.candidate.h) || 0).toFixed(3) : "N/A"
-                            color: "#6c7086"
+                            color: Theme.textDisabled
                             font.pixelSize: 12
                             font.family: "monospace"
                         }
@@ -142,8 +141,8 @@ Dialog {
                         Layout.fillWidth: true
 
                         Label {
-                            text: "State:"
-                            color: "#a6adc8"
+                            text: "状态："
+                            color: Theme.textMuted
                             font.pixelSize: 13
                         }
 
@@ -153,18 +152,18 @@ Dialog {
                             radius: 3
                             color: {
                                 switch (root.candidate ? root.candidate.state : "") {
-                                case "confirmed": return "#a6e3a130"
-                                case "rejected": return "#f38ba830"
-                                case "edited": return "#f9e2af30"
-                                default: return "#89b4fa30"
+                                case "confirmed": return Theme.accentSuccess
+                                case "rejected": return Theme.accentError
+                                case "edited": return Theme.accentWarning
+                                default: return Theme.accentPrimary
                                 }
                             }
                             border.color: {
                                 switch (root.candidate ? root.candidate.state : "") {
                                 case "confirmed": return Theme.accentSuccess
                                 case "rejected": return Theme.accentError
-                                case "edited": return "#f9e2af"
-                                default: return "#89b4fa"
+                                case "edited": return Theme.accentWarning
+                                default: return Theme.accentPrimary
                                 }
                             }
                             border.width: 1
@@ -177,8 +176,8 @@ Dialog {
                                     switch (root.candidate ? root.candidate.state : "") {
                                     case "confirmed": return Theme.accentSuccess
                                     case "rejected": return Theme.accentError
-                                    case "edited": return "#f9e2af"
-                                    default: return "#89b4fa"
+                                    case "edited": return Theme.accentWarning
+                                    default: return Theme.accentPrimary
                                     }
                                 }
                                 font.pixelSize: 11
@@ -192,7 +191,7 @@ Dialog {
     }
 
     footer: Rectangle {
-        color: "#181825"
+        color: Theme.bgInput
         height: 52
         radius: 8
 
@@ -204,7 +203,7 @@ Dialog {
 
             // Confirm button
             Button {
-                text: "Confirm"
+                text: "确认"
                 Layout.fillWidth: true
                 Layout.preferredHeight: 34
 
@@ -215,7 +214,7 @@ Dialog {
 
                 contentItem: Label {
                     text: parent.text
-                    color: "#1e1e2e"
+                    color: Theme.bgPrimary
                     font.pixelSize: 13
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
@@ -233,7 +232,7 @@ Dialog {
 
             // Reject button
             Button {
-                text: "Reject"
+                text: "拒绝"
                 Layout.fillWidth: true
                 Layout.preferredHeight: 34
 
@@ -244,7 +243,7 @@ Dialog {
 
                 contentItem: Label {
                     text: parent.text
-                    color: "#1e1e2e"
+                    color: Theme.bgPrimary
                     font.pixelSize: 13
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
@@ -262,18 +261,18 @@ Dialog {
 
             // Edit button
             Button {
-                text: "Edit"
+                text: "编辑"
                 Layout.fillWidth: true
                 Layout.preferredHeight: 34
 
                 background: Rectangle {
-                    color: parent.pressed ? "#e0cb85" : "#f9e2af"
+                    color: parent.pressed ? Qt.darker(Theme.accentWarning, 1.2) : Theme.accentWarning
                     radius: 6
                 }
 
                 contentItem: Label {
                     text: parent.text
-                    color: "#1e1e2e"
+                    color: Theme.bgPrimary
                     font.pixelSize: 13
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
