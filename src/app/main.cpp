@@ -34,9 +34,13 @@
 #include "AnomalyService.h"
 #include "AnomalyDetector.h"
 #include "ExportService.h"
+#include "ActiveLearningService.h"
 #include "Database.h"
 #include "utils/Log.h"
 #include "utils/AppSettings.h"
+#include <QSqlQuery>
+#include <QDateTime>
+#include <QFile>
 
 // 自定义消息处理器：将NaN ASSERT从FatalMsg降级为WarningMsg，防止程序abort
 // Qt 6.11 Debug模式下qCheckedFPConversionToInteger检测到NaN会调用qFatal导致程序退出
@@ -166,6 +170,22 @@ int main(int argc, char *argv[])
     Database::instance().initializeSchema();
     ltInfo(LT_LOG_DB()) << "Database initialized at" << dbPath + "/labeltorch.db";
 
+    // 冷启动自检：修正残留的 running / preparing 状态任务
+    {
+        QSqlQuery fixQuery(Database::instance().database());
+        int fixed = 0;
+        fixQuery.prepare("UPDATE training_runs SET status = 'stopped', "
+                         "finished_at = ? WHERE status IN ('running', 'preparing')");
+        fixQuery.addBindValue(QDateTime::currentDateTime().toString(Qt::ISODate));
+        if (fixQuery.exec()) {
+            fixed = fixQuery.numRowsAffected();
+        }
+        if (fixed > 0) {
+            ltWarning(LT_LOG_APP()) << "Cold boot: fixed" << fixed << "orphaned running tasks -> stopped";
+        }
+    }
+
+
     AppSettings appSettings;
     AppController controller;
     ProjectService projectService;
@@ -191,8 +211,18 @@ int main(int argc, char *argv[])
     AnomalyService anomalyService;
     AnomalyDetector anomalyDetector;
     ExportService exportService;
+    ActiveLearningService activeLearningService;
 
-    QString pythonExec = QStringLiteral("C:/A/anaconda/envs/labeltorch/python.exe");
+    QString pythonExec = appSettings.pythonPath();
+    if (pythonExec.isEmpty() || !QFile::exists(pythonExec)) {
+        // 优先检查 runtime/python/python.exe（绿色版）
+        QString embeddedPy = QCoreApplication::applicationDirPath() + QStringLiteral("/runtime/python/python.exe");
+        if (QFile::exists(embeddedPy)) {
+            pythonExec = embeddedPy;
+        } else {
+            pythonExec = QStringLiteral("python"); // fallback 系统 PATH
+        }
+    }
     ltInfo(LT_LOG_APP()) << "Using Python:" << pythonExec;
     ipcClient.startBackend(pythonExec);
     ltInfo(LT_LOG_IPC()) << "Python backend start requested" << pythonExec;
@@ -202,12 +232,17 @@ int main(int argc, char *argv[])
     inferenceService.setIpcClient(&ipcClient);
     anomalyService.setIpcClient(&ipcClient);
     exportService.setIpcClient(&ipcClient);
+    activeLearningService.setIpcClient(&ipcClient);
 
     QObject::connect(&controller, &AppController::currentProjectIdChanged, [&]() {
         if (controller.projectOpen()) {
-            appSettings.addRecentProject(controller.currentProjectName());
-            appSettings.setLastProjectPath(controller.currentProjectName());
+            appSettings.addRecentProject(controller.currentProjectId());
+            appSettings.setLastProjectPath(controller.currentProjectId());
         }
+    });
+
+    QObject::connect(&ipcClient, &IpcClient::connectedChanged, [&]() {
+        controller.setPythonBackendReady(ipcClient.connected());
     });
 
     QQmlApplicationEngine engine;
@@ -237,6 +272,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("anomalyService", &anomalyService);
     engine.rootContext()->setContextProperty("anomalyDetector", &anomalyDetector);
     engine.rootContext()->setContextProperty("exportService", &exportService);
+    engine.rootContext()->setContextProperty("activeLearningService", &activeLearningService);
 
     const QUrl url(QStringLiteral("qrc:/qt/qml/LabelTorch/Shell/qml/Main.qml"));
 

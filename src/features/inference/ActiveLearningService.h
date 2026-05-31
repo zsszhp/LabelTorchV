@@ -6,9 +6,12 @@
 #include <QString>
 #include <QVariantMap>
 
+class IpcClient;
+
 /// <summary>
 /// 主动学习服务
 /// 负责低置信样本回流、队列管理、优先级排序
+/// 通过IPC与Python后端active_learning handler通信
 /// </summary>
 class ActiveLearningService : public QObject
 {
@@ -18,7 +21,11 @@ public:
     explicit ActiveLearningService(QObject* parent = nullptr);
     ~ActiveLearningService() = default;
 
-    // 队列类型枚举
+    /// <summary>
+    /// 注入IPC客户端依赖
+    /// </summary>
+    void setIpcClient(IpcClient* client);
+
     enum class QueueType {
         LowConfidence,
         FalsePositive,
@@ -29,7 +36,7 @@ public:
 
 public slots:
     /// <summary>
-    /// 收集低置信度样本
+    /// 收集低置信度样本（通过IPC调用Python后端）
     /// </summary>
     void collectLowConfSamples(const QString& weightPath,
                                 const QString& source,
@@ -39,7 +46,7 @@ public slots:
                                 const QString& device = "auto");
 
     /// <summary>
-    /// 对队列进行优先级排序
+    /// 对队列进行优先级排序（通过IPC调用Python后端）
     /// </summary>
     void prioritizeQueue(const QJsonArray& samples,
                           const QString& queueType = "low-confidence",
@@ -47,7 +54,7 @@ public slots:
                           const QString& strategy = "default");
 
     /// <summary>
-    /// 获取队列统计信息
+    /// 获取队列统计信息（通过IPC调用Python后端）
     /// </summary>
     void getQueueStats(const QJsonArray& samples,
                         const QString& queueType = "all");
@@ -100,8 +107,15 @@ signals:
     /// </summary>
     void error(const QString& message);
 
+private slots:
+    /// <summary>
+    /// 处理IPC响应
+    /// </summary>
+    void onResponseReceived(const QJsonObject& response);
+
 private:
-    // 队列数据存储
+    IpcClient* m_ipcClient = nullptr;
+
     QJsonArray m_lowConfQueue;
     QJsonArray m_falsePositiveQueue;
     QJsonArray m_falseNegativeQueue;

@@ -13,6 +13,24 @@
 ExportService::ExportService(QObject *parent) : QObject(parent)
 {
     ltTrace(LT_LOG_EXPORT()) << "parent=" << parent;
+    ensureStatusColumn();
+}
+
+bool ExportService::ensureStatusColumn()
+{
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return false;
+    QSqlQuery query(db);
+    query.exec("SELECT status FROM export_artifacts LIMIT 0");
+    if (query.lastError().isValid()) {
+        QSqlQuery alterQuery(db);
+        if (!alterQuery.exec("ALTER TABLE export_artifacts ADD COLUMN status TEXT DEFAULT 'pending'")) {
+            ltError(LT_LOG_EXPORT()) << "Failed to add status column:" << alterQuery.lastError().text();
+            return false;
+        }
+        ltInfo(LT_LOG_EXPORT()) << "Added status column to export_artifacts table";
+    }
+    return true;
 }
 
 void ExportService::setIpcClient(IpcClient *client)
@@ -98,8 +116,8 @@ QString ExportService::exportModel(const QString &modelVersionId,
     QSqlQuery query(db);
     query.prepare(
         "INSERT INTO export_artifacts "
-        "(id, model_version_id, format, options_snapshot_json, output_path, validation_result) "
-        "VALUES (?, ?, ?, ?, ?, ?)"
+        "(id, model_version_id, format, options_snapshot_json, output_path, validation_result, status) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)"
     );
     query.addBindValue(artifactId);
     query.addBindValue(modelVersionId);
@@ -107,6 +125,7 @@ QString ExportService::exportModel(const QString &modelVersionId,
     query.addBindValue(snapshotJson);
     query.addBindValue(outputPath);
     query.addBindValue(""); 
+    query.addBindValue(QStringLiteral("pending")); 
 
     if (!query.exec()) {
         ltError(LT_LOG_EXPORT()) << "Failed to create export artifact:" << query.lastError().text();
@@ -143,7 +162,7 @@ QVariantMap ExportService::getExportStatus(const QString &artifactId)
     QSqlQuery query(db);
     query.prepare(
         "SELECT id, model_version_id, format, options_snapshot_json, "
-        "output_path, validation_result, created_at "
+        "output_path, validation_result, created_at, status "
         "FROM export_artifacts WHERE id = ?"
     );
     query.addBindValue(artifactId);
@@ -157,19 +176,7 @@ QVariantMap ExportService::getExportStatus(const QString &artifactId)
     result["outputPath"] = query.value(4).toString();
     result["validationResult"] = query.value(5).toString();
     result["createdAt"] = query.value(6).toString();
-
-    // Extract status from options_snapshot_json
-    QString optionsJson = query.value(3).toString();
-    if (!optionsJson.isEmpty()) {
-        QJsonDocument doc = QJsonDocument::fromJson(optionsJson.toUtf8());
-        if (doc.isObject()) {
-            result["status"] = doc.object().value("status").toString("pending");
-        } else {
-            result["status"] = "pending";
-        }
-    } else {
-        result["status"] = "pending";
-    }
+    result["status"] = query.value(7).toString().isEmpty() ? QStringLiteral("pending") : query.value(7).toString();
 
     return result;
 }
@@ -184,7 +191,7 @@ QVariantList ExportService::listExports(const QString &modelVersionId)
     QSqlQuery query(db);
     query.prepare(
         "SELECT id, model_version_id, format, options_snapshot_json, "
-        "output_path, validation_result, created_at "
+        "output_path, validation_result, created_at, status "
         "FROM export_artifacts WHERE model_version_id = ? "
         "ORDER BY created_at DESC"
     );
@@ -204,19 +211,7 @@ QVariantList ExportService::listExports(const QString &modelVersionId)
         artifact["outputPath"] = query.value(4).toString();
         artifact["validationResult"] = query.value(5).toString();
         artifact["createdAt"] = query.value(6).toString();
-
-        // Extract status from options_snapshot_json
-        QString optionsJson = query.value(3).toString();
-        if (!optionsJson.isEmpty()) {
-            QJsonDocument doc = QJsonDocument::fromJson(optionsJson.toUtf8());
-            if (doc.isObject()) {
-                artifact["status"] = doc.object().value("status").toString("pending");
-            } else {
-                artifact["status"] = "pending";
-            }
-        } else {
-            artifact["status"] = "pending";
-        }
+        artifact["status"] = query.value(7).toString().isEmpty() ? QStringLiteral("pending") : query.value(7).toString();
 
         result.append(artifact);
     }
@@ -248,11 +243,18 @@ bool ExportService::verifyExport(const QString &artifactId)
         }
     }
 
-    // Can only verify succeeded exports
+    // 仅允许从 succeeded 或 verifying 状态发起验证
+    // verifying: 自动验证流程中；succeeded: 手动重新验证
     QString currentStatus = optionsObj.value("status").toString("pending");
-    if (currentStatus != "succeeded") {
+    if (currentStatus != "succeeded" && currentStatus != "verifying") {
         ltWarning(LT_LOG_EXPORT()) << "Cannot verify export in status:" << currentStatus;
         return false;
+    }
+
+    // 如果已经是verifying状态（自动验证中），避免重复发送IPC请求
+    if (currentStatus == "verifying") {
+        ltInfo(LT_LOG_EXPORT()) << "Verification already in progress for artifact:" << artifactId;
+        return true;
     }
 
     // Transition to verifying
@@ -302,8 +304,9 @@ bool ExportService::updateExportStatus(const QString &artifactId, const QString 
         QJsonDocument(optionsObj).toJson(QJsonDocument::Compact));
 
     QSqlQuery updateQuery(db);
-    updateQuery.prepare("UPDATE export_artifacts SET options_snapshot_json = ? WHERE id = ?");
+    updateQuery.prepare("UPDATE export_artifacts SET options_snapshot_json = ?, status = ? WHERE id = ?");
     updateQuery.addBindValue(updatedJson);
+    updateQuery.addBindValue(status);
     updateQuery.addBindValue(artifactId);
 
     if (!updateQuery.exec()) {
@@ -333,7 +336,7 @@ void ExportService::handleIpcResponse(const QJsonObject &response)
             QString exportPath = result[QStringLiteral("export_path")].toString();
             int fileSize = result[QStringLiteral("file_size_bytes")].toInt();
 
-            // 更新 output_path 
+            // 更新 output_path
             auto db = Database::instance().database();
             QSqlQuery updateQuery(db);
             updateQuery.prepare("UPDATE export_artifacts SET output_path = ? WHERE id = ?");
@@ -341,8 +344,21 @@ void ExportService::handleIpcResponse(const QJsonObject &response)
             updateQuery.addBindValue(artifactId);
             updateQuery.exec();
 
-            updateExportStatus(artifactId, QStringLiteral("succeeded"));
-            ltInfo(LT_LOG_EXPORT()) << "Export succeeded for artifact:" << artifactId << "path:" << exportPath;
+            // 导出成功后自动进入验证阶段，而非直接标记为succeeded
+            updateExportStatus(artifactId, QStringLiteral("verifying"));
+            ltInfo(LT_LOG_EXPORT()) << "Export succeeded, auto-starting verification for artifact:" << artifactId << "path:" << exportPath;
+
+            // 自动发送 artifact.verify IPC请求
+            if (m_ipcClient) {
+                QVariantMap details = getExportStatus(artifactId);
+                QJsonObject verifyPayload;
+                verifyPayload["artifact_id"] = artifactId;
+                verifyPayload["model_version_id"] = details["modelVersionId"].toString();
+                verifyPayload["format"] = details["format"].toString();
+                verifyPayload["output_path"] = details["outputPath"].toString();
+                m_ipcClient->sendRequest("artifact.verify", verifyPayload);
+                ltInfo(LT_LOG_EXPORT()) << "Auto-verify request sent for artifact:" << artifactId;
+            }
         } else {
             updateExportStatus(artifactId, QStringLiteral("failed"));
             QString error = result.contains("error") ? result["error"].toString() : 
@@ -363,9 +379,21 @@ void ExportService::handleIpcResponse(const QJsonObject &response)
             updateExportStatus(artifactId, QStringLiteral("succeeded"));
             ltInfo(LT_LOG_EXPORT()) << "Validation succeeded for artifact:" << artifactId;
         } else {
+            // 验证失败时存储错误信息到validation_result
+            QJsonObject errorResult;
+            errorResult["verified"] = false;
+            errorResult["error"] = response[QStringLiteral("error")].toObject()[QStringLiteral("message")].toString();
+            QString errorJson = QString::fromUtf8(QJsonDocument(errorResult).toJson(QJsonDocument::Compact));
+
+            auto db = Database::instance().database();
+            QSqlQuery updateQuery(db);
+            updateQuery.prepare("UPDATE export_artifacts SET validation_result = ? WHERE id = ?");
+            updateQuery.addBindValue(errorJson);
+            updateQuery.addBindValue(artifactId);
+            updateQuery.exec();
+
             updateExportStatus(artifactId, QStringLiteral("failed"));
-            QString error = response[QStringLiteral("error")].toObject()[QStringLiteral("message")].toString();
-            ltError(LT_LOG_EXPORT()) << "Validation failed for artifact:" << artifactId << "error:" << error;
+            ltError(LT_LOG_EXPORT()) << "Validation failed for artifact:" << artifactId << "error:" << errorResult["error"].toString();
         }
     }
 }

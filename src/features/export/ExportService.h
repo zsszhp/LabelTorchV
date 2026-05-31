@@ -89,6 +89,8 @@ private slots:
     void handleIpcResponse(const QJsonObject &response);
 
 private:
+    bool ensureStatusColumn();
+
     IpcClient *m_ipcClient = nullptr;
 };
 

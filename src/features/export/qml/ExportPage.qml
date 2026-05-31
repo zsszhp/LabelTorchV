@@ -26,11 +26,53 @@ Item {
         }
     }
 
-    // 监听导出状态变更，自动刷新列表
+    // 监听导出状态变更，自动刷新列表并更新状态提示
     Connections {
         target: exportService
         function onExportStatusChanged(artifactId, status) {
             refreshExports()
+            if (status === "verifying") {
+                statusLabel.text = "导出完成，正在验证产物:" + artifactId.substring(0, 8) + "..."
+                statusLabel.color = Theme.accentWarning
+                validationResultBox.visible = false
+            } else if (status === "succeeded") {
+                statusLabel.text = "导出并验证完成:" + artifactId.substring(0, 8) + "..."
+                statusLabel.color = Theme.accentSuccess
+                // 获取验证结果并显示
+                var details = exportService.getExportStatus(artifactId)
+                if (details.validationResult && details.validationResult.length > 0) {
+                    try {
+                        var vr = JSON.parse(details.validationResult)
+                        validationResultBox.isVerified = vr.verified !== false
+                        validationResultBox.resultText = details.validationResult
+                        validationResultBox.visible = true
+                    } catch (e) {
+                        validationResultBox.resultText = details.validationResult
+                        validationResultBox.isVerified = true
+                        validationResultBox.visible = true
+                    }
+                }
+            } else if (status === "failed") {
+                statusLabel.text = "导出或验证失败:" + artifactId.substring(0, 8) + "..."
+                statusLabel.color = Theme.accentError
+                var details2 = exportService.getExportStatus(artifactId)
+                if (details2.validationResult && details2.validationResult.length > 0) {
+                    try {
+                        var vr2 = JSON.parse(details2.validationResult)
+                        validationResultBox.isVerified = false
+                        validationResultBox.resultText = vr2.error || details2.validationResult
+                        validationResultBox.visible = true
+                    } catch (e2) {
+                        validationResultBox.resultText = details2.validationResult
+                        validationResultBox.isVerified = false
+                        validationResultBox.visible = true
+                    }
+                }
+            } else if (status === "running") {
+                statusLabel.text = "正在导出:" + artifactId.substring(0, 8) + "..."
+                statusLabel.color = Theme.accentWarning
+                validationResultBox.visible = false
+            }
         }
     }
 
@@ -330,7 +372,7 @@ Item {
                     }
                 }
 
-                    // 状态标签
+                // 状态标签 - 显示导出/验证进度
                 Label {
                     id: statusLabel
                     Layout.fillWidth: true
@@ -338,6 +380,42 @@ Item {
                     color: Theme.accentSuccess
                     font.pixelSize: 12
                     wrapMode: Text.WordWrap
+                }
+
+                // 验证结果详情
+                Rectangle {
+                    id: validationResultBox
+                    Layout.fillWidth: true
+                    visible: false
+                    height: validationResultContent.implicitHeight + 16
+                    color: Theme.bgInput
+                    radius: Theme.radiusSmall
+
+                    property string resultText: ""
+                    property bool isVerified: false
+
+                    Column {
+                        id: validationResultContent
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        spacing: 4
+
+                        Label {
+                            text: validationResultBox.isVerified ? "✅ 验证通过" : "❌ 验证失败"
+                            color: validationResultBox.isVerified ? Theme.accentSuccess : Theme.accentError
+                            font.pixelSize: Theme.fontSizeNormal
+                            font.bold: true
+                        }
+
+                        Label {
+                            text: validationResultBox.resultText
+                            color: Theme.textSecondary
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.family: Theme.fontFamilyMono
+                            wrapMode: Text.WordWrap
+                            width: parent.width
+                        }
+                    }
                 }
             }
         }
@@ -535,6 +613,26 @@ Item {
                                     elide: Text.ElideMiddle
                                 }
 
+                                // 验证结果摘要
+                                Label {
+                                    Layout.fillWidth: true
+                                    visible: modelData.validationResult && modelData.validationResult.length > 0
+                                    text: {
+                                        if (!modelData.validationResult || modelData.validationResult.length === 0) return ""
+                                        try {
+                                            var vr = JSON.parse(modelData.validationResult)
+                                            if (vr.verified === false && vr.error) return "验证错误: " + vr.error
+                                            if (vr.verified !== undefined) return "验证结果: " + (vr.verified ? "通过" : "未通过")
+                                            return "验证信息: " + modelData.validationResult.substring(0, 60)
+                                        } catch (e) {
+                                            return "验证信息: " + modelData.validationResult.substring(0, 60)
+                                        }
+                                    }
+                                    color: modelData.status === "succeeded" ? Theme.accentSuccess : Theme.accentError
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+
                                 // 时间戳
                                 Label {
                                     text: modelData.createdAt || "N/A"
@@ -543,24 +641,28 @@ Item {
                                 }
                             }
 
-                            // 验证按钮（仅对已成功的导出可见）
+                            // 验证/重试按钮
                             Button {
-                                text: "验证"
-                                visible: modelData.status === "succeeded"
+                                text: {
+                                    if (modelData.status === "failed") return "重试验证"
+                                    if (modelData.status === "succeeded") return "重新验证"
+                                    return "验证"
+                                }
+                                visible: modelData.status === "succeeded" || modelData.status === "failed"
                                 flat: true
-                                Layout.preferredWidth: 64
+                                Layout.preferredWidth: 72
 
                                 background: Rectangle {
                                     color: parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : "#34D39920"
                                     radius: 4
-                                    border.color: Theme.accentSuccess
+                                    border.color: modelData.status === "failed" ? Theme.accentError : Theme.accentSuccess
                                     border.width: 1
                                     implicitHeight: 28
                                 }
 
                                 contentItem: Label {
                                     text: parent.text
-                                    color: Theme.accentSuccess
+                                    color: modelData.status === "failed" ? Theme.accentError : Theme.accentSuccess
                                     font.pixelSize: 11
                                     font.bold: true
                                     horizontalAlignment: Text.AlignHCenter
@@ -571,6 +673,7 @@ Item {
                                     if (exportService.verifyExport(modelData.id)) {
                                         statusLabel.text = "验证已启动:" + modelData.id.substring(0, 8) + "..."
                                         statusLabel.color = Theme.accentWarning
+                                        validationResultBox.visible = false
                                         refreshExports()
                                     } else {
                                         statusLabel.text = "验证启动失败"

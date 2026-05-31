@@ -215,9 +215,9 @@ void TestExport::testVerifyNonSucceededFails()
     QVERIFY(service.updateExportStatus(artifactId, "failed"));
     QVERIFY(!service.verifyExport(artifactId));
 
-    // Set to verifying - verify should fail (already verifying)
+    // Set to verifying - verify should return true (already in progress, no duplicate IPC)
     QVERIFY(service.updateExportStatus(artifactId, "verifying"));
-    QVERIFY(!service.verifyExport(artifactId));
+    QVERIFY(service.verifyExport(artifactId));
 }
 
 void TestExport::testUpdateExportStatus()

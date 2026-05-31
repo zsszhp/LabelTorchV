@@ -69,6 +69,33 @@ Item {
         }
     }
 
+    // 异步扫描完成信号处理
+    Connections {
+        target: datasetService
+        function onScanFolderFinished(result) {
+            root.isScanning = false
+            root.scanResult = result
+            if (result && result.isValid) {
+                datasetNameField.text = extractFolderName(root.selectedImagePath)
+            }
+        }
+        function onScanSeparateFinished(result) {
+            root.isScanning = false
+            if (result && result.isValid) {
+                root.scanResult = result
+            } else if (result && result.error && result.error.length > 0) {
+                root.scanResult = result
+            } else {
+                // 无标签或纯图片模式，尝试 scanFolderAsync
+                datasetService.scanFolderAsync(root.selectedImagePath)
+                return
+            }
+            if (root.scanResult && root.scanResult.isValid) {
+                datasetNameField.text = extractFolderName(root.selectedImagePath)
+            }
+        }
+    }
+
     Component.onCompleted: {
         datasetModel.setProjectId(appController.currentProjectId)
     }
@@ -991,11 +1018,7 @@ Item {
         root.isScanning = true
         root.scanResult = null
         root.selectedImagePath = folderPathField.text.trim()
-        root.scanResult = datasetService.scanFolder(root.selectedImagePath)
-        root.isScanning = false
-        if (root.scanResult && root.scanResult.isValid) {
-            datasetNameField.text = extractFolderName(root.selectedImagePath)
-        }
+        datasetService.scanFolderAsync(root.selectedImagePath)
     }
 
     // 分别路径扫描
@@ -1005,31 +1028,7 @@ Item {
         root.scanResult = null
         root.selectedImagePath = imagePathField.text.trim()
         root.selectedLabelPath = labelPathField.text.trim()
-
-        // 直接使用 scanSeparate 进行分别路径扫描
-        var separateResult = datasetService.scanSeparate(root.selectedImagePath, root.selectedLabelPath)
-
-        if (separateResult && separateResult.isValid) {
-            root.scanResult = separateResult
-        } else if (separateResult && separateResult.error && separateResult.error.length > 0) {
-            // 扫描失败，显示错误
-            root.scanResult = separateResult
-        } else {
-            // 无标签或纯图片模式
-            var scanResult = datasetService.scanFolder(root.selectedImagePath)
-            if (scanResult && scanResult.isValid) {
-                root.scanResult = scanResult
-            } else if (scanResult) {
-                scanResult.detectedFormat = "image_only"
-                scanResult.isValid = true
-                root.scanResult = scanResult
-            }
-        }
-
-        root.isScanning = false
-        if (root.scanResult && root.scanResult.isValid) {
-            datasetNameField.text = extractFolderName(root.selectedImagePath)
-        }
+        datasetService.scanSeparateAsync(root.selectedImagePath, root.selectedLabelPath)
     }
 
     // 从路径提取文件夹名

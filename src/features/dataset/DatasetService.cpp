@@ -165,6 +165,30 @@ QVariantList DatasetService::listDatasets(const QString &projectId)
     return result;
 }
 
+void DatasetService::scanFolderAsync(const QString &folderPath)
+{
+    ltInfo(LT_LOG_DATASET()) << "scanFolderAsync folderPath=" << folderPath;
+    auto *self = this;
+    QtConcurrent::run([self, folderPath]() {
+        QVariantMap result = self->m_scanner->scanFolder(folderPath);
+        QMetaObject::invokeMethod(self, [self, result]() {
+            emit self->scanFolderFinished(result);
+        }, Qt::QueuedConnection);
+    });
+}
+
+void DatasetService::scanSeparateAsync(const QString &imageDir, const QString &labelDir)
+{
+    ltInfo(LT_LOG_DATASET()) << "scanSeparateAsync imageDir=" << imageDir << "labelDir=" << labelDir;
+    auto *self = this;
+    QtConcurrent::run([self, imageDir, labelDir]() {
+        QVariantMap result = self->scanSeparate(imageDir, labelDir);
+        QMetaObject::invokeMethod(self, [self, result]() {
+            emit self->scanSeparateFinished(result);
+        }, Qt::QueuedConnection);
+    });
+}
+
 QVariantMap DatasetService::getDataset(const QString &datasetId)
 {
     ltTrace(LT_LOG_DATASET()) << "getDataset datasetId=" << datasetId;
@@ -197,7 +221,43 @@ bool DatasetService::deleteDataset(const QString &datasetId)
 
     QSqlDatabase db = Database::instance().database();
 
-    // Delete imported_label_schemas first (depends on dataset)
+    // Delete assisted_label_batches (references dataset)
+    QSqlQuery assistedQuery(db);
+    assistedQuery.prepare("DELETE FROM assisted_label_batches WHERE dataset_id = ?");
+    assistedQuery.addBindValue(datasetId);
+    if (!assistedQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to delete assisted_label_batches:" << assistedQuery.lastError().text();
+        return false;
+    }
+
+    // Delete annotation_revisions (references dataset and dataset_samples)
+    QSqlQuery annotQuery(db);
+    annotQuery.prepare("DELETE FROM annotation_revisions WHERE dataset_id = ?");
+    annotQuery.addBindValue(datasetId);
+    if (!annotQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to delete annotation_revisions:" << annotQuery.lastError().text();
+        return false;
+    }
+
+    // Delete class_mapping_revisions (references dataset)
+    QSqlQuery mappingQuery(db);
+    mappingQuery.prepare("DELETE FROM class_mapping_revisions WHERE dataset_id = ?");
+    mappingQuery.addBindValue(datasetId);
+    if (!mappingQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to delete class_mapping_revisions:" << mappingQuery.lastError().text();
+        return false;
+    }
+
+    // Delete dataset_snapshots (references dataset)
+    QSqlQuery snapshotQuery(db);
+    snapshotQuery.prepare("DELETE FROM dataset_snapshots WHERE dataset_id = ?");
+    snapshotQuery.addBindValue(datasetId);
+    if (!snapshotQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to delete dataset_snapshots:" << snapshotQuery.lastError().text();
+        return false;
+    }
+
+    // Delete imported_label_schemas (references dataset)
     QSqlQuery schemaQuery(db);
     schemaQuery.prepare("DELETE FROM imported_label_schemas WHERE dataset_id = ?");
     schemaQuery.addBindValue(datasetId);
@@ -206,7 +266,7 @@ bool DatasetService::deleteDataset(const QString &datasetId)
         return false;
     }
 
-    // Delete dataset_samples
+    // Delete dataset_samples (references dataset)
     QSqlQuery samplesQuery(db);
     samplesQuery.prepare("DELETE FROM dataset_samples WHERE dataset_id = ?");
     samplesQuery.addBindValue(datasetId);
@@ -215,7 +275,7 @@ bool DatasetService::deleteDataset(const QString &datasetId)
         return false;
     }
 
-    // Delete the dataset itself
+    // Finally delete the dataset itself
     QSqlQuery datasetQuery(db);
     datasetQuery.prepare("DELETE FROM datasets WHERE id = ?");
     datasetQuery.addBindValue(datasetId);
@@ -224,9 +284,10 @@ bool DatasetService::deleteDataset(const QString &datasetId)
         return false;
     }
 
-    ltInfo(LT_LOG_DATASET()) << "Deleted dataset and associated records:" << datasetId;
+    ltInfo(LT_LOG_DATASET()) << "Deleted dataset and all associated records:" << datasetId;
     return true;
 }
+
 
 QVariantMap DatasetService::getSampleStats(const QString &datasetId)
 {

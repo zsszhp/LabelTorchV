@@ -5,6 +5,7 @@
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QtConcurrent>
 
 class ImportScanner;
 
@@ -157,6 +158,28 @@ public:
      * @return QVariantMap 扫描结果，包含 detectedFormat/imageCount/labelCount 等
      */
     Q_INVOKABLE QVariantMap scanSeparate(const QString &imageDir, const QString &labelDir);
+
+    /**
+     * @brief 异步扫描文件夹并自动探测数据集格式
+     * 使用 QtConcurrent::run 在后台线程执行扫描，通过信号通知结果
+     * @param folderPath 用户选中的文件夹绝对路径
+     */
+    Q_INVOKABLE void scanFolderAsync(const QString &folderPath);
+
+    /**
+     * @brief 异步分别指定图片和标签路径进行扫描匹配
+     * 使用 QtConcurrent::run 在后台线程执行扫描，通过信号通知结果
+     * @param imageDir 图片目录路径
+     * @param labelDir 标签目录路径
+     */
+    Q_INVOKABLE void scanSeparateAsync(const QString &imageDir, const QString &labelDir);
+
+signals:
+    /** @brief scanFolderAsync 扫描完成信号 */
+    void scanFolderFinished(const QVariantMap &result);
+
+    /** @brief scanSeparateAsync 扫描完成信号 */
+    void scanSeparateFinished(const QVariantMap &result);
 
 private:
     bool updateImportStatus(const QString &datasetId, const QString &status);
