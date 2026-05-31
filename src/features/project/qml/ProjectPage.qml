@@ -98,6 +98,22 @@ Item {
                 }
                 onClicked: newProjectDialog.open()
             }
+
+            // 导入项目按钮
+            Button {
+                id: importProjectBtn
+                text: "导入项目"
+                font.family: Theme.fontFamily
+                font.bold: true
+                palette.buttonText: Theme.accentPrimary
+                background: Rectangle {
+                    color: importProjectBtn.hovered ? Theme.bgHover : Theme.bgTertiary
+                    border.color: Theme.accentPrimary
+                    border.width: 1
+                    radius: Theme.radiusNormal
+                }
+                onClicked: importFolderDialog.open()
+            }
         }
 
         // 分割线
@@ -505,6 +521,28 @@ Item {
         title: "选择项目存储路径"
         onAccepted: {
             projectPathField.text = urlToPath(folderDialog.selectedFolder)
+        }
+    }
+
+    // === 导入项目文件夹选择 ===
+    FolderDialog {
+        id: importFolderDialog
+        title: "选择已有项目目录"
+        onAccepted: {
+            var importPath = urlToPath(importFolderDialog.selectedFolder)
+            var pid = projectService.importProject(importPath)
+            if (pid) {
+                projectModel.refresh()
+                projectService.openProject(pid)
+                var projInfo = projectService.getCurrentProject()
+                appController.openProject(pid, projInfo.name || "导入项目")
+                var taxonomies = taxonomyService.listTaxonomies(pid)
+                if (taxonomies.length > 0) {
+                    taxonomyModel.taxonomyId = taxonomies[0].id
+                }
+            } else {
+                projectModel.refresh()
+            }
         }
     }
 }

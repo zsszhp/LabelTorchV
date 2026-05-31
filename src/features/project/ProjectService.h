@@ -22,6 +22,7 @@ public:
     void setTaxonomyService(TaxonomyService *service) { m_taxonomyService = service; }
 
     Q_INVOKABLE QString createProject(const QString &name, const QString &rootPath);
+    Q_INVOKABLE QString importProject(const QString &rootPath);
     Q_INVOKABLE QVariantList listProjects();
     Q_INVOKABLE bool deleteProject(const QString &projectId);
     Q_INVOKABLE bool openProject(const QString &projectId);

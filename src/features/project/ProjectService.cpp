@@ -6,6 +6,10 @@
 #include "utils/Log.h"
 #include <QSqlQuery>
 #include <QSqlError>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QFile>
+#include <QFileInfo>
 
 ProjectService::ProjectService(QObject *parent) : QObject(parent) {}
 
@@ -26,11 +30,14 @@ QString ProjectService::createProject(const QString &name, const QString &rootPa
         return {};
     }
 
+    ensureTaskTypeColumn();
+
     QSqlQuery query(Database::instance().database());
-    query.prepare("INSERT INTO projects (id, name, root_path) VALUES (?, ?, ?)");
+    query.prepare("INSERT INTO projects (id, name, root_path, task_type) VALUES (?, ?, ?, ?)");
     query.addBindValue(projectId);
     query.addBindValue(name);
     query.addBindValue(rootPath);
+    query.addBindValue(QStringLiteral("detect"));
 
     if (!query.exec()) {
         ltError(LT_LOG_PROJECT()) << "Failed to create project:" << query.lastError().text();
@@ -43,6 +50,95 @@ QString ProjectService::createProject(const QString &name, const QString &rootPa
     }
 
     ltInfo(LT_LOG_PROJECT()) << "Project created:" << projectId << name << "at" << rootPath;
+    return projectId;
+}
+
+QString ProjectService::importProject(const QString &rootPath)
+{
+    ltInfo(LT_LOG_PROJECT()) << "importProject rootPath=" << rootPath;
+
+    if (rootPath.isEmpty()) {
+        ltWarning(LT_LOG_PROJECT()) << "importProject: empty rootPath";
+        return {};
+    }
+
+    // 检查目录是否存在
+    QFileInfo rootInfo(rootPath);
+    if (!rootInfo.exists() || !rootInfo.isDir()) {
+        ltWarning(LT_LOG_PROJECT()) << "importProject: directory does not exist:" << rootPath;
+        return {};
+    }
+
+    // 读取 project.json 获取项目名称和任务类型
+    QString projectName;
+    QString taskType = QStringLiteral("detect");
+
+    QString jsonPath = rootPath + QStringLiteral("/project.json");
+    QFile jsonFile(jsonPath);
+    if (jsonFile.exists() && jsonFile.open(QIODevice::ReadOnly)) {
+        QJsonDocument doc = QJsonDocument::fromJson(jsonFile.readAll());
+        jsonFile.close();
+        if (doc.isObject()) {
+            QJsonObject obj = doc.object();
+            projectName = obj[QStringLiteral("name")].toString();
+            taskType = obj[QStringLiteral("task_type")].toString();
+        }
+    }
+
+    // 如果没有 project.json，用目录名作为项目名
+    if (projectName.isEmpty()) {
+        projectName = rootInfo.fileName();
+        if (projectName.isEmpty()) {
+            projectName = QStringLiteral("导入项目");
+        }
+    }
+
+    // 检查是否已导入过（同一路径不重复导入）
+    QSqlQuery checkQuery(Database::instance().database());
+    checkQuery.prepare("SELECT id FROM projects WHERE root_path = ?");
+    checkQuery.addBindValue(rootPath);
+    if (checkQuery.exec() && checkQuery.next()) {
+        QString existingId = checkQuery.value(0).toString();
+        ltWarning(LT_LOG_PROJECT()) << "importProject: project already imported:" << existingId;
+        return existingId;
+    }
+
+    // 确保目录结构完整（补齐缺失的子目录）
+    if (!ProjectFs::createProjectDirs(rootPath)) {
+        ltError(LT_LOG_PROJECT()) << "importProject: failed to ensure project dirs:" << rootPath;
+        return {};
+    }
+
+    // 如果没有 project.json 则创建
+    if (!QFile::exists(jsonPath)) {
+        if (!ProjectFs::createProjectJson(rootPath, projectName, taskType)) {
+            ltError(LT_LOG_PROJECT()) << "importProject: failed to create project.json";
+            return {};
+        }
+    }
+
+    // 在数据库中注册项目
+    QString projectId = Id::generate();
+    ensureTaskTypeColumn();
+
+    QSqlQuery query(Database::instance().database());
+    query.prepare("INSERT INTO projects (id, name, root_path, task_type) VALUES (?, ?, ?, ?)");
+    query.addBindValue(projectId);
+    query.addBindValue(projectName);
+    query.addBindValue(rootPath);
+    query.addBindValue(taskType);
+
+    if (!query.exec()) {
+        ltError(LT_LOG_PROJECT()) << "importProject: failed to insert project:" << query.lastError().text();
+        return {};
+    }
+
+    // 为项目创建默认类别体系
+    if (m_taxonomyService) {
+        m_taxonomyService->createTaxonomy(projectId, QStringLiteral("默认类别体系"), {});
+    }
+
+    ltInfo(LT_LOG_PROJECT()) << "Project imported:" << projectId << projectName << "at" << rootPath;
     return projectId;
 }
 
