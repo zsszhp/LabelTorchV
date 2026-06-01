@@ -9,6 +9,9 @@
 
 #include <windows.h>
 #include <dbghelp.h>
+#ifdef Q_OS_WIN
+#include <shobjidl.h>
+#endif
 
 #include "AppController.h"
 #include "ProjectService.h"
@@ -21,6 +24,7 @@
 #include "AnnotationService.h"
 #include "AnnotationModel.h"
 #include "canvas/CanvasController.h"
+#include "canvas/AnnotCanvasItem.h"
 #include "ipc/IpcClient.h"
 #include "SnapshotService.h"
 #include "SnapshotModel.h"
@@ -128,6 +132,11 @@ static void customMessageHandler(QtMsgType type, const QMessageLogContext &conte
 
 int main(int argc, char *argv[])
 {
+#ifdef Q_OS_WIN
+    // 强制设置 AppUserModelID 保证在 VS2026 Debug 模式（控制台子系统）下也能正常显示窗口/任务栏图标
+    SetCurrentProcessExplicitAppUserModelID(L"LabelTorch.LabelTorch.0.1.0");
+#endif
+
 #if defined(Q_OS_WIN) && defined(_DEBUG)
     // 注册CRT报告钩子，阻止MSVC弹出Abort/Retry/Ignore对话框，并使assert返回0继续运行
     _CrtSetReportHook(msvcReportHook);
@@ -161,6 +170,8 @@ int main(int argc, char *argv[])
                          << "Qt" << QT_VERSION_STR;
 
     QQuickStyle::setStyle("Basic");
+
+    qmlRegisterType<AnnotCanvasItem>("LabelTorch.Annotation", 1, 0, "AnnotCanvasItem");
 
     QString dbPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(dbPath);

@@ -66,15 +66,33 @@ class IpcServer:
         """启动服务端主循环"""
         logger.info("LabelTorch Python backend started")
 
-        reader = asyncio.StreamReader()
-        protocol = asyncio.StreamReaderProtocol(reader)
-        await asyncio.get_event_loop().connect_read_pipe(
-            lambda: protocol, sys.stdin
-        )
+        # Create an asyncio queue to hold lines read from stdin
+        queue = asyncio.Queue()
+        loop = asyncio.get_event_loop()
+
+        def read_stdin():
+            while self.running:
+                try:
+                    line = sys.stdin.readline()
+                    if not line:
+                        # EOF reached
+                        loop.call_soon_threadsafe(queue.put_nowait, b"")
+                        break
+                    # Put line as bytes into the queue
+                    loop.call_soon_threadsafe(queue.put_nowait, line.encode('utf-8'))
+                except Exception as e:
+                    logger.error(f"Error reading from stdin: {e}")
+                    loop.call_soon_threadsafe(queue.put_nowait, b"")
+                    break
+
+        # Start the background thread
+        import threading
+        stdin_thread = threading.Thread(target=read_stdin, daemon=True)
+        stdin_thread.start()
 
         while self.running:
             try:
-                line = await asyncio.wait_for(reader.readline(), timeout=30.0)
+                line = await asyncio.wait_for(queue.get(), timeout=30.0)
                 if not line:
                     break
 

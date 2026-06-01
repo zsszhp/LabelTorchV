@@ -195,6 +195,22 @@ Item {
                         ColorAnimation { duration: Theme.animDuration }
                     }
 
+                    MouseArea {
+                        id: cardMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onDoubleClicked: {
+                            if (appController.currentProjectId !== model.projectId) {
+                                projectService.openProject(model.projectId)
+                                appController.openProject(model.projectId, model.name)
+                                var taxonomies = taxonomyService.listTaxonomies(model.projectId)
+                                if (taxonomies.length > 0) {
+                                    taxonomyModel.taxonomyId = taxonomies[0].id
+                                }
+                            }
+                        }
+                    }
+
                     ColumnLayout {
                         anchors.fill: parent
                         anchors.margins: Theme.spacingLarge
@@ -336,22 +352,6 @@ Item {
                                     color: "transparent"
                                 }
                                 onClicked: deleteConfirmDialog.projectId = model.projectId
-                            }
-                        }
-                    }
-
-                    MouseArea {
-                        id: cardMouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onDoubleClicked: {
-                            if (appController.currentProjectId !== model.projectId) {
-                                projectService.openProject(model.projectId)
-                                appController.openProject(model.projectId, model.name)
-                                var taxonomies = taxonomyService.listTaxonomies(model.projectId)
-                                if (taxonomies.length > 0) {
-                                    taxonomyModel.taxonomyId = taxonomies[0].id
-                                }
                             }
                         }
                     }

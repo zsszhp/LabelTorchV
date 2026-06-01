@@ -65,11 +65,30 @@ bool Database::initializeSchema()
         return false;
     }
 
+    // 始终确保 schema_version 表存在
+    QSqlQuery query(m_db);
+    if (!query.exec("CREATE TABLE IF NOT EXISTS schema_version ("
+                     "version INTEGER PRIMARY KEY"
+                     ")")) {
+        ltError(LT_LOG_DB()) << "Failed to create schema_version table:" << query.lastError().text();
+        return false;
+    }
+
+    // 始终对 Schema 中定义的所有核心表强制执行 CREATE TABLE IF NOT EXISTS。
+    // 这能确保即使已存在旧的数据库，新增的表（如 run_metrics）也会在下次启动时自动创建补齐。
+    const auto &statements = Schema::createTableStatements();
+    for (const auto &sql : statements) {
+        if (!query.exec(sql)) {
+            ltError(LT_LOG_DB()) << "Failed to execute DDL:" << query.lastError().text();
+            return false;
+        }
+    }
+
     int version = currentSchemaVersion();
     ltDebug(LT_LOG_DB()) << "Current schema version:" << version;
 
     if (version == 0) {
-        return createTables();
+        query.exec("INSERT INTO schema_version (version) VALUES (1)");
     }
 
     return migrate();

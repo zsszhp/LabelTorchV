@@ -21,6 +21,7 @@ private slots:
     void testImportLabelMeUser();
     void testProjectSerializationAndMigration();
     void testDuplicateProjectCreation();
+    void testDeleteDataset();
     void cleanupTestCase();
 
 private:
@@ -219,6 +220,118 @@ void TestDatabase::testDuplicateProjectCreation()
 
     // 4. 清理临时文件
     QDir(rootPath).removeRecursively();
+}
+
+void TestDatabase::testDeleteDataset()
+{
+    // 1. Create a project
+    QSqlQuery query(Database::instance().database());
+    query.exec("DELETE FROM projects WHERE id = 'test-proj-delete'");
+    query.prepare("INSERT INTO projects (id, name, root_path) VALUES (?, ?, ?)");
+    query.addBindValue("test-proj-delete");
+    query.addBindValue("DeleteTestProj");
+    query.addBindValue("/tmp/delete_proj");
+    QVERIFY(query.exec());
+
+    // 2. Create a dataset
+    QString dsId = "test-ds-delete";
+    query.prepare("INSERT INTO datasets (id, project_id, name, image_root, label_root, format, sample_count, import_status) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    query.addBindValue(dsId);
+    query.addBindValue("test-proj-delete");
+    query.addBindValue("DeleteTestDS");
+    query.addBindValue("/tmp/delete_ds/images");
+    query.addBindValue("/tmp/delete_ds/labels");
+    query.addBindValue("yolo_txt");
+    query.addBindValue(1);
+    query.addBindValue("completed");
+    QVERIFY(query.exec());
+
+    // 3. Create a sample
+    query.prepare("INSERT INTO dataset_samples (id, dataset_id, image_path, label_path, validation_status) "
+                  "VALUES (?, ?, ?, ?, ?)");
+    query.addBindValue("test-sample-delete");
+    query.addBindValue(dsId);
+    query.addBindValue("/tmp/delete_ds/images/1.jpg");
+    query.addBindValue("/tmp/delete_ds/labels/1.txt");
+    query.addBindValue("valid");
+    QVERIFY(query.exec());
+
+    // 4. Create an imported label schema
+    query.prepare("INSERT INTO imported_label_schemas (id, dataset_id, raw_class_names_json, raw_class_order_json, source_format) "
+                  "VALUES (?, ?, ?, ?, ?)");
+    query.addBindValue("test-schema-delete");
+    query.addBindValue(dsId);
+    query.addBindValue("[\"class0\"]");
+    query.addBindValue("[0]");
+    query.addBindValue("yolo_txt");
+    QVERIFY(query.exec());
+
+    // 5. Create a snapshot referencing the dataset
+    QString snapId = "test-snap-delete";
+    query.prepare("INSERT INTO dataset_snapshots (id, dataset_id, sample_manifest_json) "
+                  "VALUES (?, ?, ?)");
+    query.addBindValue(snapId);
+    query.addBindValue(dsId);
+    query.addBindValue("{}");
+    QVERIFY(query.exec());
+
+    // 6. Create a training run referencing the snapshot
+    QString runId = "test-run-delete";
+    query.prepare("INSERT INTO training_runs (id, project_id, snapshot_id, config_snapshot_json) "
+                  "VALUES (?, ?, ?, ?)");
+    query.addBindValue(runId);
+    query.addBindValue("test-proj-delete");
+    query.addBindValue(snapId);
+    query.addBindValue("{}");
+    QVERIFY(query.exec());
+
+    // 7. Create a model version referencing the training run
+    QString modelId = "test-model-delete";
+    query.prepare("INSERT INTO model_versions (id, run_id) "
+                  "VALUES (?, ?)");
+    query.addBindValue(modelId);
+    query.addBindValue(runId);
+    QVERIFY(query.exec());
+
+    // 8. Create an export artifact referencing the model version
+    query.prepare("INSERT INTO export_artifacts (id, model_version_id, format, output_path) "
+                  "VALUES (?, ?, ?, ?)");
+    query.addBindValue("test-export-delete");
+    query.addBindValue(modelId);
+    query.addBindValue("onnx");
+    query.addBindValue("/tmp/export.onnx");
+    QVERIFY(query.exec());
+
+    // 9. Call DatasetService::deleteDataset
+    DatasetService dsService;
+    bool success = dsService.deleteDataset(dsId);
+    QVERIFY(success);
+
+    // 10. Verify that all records are deleted
+    query.prepare("SELECT count(*) FROM datasets WHERE id = ?");
+    query.addBindValue(dsId);
+    QVERIFY(query.exec());
+    QVERIFY(query.next());
+    QCOMPARE(query.value(0).toInt(), 0);
+
+    query.prepare("SELECT count(*) FROM dataset_snapshots WHERE id = ?");
+    query.addBindValue(snapId);
+    QVERIFY(query.exec());
+    QVERIFY(query.next());
+    QCOMPARE(query.value(0).toInt(), 0);
+
+    query.prepare("SELECT count(*) FROM training_runs WHERE id = ?");
+    query.addBindValue(runId);
+    QVERIFY(query.exec());
+    QVERIFY(query.next());
+    QCOMPARE(query.value(0).toInt(), 0);
+
+    query.prepare("SELECT count(*) FROM model_versions WHERE id = ?");
+    query.addBindValue(modelId);
+    QVERIFY(query.exec());
+    QVERIFY(query.next());
+    QCOMPARE(query.value(0).toInt(), 0);
 }
 
 void TestDatabase::cleanupTestCase()

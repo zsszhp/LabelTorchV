@@ -240,68 +240,171 @@ bool DatasetService::deleteDataset(const QString &datasetId)
 
     QSqlDatabase db = Database::instance().database();
 
-    // Delete assisted_label_batches (references dataset)
+    // 1. 临时禁用外键约束（在事务外执行）
+    QSqlQuery pragmaQuery(db);
+    pragmaQuery.exec("PRAGMA foreign_keys = OFF");
+
+    // 2. 开启事务
+    if (!db.transaction()) {
+        ltError(LT_LOG_DATASET()) << "Failed to start transaction for deleting dataset";
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
+        return false;
+    }
+
+    // (1) 删除相关的训练指标 (run_metrics)
+    QSqlQuery runMetricsQuery(db);
+    runMetricsQuery.prepare("DELETE FROM run_metrics WHERE run_id IN ("
+                            "  SELECT id FROM training_runs WHERE snapshot_id IN ("
+                            "    SELECT id FROM dataset_snapshots WHERE dataset_id = ?"
+                            "  )"
+                            ")");
+    runMetricsQuery.addBindValue(datasetId);
+    if (!runMetricsQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to delete run_metrics:" << runMetricsQuery.lastError().text();
+        db.rollback();
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
+        return false;
+    }
+
+    // (2) 删除相关的模型导出产物 (export_artifacts)
+    QSqlQuery exportQuery(db);
+    exportQuery.prepare("DELETE FROM export_artifacts WHERE model_version_id IN ("
+                        "  SELECT id FROM model_versions WHERE run_id IN ("
+                        "    SELECT id FROM training_runs WHERE snapshot_id IN ("
+                        "      SELECT id FROM dataset_snapshots WHERE dataset_id = ?"
+                        "    )"
+                        "  )"
+                        ")");
+    exportQuery.addBindValue(datasetId);
+    if (!exportQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to delete export_artifacts:" << exportQuery.lastError().text();
+        db.rollback();
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
+        return false;
+    }
+
+    // (3) 删除相关的辅助标注批次 (assisted_label_batches)
     QSqlQuery assistedQuery(db);
-    assistedQuery.prepare("DELETE FROM assisted_label_batches WHERE dataset_id = ?");
+    assistedQuery.prepare("DELETE FROM assisted_label_batches WHERE dataset_id = ? OR model_version_id IN ("
+                          "  SELECT id FROM model_versions WHERE run_id IN ("
+                          "    SELECT id FROM training_runs WHERE snapshot_id IN ("
+                          "      SELECT id FROM dataset_snapshots WHERE dataset_id = ?"
+                          "    )"
+                          "  )"
+                          ")");
+    assistedQuery.addBindValue(datasetId);
     assistedQuery.addBindValue(datasetId);
     if (!assistedQuery.exec()) {
         ltError(LT_LOG_DATASET()) << "Failed to delete assisted_label_batches:" << assistedQuery.lastError().text();
+        db.rollback();
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
         return false;
     }
 
-    // Delete annotation_revisions (references dataset and dataset_samples)
-    QSqlQuery annotQuery(db);
-    annotQuery.prepare("DELETE FROM annotation_revisions WHERE dataset_id = ?");
-    annotQuery.addBindValue(datasetId);
-    if (!annotQuery.exec()) {
-        ltError(LT_LOG_DATASET()) << "Failed to delete annotation_revisions:" << annotQuery.lastError().text();
+    // (4) 删除相关的模型版本 (model_versions)
+    QSqlQuery modelQuery(db);
+    modelQuery.prepare("DELETE FROM model_versions WHERE run_id IN ("
+                       "  SELECT id FROM training_runs WHERE snapshot_id IN ("
+                       "    SELECT id FROM dataset_snapshots WHERE dataset_id = ?"
+                       "  )"
+                       ")");
+    modelQuery.addBindValue(datasetId);
+    if (!modelQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to delete model_versions:" << modelQuery.lastError().text();
+        db.rollback();
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
         return false;
     }
 
-    // Delete class_mapping_revisions (references dataset)
-    QSqlQuery mappingQuery(db);
-    mappingQuery.prepare("DELETE FROM class_mapping_revisions WHERE dataset_id = ?");
-    mappingQuery.addBindValue(datasetId);
-    if (!mappingQuery.exec()) {
-        ltError(LT_LOG_DATASET()) << "Failed to delete class_mapping_revisions:" << mappingQuery.lastError().text();
+    // (5) 删除相关的训练运行记录 (training_runs)
+    QSqlQuery trainingQuery(db);
+    trainingQuery.prepare("DELETE FROM training_runs WHERE snapshot_id IN ("
+                          "  SELECT id FROM dataset_snapshots WHERE dataset_id = ?"
+                          ")");
+    trainingQuery.addBindValue(datasetId);
+    if (!trainingQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to delete training_runs:" << trainingQuery.lastError().text();
+        db.rollback();
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
         return false;
     }
 
-    // Delete dataset_snapshots (references dataset)
+    // (6) 删除相关的数据快照 (dataset_snapshots)
     QSqlQuery snapshotQuery(db);
     snapshotQuery.prepare("DELETE FROM dataset_snapshots WHERE dataset_id = ?");
     snapshotQuery.addBindValue(datasetId);
     if (!snapshotQuery.exec()) {
         ltError(LT_LOG_DATASET()) << "Failed to delete dataset_snapshots:" << snapshotQuery.lastError().text();
+        db.rollback();
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
         return false;
     }
 
-    // Delete imported_label_schemas (references dataset)
+    // (7) 删除相关的标注修订记录 (annotation_revisions)
+    QSqlQuery annotQuery(db);
+    annotQuery.prepare("DELETE FROM annotation_revisions WHERE dataset_id = ?");
+    annotQuery.addBindValue(datasetId);
+    if (!annotQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to delete annotation_revisions:" << annotQuery.lastError().text();
+        db.rollback();
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
+        return false;
+    }
+
+    // (8) 删除相关的类别映射修订 (class_mapping_revisions)
+    QSqlQuery mappingQuery(db);
+    mappingQuery.prepare("DELETE FROM class_mapping_revisions WHERE dataset_id = ?");
+    mappingQuery.addBindValue(datasetId);
+    if (!mappingQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to delete class_mapping_revisions:" << mappingQuery.lastError().text();
+        db.rollback();
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
+        return false;
+    }
+
+    // (9) 删除相关的导入原始标签schema (imported_label_schemas)
     QSqlQuery schemaQuery(db);
     schemaQuery.prepare("DELETE FROM imported_label_schemas WHERE dataset_id = ?");
     schemaQuery.addBindValue(datasetId);
     if (!schemaQuery.exec()) {
         ltError(LT_LOG_DATASET()) << "Failed to delete label schemas:" << schemaQuery.lastError().text();
+        db.rollback();
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
         return false;
     }
 
-    // Delete dataset_samples (references dataset)
+    // (10) 删除相关的样本记录 (dataset_samples)
     QSqlQuery samplesQuery(db);
     samplesQuery.prepare("DELETE FROM dataset_samples WHERE dataset_id = ?");
     samplesQuery.addBindValue(datasetId);
     if (!samplesQuery.exec()) {
         ltError(LT_LOG_DATASET()) << "Failed to delete samples:" << samplesQuery.lastError().text();
+        db.rollback();
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
         return false;
     }
 
-    // Finally delete the dataset itself
+    // (11) 最后删除数据集本身记录 (datasets)
     QSqlQuery datasetQuery(db);
     datasetQuery.prepare("DELETE FROM datasets WHERE id = ?");
     datasetQuery.addBindValue(datasetId);
     if (!datasetQuery.exec()) {
         ltError(LT_LOG_DATASET()) << "Failed to delete dataset:" << datasetQuery.lastError().text();
+        db.rollback();
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
         return false;
     }
+
+    // 4. 提交事务
+    if (!db.commit()) {
+        ltError(LT_LOG_DATASET()) << "Failed to commit transaction for deleting dataset";
+        db.rollback();
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
+        return false;
+    }
+
+    // 5. 重新启用外键约束（在事务外执行）
+    pragmaQuery.exec("PRAGMA foreign_keys = ON");
 
     ltInfo(LT_LOG_DATASET()) << "Deleted dataset and all associated records:" << datasetId;
     return true;

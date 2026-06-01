@@ -1,26 +1,20 @@
-// AnnotationPage.qml - 标注工作台
+// AnnotationPage.qml - 标注工作台（v1.0.0 高性能画布版）
 import QtQuick
 import QtQuick.Controls
 import LabelTorch.Theme
+import LabelTorch.Annotation 1.0
 import QtQuick.Layouts
 
 Item {
     id: root
 
-    // Current shape mode: 0 = HBB, 1 = OBB
     property int shapeMode: 0
-
-    // Annotation mode: "detect", "obb", "classify", or "anomaly"
     property string annotationMode: "detect"
-
-    // Classification state
     property int selectedClassId: -1
     property var selectedMultiClassIds: []
-
-    // Anomaly detection state
     property bool isAnomalous: false
+    property var sampleListData: []
 
-    // Sync annotation mode with project task type from Main.qml
     Connections {
         target: ApplicationWindow.window
         function onCurrentTaskTypeChanged() {
@@ -29,10 +23,12 @@ Item {
                 root.annotationMode = "detect"
                 root.shapeMode = 0
                 annotationService.setShapeType(0)
+                canvasItem.shapeMode = 0
             } else if (taskType === "obb") {
                 root.annotationMode = "detect"
                 root.shapeMode = 1
                 annotationService.setShapeType(1)
+                canvasItem.shapeMode = 1
             } else if (taskType === "classify") {
                 root.annotationMode = "classify"
             } else if (taskType === "anomaly") {
@@ -41,7 +37,6 @@ Item {
         }
     }
 
-    // On component load, read initial task type from project
     Component.onCompleted: {
         if (appController.projectOpen) {
             var taskType = projectService.getTaskType(appController.currentProjectId)
@@ -56,16 +51,41 @@ Item {
             } else if (taskType === "anomaly") {
                 root.annotationMode = "anomaly"
             }
+            refreshSampleList()
         }
+    }
+
+    onVisibleChanged: {
+        if (visible && appController.projectOpen) {
+            refreshSampleList()
+        }
+    }
+
+    function refreshSampleList() {
+        if (!appController.projectOpen) {
+            sampleListData = []
+            return
+        }
+        var datasets = datasetService.listDatasets(appController.currentProjectId)
+        var allSamples = []
+        for (var d = 0; d < datasets.length; d++) {
+            var ds = datasets[d]
+            var samples = annotationService.listSamples(ds.id)
+            for (var s = 0; s < samples.length; s++) {
+                var sample = samples[s]
+                sample.datasetName = ds.name
+                allSamples.push(sample)
+            }
+        }
+        sampleListData = allSamples
     }
 
     RowLayout {
         anchors.fill: parent
         spacing: 0
 
-        // 左侧样本列表
         Rectangle {
-            Layout.preferredWidth: 200
+            Layout.preferredWidth: 220
             Layout.fillHeight: true
             color: Theme.bgCard
 
@@ -76,7 +96,7 @@ Item {
                 Label {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 36
-                    text: "样本列表"
+                    text: "样本列表 (" + sampleListData.length + ")"
                     font.pixelSize: 13
                     font.bold: true
                     color: Theme.textPrimary
@@ -84,375 +104,118 @@ Item {
                     verticalAlignment: Text.AlignVCenter
                 }
 
+                TextField {
+                    id: sampleFilter
+                    Layout.fillWidth: true
+                    Layout.margins: 4
+                    placeholderText: "搜索样本..."
+                    placeholderTextColor: Theme.textMuted
+                    color: Theme.textPrimary
+                    font.pixelSize: 12
+                    leftPadding: 8
+
+                    background: Rectangle {
+                        color: Theme.bgInput
+                        radius: 4
+                        border.color: sampleFilter.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                    }
+                }
+
                 ListView {
                     id: sampleList
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     clip: true
-                    model: annotationService.listSamples(appController.currentProjectId ? "" : "")
-                    spacing: 2
+                    model: sampleListData
+                    spacing: 1
 
                     delegate: ItemDelegate {
                         width: sampleList.width
                         height: 36
-                        text: modelData.imagePath ? modelData.imagePath.split('/').pop().split('\\').pop() : ""
-                        font.pixelSize: 12
 
-                        contentItem: Label {
-                            text: parent.text
-                            font.pixelSize: 12
-                            color: Theme.textPrimary
-                            elide: Text.ElideRight
-                            verticalAlignment: Text.AlignVCenter
+                        property var sampleData: modelData
+                        property string fileName: sampleData.imagePath ? sampleData.imagePath.split('/').pop().split('\\').pop() : ""
+                        property bool isCurrentSample: canvasController.currentImagePath === sampleData.imagePath
+
+                        contentItem: Row {
+                            spacing: 6
+                            leftPadding: 8
+                            Rectangle {
+                                width: 4; height: parent.height - 8
+                                radius: 2
+                                color: isCurrentSample ? Theme.accentPrimary : "transparent"
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Label {
+                                text: fileName
+                                font.pixelSize: 11
+                                color: isCurrentSample ? Theme.accentPrimary : Theme.textPrimary
+                                elide: Text.ElideRight
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
                         }
 
                         background: Rectangle {
-                            color: parent.hovered ? Theme.bgInput : "transparent"
+                            color: isCurrentSample ? Theme.bgInput : (parent.hovered ? Theme.bgInput : "transparent")
                         }
 
-                        onClicked: {
-                            // Load this sample's annotations
-                            if (annotationMode === "classify") {
-                                var clsLabels = annotationService.loadClassificationLabels(modelData.labelPath || "")
-                                if (clsLabels.labelType === "multi") {
-                                    selectedMultiClassIds = clsLabels.classIds || []
-                                } else {
-                                    selectedClassId = clsLabels.classId !== undefined ? clsLabels.classId : -1
-                                    selectedMultiClassIds = []
-                                }
-                            } else if (annotationMode === "anomaly") {
-                                var anomalyLabels = annotationService.loadAnomalyLabels(modelData.labelPath || "")
-                                isAnomalous = anomalyLabels.isAnomalous || false
-                            } else {
-                                annotationModel.loadFromLabel(modelData.labelPath || "")
-                            }
-                            canvasController.loadImage(modelData.imagePath || "", modelData.labelPath || "")
-                        }
+                        onClicked: loadSample(sampleData)
                     }
+                }
+
+                Button {
+                    Layout.fillWidth: true
+                    Layout.margins: 4
+                    Layout.preferredHeight: 28
+                    text: "刷新列表"
+                    font.pixelSize: 11
+
+                    background: Rectangle {
+                        color: parent.hovered ? Theme.bgInput : Theme.bgPrimary
+                        radius: 4
+                        border.color: Theme.borderNormal
+                    }
+
+                    contentItem: Label {
+                        text: parent.text
+                        font.pixelSize: 11
+                        color: Theme.textPrimary
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    onClicked: refreshSampleList()
                 }
             }
         }
 
-        // 中央画布
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: Theme.bgInput
+            color: Theme.bgPrimary
 
-            Canvas {
-                id: annotationCanvas
+            AnnotCanvasItem {
+                id: canvasItem
                 anchors.fill: parent
+                controller: canvasController
+                annotationModel: annotationModel
+                shapeMode: root.shapeMode
+                currentClassIndex: selectedClassId >= 0 ? selectedClassId : 0
+                currentClassName: selectedClassId >= 0 ? getClassName(selectedClassId) : "class_0"
+                interactionMode: (annotationMode === "detect" && canvasController.drawMode === "draw") ? "draw" : "select"
 
-                onPaint: {
-                    var ctx = getContext('2d')
-                    ctx.clearRect(0, 0, width, height)
-
-                    // Draw image background (placeholder)
-                    ctx.fillStyle = Theme.bgPrimary
-                    ctx.fillRect(0, 0, width, height)
-
-                    if (!canvasController.currentImagePath) {
-                        ctx.fillStyle = Theme.textMuted
-                        ctx.font = "16px sans-serif"
-                        ctx.textAlign = "center"
-                        ctx.fillText("选择一个样本开始标注", width / 2, height / 2)
-                        return
-                    }
-
-                    // Anomaly detection mode: show anomaly label overlay
-                    if (annotationMode === "anomaly") {
-                        // Draw image border
-                        var imgW = canvasController.imageToCanvasX(1.0) - canvasController.imageToCanvasX(0)
-                        var imgH = canvasController.imageToCanvasY(1.0) - canvasController.imageToCanvasY(0)
-                        var imgX = canvasController.imageToCanvasX(0)
-                        var imgY = canvasController.imageToCanvasY(0)
-
-                        // Draw image area border with anomaly-coded color
-                        ctx.strokeStyle = isAnomalous ? Theme.accentError : Theme.accentSuccess
-                        ctx.lineWidth = 3
-                        ctx.strokeRect(imgX, imgY, imgW, imgH)
-
-                        // Show anomaly label at center
-                        var labelText = isAnomalous ? "异常" : "正常"
-                        var labelColor = isAnomalous ? Theme.accentError : Theme.accentSuccess
-
-                        ctx.globalAlpha = 0.15
-                        ctx.fillStyle = labelColor
-                        ctx.fillRect(imgX, imgY, imgW, imgH)
-
-                        ctx.globalAlpha = 1.0
-                        ctx.fillStyle = labelColor
-                        ctx.font = "bold 24px sans-serif"
-                        ctx.textAlign = "center"
-                        ctx.fillText(labelText, imgX + imgW / 2, imgY + imgH / 2)
-
-                        return
-                    }
-
-                    // Classification mode: show class label overlay
-                    if (annotationMode === "classify") {
-                        // Draw image border
-                        var imgW = canvasController.imageToCanvasX(1.0) - canvasController.imageToCanvasX(0)
-                        var imgH = canvasController.imageToCanvasY(1.0) - canvasController.imageToCanvasY(0)
-                        var imgX = canvasController.imageToCanvasX(0)
-                        var imgY = canvasController.imageToCanvasY(0)
-
-                        ctx.strokeStyle = Theme.borderNormal
-                        ctx.lineWidth = 1
-                        ctx.strokeRect(imgX, imgY, imgW, imgH)
-
-                        // Show classification label at center
-                        var colors = Theme.classColors
-                        var labelText = ""
-
-                        if (classificationMultiCheck.checked) {
-                            // Multi-label mode
-                            if (selectedMultiClassIds.length > 0) {
-                                var names = []
-                                for (var mi = 0; mi < selectedMultiClassIds.length; mi++) {
-                                    names.push("class_" + selectedMultiClassIds[mi])
-                                }
-                                labelText = names.join(", ")
-                            } else {
-                                labelText = "未分类"
-                            }
-                        } else {
-                            // Single-label mode
-                            if (selectedClassId >= 0) {
-                                labelText = "class_" + selectedClassId
-                            } else {
-                                labelText = "未分类"
-                            }
-                        }
-
-                        ctx.globalAlpha = 1.0
-                        ctx.fillStyle = Theme.accentPrimary
-                        ctx.font = "bold 18px sans-serif"
-                        ctx.textAlign = "center"
-                        ctx.fillText(labelText, imgX + imgW / 2, imgY + imgH / 2)
-
-                        return
-                    }
-
-                    // Draw image area
-                    var imgW2 = canvasController.imageToCanvasX(1.0) - canvasController.imageToCanvasX(0)
-                    var imgH2 = canvasController.imageToCanvasY(1.0) - canvasController.imageToCanvasY(0)
-                    var imgX2 = canvasController.imageToCanvasX(0)
-                    var imgY2 = canvasController.imageToCanvasY(0)
-
-                    // Image border
-                    ctx.strokeStyle = Theme.borderNormal
-                    ctx.lineWidth = 1
-                    ctx.strokeRect(imgX2, imgY2, imgW2, imgH2)
-
-                    // Draw annotations
-                    var colors2 = Theme.classColors
-
-                    for (var i = 0; i < annotationModel.rowCount(); i++) {
-                        var idx = annotationModel.index(i, 0)
-                        var cx = annotationModel.data(idx, Qt.UserRole + 3)  // CxRole
-                        var cy = annotationModel.data(idx, Qt.UserRole + 4)  // CyRole
-                        var w = annotationModel.data(idx, Qt.UserRole + 5)   // WRole
-                        var h = annotationModel.data(idx, Qt.UserRole + 6)   // HRole
-                        var annAngle = annotationModel.data(idx, Qt.UserRole + 7) // AngleRole
-                        var classIdx = annotationModel.data(idx, Qt.UserRole)      // ClassIndexRole
-                        var className = annotationModel.data(idx, Qt.UserRole + 1) // ClassNameRole
-                        var selected = annotationModel.data(idx, Qt.UserRole + 8)  // IsSelectedRole
-
-                        if (cx === undefined || cy === undefined || w === undefined || h === undefined) continue
-
-                        var colorIdx = classIdx !== undefined ? classIdx : 0
-                        var color = colors2[colorIdx % colors2.length]
-
-                        // Center in canvas coordinates
-                        var canvasCx = canvasController.imageToCanvasX(cx)
-                        var canvasCy = canvasController.imageToCanvasY(cy)
-                        var canvasHalfW = (canvasController.imageToCanvasX(cx + w / 2) - canvasController.imageToCanvasX(cx - w / 2)) / 2
-                        var canvasHalfH = (canvasController.imageToCanvasY(cy + h / 2) - canvasController.imageToCanvasY(cy - h / 2)) / 2
-
-                        if (annAngle !== undefined && annAngle !== 0 && shapeMode === 1) {
-                            // OBB mode: draw rotated rectangle
-                            var rad = annAngle * Math.PI / 180.0
-                            ctx.save()
-                            ctx.translate(canvasCx, canvasCy)
-                            ctx.rotate(rad)
-
-                            // Fill
-                            ctx.globalAlpha = 0.15
-                            ctx.fillStyle = color
-                            ctx.fillRect(-canvasHalfW, -canvasHalfH, canvasHalfW * 2, canvasHalfH * 2)
-
-                            // Stroke
-                            ctx.globalAlpha = selected ? 1.0 : 0.8
-                            ctx.strokeStyle = color
-                            ctx.lineWidth = selected ? 3 : 2
-                            ctx.strokeRect(-canvasHalfW, -canvasHalfH, canvasHalfW * 2, canvasHalfH * 2)
-
-                            // Rotation indicator line
-                            ctx.globalAlpha = 0.5
-                            ctx.strokeStyle = Theme.textPrimary
-                            ctx.lineWidth = 1
-                            ctx.beginPath()
-                            ctx.moveTo(0, 0)
-                            ctx.lineTo(canvasHalfW, 0)
-                            ctx.stroke()
-
-                            ctx.restore()
-                        } else {
-                            // HBB mode: draw axis-aligned rectangle
-                            var x1 = canvasController.imageToCanvasX(cx - w / 2)
-                            var y1 = canvasController.imageToCanvasY(cy - h / 2)
-                            var x2 = canvasController.imageToCanvasX(cx + w / 2)
-                            var y2 = canvasController.imageToCanvasY(cy + h / 2)
-
-                            // Fill
-                            ctx.globalAlpha = 0.15
-                            ctx.fillStyle = color
-                            ctx.fillRect(x1, y1, x2 - x1, y2 - y1)
-
-                            // Stroke
-                            ctx.globalAlpha = selected ? 1.0 : 0.8
-                            ctx.strokeStyle = color
-                            ctx.lineWidth = selected ? 3 : 2
-                            ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
-                        }
-
-                        // Label (always drawn at the top of the annotation)
-                        var labelX, labelY
-                        if (annAngle !== undefined && annAngle !== 0 && shapeMode === 1) {
-                            // For OBB, place label at the rotated top-left corner area
-                            labelX = canvasCx - canvasHalfW * Math.cos(annAngle * Math.PI / 180) - 4
-                            labelY = canvasCy - canvasHalfW * Math.sin(annAngle * Math.PI / 180) - 4
-                        } else {
-                            labelX = canvasController.imageToCanvasX(cx - w / 2)
-                            labelY = canvasController.imageToCanvasY(cy - h / 2) - 18
-                        }
-
-                        ctx.globalAlpha = 1.0
-                        ctx.fillStyle = color
-                        ctx.font = "bold 11px sans-serif"
-                        var label = (className || ("class_" + classIdx))
-                        var textW = ctx.measureText(label).width + 8
-                        ctx.fillRect(labelX, labelY, textW, 18)
-                        ctx.fillStyle = Theme.bgPrimary
-                        ctx.fillText(label, labelX + 4, labelY + 13)
-                    }
-
-                    // Draw current drawing rect
-                    if (drawingRect.visible) {
-                        ctx.strokeStyle = Theme.accentPrimary
-                        ctx.lineWidth = 2
-                        ctx.setLineDash([4, 4])
-                        ctx.strokeRect(drawingRect.x, drawingRect.y, drawingRect.width, drawingRect.height)
-                        ctx.setLineDash([])
-                    }
-                }
-
-                // Mouse handling
-                MouseArea {
-                    id: canvasMouseArea
-                    anchors.fill: parent
-                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    hoverEnabled: true
-
-                    property real startImgX: 0
-                    property real startImgY: 0
-                    property bool isDrawing: false
-
-                    onWheel: function(wheel) {
-                        var factor = wheel.angleDelta.y > 0 ? 1.1 : 0.9
-                        var newZoom = canvasController.zoom * factor
-                        if (newZoom < 0.1) newZoom = 0.1
-                        if (newZoom > 20) newZoom = 20
-
-                        var mx = wheel.x
-                        var my = wheel.y
-                        var currentZoom = canvasController.zoom > 0 ? canvasController.zoom : 1.0
-                        canvasController.panX = mx - (mx - canvasController.panX) * (newZoom / currentZoom)
-                        canvasController.panY = my - (my - canvasController.panY) * (newZoom / currentZoom)
-                        canvasController.zoom = newZoom
-                        annotationCanvas.requestPaint()
-                    }
-
-                    onPressed: function(mouse) {
-                        if (annotationMode === "classify" || annotationMode === "anomaly") {
-                            // No drawing in classification or anomaly mode
-                            return
-                        }
-                        if (canvasController.drawMode === "draw" && mouse.button === Qt.LeftButton) {
-                            isDrawing = true
-                            startImgX = mouse.x
-                            startImgY = mouse.y
-                            drawingRect.x = mouse.x
-                            drawingRect.y = mouse.y
-                            drawingRect.width = 0
-                            drawingRect.height = 0
-                            drawingRect.visible = true
-                        } else if (canvasController.drawMode === "select" && mouse.button === Qt.LeftButton) {
-                            // Check hit on existing annotations
-                            var imgX = canvasController.canvasToImageX(mouse.x)
-                            var imgY = canvasController.canvasToImageY(mouse.y)
-                            selectAnnotationAt(imgX, imgY)
-                        }
-                    }
-
-                    onPositionChanged: function(mouse) {
-                        if (isDrawing) {
-                            drawingRect.x = Math.min(startImgX, mouse.x)
-                            drawingRect.y = Math.min(startImgY, mouse.y)
-                            drawingRect.width = Math.abs(mouse.x - startImgX)
-                            drawingRect.height = Math.abs(mouse.y - startImgY)
-                            annotationCanvas.requestPaint()
-                        }
-                    }
-
-                    onReleased: function(mouse) {
-                        if (isDrawing && drawingRect.width > 5 && drawingRect.height > 5) {
-                            // Convert canvas rect to normalized image coordinates
-                            var imgX1 = canvasController.canvasToImageX(drawingRect.x)
-                            var imgY1 = canvasController.canvasToImageY(drawingRect.y)
-                            var imgX2 = canvasController.canvasToImageX(drawingRect.x + drawingRect.width)
-                            var imgY2 = canvasController.canvasToImageY(drawingRect.y + drawingRect.height)
-
-                            var cx = (imgX1 + imgX2) / 2
-                            var cy = (imgY1 + imgY2) / 2
-                            var w = Math.abs(imgX2 - imgX1)
-                            var h = Math.abs(imgY2 - imgY1)
-
-                            if (w > 0.001 && h > 0.001 && cx >= 0 && cy >= 0 && cx <= 1 && cy <= 1) {
-                                if (shapeMode === 1) {
-                                    annotationModel.addOBBAnnotation(0, "class_0", cx, cy, w, h, 0.0)
-                                } else {
-                                    annotationModel.addAnnotation(0, "class_0", cx, cy, w, h)
-                                }
-                                canvasController.markDirty()
-                            }
-                        }
-                        isDrawing = false
-                        drawingRect.visible = false
-                        annotationCanvas.requestPaint()
-                    }
-                }
-
-                // Drawing rect indicator
-                QtObject {
-                    id: drawingRect
-                    property real x: 0
-                    property real y: 0
-                    property real width: 0
-                    property real height: 0
-                    property bool visible: false
+                onAnnotationModified: {
+                    canvasController.markDirty()
                 }
             }
 
-            // Overlay toolbar
             RowLayout {
                 anchors.top: parent.top
                 anchors.right: parent.right
                 anchors.margins: 8
                 spacing: 4
+                z: 10
 
-                // HBB/OBB/CLS/AD mode switch
                 RowLayout {
                     spacing: 0
 
@@ -464,6 +227,7 @@ Item {
                         onClicked: {
                             annotationMode = "detect"
                             shapeMode = 0
+                            canvasItem.shapeMode = 0
                             annotationService.setShapeType(0)
                         }
 
@@ -489,6 +253,7 @@ Item {
                         onClicked: {
                             annotationMode = "detect"
                             shapeMode = 1
+                            canvasItem.shapeMode = 1
                             annotationService.setShapeType(1)
                         }
 
@@ -511,9 +276,7 @@ Item {
                         font.pixelSize: 11
                         highlighted: annotationMode === "classify"
                         flat: !highlighted
-                        onClicked: {
-                            annotationMode = "classify"
-                        }
+                        onClicked: annotationMode = "classify"
 
                         background: Rectangle {
                             color: parent.highlighted ? Theme.accentPrimary : Theme.bgInput
@@ -534,9 +297,7 @@ Item {
                         font.pixelSize: 11
                         highlighted: annotationMode === "anomaly"
                         flat: !highlighted
-                        onClicked: {
-                            annotationMode = "anomaly"
-                        }
+                        onClicked: annotationMode = "anomaly"
 
                         background: Rectangle {
                             color: parent.highlighted ? Theme.accentPrimary : Theme.bgInput
@@ -554,32 +315,120 @@ Item {
                 }
 
                 Button {
-                    text: canvasController.drawMode === "draw" ? "绘制中" : "选择"
+                    text: canvasController.drawMode === "draw" ? "绘制中" : "绘制"
                     highlighted: canvasController.drawMode === "draw"
-                    visible: annotationMode !== "classify" && annotationMode !== "anomaly"
-                    onClicked: canvasController.drawMode = canvasController.drawMode === "draw" ? "select" : "draw"
+                    visible: annotationMode === "detect"
+                    font.pixelSize: 11
+                    onClicked: {
+                        canvasController.drawMode = canvasController.drawMode === "draw" ? "select" : "draw"
+                    }
+
+                    background: Rectangle {
+                        color: parent.highlighted ? Theme.accentPrimary : Theme.bgInput
+                        radius: 4
+                        border.color: parent.highlighted ? Theme.accentPrimary : Theme.borderNormal
+                    }
+
+                    contentItem: Label {
+                        text: parent.text
+                        font.pixelSize: 11
+                        color: parent.highlighted ? Theme.bgPrimary : Theme.textPrimary
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
                 }
 
                 Button {
                     text: "适应"
-                    onClicked: {
-                        canvasController.fitToView(annotationCanvas.width, annotationCanvas.height)
-                        annotationCanvas.requestPaint()
+                    font.pixelSize: 11
+                    onClicked: canvasItem.fitToView()
+
+                    background: Rectangle {
+                        color: parent.hovered ? Theme.bgInput : Theme.bgPrimary
+                        radius: 4
+                        border.color: Theme.borderNormal
+                    }
+
+                    contentItem: Label {
+                        text: parent.text
+                        font.pixelSize: 11
+                        color: Theme.textPrimary
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                Button {
+                    text: "撤销"
+                    font.pixelSize: 11
+                    enabled: canvasItem.canUndo()
+                    visible: annotationMode === "detect"
+                    onClicked: canvasItem.undo()
+
+                    background: Rectangle {
+                        color: parent.enabled ? (parent.hovered ? Theme.bgInput : Theme.bgPrimary) : Theme.bgPrimary
+                        radius: 4
+                        border.color: parent.enabled ? Theme.borderNormal : Theme.borderDisabled
+                    }
+
+                    contentItem: Label {
+                        text: parent.text
+                        font.pixelSize: 11
+                        color: parent.enabled ? Theme.textPrimary : Theme.textDisabled
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                Button {
+                    text: "重做"
+                    font.pixelSize: 11
+                    enabled: canvasItem.canRedo()
+                    visible: annotationMode === "detect"
+                    onClicked: canvasItem.redo()
+
+                    background: Rectangle {
+                        color: parent.enabled ? (parent.hovered ? Theme.bgInput : Theme.bgPrimary) : Theme.bgPrimary
+                        radius: 4
+                        border.color: parent.enabled ? Theme.borderNormal : Theme.borderDisabled
+                    }
+
+                    contentItem: Label {
+                        text: parent.text
+                        font.pixelSize: 11
+                        color: parent.enabled ? Theme.textPrimary : Theme.textDisabled
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                     }
                 }
 
                 Button {
                     text: "保存"
+                    font.pixelSize: 11
                     highlighted: true
-                    visible: annotationMode !== "classify" && annotationMode !== "anomaly"
+                    visible: annotationMode === "detect"
                     enabled: canvasController.dirty
                     onClicked: {
+                        canvasItem.commitUndoState()
                         annotationService.saveAnnotations(
                             canvasController.currentLabelPath,
                             "", "",
                             annotationModel.toVariantList()
                         )
                         canvasController.clearDirty()
+                    }
+
+                    background: Rectangle {
+                        color: parent.enabled ? Theme.accentPrimary : Theme.bgPrimary
+                        radius: 4
+                    }
+
+                    contentItem: Label {
+                        text: parent.text
+                        font.pixelSize: 11
+                        color: parent.enabled ? Theme.bgPrimary : Theme.textDisabled
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                     }
                 }
 
@@ -590,7 +439,6 @@ Item {
                 }
             }
 
-            // Classification panel (only visible in classify mode)
             Rectangle {
                 id: classificationPanel
                 visible: annotationMode === "classify"
@@ -601,6 +449,7 @@ Item {
                 height: classificationLayout.implicitHeight + 16
                 color: Theme.bgCard
                 radius: 6
+                z: 10
 
                 ColumnLayout {
                     id: classificationLayout
@@ -653,29 +502,26 @@ Item {
                             }
 
                             onCheckedChanged: {
-                                if (!checked) {
-                                    selectedMultiClassIds = []
-                                } else {
-                                    selectedClassId = -1
-                                }
-                                annotationCanvas.requestPaint()
+                                if (!checked) selectedMultiClassIds = []
+                                else selectedClassId = -1
                             }
                         }
 
                         Button {
                             text: "保存分类"
                             highlighted: true
+                            font.pixelSize: 12
                             enabled: classificationMultiCheck.checked ? selectedMultiClassIds.length > 0 : selectedClassId >= 0
 
                             background: Rectangle {
-                                color: parent.enabled ? (parent.highlighted ? Theme.accentPrimary : Theme.bgInput) : Theme.bgPrimary
+                                color: parent.enabled ? Theme.accentPrimary : Theme.bgPrimary
                                 radius: 4
                             }
 
                             contentItem: Label {
                                 text: parent.text
                                 font.pixelSize: 12
-                                color: parent.enabled ? (parent.highlighted ? Theme.bgPrimary : Theme.textPrimary) : Theme.textDisabled
+                                color: parent.enabled ? Theme.bgPrimary : Theme.textDisabled
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -690,15 +536,12 @@ Item {
                                     labels.classId = selectedClassId
                                 }
                                 annotationService.saveClassificationLabels(
-                                    canvasController.currentLabelPath,
-                                    "", "",
-                                    labels
+                                    canvasController.currentLabelPath, "", "", labels
                                 )
                             }
                         }
                     }
 
-                    // Class selector grid
                     GridView {
                         id: classGrid
                         Layout.fillWidth: true
@@ -742,20 +585,14 @@ Item {
 
                                 onClicked: {
                                     if (classificationMultiCheck.checked) {
-                                        // Multi-label toggle
                                         var idx = selectedMultiClassIds.indexOf(model.classIndex)
                                         var newIds = selectedMultiClassIds.slice()
-                                        if (idx >= 0) {
-                                            newIds.splice(idx, 1)
-                                        } else {
-                                            newIds.push(model.classIndex)
-                                        }
+                                        if (idx >= 0) newIds.splice(idx, 1)
+                                        else newIds.push(model.classIndex)
                                         selectedMultiClassIds = newIds
                                     } else {
-                                        // Single-label: select this class
                                         selectedClassId = model.classIndex
                                     }
-                                    annotationCanvas.requestPaint()
                                 }
                             }
                         }
@@ -763,7 +600,6 @@ Item {
                 }
             }
 
-            // Anomaly detection panel (only visible in anomaly mode)
             Rectangle {
                 id: anomalyPanel
                 visible: annotationMode === "anomaly"
@@ -774,6 +610,7 @@ Item {
                 height: anomalyLayout.implicitHeight + 16
                 color: Theme.bgCard
                 radius: 6
+                z: 10
 
                 ColumnLayout {
                     id: anomalyLayout
@@ -794,9 +631,7 @@ Item {
 
                         Item { Layout.fillWidth: true }
 
-                        // Normal button
                         Button {
-                            id: normalBtn
                             text: "正常"
                             font.pixelSize: 14
                             font.bold: true
@@ -820,15 +655,10 @@ Item {
                                 verticalAlignment: Text.AlignVCenter
                             }
 
-                            onClicked: {
-                                isAnomalous = false
-                                annotationCanvas.requestPaint()
-                            }
+                            onClicked: isAnomalous = false
                         }
 
-                        // Anomalous button
                         Button {
-                            id: anomalousBtn
                             text: "异常"
                             font.pixelSize: 14
                             font.bold: true
@@ -852,38 +682,32 @@ Item {
                                 verticalAlignment: Text.AlignVCenter
                             }
 
-                            onClicked: {
-                                isAnomalous = true
-                                annotationCanvas.requestPaint()
-                            }
+                            onClicked: isAnomalous = true
                         }
 
                         Item { Layout.fillWidth: true }
 
-                        // Save button
                         Button {
                             text: "保存"
                             highlighted: true
                             Layout.preferredHeight: 36
 
                             background: Rectangle {
-                                color: parent.highlighted ? Theme.accentPrimary : Theme.bgInput
+                                color: Theme.accentPrimary
                                 radius: 4
                             }
 
                             contentItem: Label {
                                 text: parent.text
                                 font.pixelSize: 12
-                                color: parent.highlighted ? Theme.bgPrimary : Theme.textPrimary
+                                color: Theme.bgPrimary
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
 
                             onClicked: {
                                 annotationService.saveAnomalyLabels(
-                                    canvasController.currentLabelPath,
-                                    "", "",
-                                    isAnomalous
+                                    canvasController.currentLabelPath, "", "", isAnomalous
                                 )
                             }
                         }
@@ -891,10 +715,9 @@ Item {
                 }
             }
 
-            // OBB rotation control (only visible in OBB mode when an annotation is selected)
             Rectangle {
                 id: rotationPanel
-                visible: annotationMode === "detect" && shapeMode === 1 && hasSelectedAnnotation()
+                visible: annotationMode === "detect" && shapeMode === 1
                 anchors.bottom: statusBar.top
                 anchors.right: parent.right
                 anchors.margins: 8
@@ -902,6 +725,7 @@ Item {
                 height: 44
                 color: Theme.bgCard
                 radius: 4
+                z: 10
 
                 RowLayout {
                     anchors.fill: parent
@@ -922,17 +746,15 @@ Item {
                         stepSize: 1
 
                         onValueChanged: {
-                            // Update the angle of the selected annotation
                             for (var i = 0; i < annotationModel.rowCount(); i++) {
                                 var idx = annotationModel.index(i, 0)
-                                if (annotationModel.data(idx, Qt.UserRole + 8)) { // IsSelectedRole
+                                if (annotationModel.data(idx, Qt.UserRole + 8)) {
                                     var currentCx = annotationModel.data(idx, Qt.UserRole + 3)
                                     var currentCy = annotationModel.data(idx, Qt.UserRole + 4)
                                     var currentW = annotationModel.data(idx, Qt.UserRole + 5)
                                     var currentH = annotationModel.data(idx, Qt.UserRole + 6)
                                     annotationModel.updateOBBGeometry(i, currentCx, currentCy, currentW, currentH, angleSlider.value)
                                     canvasController.markDirty()
-                                    annotationCanvas.requestPaint()
                                     break
                                 }
                             }
@@ -973,14 +795,14 @@ Item {
                 }
             }
 
-            // Status bar
             Rectangle {
                 id: statusBar
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: 24
-                color: Theme.bgInput
+                color: Theme.bgCard
+                z: 10
 
                 RowLayout {
                     anchors.fill: parent
@@ -998,22 +820,35 @@ Item {
                         font.pixelSize: 11
                     }
 
+                    Label {
+                        text: canvasController.drawMode === "draw" ? "绘制" : "选择"
+                        color: Theme.textMuted
+                        font.pixelSize: 11
+                        visible: annotationMode === "detect"
+                    }
+
                     Item { Layout.fillWidth: true }
 
                     Label {
                         text: annotationMode === "classify"
-                            ? (classificationMultiCheck.checked ? selectedMultiClassIds.length + " 个类别" : (selectedClassId >= 0 ? "class_" + selectedClassId : "未分类"))
+                            ? (classificationMultiCheck.checked ? selectedMultiClassIds.length + " 个类别" : (selectedClassId >= 0 ? getClassName(selectedClassId) : "未分类"))
                             : (annotationMode === "anomaly"
                                ? (isAnomalous ? "异常" : "正常")
                                : (annotationModel.count + " 个标注"))
                         color: Theme.textMuted
                         font.pixelSize: 11
                     }
+
+                    Label {
+                        text: "W绘制 | Space平移 | Del删除 | Ctrl+Z撤销"
+                        color: Theme.textDisabled
+                        font.pixelSize: 10
+                        visible: annotationMode === "detect"
+                    }
                 }
             }
         }
 
-        // 右侧类别面板
         Rectangle {
             Layout.preferredWidth: 200
             Layout.fillHeight: true
@@ -1046,6 +881,8 @@ Item {
                         width: classListView.width
                         height: 32
 
+                        property bool isDrawingClass: annotationMode === "detect" && selectedClassId === model.classIndex
+
                         contentItem: Row {
                             spacing: 8
                             leftPadding: 8
@@ -1053,35 +890,43 @@ Item {
                                 width: 16; height: 16; radius: 2
                                 color: Theme.classColors[model.classIndex % Theme.classColors.length]
                                 anchors.verticalCenter: parent.verticalCenter
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 2
+                                    border.color: Theme.bgPrimary
+                                    border.width: isDrawingClass ? 2 : 0
+                                    visible: isDrawingClass
+                                }
                             }
                             Label {
                                 text: model.className
                                 font.pixelSize: 12
-                                color: Theme.textPrimary
+                                color: isDrawingClass ? Theme.accentPrimary : Theme.textPrimary
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                         }
 
-                        background: Rectangle { color: parent.hovered ? Theme.bgInput : "transparent" }
+                        background: Rectangle {
+                            color: isDrawingClass ? Theme.bgInput : (parent.hovered ? Theme.bgInput : "transparent")
+                        }
 
                         onClicked: {
-                            // In classification mode, clicking a class assigns it
                             if (annotationMode === "classify") {
                                 if (classificationMultiCheck.checked) {
                                     var idx = selectedMultiClassIds.indexOf(model.classIndex)
                                     var newIds = selectedMultiClassIds.slice()
-                                    if (idx >= 0) {
-                                        newIds.splice(idx, 1)
-                                    } else {
-                                        newIds.push(model.classIndex)
-                                    }
+                                    if (idx >= 0) newIds.splice(idx, 1)
+                                    else newIds.push(model.classIndex)
                                     selectedMultiClassIds = newIds
                                 } else {
                                     selectedClassId = model.classIndex
                                 }
-                                annotationCanvas.requestPaint()
+                            } else if (annotationMode === "detect") {
+                                selectedClassId = model.classIndex
+                                canvasItem.currentClassIndex = model.classIndex
+                                canvasItem.currentClassName = model.className
                             }
-                            // In detect mode, set current class for drawing
                         }
                     }
                 }
@@ -1101,99 +946,51 @@ Item {
 
                     background: Rectangle { color: parent.hovered ? Theme.bgInput : "transparent" }
 
-                    onClicked: {
-                        // Remove selected annotations
-                        for (var i = annotationModel.rowCount() - 1; i >= 0; i--) {
-                            var idx = annotationModel.index(i, 0)
-                            if (annotationModel.data(idx, Qt.UserRole + 8)) { // IsSelectedRole
-                                annotationModel.removeAnnotation(i)
-                                canvasController.markDirty()
-                            }
-                        }
-                        annotationCanvas.requestPaint()
-                    }
+                    onClicked: canvasItem.deleteSelected()
                 }
             }
         }
     }
 
-    function hasSelectedAnnotation() {
-        for (var i = 0; i < annotationModel.rowCount(); i++) {
-            var idx = annotationModel.index(i, 0)
-            if (annotationModel.data(idx, Qt.UserRole + 8)) { // IsSelectedRole
-                return true
-            }
-        }
-        return false
-    }
-
-    function selectAnnotationAt(imgX, imgY) {
-        var found = false
-        for (var i = annotationModel.rowCount() - 1; i >= 0; i--) {
-            var idx = annotationModel.index(i, 0)
-            var cx = annotationModel.data(idx, Qt.UserRole + 3)
-            var cy = annotationModel.data(idx, Qt.UserRole + 4)
-            var w = annotationModel.data(idx, Qt.UserRole + 5)
-            var h = annotationModel.data(idx, Qt.UserRole + 6)
-            var annAngle = annotationModel.data(idx, Qt.UserRole + 7) // AngleRole
-
-            if (shapeMode === 1 && annAngle !== undefined && annAngle !== 0) {
-                // OBB hit test: transform point to local coordinates
-                var dx = imgX - cx
-                var dy = imgY - cy
-                var rad = -annAngle * Math.PI / 180.0
-                var localX = dx * Math.cos(rad) - dy * Math.sin(rad)
-                var localY = dx * Math.sin(rad) + dy * Math.cos(rad)
-                var hw = w / 2
-                var hh = h / 2
-
-                if (localX >= -hw && localX <= hw && localY >= -hh && localY <= hh) {
-                    annotationModel.setSelected(i, !annotationModel.data(idx, Qt.UserRole + 8))
-
-                    // Update angle slider to this annotation's angle
-                    angleSlider.value = annAngle
-
-                    found = true
-                    break
-                }
+    function loadSample(sampleData) {
+        if (annotationMode === "classify") {
+            var clsLabels = annotationService.loadClassificationLabels(sampleData.labelPath || "")
+            if (clsLabels.labelType === "multi") {
+                selectedMultiClassIds = clsLabels.classIds || []
             } else {
-                // HBB hit test
-                var left = cx - w / 2
-                var right = cx + w / 2
-                var top = cy - h / 2
-                var bottom = cy + h / 2
+                selectedClassId = clsLabels.classId !== undefined ? clsLabels.classId : -1
+                selectedMultiClassIds = []
+            }
+        } else if (annotationMode === "anomaly") {
+            var anomalyLabels = annotationService.loadAnomalyLabels(sampleData.labelPath || "")
+            isAnomalous = anomalyLabels.isAnomalous || false
+        } else {
+            annotationModel.loadFromLabel(sampleData.labelPath || "")
+        }
+        canvasItem.loadImage(sampleData.imagePath || "", sampleData.labelPath || "")
+    }
 
-                if (imgX >= left && imgX <= right && imgY >= top && imgY <= bottom) {
-                    annotationModel.setSelected(i, !annotationModel.data(idx, Qt.UserRole + 8))
-                    found = true
-                    break
-                }
+    function getClassName(classIndex) {
+        for (var i = 0; i < taxonomyModel.rowCount(); i++) {
+            var idx = taxonomyModel.index(i, 0)
+            if (taxonomyModel.data(idx, 0) === classIndex) {
+                return taxonomyModel.data(idx, 1) || ("class_" + classIndex)
             }
         }
-        if (!found) {
-            // Deselect all
-            for (var j = 0; j < annotationModel.rowCount(); j++) {
-                var jdx = annotationModel.index(j, 0)
-                if (annotationModel.data(jdx, Qt.UserRole + 8)) {
-                    annotationModel.setSelected(j, false)
-                }
-            }
-        }
-        annotationCanvas.requestPaint()
+        return "class_" + classIndex
     }
 
     Connections {
-        target: canvasController
-        function onCanvasUpdateRequested() {
-            annotationCanvas.requestPaint()
+        target: appController
+        function onCurrentProjectIdChanged() {
+            refreshSampleList()
         }
     }
 
-    // Keyboard shortcuts
     Shortcut {
         sequence: "W"
         onActivated: {
-            if (annotationMode !== "classify" && annotationMode !== "anomaly") {
+            if (annotationMode === "detect") {
                 canvasController.drawMode = "draw"
             }
         }
@@ -1205,16 +1002,19 @@ Item {
     Shortcut {
         sequence: "Delete"
         onActivated: {
-            if (annotationMode !== "classify" && annotationMode !== "anomaly") {
-                for (var i = annotationModel.rowCount() - 1; i >= 0; i--) {
-                    var idx = annotationModel.index(i, 0)
-                    if (annotationModel.data(idx, Qt.UserRole + 8)) {
-                        annotationModel.removeAnnotation(i)
-                        canvasController.markDirty()
-                    }
-                }
-                annotationCanvas.requestPaint()
-            }
+            if (annotationMode === "detect") canvasItem.deleteSelected()
+        }
+    }
+    Shortcut {
+        sequence: "Ctrl+Z"
+        onActivated: {
+            if (annotationMode === "detect") canvasItem.undo()
+        }
+    }
+    Shortcut {
+        sequence: "Ctrl+Shift+Z"
+        onActivated: {
+            if (annotationMode === "detect") canvasItem.redo()
         }
     }
     Shortcut {
@@ -1231,27 +1031,31 @@ Item {
                         labels.classId = selectedClassId
                     }
                     annotationService.saveClassificationLabels(
-                        canvasController.currentLabelPath,
-                        "", "",
-                        labels
+                        canvasController.currentLabelPath, "", "", labels
                     )
                 }
             } else if (annotationMode === "anomaly") {
                 annotationService.saveAnomalyLabels(
-                    canvasController.currentLabelPath,
-                    "", "",
-                    isAnomalous
+                    canvasController.currentLabelPath, "", "", isAnomalous
                 )
             } else {
                 if (canvasController.dirty) {
+                    canvasItem.commitUndoState()
                     annotationService.saveAnnotations(
-                        canvasController.currentLabelPath,
-                        "", "",
+                        canvasController.currentLabelPath, "", "",
                         annotationModel.toVariantList()
                     )
                     canvasController.clearDirty()
                 }
             }
         }
+    }
+    Shortcut {
+        sequence: "F"
+        onActivated: canvasItem.fitToView()
+    }
+    Shortcut {
+        sequence: "Ctrl+A"
+        onActivated: canvasItem.selectAll()
     }
 }

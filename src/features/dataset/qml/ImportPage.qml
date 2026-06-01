@@ -888,6 +888,13 @@ Item {
 
                         property bool hovered: mouseArea.containsMouse
 
+                        MouseArea {
+                            id: mouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.NoButton
+                        }
+
                         RowLayout {
                             anchors.fill: parent
                             anchors.margins: Theme.spacingNormal
@@ -980,13 +987,6 @@ Item {
                                     datasetModel.refresh()
                                 }
                             }
-                        }
-
-                        MouseArea {
-                            id: mouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            acceptedButtons: Qt.NoButton
                         }
                     }
                 }

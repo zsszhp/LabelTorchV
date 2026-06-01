@@ -108,6 +108,13 @@ Item {
                         color: mouseArea.containsMouse ? Theme.bgHover : Theme.bgTertiary
                         radius: Theme.radiusSmall
 
+                        MouseArea {
+                            id: mouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onDoubleClicked: editLoader.active = true
+                        }
+
                         RowLayout {
                             anchors.fill: parent
                             anchors.leftMargin: Theme.spacingNormal
@@ -207,13 +214,6 @@ Item {
                                     verticalAlignment: Text.AlignVCenter
                                 }
                             }
-                        }
-
-                        MouseArea {
-                            id: mouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onDoubleClicked: editLoader.active = true
                         }
                     }
                 }
