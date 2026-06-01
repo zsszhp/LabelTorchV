@@ -18,9 +18,25 @@ Item {
         refreshExports()
     }
 
+    // 页面可见时自动刷新导出历史
+    onVisibleChanged: {
+        if (visible && currentProjectId !== "") {
+            refreshExports()
+        }
+    }
+
     function refreshExports() {
         if (selectedVersionId !== "") {
             exportHistory = exportService.listExports(selectedVersionId)
+        } else if (currentProjectId !== "" && modelVersionModel.rowCount() > 0) {
+            // 未选择版本时，自动选择第一个版本并刷新
+            var firstIdx = modelVersionModel.index(0, 0)
+            var firstId = modelVersionModel.data(firstIdx, Qt.UserRole + 1)
+            if (firstId) {
+                selectedVersionId = firstId
+                versionCombo.currentIndex = 0
+                exportHistory = exportService.listExports(firstId)
+            }
         } else {
             exportHistory = []
         }

@@ -12,13 +12,78 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
 
 ProjectService::ProjectService(QObject *parent) : QObject(parent) {}
+
+QVariantMap ProjectService::validateProjectPath(const QString &path)
+{
+    QVariantMap result;
+    QStringList warnings;
+    QStringList errors;
+
+    QString cleanPath = path.trimmed();
+
+    // 空路径检查
+    if (cleanPath.isEmpty()) {
+        errors.append(QStringLiteral("项目路径不能为空"));
+        result["valid"] = false;
+        result["warnings"] = warnings;
+        result["errors"] = errors;
+        return result;
+    }
+
+    // 中文字符检查：Python/Ultralytics 对中文路径兼容性差
+    static const QRegularExpression chineseRe(
+        QStringLiteral("[\\x{4e00}-\\x{9fff}\\x{3400}-\\x{4dbf}]"));
+    if (chineseRe.match(cleanPath).hasMatch()) {
+        warnings.append(QStringLiteral("路径包含中文字符，可能导致训练/导出失败，建议使用纯英文路径"));
+    }
+
+    // 空格检查：部分训练框架路径空格兼容性问题
+    if (cleanPath.contains(QLatin1Char(' '))) {
+        warnings.append(QStringLiteral("路径包含空格，可能导致训练/导出异常，建议使用无空格路径"));
+    }
+
+    // 特殊字符检查：括号、&、# 等可能导致命令行工具异常
+    static const QRegularExpression specialCharRe(
+        QStringLiteral("[()&#!$`|;<>]"));
+    if (specialCharRe.match(cleanPath).hasMatch()) {
+        warnings.append(QStringLiteral("路径包含特殊字符，可能导致训练/导出异常"));
+    }
+
+    // 非 ASCII 字符检查（日文、韩文等）
+    static const QRegularExpression nonAsciiRe(
+        QStringLiteral("[^\\x{0000}-\\x{007F}]"));
+    auto nonAsciiMatch = nonAsciiRe.match(cleanPath);
+    // 排除已经检测过的中文字符
+    if (nonAsciiMatch.hasMatch() && !chineseRe.match(cleanPath).hasMatch()) {
+        warnings.append(QStringLiteral("路径包含非ASCII字符，建议使用纯英文路径"));
+    }
+
+    result["valid"] = errors.isEmpty();
+    result["warnings"] = warnings;
+    result["errors"] = errors;
+    return result;
+}
 
 QString ProjectService::createProject(const QString &name, const QString &rootPath)
 {
     QString cleanPath = QDir::cleanPath(rootPath);
     ltTrace(LT_LOG_PROJECT()) << "createProject name=" << name << "path=" << cleanPath;
+
+    // 路径校验：有 errors 时拒绝创建
+    QVariantMap validation = validateProjectPath(cleanPath);
+    if (!validation["valid"].toBool()) {
+        QStringList errs = validation["errors"].toStringList();
+        ltError(LT_LOG_PROJECT()) << "createProject: path validation failed:" << errs.join(", ");
+        return {};
+    }
+    // 有 warnings 时记录日志但允许继续
+    QStringList warns = validation["warnings"].toStringList();
+    for (const QString &w : warns) {
+        ltWarning(LT_LOG_PROJECT()) << "createProject: path warning:" << w;
+    }
 
     // 1. 检查数据库中是否已存在该路径的项目，防止重复创建导致唯一约束冲突
     QSqlQuery checkQuery(Database::instance().database());
@@ -93,6 +158,18 @@ QString ProjectService::importProject(const QString &rootPath)
     ltInfo(LT_LOG_PROJECT()) << "importProject cleanPath=" << cleanPath;
 
     if (cleanPath.isEmpty()) return {};
+
+    // 路径校验：有 errors 时拒绝导入
+    QVariantMap validation = validateProjectPath(cleanPath);
+    if (!validation["valid"].toBool()) {
+        QStringList errs = validation["errors"].toStringList();
+        ltError(LT_LOG_PROJECT()) << "importProject: path validation failed:" << errs.join(", ");
+        return {};
+    }
+    QStringList warns = validation["warnings"].toStringList();
+    for (const QString &w : warns) {
+        ltWarning(LT_LOG_PROJECT()) << "importProject: path warning:" << w;
+    }
 
     QFileInfo rootInfo(cleanPath);
     if (!rootInfo.exists() || !rootInfo.isDir()) return {};

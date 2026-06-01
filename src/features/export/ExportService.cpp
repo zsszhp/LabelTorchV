@@ -109,7 +109,7 @@ QString ExportService::exportModel(const QString &modelVersionId,
     }
 
     QJsonObject optionsObj = QJsonDocument::fromJson(validatedOptionsJson.toUtf8()).object();
-    optionsObj["status"] = "pending";
+    // options_snapshot_json 只存储导出选项配置，不存储运行时状态
     QString snapshotJson = QString::fromUtf8(
         QJsonDocument(optionsObj).toJson(QJsonDocument::Compact));
 
@@ -227,25 +227,17 @@ bool ExportService::verifyExport(const QString &artifactId)
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
-    // Get current status
+    // 从 status 列读取当前状态（不再从 options_snapshot_json 读取）
     QSqlQuery getQuery(db);
-    getQuery.prepare("SELECT options_snapshot_json FROM export_artifacts WHERE id = ?");
+    getQuery.prepare("SELECT status FROM export_artifacts WHERE id = ?");
     getQuery.addBindValue(artifactId);
     if (!getQuery.exec() || !getQuery.next()) return false;
 
-    QString optionsJsonStr = getQuery.value(0).toString();
-
-    QJsonObject optionsObj;
-    if (!optionsJsonStr.isEmpty()) {
-        QJsonDocument doc = QJsonDocument::fromJson(optionsJsonStr.toUtf8());
-        if (doc.isObject()) {
-            optionsObj = doc.object();
-        }
-    }
+    QString currentStatus = getQuery.value(0).toString();
+    if (currentStatus.isEmpty()) currentStatus = QStringLiteral("pending");
 
     // 仅允许从 succeeded 或 verifying 状态发起验证
     // verifying: 自动验证流程中；succeeded: 手动重新验证
-    QString currentStatus = optionsObj.value("status").toString("pending");
     if (currentStatus != "succeeded" && currentStatus != "verifying") {
         ltWarning(LT_LOG_EXPORT()) << "Cannot verify export in status:" << currentStatus;
         return false;
@@ -283,34 +275,20 @@ bool ExportService::updateExportStatus(const QString &artifactId, const QString 
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
-    // Get current options_snapshot_json
-    QSqlQuery getQuery(db);
-    getQuery.prepare("SELECT options_snapshot_json FROM export_artifacts WHERE id = ?");
-    getQuery.addBindValue(artifactId);
-    if (!getQuery.exec() || !getQuery.next()) return false;
-
-    QString optionsJsonStr = getQuery.value(0).toString();
-
-    QJsonObject optionsObj;
-    if (!optionsJsonStr.isEmpty()) {
-        QJsonDocument doc = QJsonDocument::fromJson(optionsJsonStr.toUtf8());
-        if (doc.isObject()) {
-            optionsObj = doc.object();
-        }
-    }
-
-    optionsObj["status"] = status;
-    QString updatedJson = QString::fromUtf8(
-        QJsonDocument(optionsObj).toJson(QJsonDocument::Compact));
-
+    // 直接更新 status 列，不再冗余写入 options_snapshot_json
     QSqlQuery updateQuery(db);
-    updateQuery.prepare("UPDATE export_artifacts SET options_snapshot_json = ?, status = ? WHERE id = ?");
-    updateQuery.addBindValue(updatedJson);
+    updateQuery.prepare("UPDATE export_artifacts SET status = ? WHERE id = ?");
     updateQuery.addBindValue(status);
     updateQuery.addBindValue(artifactId);
 
     if (!updateQuery.exec()) {
         ltError(LT_LOG_EXPORT()) << "Failed to update export status:" << updateQuery.lastError().text();
+        return false;
+    }
+
+    // 检查是否实际更新了行（不存在的 artifactId）
+    if (updateQuery.numRowsAffected() == 0) {
+        ltWarning(LT_LOG_EXPORT()) << "No rows affected, artifact not found:" << artifactId;
         return false;
     }
 
@@ -428,28 +406,8 @@ int ExportService::reconcileStaleExports()
         fixed = fixQuery.numRowsAffected();
     }
 
-    // 同步更新 options_snapshot_json 中的 status 字段
+    // 逐条发射状态变更信号，通知 UI 层刷新
     for (const QString &artifactId : staleArtifactIds) {
-        QSqlQuery getQuery(db);
-        getQuery.prepare("SELECT options_snapshot_json FROM export_artifacts WHERE id = ?");
-        getQuery.addBindValue(artifactId);
-        if (getQuery.exec() && getQuery.next()) {
-            QString optionsJsonStr = getQuery.value(0).toString();
-            QJsonObject optionsObj;
-            if (!optionsJsonStr.isEmpty()) {
-                QJsonDocument doc = QJsonDocument::fromJson(optionsJsonStr.toUtf8());
-                if (doc.isObject()) optionsObj = doc.object();
-            }
-            optionsObj["status"] = "failed";
-            QString updatedJson = QString::fromUtf8(
-                QJsonDocument(optionsObj).toJson(QJsonDocument::Compact));
-            QSqlQuery updateQuery(db);
-            updateQuery.prepare("UPDATE export_artifacts SET options_snapshot_json = ? WHERE id = ?");
-            updateQuery.addBindValue(updatedJson);
-            updateQuery.addBindValue(artifactId);
-            updateQuery.exec();
-        }
-
         emit exportStatusChanged(artifactId, QStringLiteral("failed"));
     }
 

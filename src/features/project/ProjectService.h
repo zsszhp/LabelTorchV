@@ -31,6 +31,16 @@ public:
     Q_INVOKABLE bool saveProjectConfig(const QString &projectId);
 
     /**
+     * @brief 校验项目路径是否包含中文或空格
+     * @param path 待校验的路径
+     * @return QVariantMap: { "valid": bool, "warnings": [string], "errors": [string] }
+     *   - valid: true=路径可用, false=路径不可用
+     *   - warnings: 警告列表（中文/空格等兼容性风险）
+     *   - errors: 错误列表（路径为空等致命问题）
+     */
+    Q_INVOKABLE QVariantMap validateProjectPath(const QString &path);
+
+    /**
      * @brief Get the current task type for a project.
      * Returns: "detect", "obb", "classify", or "anomaly".
      * Defaults to "detect" if not set.

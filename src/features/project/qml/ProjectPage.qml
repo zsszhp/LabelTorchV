@@ -8,6 +8,14 @@ import LabelTorch.Theme
 Item {
     id: pageRoot
 
+    // 路径校验结果状态
+    QtObject {
+        id: pathValidationResult
+        property var errors: []
+        property var warnings: []
+        property bool valid: true
+    }
+
     // 背景装饰光晕
     Rectangle {
         anchors.fill: parent
@@ -417,8 +425,25 @@ Item {
                         background: Rectangle {
                             color: Theme.bgInput
                             radius: Theme.radiusSmall
-                            border.color: projectPathField.activeFocus ? Theme.borderFocus : Theme.borderNormal
+                            border.color: {
+                                if (projectPathField.activeFocus) return Theme.borderFocus
+                                if (pathValidationResult.errors.length > 0) return Theme.accentError
+                                if (pathValidationResult.warnings.length > 0) return Theme.accentWarning
+                                return Theme.borderNormal
+                            }
                             border.width: 1
+                        }
+                        onTextChanged: {
+                            if (text.length > 0) {
+                                var result = projectService.validateProjectPath(text)
+                                pathValidationResult.errors = result.errors
+                                pathValidationResult.warnings = result.warnings
+                                pathValidationResult.valid = result.valid
+                            } else {
+                                pathValidationResult.errors = []
+                                pathValidationResult.warnings = []
+                                pathValidationResult.valid = true
+                            }
                         }
                     }
                     Button {
@@ -435,11 +460,45 @@ Item {
                         onClicked: folderDialog.open()
                     }
                 }
+
+                // 路径校验结果提示
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 2
+                    visible: pathValidationResult.errors.length > 0 || pathValidationResult.warnings.length > 0
+
+                    Repeater {
+                        model: pathValidationResult.errors
+                        delegate: Label {
+                            text: "✗ " + modelData
+                            color: Theme.accentError
+                            font.pixelSize: Theme.fontSizeCaption
+                            font.family: Theme.fontFamily
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                    Repeater {
+                        model: pathValidationResult.warnings
+                        delegate: Label {
+                            text: "⚠ " + modelData
+                            color: Theme.accentWarning
+                            font.pixelSize: Theme.fontSizeCaption
+                            font.family: Theme.fontFamily
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
             }
         }
 
         onAccepted: {
             if (projectNameField.text && projectPathField.text) {
+                // 路径校验不通过时阻止创建
+                if (!pathValidationResult.valid) {
+                    return
+                }
                 var pid = projectService.createProject(projectNameField.text, projectPathField.text)
                 if (pid) {
                     projectModel.refresh()
@@ -454,6 +513,9 @@ Item {
                 }
                 projectNameField.clear()
                 projectPathField.clear()
+                pathValidationResult.errors = []
+                pathValidationResult.warnings = []
+                pathValidationResult.valid = true
             }
         }
     }
