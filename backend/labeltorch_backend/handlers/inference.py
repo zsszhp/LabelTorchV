@@ -40,6 +40,12 @@ async def handle_run(payload: dict) -> dict:
 
     try:
         from ultralytics import YOLO
+        import torch
+
+        if device and device != "auto" and device != "cpu":
+            if not torch.cuda.is_available():
+                logger.warning(f"CUDA is not available. Falling back to CPU for inference (requested device was: {device}).")
+                device = "cpu"
 
         model = YOLO(weight_path)
 

@@ -39,6 +39,12 @@ async def handle_collect_low_conf(payload: dict) -> dict:
 
     try:
         from ultralytics import YOLO
+        import torch
+
+        if device and device != "auto" and device != "cpu":
+            if not torch.cuda.is_available():
+                logger.warning(f"CUDA is not available. Falling back to CPU for active learning (requested device was: {device}).")
+                device = "cpu"
 
         model = YOLO(weight_path)
 
