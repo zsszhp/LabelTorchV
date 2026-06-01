@@ -189,6 +189,28 @@ void TrainingService::handleTrainingEvent(const QVariantMap &event)
         if (!allMetrics.isEmpty() && epoch > 0) {
             m_metricService->storeEpochMetrics(taskId, epoch, allMetrics);
         }
+    } else if (eventType == QStringLiteral("task.log")) {
+        // 训练日志事件，转发给QML层实时显示
+        QString logLine = payload[QStringLiteral("message")].toString();
+        if (logLine.isEmpty()) {
+            logLine = payload[QStringLiteral("log")].toString();
+        }
+        if (logLine.isEmpty()) {
+            logLine = payload[QStringLiteral("line")].toString();
+        }
+        if (!logLine.isEmpty()) {
+            emit trainingLog(taskId, logLine);
+        }
+    } else if (eventType == QStringLiteral("task.warning")) {
+        // 训练警告事件
+        QString message = payload[QStringLiteral("message")].toString();
+        if (message.isEmpty()) {
+            message = payload[QStringLiteral("warning")].toString();
+        }
+        if (!message.isEmpty()) {
+            emit trainingWarning(taskId, message);
+        }
+        ltWarning(LT_LOG_TRAINING()) << "Training warning for" << taskId << ":" << message;
     }
 }
 

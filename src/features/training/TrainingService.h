@@ -113,6 +113,20 @@ signals:
     void trainingProgress(const QString &runId, int epoch, int totalEpochs,
                            double loss, const QVariantMap &metrics);
 
+    /**
+     * @brief 训练日志信号（实时日志行）
+     * @param runId 运行ID
+     * @param logLine 日志文本行
+     */
+    void trainingLog(const QString &runId, const QString &logLine);
+
+    /**
+     * @brief 训练警告信号
+     * @param runId 运行ID
+     * @param message 警告消息
+     */
+    void trainingWarning(const QString &runId, const QString &message);
+
 private:
     void onResponseReceived(const QJsonObject &response);
 

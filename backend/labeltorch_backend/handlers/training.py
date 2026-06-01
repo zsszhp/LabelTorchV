@@ -33,15 +33,32 @@ async def handle_start(payload: dict) -> dict:
     def on_epoch_end(epoch_data: dict):
         """每个epoch结束时通过IPC推送进度"""
         try:
+            epoch = epoch_data.get("epoch", 0)
+            total = epoch_data.get("total_epochs", 0)
+            loss = epoch_data.get("loss", 0)
+            map50 = epoch_data.get("mAP50(B)", epoch_data.get("mAP50", 0))
+            map50_95 = epoch_data.get("mAP50-95(B)", epoch_data.get("mAP50-95", 0))
+
             server.send_event("task.progress", task_id, {
                 "task_id": task_id,
-                "epoch": epoch_data.get("epoch", 0),
-                "total_epochs": epoch_data.get("total_epochs", 0),
-                "loss": epoch_data.get("loss", 0),
-                "mAP50": epoch_data.get("mAP50(B)", epoch_data.get("mAP50", 0)),
-                "mAP50-95": epoch_data.get("mAP50-95(B)", epoch_data.get("mAP50-95", 0)),
+                "epoch": epoch,
+                "total_epochs": total,
+                "loss": loss,
+                "mAP50": map50,
+                "mAP50-95": map50_95,
                 "precision": epoch_data.get("precision(B)", epoch_data.get("precision", 0)),
                 "recall": epoch_data.get("recall(B)", epoch_data.get("recall", 0)),
+            })
+
+            # 同时发送日志事件，让UI层实时显示训练进度
+            log_msg = f"Epoch {epoch}/{total} - loss: {loss:.4f}"
+            if map50:
+                log_msg += f", mAP50: {map50:.4f}"
+            if map50_95:
+                log_msg += f", mAP50-95: {map50_95:.4f}"
+            server.send_event("task.log", task_id, {
+                "task_id": task_id,
+                "message": log_msg,
             })
         except Exception as e:
             logger.warning(f"Failed to send epoch event: {e}")
@@ -50,19 +67,29 @@ async def handle_start(payload: dict) -> dict:
 
     _active_tasks[task_id] = adapter
 
-    asyncio.create_task(_run_training(task_id, adapter, config))
+    asyncio.create_task(_run_training(task_id, adapter, config, server))
 
     return {"task_id": task_id, "status": "started"}
 
 
-async def _run_training(task_id: str, adapter, config: dict):
+async def _run_training(task_id: str, adapter, config: dict, server):
     """异步执行训练，发送IPC事件"""
-    server = get_server()
 
     try:
         server.send_event("task.started", task_id, {
             "task_id": task_id,
             "config": config,
+        })
+
+        # 发送训练配置日志
+        model_family = config.get("model_family", "yolov8")
+        epochs = config.get("epochs", 100)
+        batch = config.get("batch", 16)
+        device = config.get("device", "auto")
+        imgsz = config.get("imgsz", config.get("img_size", 640))
+        server.send_event("task.log", task_id, {
+            "task_id": task_id,
+            "message": f"Training config: model={model_family}, epochs={epochs}, batch={batch}, device={device}, imgsz={imgsz}",
         })
 
         result = await adapter.start_training(config)
@@ -73,6 +100,11 @@ async def _run_training(task_id: str, adapter, config: dict):
             best_weight = _find_best_weight(run_dir)
             last_weight = _find_last_weight(run_dir)
             metrics = await adapter.collect_metrics(run_dir) if run_dir else {}
+
+            server.send_event("task.log", task_id, {
+                "task_id": task_id,
+                "message": f"Training completed! best_weight={best_weight}, last_weight={last_weight}",
+            })
 
             server.send_event("task.succeeded", task_id, {
                 "task_id": task_id,
@@ -96,13 +128,22 @@ async def _run_training(task_id: str, adapter, config: dict):
                 "run_dir": run_dir,
             })
         else:
+            error_msg = result.get("error", "Unknown error")
+            server.send_event("task.log", task_id, {
+                "task_id": task_id,
+                "message": f"Training failed: {error_msg}",
+            })
             server.send_event("task.failed", task_id, {
                 "task_id": task_id,
-                "error": result.get("error", "Unknown error"),
+                "error": error_msg,
             })
 
     except Exception as e:
         logger.error(f"Training {task_id} failed: {e}")
+        server.send_event("task.log", task_id, {
+            "task_id": task_id,
+            "message": f"Training exception: {str(e)}",
+        })
         server.send_event("task.failed", task_id, {
             "task_id": task_id,
             "error": str(e),

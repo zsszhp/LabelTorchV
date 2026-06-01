@@ -134,9 +134,23 @@ Item {
                 " | Loss: " + loss.toFixed(4) +
                 " | " + metricName + ": " + metricValue.toFixed(4)
 
+            // 更新状态标签
+            statusLabel.text = "训练中: Epoch " + epoch + "/" + totalEpochs
+            statusLabel.color = Theme.accentPrimary
+
             // 触发图表重绘
             lossChart.requestPaint()
             metricChart.requestPaint()
+        }
+
+        function onTrainingLog(runId, logLine) {
+            if (runId !== currentRunId) return
+            logView.appendLog(logLine)
+        }
+
+        function onTrainingWarning(runId, message) {
+            if (runId !== currentRunId) return
+            logView.appendLog("[WARNING] " + message)
         }
 
         function onRunStatusChanged(runId, status) {
@@ -145,15 +159,23 @@ Item {
             if (status === "preparing") {
                 statusLabel.text = "正在准备训练数据..."
                 statusLabel.color = Theme.accentWarning
+                logView.appendLog("[LabelTorch] 正在准备训练数据目录...")
+            } else if (status === "running") {
+                statusLabel.text = "训练运行中..."
+                statusLabel.color = Theme.accentPrimary
+                logView.appendLog("[LabelTorch] 训练已启动，等待进度事件...")
             } else if (status === "succeeded") {
                 statusLabel.text = "训练完成:" + runId.substring(0, 8) + "..."
                 statusLabel.color = Theme.accentSuccess
+                logView.appendLog("[LabelTorch] 训练完成!")
             } else if (status === "failed") {
                 statusLabel.text = "训练失败"
                 statusLabel.color = Theme.accentError
+                logView.appendLog("[LabelTorch] 训练失败!")
             } else if (status === "cancelled" || status === "stopped") {
                 statusLabel.text = "训练已停止"
                 statusLabel.color = Theme.accentWarning
+                logView.appendLog("[LabelTorch] 训练已停止")
             }
             trainingModel.refresh()
         }
