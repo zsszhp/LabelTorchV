@@ -77,6 +77,16 @@ public:
      */
     Q_INVOKABLE bool updateExportStatus(const QString &artifactId, const QString &status);
 
+    /**
+     * @brief 冷启动自检：修正残留的 running / verifying 状态导出产物
+     *
+     * 应用启动时调用，将上次异常退出遗留的 running / verifying 状态
+     * 导出产物修正为 failed，防止"幽灵导出"任务永远无法完成。
+     *
+     * @return 修正的记录数
+     */
+    int reconcileStaleExports();
+
 signals:
     /**
      * @brief Emitted when an export artifact's status changes.

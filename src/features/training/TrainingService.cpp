@@ -529,3 +529,47 @@ QStringList TrainingService::listAdapters()
     ltTrace(LT_LOG_TRAINING());
     return m_adapters;
 }
+
+int TrainingService::reconcileStaleRuns()
+{
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return 0;
+
+    int fixed = 0;
+
+    // 先查询需要修正的记录，逐条修正并发射信号
+    QSqlQuery query(db);
+    query.prepare("SELECT id FROM training_runs WHERE status IN ('running', 'preparing')");
+    if (!query.exec()) {
+        ltError(LT_LOG_TRAINING()) << "reconcileStaleRuns: query failed:" << query.lastError().text();
+        return 0;
+    }
+
+    QStringList staleRunIds;
+    while (query.next()) {
+        staleRunIds.append(query.value(0).toString());
+    }
+
+    if (staleRunIds.isEmpty()) return 0;
+
+    // 批量更新状态
+    QSqlQuery fixQuery(db);
+    fixQuery.prepare("UPDATE training_runs SET status = 'stopped', "
+                     "finished_at = ? WHERE status IN ('running', 'preparing')");
+    fixQuery.addBindValue(QDateTime::currentDateTime().toString(Qt::ISODate));
+    if (fixQuery.exec()) {
+        fixed = fixQuery.numRowsAffected();
+    }
+
+    // 逐条发射状态变更信号，通知 UI 层刷新
+    for (const QString &runId : staleRunIds) {
+        emit runStatusChanged(runId, QStringLiteral("stopped"));
+    }
+
+    if (fixed > 0) {
+        ltWarning(LT_LOG_TRAINING()) << "Cold boot: reconciled" << fixed
+                                     << "orphaned running/preparing tasks -> stopped";
+    }
+
+    return fixed;
+}

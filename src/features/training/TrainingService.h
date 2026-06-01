@@ -84,6 +84,16 @@ public:
      */
     Q_INVOKABLE QStringList listAdapters();
 
+    /**
+     * @brief 冷启动自检：修正残留的 running / preparing 状态任务
+     *
+     * 应用启动时调用，将上次异常退出遗留的 running / preparing 状态
+     * 训练任务修正为 stopped，防止"幽灵运行"任务永远无法完成。
+     *
+     * @return 修正的记录数
+     */
+    int reconcileStaleRuns();
+
 signals:
     /**
      * @brief 训练运行状态变更信号

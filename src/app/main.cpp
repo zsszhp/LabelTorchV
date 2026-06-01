@@ -38,8 +38,6 @@
 #include "Database.h"
 #include "utils/Log.h"
 #include "utils/AppSettings.h"
-#include <QSqlQuery>
-#include <QDateTime>
 #include <QFile>
 
 // 自定义消息处理器：将NaN ASSERT从FatalMsg降级为WarningMsg，防止程序abort
@@ -171,19 +169,9 @@ int main(int argc, char *argv[])
     ltInfo(LT_LOG_DB()) << "Database initialized at" << dbPath + "/labeltorch.db";
 
     // 冷启动自检：修正残留的 running / preparing 状态任务
-    {
-        QSqlQuery fixQuery(Database::instance().database());
-        int fixed = 0;
-        fixQuery.prepare("UPDATE training_runs SET status = 'stopped', "
-                         "finished_at = ? WHERE status IN ('running', 'preparing')");
-        fixQuery.addBindValue(QDateTime::currentDateTime().toString(Qt::ISODate));
-        if (fixQuery.exec()) {
-            fixed = fixQuery.numRowsAffected();
-        }
-        if (fixed > 0) {
-            ltWarning(LT_LOG_APP()) << "Cold boot: fixed" << fixed << "orphaned running tasks -> stopped";
-        }
-    }
+    // 通过 TrainingService / ExportService 的 reconcile 方法完成，
+    // 确保逻辑封装在 Service 层，UI 层能收到状态变更信号
+    // （注意：此处 trainingService / exportService 尚未创建，自检在创建后执行）
 
 
     AppSettings appSettings;
@@ -234,6 +222,14 @@ int main(int argc, char *argv[])
     anomalyService.setIpcClient(&ipcClient);
     exportService.setIpcClient(&ipcClient);
     activeLearningService.setIpcClient(&ipcClient);
+
+    // 冷启动自检：修正上次异常退出遗留的 running / preparing / verifying 状态
+    int trainingFixed = trainingService.reconcileStaleRuns();
+    int exportFixed = exportService.reconcileStaleExports();
+    if (trainingFixed > 0 || exportFixed > 0) {
+        ltWarning(LT_LOG_APP()) << "Cold boot: reconciled" << trainingFixed << "training runs,"
+                                << exportFixed << "export artifacts";
+    }
 
     QObject::connect(&controller, &AppController::currentProjectIdChanged, [&]() {
         if (controller.projectOpen()) {

@@ -397,3 +397,66 @@ void ExportService::handleIpcResponse(const QJsonObject &response)
         }
     }
 }
+
+int ExportService::reconcileStaleExports()
+{
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return 0;
+
+    int fixed = 0;
+
+    // 查询需要修正的记录
+    QSqlQuery query(db);
+    query.prepare("SELECT id FROM export_artifacts WHERE status IN ('running', 'verifying')");
+    if (!query.exec()) {
+        ltError(LT_LOG_EXPORT()) << "reconcileStaleExports: query failed:" << query.lastError().text();
+        return 0;
+    }
+
+    QStringList staleArtifactIds;
+    while (query.next()) {
+        staleArtifactIds.append(query.value(0).toString());
+    }
+
+    if (staleArtifactIds.isEmpty()) return 0;
+
+    // 批量更新状态为 failed（导出中断无法恢复，标记为失败）
+    QSqlQuery fixQuery(db);
+    fixQuery.prepare("UPDATE export_artifacts SET status = 'failed' "
+                     "WHERE status IN ('running', 'verifying')");
+    if (fixQuery.exec()) {
+        fixed = fixQuery.numRowsAffected();
+    }
+
+    // 同步更新 options_snapshot_json 中的 status 字段
+    for (const QString &artifactId : staleArtifactIds) {
+        QSqlQuery getQuery(db);
+        getQuery.prepare("SELECT options_snapshot_json FROM export_artifacts WHERE id = ?");
+        getQuery.addBindValue(artifactId);
+        if (getQuery.exec() && getQuery.next()) {
+            QString optionsJsonStr = getQuery.value(0).toString();
+            QJsonObject optionsObj;
+            if (!optionsJsonStr.isEmpty()) {
+                QJsonDocument doc = QJsonDocument::fromJson(optionsJsonStr.toUtf8());
+                if (doc.isObject()) optionsObj = doc.object();
+            }
+            optionsObj["status"] = "failed";
+            QString updatedJson = QString::fromUtf8(
+                QJsonDocument(optionsObj).toJson(QJsonDocument::Compact));
+            QSqlQuery updateQuery(db);
+            updateQuery.prepare("UPDATE export_artifacts SET options_snapshot_json = ? WHERE id = ?");
+            updateQuery.addBindValue(updatedJson);
+            updateQuery.addBindValue(artifactId);
+            updateQuery.exec();
+        }
+
+        emit exportStatusChanged(artifactId, QStringLiteral("failed"));
+    }
+
+    if (fixed > 0) {
+        ltWarning(LT_LOG_EXPORT()) << "Cold boot: reconciled" << fixed
+                                   << "orphaned running/verifying exports -> failed";
+    }
+
+    return fixed;
+}
