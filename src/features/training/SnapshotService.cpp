@@ -429,7 +429,7 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
     QString projectId = datasetQuery.value(0).toString();
 
     QSqlQuery projectQuery(db);
-    projectQuery.prepare("SELECT root_path FROM projects WHERE id = ?");
+    projectQuery.prepare("SELECT root_path, task_type FROM projects WHERE id = ?");
     projectQuery.addBindValue(projectId);
     if (!projectQuery.exec() || !projectQuery.next()) {
         ltError(LT_LOG_TRAINING()) << "Project not found for dataset:" << projectId;
@@ -437,17 +437,32 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
     }
     QString projectRoot = projectQuery.value(0).toString();
 
+    // 2b. 获取项目任务类型
+    QString taskType = projectQuery.value(1).toString();
+    bool isAnomaly = (taskType == QStringLiteral("anomaly"));
+
     // 3. Define target snapshot directory
     QString cacheDir = projectRoot + QStringLiteral("/cache/snapshots");
     QString snapshotDir = cacheDir + QStringLiteral("/") + snapshotId;
 
     QDir dir;
-    if (!dir.mkpath(snapshotDir + QStringLiteral("/images/train")) ||
-        !dir.mkpath(snapshotDir + QStringLiteral("/images/val")) ||
-        !dir.mkpath(snapshotDir + QStringLiteral("/labels/train")) ||
-        !dir.mkpath(snapshotDir + QStringLiteral("/labels/val"))) {
-        ltError(LT_LOG_TRAINING()) << "Failed to create physical folders for snapshot:" << snapshotDir;
-        return {};
+    if (isAnomaly) {
+        // Anomalib 目录结构: train/good + test/good + test/defective
+        if (!dir.mkpath(snapshotDir + QStringLiteral("/train/good")) ||
+            !dir.mkpath(snapshotDir + QStringLiteral("/test/good")) ||
+            !dir.mkpath(snapshotDir + QStringLiteral("/test/defective"))) {
+            ltError(LT_LOG_TRAINING()) << "Failed to create anomaly physical folders for snapshot:" << snapshotDir;
+            return {};
+        }
+    } else {
+        // YOLO 目录结构: images/train + images/val + labels/train + labels/val
+        if (!dir.mkpath(snapshotDir + QStringLiteral("/images/train")) ||
+            !dir.mkpath(snapshotDir + QStringLiteral("/images/val")) ||
+            !dir.mkpath(snapshotDir + QStringLiteral("/labels/train")) ||
+            !dir.mkpath(snapshotDir + QStringLiteral("/labels/val"))) {
+            ltError(LT_LOG_TRAINING()) << "Failed to create physical folders for snapshot:" << snapshotDir;
+            return {};
+        }
     }
 
     // 4. Parse split manifest
@@ -477,8 +492,24 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
             QString srcLbl = sampleQuery.value(1).toString();
 
             QFileInfo imgInfo(srcImg);
-            QString dstImg = snapshotDir + QStringLiteral("/images/") + splitName + QStringLiteral("/") + imgInfo.fileName();
-            
+            QString dstImg;
+
+            if (isAnomaly) {
+                // Anomaly 格式：train/good 放训练图片，test/good 或 test/defective 放验证图片
+                if (splitName == QStringLiteral("train")) {
+                    dstImg = snapshotDir + QStringLiteral("/train/good/") + imgInfo.fileName();
+                } else {
+                    // 验证集：无标签的放 good，有标签的放 defective
+                    if (srcLbl.isEmpty()) {
+                        dstImg = snapshotDir + QStringLiteral("/test/good/") + imgInfo.fileName();
+                    } else {
+                        dstImg = snapshotDir + QStringLiteral("/test/defective/") + imgInfo.fileName();
+                    }
+                }
+            } else {
+                dstImg = snapshotDir + QStringLiteral("/images/") + splitName + QStringLiteral("/") + imgInfo.fileName();
+            }
+
             if (QFile::exists(dstImg)) {
                 QFile::remove(dstImg);
             }
@@ -487,28 +518,30 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
                 return false;
             }
 
-            if (!srcLbl.isEmpty()) {
-                QFileInfo lblInfo(srcLbl);
-                QString dstLbl = snapshotDir + QStringLiteral("/labels/") + splitName + QStringLiteral("/") + lblInfo.fileName();
-                if (QFile::exists(dstLbl)) {
-                    QFile::remove(dstLbl);
-                }
-                if (QFile::exists(srcLbl)) {
-                    QFile::copy(srcLbl, dstLbl);
+            if (!isAnomaly) {
+                // YOLO 格式需要标签文件
+                if (!srcLbl.isEmpty()) {
+                    QFileInfo lblInfo(srcLbl);
+                    QString dstLbl = snapshotDir + QStringLiteral("/labels/") + splitName + QStringLiteral("/") + lblInfo.fileName();
+                    if (QFile::exists(dstLbl)) {
+                        QFile::remove(dstLbl);
+                    }
+                    if (QFile::exists(srcLbl)) {
+                        QFile::copy(srcLbl, dstLbl);
+                    } else {
+                        QFile file(dstLbl);
+                        file.open(QIODevice::WriteOnly);
+                        file.close();
+                    }
                 } else {
-                    QFile file(dstLbl);
-                    file.open(QIODevice::WriteOnly);
-                    file.close();
-                }
-            } else {
-                // 无标签样本：创建空 .txt 文件，Ultralytics 要求每张图片都有对应的标签文件
-                QFileInfo imgInfo(srcImg);
-                QString dstLbl = snapshotDir + QStringLiteral("/labels/") + splitName + QStringLiteral("/")
-                                 + imgInfo.completeBaseName() + QStringLiteral(".txt");
-                if (!QFile::exists(dstLbl)) {
-                    QFile file(dstLbl);
-                    file.open(QIODevice::WriteOnly);
-                    file.close();
+                    QFileInfo imgInfo2(srcImg);
+                    QString dstLbl = snapshotDir + QStringLiteral("/labels/") + splitName + QStringLiteral("/")
+                                     + imgInfo2.completeBaseName() + QStringLiteral(".txt");
+                    if (!QFile::exists(dstLbl)) {
+                        QFile file(dstLbl);
+                        file.open(QIODevice::WriteOnly);
+                        file.close();
+                    }
                 }
             }
         }
@@ -540,27 +573,49 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
         classes.append(QStringLiteral("defect"));
     }
 
-    // 6. Write data.yaml
-    QString yamlPath = snapshotDir + QStringLiteral("/data.yaml");
-    QFile yamlFile(yamlPath);
-    if (!yamlFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        ltError(LT_LOG_TRAINING()) << "Failed to create data.yaml file at" << yamlPath;
-        return {};
-    }
+    // 6. 生成配置文件
+    if (isAnomaly) {
+        // Anomaly 类型：生成 data.yaml 指向目录结构，Anomalib 适配器会自动识别
+        QString yamlPath = snapshotDir + QStringLiteral("/data.yaml");
+        QFile yamlFile(yamlPath);
+        if (!yamlFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            ltError(LT_LOG_TRAINING()) << "Failed to create data.yaml file at" << yamlPath;
+            return {};
+        }
 
-    QTextStream out(&yamlFile);
-    out << "path: " << QDir(snapshotDir).absolutePath() << "\n";
-    out << "train: images/train\n";
-    out << "val: images/val\n";
-    out << "nc: " << classes.size() << "\n";
-    out << "names:\n";
-    for (int i = 0; i < classes.size(); ++i) {
-        out << "  " << i << ": " << classes[i] << "\n";
-    }
-    yamlFile.close();
+        QTextStream out(&yamlFile);
+        out << "path: " << QDir(snapshotDir).absolutePath() << "\n";
+        out << "task: anomaly\n";
+        out << "normal_dir: train/good\n";
+        out << "abnormal_dir: test/defective\n";
+        out << "normal_test_dir: test/good\n";
+        yamlFile.close();
 
-    ltInfo(LT_LOG_TRAINING()) << "Snapshot prepared physically at:" << snapshotDir;
-    return yamlPath;
+        ltInfo(LT_LOG_TRAINING()) << "Anomaly snapshot prepared at:" << snapshotDir;
+        return yamlPath;
+    } else {
+        // YOLO 类型：生成标准 data.yaml
+        QString yamlPath = snapshotDir + QStringLiteral("/data.yaml");
+        QFile yamlFile(yamlPath);
+        if (!yamlFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            ltError(LT_LOG_TRAINING()) << "Failed to create data.yaml file at" << yamlPath;
+            return {};
+        }
+
+        QTextStream out(&yamlFile);
+        out << "path: " << QDir(snapshotDir).absolutePath() << "\n";
+        out << "train: images/train\n";
+        out << "val: images/val\n";
+        out << "nc: " << classes.size() << "\n";
+        out << "names:\n";
+        for (int i = 0; i < classes.size(); ++i) {
+            out << "  " << i << ": " << classes[i] << "\n";
+        }
+        yamlFile.close();
+
+        ltInfo(LT_LOG_TRAINING()) << "YOLO snapshot prepared at:" << snapshotDir;
+        return yamlPath;
+    }
 }
 
 QString SnapshotService::prepareAnomalySnapshotDir(const QString &snapshotId)

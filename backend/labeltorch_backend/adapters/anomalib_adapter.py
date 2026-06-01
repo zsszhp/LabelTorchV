@@ -184,12 +184,70 @@ class AnomalibAdapter(TrainingAdapter):
 
     def _train_sync(self, engine, model, datamodule):
         """同步执行异常检测训练（在线程池中运行）"""
-        # 检查是否需要停止
         if self._stop_event.is_set():
             raise StopTrainingException("Training stopped by user")
 
+        # 注册 Lightning 回调以推送 epoch 级进度
+        callbacks = []
+        if self._on_epoch_end:
+            try:
+                import pytorch_lightning as pl
+
+                class EpochCallback(pl.Callback):
+                    def __init__(self, adapter):
+                        super().__init__()
+                        self._adapter = adapter
+                        self._total_epochs = 0
+
+                    def on_train_start(self, trainer, pl_module):
+                        self._total_epochs = trainer.max_epochs
+
+                    def on_train_epoch_end(self, trainer, pl_module):
+                        if self._adapter._stop_event.is_set():
+                            trainer.should_stop = True
+                            return
+                        epoch = trainer.current_epoch + 1
+                        # 提取 loss
+                        loss = 0.0
+                        if trainer.callback_metrics:
+                            for key in ["loss", "train_loss", "avg_loss"]:
+                                if key in trainer.callback_metrics:
+                                    val = trainer.callback_metrics[key]
+                                    loss = float(val.item() if hasattr(val, "item") else val)
+                                    break
+
+                        # 提取验证指标
+                        metrics = {}
+                        for key, val in trainer.callback_metrics.items():
+                            try:
+                                v = float(val.item() if hasattr(val, "item") else val)
+                                # 映射 Anomalib 指标名到标准名
+                                if "image_AUROC" in key or "image_auroc" in key:
+                                    metrics["auroc"] = v
+                                elif "pixel_AUROC" in key or "pixel_auroc" in key:
+                                    metrics["pixel_auroc"] = v
+                                elif "image_F1Score" in key or "image_f1score" in key:
+                                    metrics["f1"] = v
+                            except (ValueError, TypeError):
+                                pass
+
+                        if self._adapter._on_epoch_end:
+                            self._adapter._on_epoch_end({
+                                "epoch": epoch,
+                                "total_epochs": self._total_epochs,
+                                "loss": loss,
+                                **metrics,
+                            })
+
+                callbacks.append(EpochCallback(self))
+            except ImportError:
+                logger.warning("pytorch_lightning not available, epoch callbacks disabled")
+
         # 执行训练
-        results = engine.fit(model=model, datamodule=datamodule)
+        if callbacks:
+            engine.fit(model=model, datamodule=datamodule, callbacks=callbacks)
+        else:
+            results = engine.fit(model=model, datamodule=datamodule)
 
         # 获取训练结果目录
         try:
@@ -200,7 +258,7 @@ class AnomalibAdapter(TrainingAdapter):
         except Exception:
             pass
 
-        return results
+        return {"status": "succeeded"}
 
     async def stop_training(self) -> dict:
         """停止异常检测训练"""
