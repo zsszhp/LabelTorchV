@@ -165,8 +165,8 @@ Item {
                         textRole: "versionId"
                         valueRole: "versionId"
                         displayText: currentIndex >= 0 ?
-                            modelVersionModel.data(modelVersionModel.index(currentIndex, 0), 257) ?
-                            modelVersionModel.data(modelVersionModel.index(currentIndex, 0), 257).substring(0, 8) + "..." :
+                            modelVersionModel.data(modelVersionModel.index(currentIndex, 0), Qt.UserRole + 1) ?
+                            modelVersionModel.data(modelVersionModel.index(currentIndex, 0), Qt.UserRole + 1).substring(0, 8) + "..." :
                             "选择版本" : "选择版本"
 
                         contentItem: Label {
@@ -540,7 +540,7 @@ Item {
                                         Layout.preferredHeight: 20
                                         Layout.preferredWidth: formatBadgeText.implicitWidth + 12
                                         radius: 4
-                                        color: "#3B9AFF20"
+                                        color: Theme.accentPrimary
                                         border.color: Theme.accentPrimary
                                         border.width: 1
 
@@ -561,12 +561,12 @@ Item {
                                         radius: 4
                                         color: {
                                             switch (modelData.status) {
-                                            case "pending": return "#3B9AFF20"
-                                            case "running": return "#FBBF2420"
-                                            case "verifying": return "#FBBF2420"
-                                            case "succeeded": return "#34D39920"
-                                            case "failed": return "#F8717120"
-                                            default: return "#546E7A20"
+                                            case "pending": return Theme.accentPrimary
+                                            case "running": return Theme.accentWarning
+                                            case "verifying": return Theme.accentWarning
+                                            case "succeeded": return Theme.accentSuccess
+                                            case "failed": return Theme.accentError
+                                            default: return Theme.textMuted
                                             }
                                         }
                                         border.color: {
@@ -653,7 +653,7 @@ Item {
                                 Layout.preferredWidth: 72
 
                                 background: Rectangle {
-                                    color: parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : "#34D39920"
+                                    color: parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess
                                     radius: 4
                                     border.color: modelData.status === "failed" ? Theme.accentError : Theme.accentSuccess
                                     border.width: 1

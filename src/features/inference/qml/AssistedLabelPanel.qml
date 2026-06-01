@@ -125,8 +125,8 @@ Item {
                         textRole: "id"
                         valueRole: "id"
                         displayText: currentIndex >= 0 ?
-                            modelVersionModel.data(modelVersionModel.index(currentIndex, 0), 257) ?
-                            modelVersionModel.data(modelVersionModel.index(currentIndex, 0), 257).substring(0, 8) + "..." :
+                            modelVersionModel.data(modelVersionModel.index(currentIndex, 0), Qt.UserRole + 1) ?
+                            modelVersionModel.data(modelVersionModel.index(currentIndex, 0), Qt.UserRole + 1).substring(0, 8) + "..." :
                             "选择模型" : "选择模型"
 
                         contentItem: Label {

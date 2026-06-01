@@ -176,7 +176,6 @@ Item {
                         text: "单目录自动探测"
                         font.family: Theme.fontFamily
                         font.bold: root.importMode === "auto"
-                        palette.buttonText: root.importMode === "auto" ? "#FFFFFF" : (autoBtn.hovered ? Theme.textPrimary : Theme.textSecondary)
                         background: Rectangle {
                             color: {
                                 if (root.importMode === "auto") return Theme.accentPrimary
@@ -185,6 +184,13 @@ Item {
                             radius: Theme.radiusSmall
                             border.color: root.importMode === "auto" ? Theme.accentPrimary : Theme.border
                             border.width: 1
+                        }
+                        contentItem: Label {
+                            text: autoBtn.text
+                            color: root.importMode === "auto" ? Theme.textPrimary : (autoBtn.hovered ? Theme.textPrimary : Theme.textSecondary)
+                            font: autoBtn.font
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
                         }
                         onClicked: {
                             root.importMode = "auto"
@@ -197,7 +203,6 @@ Item {
                         text: "分别指定图片和标签路径"
                         font.family: Theme.fontFamily
                         font.bold: root.importMode === "separate"
-                        palette.buttonText: root.importMode === "separate" ? "#FFFFFF" : (sepBtn.hovered ? Theme.textPrimary : Theme.textSecondary)
                         background: Rectangle {
                             color: {
                                 if (root.importMode === "separate") return Theme.accentPrimary
@@ -206,6 +211,13 @@ Item {
                             radius: Theme.radiusSmall
                             border.color: root.importMode === "separate" ? Theme.accentPrimary : Theme.border
                             border.width: 1
+                        }
+                        contentItem: Label {
+                            text: sepBtn.text
+                            color: root.importMode === "separate" ? Theme.textPrimary : (sepBtn.hovered ? Theme.textPrimary : Theme.textSecondary)
+                            font: sepBtn.font
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
                         }
                         onClicked: {
                             root.importMode = "separate"
@@ -334,12 +346,18 @@ Item {
                                 enabled: folderPathField.text.trim().length > 0 && !root.isScanning
                                 font.family: Theme.fontFamily
                                 font.bold: true
-                                palette.buttonText: enabled ? "#FFFFFF" : Theme.textDisabled
                                 background: Rectangle {
                                     color: analyzeAutoBtn.enabled ? (analyzeAutoBtn.hovered ? Qt.lighter(Theme.accentPrimary, 1.1) : Theme.accentPrimary) : Theme.bgTertiary
                                     radius: Theme.radiusSmall
                                     border.color: analyzeAutoBtn.enabled ? Theme.accentPrimary : Theme.border
                                     border.width: 1
+                                }
+                                contentItem: Label {
+                                    text: analyzeAutoBtn.text
+                                    color: enabled ? Theme.textPrimary : Theme.textDisabled
+                                    font: analyzeAutoBtn.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
                                 }
                                 onClicked: startScanAuto()
                             }
@@ -462,12 +480,18 @@ Item {
                                 enabled: imagePathField.text.trim().length > 0 && !root.isScanning
                                 font.family: Theme.fontFamily
                                 font.bold: true
-                                palette.buttonText: enabled ? "#FFFFFF" : Theme.textDisabled
                                 background: Rectangle {
                                     color: analyzeBtn.enabled ? (analyzeBtn.hovered ? Qt.lighter(Theme.accentPrimary, 1.1) : Theme.accentPrimary) : Theme.bgTertiary
                                     radius: Theme.radiusSmall
                                     border.color: analyzeBtn.enabled ? Theme.accentPrimary : Theme.border
                                     border.width: 1
+                                }
+                                contentItem: Label {
+                                    text: analyzeBtn.text
+                                    color: enabled ? Theme.textPrimary : Theme.textDisabled
+                                    font: analyzeBtn.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
                                 }
                                 onClicked: startScanSeparate()
                             }
@@ -531,7 +555,7 @@ Item {
                                         var fmt = root.scanResult ? root.scanResult.detectedFormat : ""
                                         if (fmt === "yolo_txt") return Theme.accentPrimary
                                         if (fmt === "coco_json") return Theme.accentSecondary
-                                        if (fmt === "labelme_json") return "#E67E22"
+                                        if (fmt === "labelme_json") return Theme.accentWarning
                                         if (fmt === "anomaly_unsupervised") return Theme.accentWarning
                                         if (fmt === "image_only") return Theme.textMuted
                                         return Theme.textMuted
@@ -552,7 +576,7 @@ Item {
                                         font.pixelSize: Theme.fontSizeCaption
                                         font.bold: true
                                         font.family: Theme.fontFamily
-                                        color: "#FFFFFF"
+                                        color: Theme.textPrimary
                                     }
                                 }
 
@@ -696,7 +720,7 @@ Item {
                                                 }
                                                 font.pixelSize: Theme.fontSizeCaption
                                                 font.family: Theme.fontFamily
-                                                color: "#FFFFFF"
+                                                color: Theme.textPrimary
                                             }
                                         }
                                     }
@@ -763,12 +787,18 @@ Item {
                                          && !root.isScanning
                                 font.family: Theme.fontFamily
                                 font.bold: true
-                                palette.buttonText: enabled ? "#FFFFFF" : Theme.textDisabled
                                 background: Rectangle {
                                     color: confirmImportBtn.enabled ? (confirmImportBtn.hovered ? Qt.lighter(Theme.accentPrimary, 1.1) : Theme.accentPrimary) : Theme.bgTertiary
                                     radius: Theme.radiusSmall
                                     border.color: confirmImportBtn.enabled ? Theme.accentPrimary : Theme.border
                                     border.width: 1
+                                }
+                                contentItem: Label {
+                                    text: confirmImportBtn.text
+                                    color: enabled ? Theme.textPrimary : Theme.textDisabled
+                                    font: confirmImportBtn.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
                                 }
                                 onClicked: {
                                     var dsId = ""
@@ -891,7 +921,7 @@ Item {
                                 color: {
                                     if (model.format === "yolo_txt") return Theme.accentPrimary
                                     if (model.format === "coco_json") return Theme.accentSecondary
-                                    if (model.format === "labelme_json") return "#E67E22"
+                                    if (model.format === "labelme_json") return Theme.accentWarning
                                     if (model.format === "anomaly_unsupervised") return Theme.accentWarning
                                     if (model.format === "image_only") return Theme.textMuted
                                     return Theme.textMuted
@@ -910,7 +940,7 @@ Item {
                                     }
                                     font.pixelSize: 10
                                     font.family: Theme.fontFamily
-                                    color: "#FFFFFF"
+                                    color: Theme.textPrimary
                                 }
                             }
 

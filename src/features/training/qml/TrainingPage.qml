@@ -159,28 +159,7 @@ Item {
         }
     }
 
-    // 通用图表绘制函数
-    function drawChart(ctx, w, h, model, yLabel, lineColor, threshVal, showThresh) {
-        var padL = 56, padR = 16, padT = 8, padB = 32
-        var cW = w - padL - padR
-        var cH = h - padT - padB
-
-        ctx.clearRect(0, 0, w, h)
-
-        // 图表背景
-        ctx.fillStyle = Theme.bgTertiary
-        ctx.fillRect(0, 0, w, h)
-
-        // 空数据占位提示
-        if (model.count === 0) {
-            ctx.fillStyle = Theme.textMuted
-            ctx.font = "13px sans-serif"
-            ctx.textAlign = "center"
-            ctx.fillText("等待训练数据...", w / 2, h / 2)
-            return
-        }
-
-        // 计算数据范围
+    function calculateDataRange(model, isLossModel) {
         var xMin = 0
         var xMax = Math.max(model.get(model.count - 1).epoch, 1)
         var yMin = Infinity, yMax = -Infinity
@@ -193,14 +172,22 @@ Item {
         if (yRange < 0.001) { yMin -= 0.05; yMax += 0.05; yRange = yMax - yMin }
         yMin -= yRange * 0.1
         yMax += yRange * 0.1
-        if (yMin < 0 && model === lossModel) yMin = 0
-        if (model === metricModel) { if (yMin < 0) yMin = 0; if (yMax > 1.05) yMax = 1.05 }
+        if (yMin < 0 && isLossModel) yMin = 0
+        if (!isLossModel) { if (yMin < 0) yMin = 0; if (yMax > 1.05) yMax = 1.05 }
+        return { xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax }
+    }
 
-        // 坐标映射
-        function toX(ep) { return padL + (ep - xMin) / Math.max(xMax - xMin, 1) * cW }
-        function toY(val) { return padT + cH - (val - yMin) / Math.max(yMax - yMin, 0.001) * cH }
+    function createCoordinateMappers(padL, padR, padT, padB, w, h, xMin, xMax, yMin, yMax) {
+        var cW = w - padL - padR
+        var cH = h - padT - padB
+        return {
+            toX: function(ep) { return padL + (ep - xMin) / Math.max(xMax - xMin, 1) * cW },
+            toY: function(val) { return padT + cH - (val - yMin) / Math.max(yMax - yMin, 0.001) * cH }
+        }
+    }
 
-        // 水平网格线 + Y 轴刻度
+    function drawGridLines(ctx, padL, padR, padT, padB, w, h, xMin, xMax, yMin, yMax, toX, toY, modelCount) {
+        var cH = h - padT - padB
         var ySteps = 5
         ctx.strokeStyle = Theme.divider
         ctx.lineWidth = 0.5
@@ -216,9 +203,7 @@ Item {
             ctx.textAlign = "right"
             ctx.fillText(yVal.toFixed(2), padL - 6, yPx + 3)
         }
-
-        // 垂直网格线 + X 轴刻度
-        var xSteps = Math.min(model.count, 10)
+        var xSteps = Math.min(modelCount, 10)
         for (var s = 0; s <= xSteps; s++) {
             var xVal = xMin + (xMax - xMin) * s / xSteps
             var xPx = toX(xVal)
@@ -231,8 +216,10 @@ Item {
             ctx.textAlign = "center"
             ctx.fillText(Math.round(xVal).toString(), xPx, padT + cH + 16)
         }
+    }
 
-        // 坐标轴
+    function drawAxes(ctx, padL, padR, padT, padB, w, h) {
+        var cH = h - padT - padB
         ctx.strokeStyle = Theme.borderNormal
         ctx.lineWidth = 1
         ctx.beginPath()
@@ -240,8 +227,9 @@ Item {
         ctx.lineTo(padL, padT + cH)
         ctx.lineTo(w - padR, padT + cH)
         ctx.stroke()
+    }
 
-        // 部署阈值虚线
+    function drawThresholdLine(ctx, padL, padR, w, toY, threshVal, yMin, yMax, showThresh) {
         if (showThresh && threshVal >= yMin && threshVal <= yMax) {
             var thY = toY(threshVal)
             ctx.strokeStyle = Theme.accentWarning
@@ -257,8 +245,9 @@ Item {
             ctx.textAlign = "right"
             ctx.fillText("部署阈值 " + threshVal.toFixed(2), w - padR - 4, thY - 4)
         }
+    }
 
-        // 数据折线
+    function drawDataLine(ctx, model, toX, toY, lineColor) {
         ctx.strokeStyle = lineColor
         ctx.lineWidth = 2
         ctx.lineJoin = "round"
@@ -270,8 +259,9 @@ Item {
             else ctx.lineTo(px, py)
         }
         ctx.stroke()
+    }
 
-        // 数据点圆点
+    function drawDataPoints(ctx, model, toX, toY, lineColor) {
         for (var i = 0; i < model.count; i++) {
             var px = toX(model.get(i).epoch)
             var py = toY(model.get(i).value)
@@ -280,13 +270,13 @@ Item {
             ctx.arc(px, py, 2.5, 0, Math.PI * 2)
             ctx.fill()
         }
+    }
 
-        // 最新数据点高亮 + 数值标注
+    function drawLatestPointHighlight(ctx, model, toX, toY, lineColor) {
         if (model.count > 0) {
             var li = model.count - 1
             var lpx = toX(model.get(li).epoch)
             var lpy = toY(model.get(li).value)
-            // 外圈光晕
             ctx.fillStyle = lineColor
             ctx.globalAlpha = 0.3
             ctx.beginPath()
@@ -296,14 +286,16 @@ Item {
             ctx.beginPath()
             ctx.arc(lpx, lpy, 4, 0, Math.PI * 2)
             ctx.fill()
-            // 数值文本
             ctx.fillStyle = Theme.textPrimary
             ctx.font = "bold 11px sans-serif"
             ctx.textAlign = "left"
             ctx.fillText(model.get(li).value.toFixed(4), lpx + 8, lpy - 6)
         }
+    }
 
-        // Y 轴标签（旋转）
+    function drawAxisLabels(ctx, padL, padR, padT, padB, w, h, yLabel) {
+        var cW = w - padL - padR
+        var cH = h - padT - padB
         ctx.fillStyle = Theme.textSecondary
         ctx.font = "11px sans-serif"
         ctx.textAlign = "center"
@@ -312,12 +304,38 @@ Item {
         ctx.rotate(-Math.PI / 2)
         ctx.fillText(yLabel, 0, 0)
         ctx.restore()
-
-        // X 轴标签
         ctx.fillStyle = Theme.textSecondary
         ctx.font = "11px sans-serif"
         ctx.textAlign = "center"
         ctx.fillText("Epoch", padL + cW / 2, h - 2)
+    }
+
+    function drawChart(ctx, w, h, model, yLabel, lineColor, threshVal, showThresh) {
+        var padL = 56, padR = 16, padT = 8, padB = 32
+
+        ctx.clearRect(0, 0, w, h)
+        ctx.fillStyle = Theme.bgTertiary
+        ctx.fillRect(0, 0, w, h)
+
+        if (model.count === 0) {
+            ctx.fillStyle = Theme.textMuted
+            ctx.font = "13px sans-serif"
+            ctx.textAlign = "center"
+            ctx.fillText("等待训练数据...", w / 2, h / 2)
+            return
+        }
+
+        var isLossModel = (model === lossModel)
+        var range = calculateDataRange(model, isLossModel)
+        var mappers = createCoordinateMappers(padL, padR, padT, padB, w, h, range.xMin, range.xMax, range.yMin, range.yMax)
+
+        drawGridLines(ctx, padL, padR, padT, padB, w, h, range.xMin, range.xMax, range.yMin, range.yMax, mappers.toX, mappers.toY, model.count)
+        drawAxes(ctx, padL, padR, padT, padB, w, h)
+        drawThresholdLine(ctx, padL, padR, w, mappers.toY, threshVal, range.yMin, range.yMax, showThresh)
+        drawDataLine(ctx, model, mappers.toX, mappers.toY, lineColor)
+        drawDataPoints(ctx, model, mappers.toX, mappers.toY, lineColor)
+        drawLatestPointHighlight(ctx, model, mappers.toX, mappers.toY, lineColor)
+        drawAxisLabels(ctx, padL, padR, padT, padB, w, h, yLabel)
     }
 
     // 未打开项目时的空状态提示
@@ -2155,12 +2173,12 @@ Item {
                                     radius: 4
                                     color: {
                                         switch (model.status) {
-                                        case "running": return "#FBBF2420"
-                                        case "succeeded": return "#34D39920"
-                                        case "failed": return "#F8717120"
-                                        case "cancelled": return "#546E7A20"
-                                        case "draft": return "#3B9AFF20"
-                                        default: return "#546E7A20"
+                                        case "running": return Theme.accentWarning
+                                        case "succeeded": return Theme.accentSuccess
+                                        case "failed": return Theme.accentError
+                                        case "cancelled": return Theme.textMuted
+                                        case "draft": return Theme.accentPrimary
+                                        default: return Theme.textMuted
                                         }
                                     }
                                     border.color: {

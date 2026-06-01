@@ -13,7 +13,7 @@ Item {
         anchors.fill: parent
         gradient: Gradient {
             GradientStop { position: 0.0; color: Theme.bgPrimary }
-            GradientStop { position: 1.0; color: "#15182A" }
+            GradientStop { position: 1.0; color: Theme.bgPrimary }
         }
 
         // 右上角装饰光晕
@@ -88,13 +88,19 @@ Item {
                 text: "+ 新建项目"
                 font.family: Theme.fontFamily
                 font.bold: true
-                palette.buttonText: "#FFFFFF"
                 background: Rectangle {
                     gradient: Gradient {
                         GradientStop { position: 0.0; color: Theme.accentPrimary }
-                        GradientStop { position: 1.0; color: "#2B7AE0" }
+                        GradientStop { position: 1.0; color: Theme.accentPrimary }
                     }
                     radius: Theme.radiusNormal
+                }
+                contentItem: Label {
+                    text: newProjectBtn.text
+                    color: Theme.textPrimary
+                    font: newProjectBtn.font
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
                 onClicked: newProjectDialog.open()
             }
@@ -197,7 +203,7 @@ Item {
                                 radius: Theme.radiusNormal
                                 gradient: Gradient {
                                     GradientStop { position: 0.0; color: appController.currentProjectId === model.projectId ? Theme.accentPrimary : Theme.accentSecondary }
-                                    GradientStop { position: 1.0; color: appController.currentProjectId === model.projectId ? "#2B7AE0" : "#7C3AED" }
+                                    GradientStop { position: 1.0; color: appController.currentProjectId === model.projectId ? Theme.accentPrimary : Theme.accentSecondary }
                                 }
                                 opacity: appController.currentProjectId === model.projectId ? 1.0 : 0.6
 
@@ -206,7 +212,7 @@ Item {
                                     text: model.name ? model.name.charAt(0).toUpperCase() : "P"
                                     font.bold: true
                                     font.pixelSize: Theme.fontSizeLarge
-                                    color: "#FFFFFF"
+                                    color: Theme.textPrimary
                                     font.family: Theme.fontFamily
                                 }
                             }
@@ -281,7 +287,6 @@ Item {
                                 font.pixelSize: Theme.fontSizeSmall
                                 font.family: Theme.fontFamily
                                 font.bold: true
-                                palette.buttonText: appController.currentProjectId === model.projectId ? "#FFFFFF" : (openBtn.hovered ? Theme.textPrimary : Theme.textSecondary)
                                 background: Rectangle {
                                     color: {
                                         if (appController.currentProjectId === model.projectId) {
@@ -292,6 +297,13 @@ Item {
                                     radius: Theme.radiusSmall
                                     border.color: appController.currentProjectId === model.projectId ? Theme.accentSuccess : (openBtn.hovered ? Theme.accentPrimary : Theme.border)
                                     border.width: 1
+                                }
+                                contentItem: Label {
+                                    text: openBtn.text
+                                    color: appController.currentProjectId === model.projectId ? Theme.textPrimary : (openBtn.hovered ? Theme.textPrimary : Theme.textSecondary)
+                                    font: openBtn.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
                                 }
                                 onClicked: {
                                     if (appController.currentProjectId !== model.projectId) {
