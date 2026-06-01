@@ -173,7 +173,7 @@ Item {
                         ctx.strokeRect(imgX, imgY, imgW, imgH)
 
                         // Show anomaly label at center
-                        var labelText = isAnomalous ? "ANOMALOUS" : "NORMAL"
+                        var labelText = isAnomalous ? "异常" : "正常"
                         var labelColor = isAnomalous ? Theme.accentError : Theme.accentSuccess
 
                         ctx.globalAlpha = 0.15
@@ -202,7 +202,7 @@ Item {
                         ctx.strokeRect(imgX, imgY, imgW, imgH)
 
                         // Show classification label at center
-                        var colors = [Theme.accentError, Theme.accentSuccess, Theme.accentPrimary, Theme.accentWarning, "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"]
+                        var colors = Theme.classColors
                         var labelText = ""
 
                         if (classificationMultiCheck.checked) {
@@ -246,18 +246,18 @@ Item {
                     ctx.strokeRect(imgX2, imgY2, imgW2, imgH2)
 
                     // Draw annotations
-                    var colors2 = [Theme.accentError, Theme.accentSuccess, Theme.accentPrimary, Theme.accentWarning, "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"]
+                    var colors2 = Theme.classColors
 
                     for (var i = 0; i < annotationModel.rowCount(); i++) {
                         var idx = annotationModel.index(i, 0)
-                        var cx = annotationModel.data(idx, 259)  // CxRole
-                        var cy = annotationModel.data(idx, 260)  // CyRole
-                        var w = annotationModel.data(idx, 261)   // WRole
-                        var h = annotationModel.data(idx, 262)   // HRole
-                        var annAngle = annotationModel.data(idx, 263) // AngleRole
-                        var classIdx = annotationModel.data(idx, 256)  // ClassIndexRole
-                        var className = annotationModel.data(idx, 257) // ClassNameRole
-                        var selected = annotationModel.data(idx, 264)  // IsSelectedRole
+                        var cx = annotationModel.data(idx, Qt.UserRole + 3)  // CxRole
+                        var cy = annotationModel.data(idx, Qt.UserRole + 4)  // CyRole
+                        var w = annotationModel.data(idx, Qt.UserRole + 5)   // WRole
+                        var h = annotationModel.data(idx, Qt.UserRole + 6)   // HRole
+                        var annAngle = annotationModel.data(idx, Qt.UserRole + 7) // AngleRole
+                        var classIdx = annotationModel.data(idx, Qt.UserRole)      // ClassIndexRole
+                        var className = annotationModel.data(idx, Qt.UserRole + 1) // ClassNameRole
+                        var selected = annotationModel.data(idx, Qt.UserRole + 8)  // IsSelectedRole
 
                         if (cx === undefined || cy === undefined || w === undefined || h === undefined) continue
 
@@ -457,7 +457,7 @@ Item {
                     spacing: 0
 
                     Button {
-                        text: "HBB"
+                        text: "水平框"
                         font.pixelSize: 11
                         highlighted: annotationMode === "detect" && shapeMode === 0
                         flat: !highlighted
@@ -482,7 +482,7 @@ Item {
                     }
 
                     Button {
-                        text: "OBB"
+                        text: "旋转框"
                         font.pixelSize: 11
                         highlighted: annotationMode === "detect" && shapeMode === 1
                         flat: !highlighted
@@ -507,7 +507,7 @@ Item {
                     }
 
                     Button {
-                        text: "CLS"
+                        text: "分类"
                         font.pixelSize: 11
                         highlighted: annotationMode === "classify"
                         flat: !highlighted
@@ -530,7 +530,7 @@ Item {
                     }
 
                     Button {
-                        text: "AD"
+                        text: "异常"
                         font.pixelSize: 11
                         highlighted: annotationMode === "anomaly"
                         flat: !highlighted
@@ -675,7 +675,7 @@ Item {
                             contentItem: Label {
                                 text: parent.text
                                 font.pixelSize: 12
-                                color: parent.enabled ? (parent.highlighted ? Theme.bgPrimary : Theme.textPrimary) : "#585b70"
+                                color: parent.enabled ? (parent.highlighted ? Theme.bgPrimary : Theme.textPrimary) : Theme.textDisabled
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -722,11 +722,11 @@ Item {
 
                                 background: Rectangle {
                                     color: parent.isThisSelected
-                                        ? [Theme.accentError, Theme.accentSuccess, Theme.accentPrimary, Theme.accentWarning, "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"][model.classIndex % 10]
+                                        ? Theme.classColors[model.classIndex % Theme.classColors.length]
                                         : Theme.bgInput
                                     radius: 4
                                     border.color: parent.isThisSelected
-                                        ? [Theme.accentError, Theme.accentSuccess, Theme.accentPrimary, Theme.accentWarning, "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"][model.classIndex % 10]
+                                        ? Theme.classColors[model.classIndex % Theme.classColors.length]
                                         : Theme.borderNormal
                                     border.width: parent.isThisSelected ? 2 : 1
                                 }
@@ -797,7 +797,7 @@ Item {
                         // Normal button
                         Button {
                             id: normalBtn
-                            text: "Normal"
+                            text: "正常"
                             font.pixelSize: 14
                             font.bold: true
                             highlighted: !isAnomalous
@@ -829,7 +829,7 @@ Item {
                         // Anomalous button
                         Button {
                             id: anomalousBtn
-                            text: "Anomalous"
+                            text: "异常"
                             font.pixelSize: 14
                             font.bold: true
                             highlighted: isAnomalous
@@ -925,11 +925,11 @@ Item {
                             // Update the angle of the selected annotation
                             for (var i = 0; i < annotationModel.rowCount(); i++) {
                                 var idx = annotationModel.index(i, 0)
-                                if (annotationModel.data(idx, 264)) { // IsSelectedRole
-                                    var currentCx = annotationModel.data(idx, 259)
-                                    var currentCy = annotationModel.data(idx, 260)
-                                    var currentW = annotationModel.data(idx, 261)
-                                    var currentH = annotationModel.data(idx, 262)
+                                if (annotationModel.data(idx, Qt.UserRole + 8)) { // IsSelectedRole
+                                    var currentCx = annotationModel.data(idx, Qt.UserRole + 3)
+                                    var currentCy = annotationModel.data(idx, Qt.UserRole + 4)
+                                    var currentW = annotationModel.data(idx, Qt.UserRole + 5)
+                                    var currentH = annotationModel.data(idx, Qt.UserRole + 6)
                                     annotationModel.updateOBBGeometry(i, currentCx, currentCy, currentW, currentH, angleSlider.value)
                                     canvasController.markDirty()
                                     annotationCanvas.requestPaint()
@@ -960,7 +960,7 @@ Item {
                             width: 14
                             height: 14
                             radius: 7
-                            color: angleSlider.pressed ? "#b4befe" : Theme.accentPrimary
+                            color: Theme.accentPrimary
                         }
                     }
 
@@ -993,7 +993,7 @@ Item {
                     }
 
                     Label {
-                        text: annotationMode === "classify" ? "CLS" : (annotationMode === "anomaly" ? "AD" : (shapeMode === 1 ? "OBB" : "HBB"))
+                        text: annotationMode === "classify" ? "分类" : (annotationMode === "anomaly" ? "异常" : (shapeMode === 1 ? "旋转框" : "水平框"))
                         color: Theme.accentPrimary
                         font.pixelSize: 11
                     }
@@ -1051,7 +1051,7 @@ Item {
                             leftPadding: 8
                             Rectangle {
                                 width: 16; height: 16; radius: 2
-                                color: [Theme.accentError, Theme.accentSuccess, Theme.accentPrimary, Theme.accentWarning, "#fab387", "#94e2d5", "#cba6f7", "#f5c2e7", "#89dceb", "#b4befe"][model.classIndex % 10]
+                                color: Theme.classColors[model.classIndex % Theme.classColors.length]
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                             Label {
@@ -1105,7 +1105,7 @@ Item {
                         // Remove selected annotations
                         for (var i = annotationModel.rowCount() - 1; i >= 0; i--) {
                             var idx = annotationModel.index(i, 0)
-                            if (annotationModel.data(idx, 264)) { // IsSelectedRole
+                            if (annotationModel.data(idx, Qt.UserRole + 8)) { // IsSelectedRole
                                 annotationModel.removeAnnotation(i)
                                 canvasController.markDirty()
                             }
@@ -1120,7 +1120,7 @@ Item {
     function hasSelectedAnnotation() {
         for (var i = 0; i < annotationModel.rowCount(); i++) {
             var idx = annotationModel.index(i, 0)
-            if (annotationModel.data(idx, 264)) { // IsSelectedRole
+            if (annotationModel.data(idx, Qt.UserRole + 8)) { // IsSelectedRole
                 return true
             }
         }
@@ -1131,11 +1131,11 @@ Item {
         var found = false
         for (var i = annotationModel.rowCount() - 1; i >= 0; i--) {
             var idx = annotationModel.index(i, 0)
-            var cx = annotationModel.data(idx, 259)
-            var cy = annotationModel.data(idx, 260)
-            var w = annotationModel.data(idx, 261)
-            var h = annotationModel.data(idx, 262)
-            var annAngle = annotationModel.data(idx, 263) // AngleRole
+            var cx = annotationModel.data(idx, Qt.UserRole + 3)
+            var cy = annotationModel.data(idx, Qt.UserRole + 4)
+            var w = annotationModel.data(idx, Qt.UserRole + 5)
+            var h = annotationModel.data(idx, Qt.UserRole + 6)
+            var annAngle = annotationModel.data(idx, Qt.UserRole + 7) // AngleRole
 
             if (shapeMode === 1 && annAngle !== undefined && annAngle !== 0) {
                 // OBB hit test: transform point to local coordinates
@@ -1148,7 +1148,7 @@ Item {
                 var hh = h / 2
 
                 if (localX >= -hw && localX <= hw && localY >= -hh && localY <= hh) {
-                    annotationModel.setSelected(i, !annotationModel.data(idx, 264))
+                    annotationModel.setSelected(i, !annotationModel.data(idx, Qt.UserRole + 8))
 
                     // Update angle slider to this annotation's angle
                     angleSlider.value = annAngle
@@ -1164,7 +1164,7 @@ Item {
                 var bottom = cy + h / 2
 
                 if (imgX >= left && imgX <= right && imgY >= top && imgY <= bottom) {
-                    annotationModel.setSelected(i, !annotationModel.data(idx, 264))
+                    annotationModel.setSelected(i, !annotationModel.data(idx, Qt.UserRole + 8))
                     found = true
                     break
                 }
@@ -1174,7 +1174,7 @@ Item {
             // Deselect all
             for (var j = 0; j < annotationModel.rowCount(); j++) {
                 var jdx = annotationModel.index(j, 0)
-                if (annotationModel.data(jdx, 264)) {
+                if (annotationModel.data(jdx, Qt.UserRole + 8)) {
                     annotationModel.setSelected(j, false)
                 }
             }
@@ -1208,7 +1208,7 @@ Item {
             if (annotationMode !== "classify" && annotationMode !== "anomaly") {
                 for (var i = annotationModel.rowCount() - 1; i >= 0; i--) {
                     var idx = annotationModel.index(i, 0)
-                    if (annotationModel.data(idx, 264)) {
+                    if (annotationModel.data(idx, Qt.UserRole + 8)) {
                         annotationModel.removeAnnotation(i)
                         canvasController.markDirty()
                     }

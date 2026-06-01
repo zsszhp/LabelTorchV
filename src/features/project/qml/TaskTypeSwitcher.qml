@@ -20,7 +20,7 @@ RowLayout {
     // Detect (HBB)
     Button {
         id: detectBtn
-        text: "HBB"
+        text: "水平框"
         font.pixelSize: 11
         highlighted: root.taskType === "detect"
         flat: !highlighted
@@ -46,7 +46,7 @@ RowLayout {
             text: detectBtn.text
             font.pixelSize: 11
             font.bold: detectBtn.highlighted
-            color: detectBtn.highlighted ? "#FFFFFF" : (detectBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
+            color: detectBtn.highlighted ? Theme.textPrimary : (detectBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
@@ -55,7 +55,7 @@ RowLayout {
     // OBB
     Button {
         id: obbBtn
-        text: "OBB"
+        text: "旋转框"
         font.pixelSize: 11
         highlighted: root.taskType === "obb"
         flat: !highlighted
@@ -81,7 +81,7 @@ RowLayout {
             text: obbBtn.text
             font.pixelSize: 11
             font.bold: obbBtn.highlighted
-            color: obbBtn.highlighted ? "#FFFFFF" : (obbBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
+            color: obbBtn.highlighted ? Theme.textPrimary : (obbBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
@@ -90,7 +90,7 @@ RowLayout {
     // Classify
     Button {
         id: classifyBtn
-        text: "CLS"
+        text: "分类"
         font.pixelSize: 11
         highlighted: root.taskType === "classify"
         flat: !highlighted
@@ -116,7 +116,7 @@ RowLayout {
             text: classifyBtn.text
             font.pixelSize: 11
             font.bold: classifyBtn.highlighted
-            color: classifyBtn.highlighted ? "#FFFFFF" : (classifyBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
+            color: classifyBtn.highlighted ? Theme.textPrimary : (classifyBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
@@ -125,7 +125,7 @@ RowLayout {
     // Anomaly
     Button {
         id: anomalyBtn
-        text: "AD"
+        text: "异常"
         font.pixelSize: 11
         highlighted: root.taskType === "anomaly"
         flat: !highlighted
@@ -151,7 +151,7 @@ RowLayout {
             text: anomalyBtn.text
             font.pixelSize: 11
             font.bold: anomalyBtn.highlighted
-            color: anomalyBtn.highlighted ? "#1A1A2E" : (anomalyBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
+            color: anomalyBtn.highlighted ? Theme.bgPrimary : (anomalyBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }

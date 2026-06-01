@@ -73,7 +73,7 @@ Rectangle {
                     id: modelStatusText
                     anchors.centerIn: parent
                     text: root.modelLoaded ? "模型已加载" : "模型未加载"
-                    color: root.modelLoaded ? "#FFFFFF" : Theme.textMuted
+                    color: root.modelLoaded ? Theme.textPrimary : Theme.textMuted
                     font.pixelSize: Theme.fontSizeCaption
                 }
             }
@@ -171,7 +171,7 @@ Rectangle {
                     }
                     contentItem: Label {
                         text: parent.text
-                        color: parent.enabled ? "#FFFFFF" : Theme.textMuted
+                        color: parent.enabled ? Theme.textPrimary : Theme.textMuted
                         font.pixelSize: Theme.fontSizeNormal
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -216,7 +216,7 @@ Rectangle {
                 }
                 contentItem: Label {
                     text: parent.text
-                    color: parent.enabled ? "#FFFFFF" : Theme.textMuted
+                    color: parent.enabled ? Theme.textPrimary : Theme.textMuted
                     font.pixelSize: Theme.fontSizeNormal
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -269,7 +269,7 @@ Rectangle {
                     id: statusText
                     anchors.centerIn: parent
                     text: root.isAnomalous === 1 ? "NG" : "OK"
-                    color: "#FFFFFF"
+                    color: Theme.textPrimary
                     font.pixelSize: Theme.fontSizeLarge
                     font.bold: true
                 }
@@ -283,7 +283,7 @@ Rectangle {
                 width: scoreColumn.implicitWidth + 20
                 height: scoreColumn.implicitHeight + 16
                 radius: Theme.radiusSmall
-                color: "#CC0D0E15"
+                color: Theme.bgPrimary
                 visible: root.currentResult !== null
 
                 ColumnLayout {
@@ -502,7 +502,7 @@ Rectangle {
                         width: historyList.width
                         height: 36
                         radius: Theme.radiusSmall
-                        color: modelData.isAnomalous === 1 ? "#1A0D0E15" : Theme.bgTertiary
+                        color: modelData.isAnomalous === 1 ? Theme.bgPrimary : Theme.bgTertiary
                         border.color: modelData.isAnomalous === 1 ? Theme.accentError : "transparent"
                         border.width: modelData.isAnomalous === 1 ? 1 : 0
 
@@ -522,7 +522,7 @@ Rectangle {
                                 Label {
                                     anchors.centerIn: parent
                                     text: modelData.isAnomalous === 1 ? "NG" : "OK"
-                                    color: "#FFFFFF"
+                                    color: Theme.textPrimary
                                     font.pixelSize: Theme.fontSizeCaption
                                     font.bold: true
                                 }
@@ -563,7 +563,7 @@ Rectangle {
                                 }
                                 contentItem: Label {
                                     text: parent.text
-                                    color: "#FFFFFF"
+                                    color: Theme.textPrimary
                                     font.pixelSize: Theme.fontSizeCaption
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter

@@ -451,7 +451,8 @@ Item {
     }
 
     function barColor(idx) {
-        var colors = [Theme.accentPrimary, Theme.accentSuccess, Theme.accentWarning, Theme.accentError, "#cba6f7", "#94e2d5", "#fab387", "#74c7ec"]
+        var colors = [Theme.accentPrimary, Theme.accentSuccess, Theme.accentWarning, Theme.accentError,
+                      Theme.classColors[4], Theme.classColors[5], Theme.classColors[6], Theme.classColors[7]]
         return colors[idx % colors.length]
     }
 

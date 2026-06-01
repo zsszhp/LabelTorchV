@@ -170,7 +170,7 @@ ApplicationWindow {
                             text: "LT"
                             font.pixelSize: 14
                             font.bold: true
-                            color: "#FFFFFF"
+                            color: Theme.textPrimary
                             font.family: Theme.fontFamily
                         }
                     }

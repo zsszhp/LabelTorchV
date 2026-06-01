@@ -231,10 +231,10 @@ Item {
                                                     radius: 4
                                                     color: {
                                                         switch(modelData) {
-                                                        case "baseline": return "#3B9AFF20"
-                                                        case "best-so-far": return "#34D39920"
-                                                        case "production-candidate": return "#FBBF2420"
-                                                        default: return "#546E7A20"
+                                                        case "baseline": return Theme.accentPrimary
+                                                        case "best-so-far": return Theme.accentSuccess
+                                                        case "production-candidate": return Theme.accentWarning
+                                                        default: return Theme.textDisabled
                                                         }
                                                     }
                                                     border.color: {
@@ -270,7 +270,7 @@ Item {
 
                                         Label {
                                             visible: model.parentVersionId && model.parentVersionId !== ""
-                                            text: "parent: " + model.parentVersionId.substring(0, 8) + "..."
+                                            text: "父版本：" + model.parentVersionId.substring(0, 8) + "..."
                                             color: Theme.textMuted
                                             font.pixelSize: 10
                                             font.family: "monospace"
@@ -282,7 +282,7 @@ Item {
                                         spacing: 8
 
                                         Label {
-                                            text: "Run: " + model.runId.substring(0, 8) + "..."
+                                            text: "运行：" + model.runId.substring(0, 8) + "..."
                                             color: Theme.textSecondary
                                             font.pixelSize: 11
                                             font.family: "monospace"
@@ -383,7 +383,7 @@ Item {
 
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Label { text: "ID:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
+                                    Label { text: "ID："; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: selectedVersionId
                                         color: Theme.textPrimary

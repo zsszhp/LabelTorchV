@@ -44,7 +44,7 @@ Item {
                     Layout.fillWidth: true
 
                     Label {
-                        text: "Select Versions"
+                        text: "选择版本"
                         color: Theme.accentPrimary
                         font.pixelSize: 16
                         font.bold: true
@@ -65,14 +65,14 @@ Item {
                     spacing: 8
 
                     Label {
-                        text: "Mode:"
+                        text: "模式："
                         color: Theme.textPrimary
                         font.pixelSize: 12
                     }
 
                     Button {
                         id: horizontalBtn
-                        text: "Horizontal"
+                        text: "水平"
                         font.pixelSize: 11
                         flat: true
                         palette.buttonText: compareMode === "horizontal" ? Theme.accentPrimary : Theme.textMuted
@@ -88,7 +88,7 @@ Item {
 
                     Button {
                         id: verticalBtn
-                        text: "Vertical (Chain)"
+                        text: "垂直（链式）"
                         font.pixelSize: 11
                         flat: true
                         palette.buttonText: compareMode === "vertical" ? Theme.accentPrimary : Theme.textMuted
@@ -107,8 +107,8 @@ Item {
                 Label {
                     Layout.fillWidth: true
                     text: compareMode === "horizontal"
-                          ? "Compare versions trained on the same dataset snapshot"
-                          : "Compare versions in the same incremental training chain"
+                          ? "对比同一数据快照上训练的版本"
+                          : "对比同一增量训练链中的版本"
                     color: Theme.textMuted
                     font.pixelSize: 10
                     font.italic: true
@@ -127,7 +127,7 @@ Item {
                     Label {
                         anchors.centerIn: parent
                         visible: versionCheckList.count === 0
-                        text: "No model versions yet"
+                        text: "暂无模型版本"
                         color: Theme.textMuted
                         font.pixelSize: 14
                         horizontalAlignment: Text.AlignHCenter
@@ -194,8 +194,8 @@ Item {
                                 }
 
                                 Label {
-                                    text: "Run: " + model.runId.substring(0, 8) + "..." +
-                                          (model.parentVersionId && model.parentVersionId !== "" ? "  Parent: " + model.parentVersionId.substring(0, 8) + "..." : "")
+                                    text: "运行: " + model.runId.substring(0, 8) + "..." +
+                                          (model.parentVersionId && model.parentVersionId !== "" ? "  父版本: " + model.parentVersionId.substring(0, 8) + "..." : "")
                                     color: Theme.textMuted
                                     font.pixelSize: 10
                                     font.family: "monospace"
@@ -218,7 +218,7 @@ Item {
                     spacing: 8
 
                     Button {
-                        text: "Compare"
+                        text: "对比"
                         enabled: selectedVersionIds.length >= 2
                         font.pixelSize: 12
 
@@ -249,7 +249,7 @@ Item {
                     }
 
                     Button {
-                        text: "Clear"
+                        text: "清除"
                         enabled: selectedVersionIds.length > 0
                         font.pixelSize: 12
                         flat: true
@@ -265,7 +265,7 @@ Item {
                     Item { Layout.fillWidth: true }
 
                     Button {
-                        text: "Select All"
+                        text: "全选"
                         enabled: versionCheckList.count > 0
                         font.pixelSize: 11
                         flat: true
@@ -275,7 +275,7 @@ Item {
                             var ids = []
                             for (var i = 0; i < versionCheckList.count; i++) {
                                 var idx = versionCheckList.model.index(i, 0)
-                                var vid = versionCheckList.model.data(idx, 257)  // IdRole = Qt.UserRole + 1 = 257
+                                var vid = versionCheckList.model.data(idx, Qt.UserRole + 1)
                                 if (vid && vid !== "") ids.push(vid)
                             }
                             selectedVersionIds = ids
@@ -302,7 +302,7 @@ Item {
                     Layout.fillWidth: true
 
                     Label {
-                        text: "Comparison Results"
+                        text: "对比结果"
                         color: Theme.accentPrimary
                         font.pixelSize: 16
                         font.bold: true
@@ -312,7 +312,7 @@ Item {
 
                     Label {
                         visible: hasCompared && comparisonData.length >= 2
-                        text: compareMode === "horizontal" ? "Horizontal: Same Snapshot" : "Vertical: Incremental Chain"
+                        text: compareMode === "horizontal" ? "水平：同快照" : "垂直：增量链"
                         color: compareMode === "horizontal" ? Theme.accentSuccess : Theme.accentWarning
                         font.pixelSize: 11
                     }
@@ -324,8 +324,8 @@ Item {
                     Layout.fillHeight: true
                     visible: !hasCompared || comparisonData.length < 2
                     text: !hasCompared
-                          ? "Select 2 or more versions and click Compare"
-                          : "Need at least 2 versions with metrics to compare"
+                          ? "选择 2 个或更多版本后点击对比"
+                          : "至少需要 2 个有指标的版本才能对比"
                     color: Theme.textMuted
                     font.pixelSize: 14
                     horizontalAlignment: Text.AlignHCenter
@@ -357,7 +357,7 @@ Item {
 
                                 Label {
                                     anchors.centerIn: parent
-                                    text: "Metric"
+                                    text: "指标"
                                     color: Theme.textPrimary
                                     font.pixelSize: 12
                                     font.bold: true
@@ -388,12 +388,12 @@ Item {
                                         Label {
                                             text: {
                                                 if (compareMode === "horizontal" && modelData.snapshotId) {
-                                                    return "Snap: " + modelData.snapshotId.substring(0, 8) + "..."
+                                                    return "快照: " + modelData.snapshotId.substring(0, 8) + "..."
                                                 }
                                                 if (compareMode === "vertical" && modelData.parentVersionId && modelData.parentVersionId !== "") {
-                                                    return "Parent: " + modelData.parentVersionId.substring(0, 8) + "..."
+                                                    return "父版本: " + modelData.parentVersionId.substring(0, 8) + "..."
                                                 }
-                                                return "Root version"
+                                                return "根版本"
                                             }
                                             color: Theme.textMuted
                                             font.pixelSize: 9
@@ -464,8 +464,8 @@ Item {
                                                 var maxVal = Math.max.apply(null, values)
                                                 var minVal = Math.min.apply(null, values)
 
-                                                if (numVal === maxVal) return "#34D39920"
-                                                if (numVal === minVal) return "#F8717120"
+                                                if (numVal === maxVal) return Theme.accentSuccess
+                                                if (numVal === minVal) return Theme.accentError
                                                 return Theme.bgPrimary
                                             }
 
@@ -556,12 +556,12 @@ Item {
                                     width: 12
                                     height: 12
                                     radius: 2
-                                    color: "#34D39920"
+                                    color: Theme.accentSuccess
                                     border.color: Theme.accentSuccess
                                     border.width: 1
                                 }
                                 Label {
-                                    text: "Best"
+                                    text: "最优"
                                     color: Theme.accentSuccess
                                     font.pixelSize: 11
                                 }
@@ -573,12 +573,12 @@ Item {
                                     width: 12
                                     height: 12
                                     radius: 2
-                                    color: "#F8717120"
+                                    color: Theme.accentError
                                     border.color: Theme.accentError
                                     border.width: 1
                                 }
                                 Label {
-                                    text: "Worst"
+                                    text: "最差"
                                     color: Theme.accentError
                                     font.pixelSize: 11
                                 }
@@ -587,7 +587,7 @@ Item {
                             Item { Layout.fillWidth: true }
 
                             Label {
-                                text: comparisonData.length + " versions compared"
+                                text: comparisonData.length + " 个版本已对比"
                                 color: Theme.textMuted
                                 font.pixelSize: 11
                             }

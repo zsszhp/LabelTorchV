@@ -44,7 +44,7 @@ Rectangle {
                 spacing: 8
 
                 Label {
-                    text: "Training Log"
+                    text: "训练日志"
                     color: Theme.textSecondary
                     font.pixelSize: 12
                     font.bold: true
@@ -53,13 +53,13 @@ Rectangle {
                 Item { Layout.fillWidth: true }
 
                 Label {
-                    text: autoScroll ? "Auto-scroll: ON" : "Auto-scroll: OFF"
+                    text: autoScroll ? "自动滚动：开" : "自动滚动：关"
                     color: autoScroll ? Theme.accentSuccess : Theme.textMuted
                     font.pixelSize: 11
                 }
 
                 Button {
-                    text: "Clear"
+                    text: "清除"
                     flat: true
                     font.pixelSize: 11
                     palette.buttonText: Theme.textMuted

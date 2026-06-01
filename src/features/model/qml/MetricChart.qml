@@ -25,7 +25,7 @@ Item {
                 Layout.fillWidth: true
 
                 Label {
-                    text: "Metrics"
+                    text: "指标"
                     color: Theme.accentPrimary
                     font.pixelSize: 14
                     font.bold: true
@@ -34,7 +34,7 @@ Item {
                 Item { Layout.fillWidth: true }
 
                 Label {
-                    text: "Text view (chart rendering deferred)"
+                    text: "文本视图（图表渲染延迟）"
                     color: Theme.textMuted
                     font.pixelSize: 11
                     font.italic: true
@@ -105,7 +105,7 @@ Item {
             Label {
                 Layout.fillWidth: true
                 visible: keyMetricsRepeater.count === 0
-                text: "No key metrics (mAP50, mAP50-95, precision, recall, fitness) found in metrics snapshot"
+                text: "指标快照中未找到关键指标（mAP50, mAP50-95, precision, recall, fitness）"
                 color: Theme.textMuted
                 font.pixelSize: 12
                 wrapMode: Text.WordWrap
@@ -154,7 +154,7 @@ Item {
             Label {
                 Layout.fillWidth: true
                 visible: root.versionId !== ""
-                text: "Training curves summary: requires epoch data from Python backend (deferred)"
+                text: "训练曲线摘要：需要epoch数据（延迟实现）"
                 color: Theme.textMuted
                 font.pixelSize: 11
                 font.italic: true

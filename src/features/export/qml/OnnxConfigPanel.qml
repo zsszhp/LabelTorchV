@@ -21,7 +21,7 @@ Rectangle {
         spacing: 10
 
         Label {
-            text: "ONNX Export Options"
+            text: "ONNX 导出选项"
             color: Theme.accentPrimary
             font.pixelSize: 14
             font.bold: true
@@ -33,7 +33,7 @@ Rectangle {
             spacing: 12
 
             Label {
-                text: "Opset Version:"
+                text: "Opset 版本："
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 120
@@ -113,7 +113,7 @@ Rectangle {
             spacing: 12
 
             Label {
-                text: "Dynamic Batch:"
+                text: "动态批次："
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 120
@@ -130,7 +130,7 @@ Rectangle {
                     height: 22
                     radius: 11
                     color: dynamicBatchSwitch.checked ? Theme.accentPrimary : Theme.borderNormal
-                    border.color: dynamicBatchSwitch.checked ? Theme.accentPrimary : "#585b70"
+                    border.color: dynamicBatchSwitch.checked ? Theme.accentPrimary : Theme.textDisabled
 
                     Rectangle {
                         x: dynamicBatchSwitch.checked ? parent.width - width - 3 : 3
@@ -152,7 +152,7 @@ Rectangle {
             }
 
             Label {
-                text: dynamicBatchSwitch.checked ? "Enabled" : "Disabled"
+                text: dynamicBatchSwitch.checked ? "已启用" : "已禁用"
                 color: dynamicBatchSwitch.checked ? Theme.accentSuccess : Theme.textMuted
                 font.pixelSize: 12
             }
@@ -164,7 +164,7 @@ Rectangle {
             spacing: 12
 
             Label {
-                text: "Simplify:"
+                text: "简化："
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 Layout.preferredWidth: 120
@@ -181,7 +181,7 @@ Rectangle {
                     height: 22
                     radius: 11
                     color: simplifySwitch.checked ? Theme.accentPrimary : Theme.borderNormal
-                    border.color: simplifySwitch.checked ? Theme.accentPrimary : "#585b70"
+                    border.color: simplifySwitch.checked ? Theme.accentPrimary : Theme.textDisabled
 
                     Rectangle {
                         x: simplifySwitch.checked ? parent.width - width - 3 : 3
@@ -203,7 +203,7 @@ Rectangle {
             }
 
             Label {
-                text: simplifySwitch.checked ? "Enabled" : "Disabled"
+                text: simplifySwitch.checked ? "已启用" : "已禁用"
                 color: simplifySwitch.checked ? Theme.accentSuccess : Theme.textMuted
                 font.pixelSize: 12
             }
