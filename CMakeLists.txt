@@ -14,22 +14,20 @@ set(CMAKE_DISABLE_FIND_PACKAGE_WrapVulkanHeaders ON)
 
 add_definitions(-DWIN32_LEAN_AND_MEAN)
 
-# 自定义CMake模块路径
+# Custom CMake module path
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-# Qt 6 基础设置
+# Qt 6 core setup
 find_package(Qt6 6.11 REQUIRED COMPONENTS Core Quick QuickControls2 QuickDialogs2 Sql Concurrent)
 qt_standard_project_setup(REQUIRES 6.11)
 
-# 启用 QTP0004 策略以消除 QML 模块 OUTPUT_DIRECTORY 警告
+# Enable QTP0004 policy to suppress QML module OUTPUT_DIRECTORY warnings
 qt_policy(SET QTP0004 NEW)
 
-# QML 模块输出目录，满足 QTP0004 NEW 策略要求
-# 每个模块的输出目录自动派生为 ${CMAKE_BINARY_DIR}/${target_path}
-# 例如 LabelTorch.Shell -> ${CMAKE_BINARY_DIR}/LabelTorch/Shell
+# QML module output directory - each module output is derived as ${CMAKE_BINARY_DIR}/${target_path}
 set(QT_QML_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
-# 子模块
+# Submodules
 add_subdirectory(src)
 enable_testing()
 add_subdirectory(tests)

@@ -28,7 +28,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     QString projectId() const { return m_projectId; }
-    void setProjectId(const QString &projectId);
+    Q_INVOKABLE void setProjectId(const QString &projectId);
 
     Q_INVOKABLE void refresh();
 

@@ -7,6 +7,7 @@
 #include "database/Schema.h"
 #include "DatasetService.h"
 #include "ProjectService.h"
+#include "TaxonomyService.h"
 
 class TestDatabase : public QObject
 {
@@ -18,6 +19,8 @@ private slots:
     void testInsertProject();
     void testSchemaVersion();
     void testImportLabelMeUser();
+    void testProjectSerializationAndMigration();
+    void testDuplicateProjectCreation();
     void cleanupTestCase();
 
 private:
@@ -117,6 +120,105 @@ void TestDatabase::testImportLabelMeUser()
             qDebug() << "Schema source_format:" << schemaQuery.value(2).toString();
         }
     }
+}
+
+void TestDatabase::testProjectSerializationAndMigration()
+{
+    ProjectService projService;
+    TaxonomyService taxService;
+    projService.setTaxonomyService(&taxService);
+
+    QString rootPath = QDir::tempPath() + "/serialized_project_test";
+    QDir(rootPath).removeRecursively(); // Ensure clean start
+
+    QString projId = projService.createProject("测试序列化项目", rootPath);
+    QVERIFY(!projId.isEmpty());
+
+    // 验证懒加载目录结构：初始应该只有 project.json 文件
+    QFileInfo jsonInfo(rootPath + "/project.json");
+    QVERIFY(jsonInfo.exists());
+
+    QDir dir(rootPath);
+    QStringList files = dir.entryList(QDir::NoDotAndDotDot | QDir::AllEntries);
+    QCOMPARE(files.size(), 1); 
+    QCOMPARE(files[0], QString("project.json"));
+
+    // 修改任务类型，触发元数据自动保存
+    QVERIFY(projService.setTaskType(projId, "obb"));
+
+    // 验证 project.json 中的 task_type 已更新为 obb
+    QFile file(rootPath + "/project.json");
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    file.close();
+    QVERIFY(doc.isObject());
+    QCOMPARE(doc.object()["task_type"].toString(), QString("obb"));
+
+    // 从数据库中删除项目前，先清理外键关联的类别体系记录以防止约束冲突
+    QSqlQuery deleteRefQuery(Database::instance().database());
+    deleteRefQuery.prepare("DELETE FROM taxonomies WHERE project_id = ?");
+    deleteRefQuery.addBindValue(projId);
+    QVERIFY(deleteRefQuery.exec());
+
+    // 从数据库中删除项目，模拟迁移或数据库清空场景
+    QVERIFY(projService.deleteProject(projId));
+
+    // 验证项目记录已在数据库中清除
+    QSqlQuery query(Database::instance().database());
+    query.prepare("SELECT id FROM projects WHERE id = ?");
+    query.addBindValue(projId);
+    QVERIFY(query.exec());
+    QVERIFY(!query.next());
+
+    // 通过项目目录重新导入，恢复项目状态
+    QString importedId = projService.importProject(rootPath);
+    QCOMPARE(importedId, projId);
+
+    // 验证项目数据已被成功高保真还原回 SQLite
+    QSqlQuery query2(Database::instance().database());
+    query2.prepare("SELECT task_type FROM projects WHERE id = ?");
+    query2.addBindValue(projId);
+    QVERIFY(query2.exec());
+    QVERIFY(query2.next());
+    QCOMPARE(query2.value(0).toString(), QString("obb"));
+
+    // 清理临时文件
+    QDir(rootPath).removeRecursively();
+}
+
+void TestDatabase::testDuplicateProjectCreation()
+{
+    ProjectService projService;
+    TaxonomyService taxService;
+    projService.setTaxonomyService(&taxService);
+
+    QString rootPath = QDir::tempPath() + "/duplicate_project_test";
+    QDir(rootPath).removeRecursively(); // Ensure clean start
+
+    // 1. 创建项目
+    QString projId1 = projService.createProject("项目1", rootPath);
+    QVERIFY(!projId1.isEmpty());
+
+    // 2. 再次尝试用相同路径创建项目，期望能够成功返回已存在的项目ID而不会因为 UNIQUE 约束失败
+    QString projId2 = projService.createProject("项目2", rootPath);
+    QCOMPARE(projId1, projId2);
+
+    // 3. 从数据库删除项目记录，保留物理上的 project.json
+    // 清除外键关联
+    QSqlQuery deleteRefQuery(Database::instance().database());
+    deleteRefQuery.prepare("DELETE FROM taxonomies WHERE project_id = ?");
+    deleteRefQuery.addBindValue(projId1);
+    QVERIFY(deleteRefQuery.exec());
+
+    QVERIFY(projService.deleteProject(projId1));
+
+    // 此时数据库中无此项目，但物理上有 project.json。
+    // 再次调用 createProject 应触发自动 import 并返回正确的 ID 恢复项目
+    QString projId3 = projService.createProject("项目3", rootPath);
+    QCOMPARE(projId3, projId1);
+
+    // 4. 清理临时文件
+    QDir(rootPath).removeRecursively();
 }
 
 void TestDatabase::cleanupTestCase()

@@ -28,6 +28,7 @@ public:
     Q_INVOKABLE bool openProject(const QString &projectId);
     Q_INVOKABLE void closeProject();
     Q_INVOKABLE QVariantMap getCurrentProject() const;
+    Q_INVOKABLE bool saveProjectConfig(const QString &projectId);
 
     /**
      * @brief Get the current task type for a project.

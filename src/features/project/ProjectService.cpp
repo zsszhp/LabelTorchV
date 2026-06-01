@@ -8,6 +8,8 @@
 #include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 
@@ -15,18 +17,48 @@ ProjectService::ProjectService(QObject *parent) : QObject(parent) {}
 
 QString ProjectService::createProject(const QString &name, const QString &rootPath)
 {
-    ltTrace(LT_LOG_PROJECT()) << "createProject name=" << name << "path=" << rootPath;
+    QString cleanPath = QDir::cleanPath(rootPath);
+    ltTrace(LT_LOG_PROJECT()) << "createProject name=" << name << "path=" << cleanPath;
+
+    // 1. 检查数据库中是否已存在该路径的项目，防止重复创建导致唯一约束冲突
+    QSqlQuery checkQuery(Database::instance().database());
+    checkQuery.prepare("SELECT id FROM projects WHERE root_path = ?");
+    checkQuery.addBindValue(cleanPath);
+    if (checkQuery.exec() && checkQuery.next()) {
+        QString existingId = checkQuery.value(0).toString();
+        ltInfo(LT_LOG_PROJECT()) << "createProject: project path already exists in database, returning existing ID:" << existingId;
+        
+        // 自动同步/更新项目名称以防有变更
+        QSqlQuery updateQuery(Database::instance().database());
+        updateQuery.prepare("UPDATE projects SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        updateQuery.addBindValue(name);
+        updateQuery.addBindValue(existingId);
+        updateQuery.exec();
+
+        saveProjectConfig(existingId);
+        return existingId;
+    }
+
+    // 2. 检查物理目录中是否已经存在 project.json，如果存在则直接导入，避免覆盖已有数据
+    QString jsonPath = cleanPath + QStringLiteral("/project.json");
+    if (QFile::exists(jsonPath)) {
+        ltInfo(LT_LOG_PROJECT()) << "createProject: project.json already exists in target directory, importing instead:" << cleanPath;
+        QString importedId = importProject(cleanPath);
+        if (!importedId.isEmpty()) {
+            return importedId;
+        }
+    }
 
     QString projectId = Id::generate();
     ltTrace(LT_LOG_PROJECT()) << "Generated project ID:" << projectId;
 
-    if (!ProjectFs::createProjectDirs(rootPath)) {
-        ltError(LT_LOG_PROJECT()) << "Failed to create project directories:" << rootPath;
+    if (!ProjectFs::createProjectDirs(cleanPath)) {
+        ltError(LT_LOG_PROJECT()) << "Failed to create project directories:" << cleanPath;
         return {};
     }
 
-    if (!ProjectFs::createProjectJson(rootPath, name, QStringLiteral("detect"))) {
-        ltError(LT_LOG_PROJECT()) << "Failed to create project.json:" << rootPath;
+    if (!ProjectFs::createProjectJson(cleanPath, name, QStringLiteral("detect"))) {
+        ltError(LT_LOG_PROJECT()) << "Failed to create project.json:" << cleanPath;
         return {};
     }
 
@@ -36,7 +68,7 @@ QString ProjectService::createProject(const QString &name, const QString &rootPa
     query.prepare("INSERT INTO projects (id, name, root_path, task_type) VALUES (?, ?, ?, ?)");
     query.addBindValue(projectId);
     query.addBindValue(name);
-    query.addBindValue(rootPath);
+    query.addBindValue(cleanPath);
     query.addBindValue(QStringLiteral("detect"));
 
     if (!query.exec()) {
@@ -49,96 +81,180 @@ QString ProjectService::createProject(const QString &name, const QString &rootPa
         m_taxonomyService->createTaxonomy(projectId, "默认类别体系", {});
     }
 
-    ltInfo(LT_LOG_PROJECT()) << "Project created:" << projectId << name << "at" << rootPath;
+    saveProjectConfig(projectId);
+
+    ltInfo(LT_LOG_PROJECT()) << "Project created:" << projectId << name << "at" << cleanPath;
     return projectId;
 }
 
 QString ProjectService::importProject(const QString &rootPath)
 {
-    ltInfo(LT_LOG_PROJECT()) << "importProject rootPath=" << rootPath;
+    QString cleanPath = QDir::cleanPath(rootPath);
+    ltInfo(LT_LOG_PROJECT()) << "importProject cleanPath=" << cleanPath;
 
-    if (rootPath.isEmpty()) {
-        ltWarning(LT_LOG_PROJECT()) << "importProject: empty rootPath";
-        return {};
-    }
+    if (cleanPath.isEmpty()) return {};
 
-    // 检查目录是否存在
-    QFileInfo rootInfo(rootPath);
-    if (!rootInfo.exists() || !rootInfo.isDir()) {
-        ltWarning(LT_LOG_PROJECT()) << "importProject: directory does not exist:" << rootPath;
-        return {};
-    }
+    QFileInfo rootInfo(cleanPath);
+    if (!rootInfo.exists() || !rootInfo.isDir()) return {};
 
-    // 读取 project.json 获取项目名称和任务类型
-    QString projectName;
-    QString taskType = QStringLiteral("detect");
-
-    QString jsonPath = rootPath + QStringLiteral("/project.json");
+    // 1. 读取并解析 project.json
+    QString jsonPath = cleanPath + QStringLiteral("/project.json");
     QFile jsonFile(jsonPath);
-    if (jsonFile.exists() && jsonFile.open(QIODevice::ReadOnly)) {
-        QJsonDocument doc = QJsonDocument::fromJson(jsonFile.readAll());
-        jsonFile.close();
-        if (doc.isObject()) {
-            QJsonObject obj = doc.object();
-            projectName = obj[QStringLiteral("name")].toString();
-            taskType = obj[QStringLiteral("task_type")].toString();
-        }
+    if (!jsonFile.exists() || !jsonFile.open(QIODevice::ReadOnly)) {
+        ltError(LT_LOG_PROJECT()) << "importProject: project.json missing or unreadable at:" << cleanPath;
+        return {};
     }
 
-    // 如果没有 project.json，用目录名作为项目名
+    QJsonDocument doc = QJsonDocument::fromJson(jsonFile.readAll());
+    jsonFile.close();
+    if (!doc.isObject()) {
+        ltError(LT_LOG_PROJECT()) << "importProject: project.json is not a valid JSON object";
+        return {};
+    }
+
+    QJsonObject rootObj = doc.object();
+    QString projectId = rootObj["id"].toString();
+    QString projectName = rootObj["name"].toString();
+    QString taskType = rootObj["task_type"].toString();
+
+    if (projectId.isEmpty()) {
+        projectId = Id::generate(); // 降级处理
+    }
     if (projectName.isEmpty()) {
         projectName = rootInfo.fileName();
-        if (projectName.isEmpty()) {
-            projectName = QStringLiteral("导入项目");
-        }
+    }
+    if (taskType.isEmpty()) {
+        taskType = QStringLiteral("detect");
     }
 
-    // 检查是否已导入过（同一路径不重复导入）
+    // 2. 检查数据库是否已存在该项目（防止重复导入）
     QSqlQuery checkQuery(Database::instance().database());
-    checkQuery.prepare("SELECT id FROM projects WHERE root_path = ?");
-    checkQuery.addBindValue(rootPath);
+    checkQuery.prepare("SELECT id FROM projects WHERE id = ? OR root_path = ?");
+    checkQuery.addBindValue(projectId);
+    checkQuery.addBindValue(cleanPath);
     if (checkQuery.exec() && checkQuery.next()) {
         QString existingId = checkQuery.value(0).toString();
-        ltWarning(LT_LOG_PROJECT()) << "importProject: project already imported:" << existingId;
+        ltInfo(LT_LOG_PROJECT()) << "importProject: project already imported in database:" << existingId;
         return existingId;
     }
 
-    // 确保目录结构完整（补齐缺失的子目录）
-    if (!ProjectFs::createProjectDirs(rootPath)) {
-        ltError(LT_LOG_PROJECT()) << "importProject: failed to ensure project dirs:" << rootPath;
-        return {};
-    }
+    // 3. 确保子目录环境结构（补齐可能在迁移中丢失的零散文件夹）
+    if (!ProjectFs::createProjectDirs(cleanPath)) return {};
 
-    // 如果没有 project.json 则创建
-    if (!QFile::exists(jsonPath)) {
-        if (!ProjectFs::createProjectJson(rootPath, projectName, taskType)) {
-            ltError(LT_LOG_PROJECT()) << "importProject: failed to create project.json";
-            return {};
-        }
-    }
-
-    // 在数据库中注册项目
-    QString projectId = Id::generate();
+    // 4. 在数据库中注册主项目记录
     ensureTaskTypeColumn();
-
     QSqlQuery query(Database::instance().database());
     query.prepare("INSERT INTO projects (id, name, root_path, task_type) VALUES (?, ?, ?, ?)");
     query.addBindValue(projectId);
     query.addBindValue(projectName);
-    query.addBindValue(rootPath);
+    query.addBindValue(cleanPath);
     query.addBindValue(taskType);
-
     if (!query.exec()) {
-        ltError(LT_LOG_PROJECT()) << "importProject: failed to insert project:" << query.lastError().text();
+        ltError(LT_LOG_PROJECT()) << "importProject: failed to register project to SQLite:" << query.lastError().text();
         return {};
     }
 
-    // 为项目创建默认类别体系
-    if (m_taxonomyService) {
-        m_taxonomyService->createTaxonomy(projectId, QStringLiteral("默认类别体系"), {});
+    // === 开始全量高保真数据恢复 ===
+    QSqlDatabase db = Database::instance().database();
+
+    // 5. 恢复 Taxonomies
+    QJsonArray taxonomies = rootObj["taxonomies"].toArray();
+    for (int i = 0; i < taxonomies.size(); ++i) {
+        QJsonObject tax = taxonomies[i].toObject();
+        QSqlQuery tQuery(db);
+        tQuery.prepare("INSERT INTO taxonomies (id, project_id, name, version, class_definitions_json) VALUES (?, ?, ?, ?, ?)");
+        tQuery.addBindValue(tax["id"].toString());
+        tQuery.addBindValue(projectId);
+        tQuery.addBindValue(tax["name"].toString());
+        tQuery.addBindValue(tax["version"].toInt());
+        
+        QJsonDocument classDoc(tax["class_definitions"].toArray());
+        tQuery.addBindValue(QString::fromUtf8(classDoc.toJson(QJsonDocument::Compact)));
+        tQuery.exec();
     }
 
-    ltInfo(LT_LOG_PROJECT()) << "Project imported:" << projectId << projectName << "at" << rootPath;
+    // 6. 恢复 Datasets
+    QJsonArray datasets = rootObj["datasets"].toArray();
+    for (int i = 0; i < datasets.size(); ++i) {
+        QJsonObject ds = datasets[i].toObject();
+        QSqlQuery dsQuery(db);
+        dsQuery.prepare("INSERT INTO datasets (id, project_id, name, image_root, label_root, format, sample_count) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        dsQuery.addBindValue(ds["id"].toString());
+        dsQuery.addBindValue(projectId);
+        dsQuery.addBindValue(ds["name"].toString());
+        
+        // 结合当前机器下的新 rootPath 还原绝对物理路径
+        QString relImg = ds["image_root"].toString();
+        QString relLbl = ds["label_root"].toString();
+        dsQuery.addBindValue(QDir(cleanPath).absoluteFilePath(relImg));
+        dsQuery.addBindValue(QDir(cleanPath).absoluteFilePath(relLbl));
+        
+        dsQuery.addBindValue(ds["format"].toString());
+        dsQuery.addBindValue(ds["sample_count"].toInt());
+        dsQuery.exec();
+    }
+
+    // 7. 恢复 Snapshots
+    QJsonArray snapshots = rootObj["snapshots"].toArray();
+    for (int i = 0; i < snapshots.size(); ++i) {
+        QJsonObject snap = snapshots[i].toObject();
+        QSqlQuery sQuery(db);
+        sQuery.prepare("INSERT INTO dataset_snapshots (id, dataset_id, sample_manifest_json, split_manifest_json, taxonomy_version) VALUES (?, ?, ?, ?, ?)");
+        sQuery.addBindValue(snap["id"].toString());
+        sQuery.addBindValue(snap["dataset_id"].toString());
+        
+        QJsonDocument manifestDoc(snap["sample_manifest"].toArray());
+        sQuery.addBindValue(QString::fromUtf8(manifestDoc.toJson(QJsonDocument::Compact)));
+        
+        QJsonDocument splitDoc(snap["split_manifest"].toObject());
+        sQuery.addBindValue(QString::fromUtf8(splitDoc.toJson(QJsonDocument::Compact)));
+        
+        sQuery.addBindValue(snap["taxonomy_version"].toString());
+        sQuery.exec();
+    }
+
+    // 8. 恢复 Training Runs
+    QJsonArray trainingRuns = rootObj["training_runs"].toArray();
+    for (int i = 0; i < trainingRuns.size(); ++i) {
+        QJsonObject run = trainingRuns[i].toObject();
+        QSqlQuery rQuery(db);
+        rQuery.prepare("INSERT INTO training_runs (id, project_id, snapshot_id, config_snapshot_json, status, log_uri, started_at, finished_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        rQuery.addBindValue(run["id"].toString());
+        rQuery.addBindValue(projectId);
+        rQuery.addBindValue(run["snapshot_id"].toString());
+        
+        QJsonDocument cfgDoc(run["config_snapshot"].toObject());
+        rQuery.addBindValue(QString::fromUtf8(cfgDoc.toJson(QJsonDocument::Compact)));
+        
+        rQuery.addBindValue(run["status"].toString());
+        rQuery.addBindValue(run["log_uri"].toString());
+        rQuery.addBindValue(run["started_at"].toString());
+        rQuery.addBindValue(run["finished_at"].toString());
+        rQuery.exec();
+    }
+
+    // 9. 恢复 Model Versions
+    QJsonArray modelVersions = rootObj["model_versions"].toArray();
+    for (int i = 0; i < modelVersions.size(); ++i) {
+        QJsonObject model = modelVersions[i].toObject();
+        QSqlQuery mQuery(db);
+        mQuery.prepare("INSERT INTO model_versions (id, run_id, parent_model_version_id, best_weight_path, last_weight_path, metrics_snapshot_json) VALUES (?, ?, ?, ?, ?, ?)");
+        mQuery.addBindValue(model["id"].toString());
+        mQuery.addBindValue(model["run_id"].toString());
+        mQuery.addBindValue(model["parent_model_version_id"].toString());
+        
+        // 结合当前机器下的新 rootPath 还原权重的绝对物理路径
+        QString relBest = model["best_weight_path"].toString();
+        QString relLast = model["last_weight_path"].toString();
+        mQuery.addBindValue(QDir(cleanPath).absoluteFilePath(relBest));
+        mQuery.addBindValue(QDir(cleanPath).absoluteFilePath(relLast));
+        
+        QJsonDocument metricsDoc(model["metrics_snapshot"].toObject());
+        mQuery.addBindValue(QString::fromUtf8(metricsDoc.toJson(QJsonDocument::Compact)));
+        mQuery.exec();
+    }
+
+    ltInfo(LT_LOG_PROJECT()) << "Project metadata successfully restored & migrated in local database for:" << projectId;
     return projectId;
 }
 
@@ -291,9 +407,177 @@ bool ProjectService::setTaskType(const QString &projectId, const QString &taskTy
     if (query.exec()) {
         emit taskTypeChanged(projectId, taskType);
         ltInfo(LT_LOG_PROJECT()) << "Task type set:" << projectId << taskType;
+        saveProjectConfig(projectId);
         return true;
     }
 
     ltError(LT_LOG_PROJECT()) << "Failed to set task type:" << query.lastError().text();
     return false;
+}
+
+bool ProjectService::saveProjectConfig(const QString &projectId)
+{
+    ltInfo(LT_LOG_PROJECT()) << "saveProjectConfig projectId=" << projectId;
+
+    if (projectId.isEmpty()) return false;
+
+    QSqlQuery query(Database::instance().database());
+    
+    // 1. 查询项目基本信息
+    query.prepare("SELECT name, root_path, task_type, created_at, updated_at FROM projects WHERE id = ?");
+    query.addBindValue(projectId);
+    if (!query.exec() || !query.next()) {
+        ltError(LT_LOG_PROJECT()) << "saveProjectConfig: project not found in database:" << projectId;
+        return false;
+    }
+    
+    QString projectName = query.value(0).toString();
+    QString rootPath = query.value(1).toString();
+    QString taskType = query.value(2).toString();
+    QString createdAt = query.value(3).toString();
+    QString updatedAt = query.value(4).toString();
+
+    QJsonObject rootObj;
+    rootObj["id"] = projectId;
+    rootObj["name"] = projectName;
+    rootObj["root_path"] = rootPath;
+    rootObj["task_type"] = taskType;
+    rootObj["version"] = QStringLiteral("1.1"); // 升级配置文件版本号以示区别
+    rootObj["labeltorch_version"] = QStringLiteral("0.1.0");
+    rootObj["created_at"] = createdAt;
+    rootObj["updated_at"] = updatedAt;
+
+    // 2. 查询 Taxonomies 类别体系列表
+    QJsonArray taxonomiesArray;
+    QSqlQuery taxQuery(Database::instance().database());
+    taxQuery.prepare("SELECT id, name, version, class_definitions_json FROM taxonomies WHERE project_id = ?");
+    taxQuery.addBindValue(projectId);
+    if (taxQuery.exec()) {
+        while (taxQuery.next()) {
+            QJsonObject taxObj;
+            taxObj["id"] = taxQuery.value(0).toString();
+            taxObj["name"] = taxQuery.value(1).toString();
+            taxObj["version"] = taxQuery.value(2).toInt();
+            
+            // 解析已存的类别 JSON 字符串并作为 JSON 对象嵌入
+            QString classJsonStr = taxQuery.value(3).toString();
+            QJsonDocument classDoc = QJsonDocument::fromJson(classJsonStr.toUtf8());
+            taxObj["class_definitions"] = classDoc.isArray() ? classDoc.array() : QJsonArray();
+            taxonomiesArray.append(taxObj);
+        }
+    }
+    rootObj["taxonomies"] = taxonomiesArray;
+
+    // 3. 查询 Datasets 数据集元信息
+    QJsonArray datasetsArray;
+    QSqlQuery dsQuery(Database::instance().database());
+    dsQuery.prepare("SELECT id, name, image_root, label_root, format, sample_count FROM datasets WHERE project_id = ?");
+    dsQuery.addBindValue(projectId);
+    if (dsQuery.exec()) {
+        while (dsQuery.next()) {
+            QJsonObject dsObj;
+            dsObj["id"] = dsQuery.value(0).toString();
+            dsObj["name"] = dsQuery.value(1).toString();
+            
+            // 路径相对于项目根目录进行存储，方便跨平台/跨机器迁移
+            QString fullImgRoot = dsQuery.value(2).toString();
+            QString fullLblRoot = dsQuery.value(3).toString();
+            dsObj["image_root"] = QDir(rootPath).relativeFilePath(fullImgRoot);
+            dsObj["label_root"] = QDir(rootPath).relativeFilePath(fullLblRoot);
+            
+            dsObj["format"] = dsQuery.value(4).toString();
+            dsObj["sample_count"] = dsQuery.value(5).toInt();
+            datasetsArray.append(dsObj);
+        }
+    }
+    rootObj["datasets"] = datasetsArray;
+
+    // 4. 查询 Dataset Snapshots 快照记录
+    QJsonArray snapshotsArray;
+    QSqlQuery snapQuery(Database::instance().database());
+    snapQuery.prepare("SELECT s.id, s.dataset_id, s.sample_manifest_json, s.split_manifest_json, s.taxonomy_version "
+                      "FROM dataset_snapshots s INNER JOIN datasets d ON s.dataset_id = d.id WHERE d.project_id = ?");
+    snapQuery.addBindValue(projectId);
+    if (snapQuery.exec()) {
+        while (snapQuery.next()) {
+            QJsonObject snapObj;
+            snapObj["id"] = snapQuery.value(0).toString();
+            snapObj["dataset_id"] = snapQuery.value(1).toString();
+            
+            QJsonDocument manifestDoc = QJsonDocument::fromJson(snapQuery.value(2).toString().toUtf8());
+            snapObj["sample_manifest"] = manifestDoc.isArray() ? manifestDoc.array() : QJsonArray();
+            
+            QJsonDocument splitDoc = QJsonDocument::fromJson(snapQuery.value(3).toString().toUtf8());
+            snapObj["split_manifest"] = splitDoc.isObject() ? splitDoc.object() : QJsonObject();
+            
+            snapObj["taxonomy_version"] = snapQuery.value(4).toString();
+            snapshotsArray.append(snapObj);
+        }
+    }
+    rootObj["snapshots"] = snapshotsArray;
+
+    // 5. 查询 Training Runs 训练运行记录
+    QJsonArray runsArray;
+    QSqlQuery runQuery(Database::instance().database());
+    runQuery.prepare("SELECT id, snapshot_id, config_snapshot_json, status, log_uri, started_at, finished_at "
+                      "FROM training_runs WHERE project_id = ?");
+    runQuery.addBindValue(projectId);
+    if (runQuery.exec()) {
+        while (runQuery.next()) {
+            QJsonObject runObj;
+            runObj["id"] = runQuery.value(0).toString();
+            runObj["snapshot_id"] = runQuery.value(1).toString();
+            
+            QJsonDocument cfgDoc = QJsonDocument::fromJson(runQuery.value(2).toString().toUtf8());
+            runObj["config_snapshot"] = cfgDoc.isObject() ? cfgDoc.object() : QJsonObject();
+            
+            runObj["status"] = runQuery.value(3).toString();
+            runObj["log_uri"] = runQuery.value(4).toString();
+            runObj["started_at"] = runQuery.value(5).toString();
+            runObj["finished_at"] = runQuery.value(6).toString();
+            runsArray.append(runObj);
+        }
+    }
+    rootObj["training_runs"] = runsArray;
+
+    // 6. 查询 Model Versions 注册模型版本
+    QJsonArray modelsArray;
+    QSqlQuery modelQuery(Database::instance().database());
+    modelQuery.prepare("SELECT m.id, m.run_id, m.parent_model_version_id, m.best_weight_path, m.last_weight_path, m.metrics_snapshot_json "
+                       "FROM model_versions m INNER JOIN training_runs r ON m.run_id = r.id WHERE r.project_id = ?");
+    modelQuery.addBindValue(projectId);
+    if (modelQuery.exec()) {
+        while (modelQuery.next()) {
+            QJsonObject mObj;
+            mObj["id"] = modelQuery.value(0).toString();
+            mObj["run_id"] = modelQuery.value(1).toString();
+            mObj["parent_model_version_id"] = modelQuery.value(2).toString();
+            
+            // 路径转换为相对于项目根目录的相对路径
+            QString fullBest = modelQuery.value(3).toString();
+            QString fullLast = modelQuery.value(4).toString();
+            mObj["best_weight_path"] = QDir(rootPath).relativeFilePath(fullBest);
+            mObj["last_weight_path"] = QDir(rootPath).relativeFilePath(fullLast);
+            
+            QJsonDocument metricsDoc = QJsonDocument::fromJson(modelQuery.value(5).toString().toUtf8());
+            mObj["metrics_snapshot"] = metricsDoc.isObject() ? metricsDoc.object() : QJsonObject();
+            modelsArray.append(mObj);
+        }
+    }
+    rootObj["model_versions"] = modelsArray;
+
+    // 原子写入项目根目录下的 project.json 文件
+    QString configPath = rootPath + QStringLiteral("/project.json");
+    QFile file(configPath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        ltError(LT_LOG_PROJECT()) << "saveProjectConfig: failed to open config file for writing:" << configPath;
+        return false;
+    }
+
+    QJsonDocument doc(rootObj);
+    file.write(doc.toJson(QJsonDocument::Indented));
+    file.close();
+
+    ltInfo(LT_LOG_PROJECT()) << "Project configuration synchronized to disk successfully:" << configPath;
+    return true;
 }

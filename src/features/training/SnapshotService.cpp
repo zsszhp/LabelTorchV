@@ -17,6 +17,13 @@
 #include <QFileInfo>
 #include <random>
 
+struct ThreadDbGuard {
+    QString connectionName;
+    ~ThreadDbGuard() {
+        QSqlDatabase::removeDatabase(connectionName);
+    }
+};
+
 SnapshotService::SnapshotService(QObject *parent) : QObject(parent)
 {
     ltTrace(LT_LOG_TRAINING()) << "parent=" << parent;
@@ -387,9 +394,14 @@ bool SnapshotService::isOBBDataset(const QString &datasetId)
 QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
 {
     ltInfo(LT_LOG_TRAINING()) << "Preparing snapshot physical directory for" << snapshotId;
-    auto db = Database::instance().database();
-    if (!db.isOpen()) {
-        ltError(LT_LOG_TRAINING()) << "Database not open";
+    QString dbPath = Database::instance().dbPath();
+    QString connectionName = QStringLiteral("thread_snap_") + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    ThreadDbGuard guard{connectionName};
+
+    QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+    db.setDatabaseName(dbPath);
+    if (!db.open()) {
+        ltError(LT_LOG_TRAINING()) << "Failed to open thread database:" << db.lastError().text();
         return {};
     }
 
@@ -544,9 +556,14 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
 QString SnapshotService::prepareAnomalySnapshotDir(const QString &snapshotId)
 {
     ltInfo(LT_LOG_TRAINING()) << "Preparing anomaly detection snapshot directory for" << snapshotId;
-    auto db = Database::instance().database();
-    if (!db.isOpen()) {
-        ltError(LT_LOG_TRAINING()) << "Database not open";
+    QString dbPath = Database::instance().dbPath();
+    QString connectionName = QStringLiteral("thread_anomaly_snap_") + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    ThreadDbGuard guard{connectionName};
+
+    QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+    db.setDatabaseName(dbPath);
+    if (!db.open()) {
+        ltError(LT_LOG_TRAINING()) << "Failed to open thread database:" << db.lastError().text();
         return {};
     }
 
