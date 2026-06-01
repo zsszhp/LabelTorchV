@@ -71,9 +71,11 @@ class UltralyticsAdapter(TrainingAdapter):
         epochs = config.get("epochs", 100)
         imgsz = config.get("imgsz", config.get("img_size", 640))
         batch = config.get("batch", 16)
-        device = config.get("device", "cpu")
+        device = config.get("device", "auto")
         import torch
-        if device and device != "cpu":
+        if device == "auto":
+            device = "0" if torch.cuda.is_available() else "cpu"
+        elif device and device != "cpu":
             if not torch.cuda.is_available():
                 logger.warning(f"CUDA is not available. Falling back to CPU training (requested device was: {device}).")
                 device = "cpu"
