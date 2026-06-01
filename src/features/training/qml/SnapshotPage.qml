@@ -65,6 +65,45 @@ Item {
                 valueFromText: function(text) {
                     return Math.round(parseFloat(text) * 100) || 80
                 }
+
+                contentItem: TextInput {
+                    text: trainRatioSpin.displayText
+                    color: Theme.textPrimary
+                    font.pixelSize: 13
+                    font.family: "monospace"
+                    verticalAlignment: Text.AlignVCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    selectByMouse: true
+                    readOnly: !trainRatioSpin.editable
+                    validator: trainRatioSpin.validator
+                    inputMethodHints: Qt.ImhFormattedNumbersOnly
+                }
+
+                up.indicator: Rectangle {
+                    x: trainRatioSpin.mirrored ? 0 : parent.width - width
+                    height: parent.height
+                    implicitWidth: 32
+                    color: trainRatioSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
+                    border.color: Theme.borderNormal
+                    radius: 2
+                    Label { anchors.centerIn: parent; text: "+"; color: Theme.textPrimary; font.pixelSize: 14 }
+                }
+
+                down.indicator: Rectangle {
+                    x: trainRatioSpin.mirrored ? parent.width - width : 0
+                    height: parent.height
+                    implicitWidth: 32
+                    color: trainRatioSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
+                    border.color: Theme.borderNormal
+                    radius: 2
+                    Label { anchors.centerIn: parent; text: "-"; color: Theme.textPrimary; font.pixelSize: 14 }
+                }
+
+                background: Rectangle {
+                    color: Theme.bgInput
+                    border.color: trainRatioSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                    radius: 4
+                }
             }
 
             Label {

@@ -294,13 +294,17 @@ Rectangle {
                 textFromValue: function(value) { return value }
                 valueFromText: function(text) { return parseInt(text) || 640 }
 
-                contentItem: Label {
-                    text: imgSizeSpin.textFromValue(imgSizeSpin.value, imgSizeSpin.locale)
+                contentItem: TextInput {
+                    text: imgSizeSpin.displayText
                     color: Theme.textPrimary
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
+                    selectByMouse: true
+                    readOnly: !imgSizeSpin.editable
+                    validator: imgSizeSpin.validator
+                    inputMethodHints: Qt.ImhFormattedNumbersOnly
                 }
 
                 up.indicator: Rectangle {
@@ -364,13 +368,17 @@ Rectangle {
                 editable: true
                 Layout.fillWidth: true
 
-                contentItem: Label {
-                    text: batchSpin.textFromValue(batchSpin.value, batchSpin.locale)
+                contentItem: TextInput {
+                    text: batchSpin.displayText
                     color: Theme.textPrimary
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
+                    selectByMouse: true
+                    readOnly: !batchSpin.editable
+                    validator: batchSpin.validator
+                    inputMethodHints: Qt.ImhFormattedNumbersOnly
                 }
 
                 up.indicator: Rectangle {
@@ -422,13 +430,17 @@ Rectangle {
                 editable: true
                 Layout.fillWidth: true
 
-                contentItem: Label {
-                    text: epochsSpin.textFromValue(epochsSpin.value, epochsSpin.locale)
+                contentItem: TextInput {
+                    text: epochsSpin.displayText
                     color: Theme.textPrimary
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
+                    selectByMouse: true
+                    readOnly: !epochsSpin.editable
+                    validator: epochsSpin.validator
+                    inputMethodHints: Qt.ImhFormattedNumbersOnly
                 }
 
                 up.indicator: Rectangle {
@@ -480,13 +492,17 @@ Rectangle {
                 editable: true
                 Layout.fillWidth: true
 
-                contentItem: Label {
-                    text: patienceSpin.textFromValue(patienceSpin.value, patienceSpin.locale)
+                contentItem: TextInput {
+                    text: patienceSpin.displayText
                     color: Theme.textPrimary
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
+                    selectByMouse: true
+                    readOnly: !patienceSpin.editable
+                    validator: patienceSpin.validator
+                    inputMethodHints: Qt.ImhFormattedNumbersOnly
                 }
 
                 up.indicator: Rectangle {
@@ -538,13 +554,17 @@ Rectangle {
                 editable: true
                 Layout.fillWidth: true
 
-                contentItem: Label {
-                    text: workersSpin.textFromValue(workersSpin.value, workersSpin.locale)
+                contentItem: TextInput {
+                    text: workersSpin.displayText
                     color: Theme.textPrimary
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
+                    selectByMouse: true
+                    readOnly: !workersSpin.editable
+                    validator: workersSpin.validator
+                    inputMethodHints: Qt.ImhFormattedNumbersOnly
                 }
 
                 up.indicator: Rectangle {

@@ -887,14 +887,18 @@ Item {
                                     textFromValue: function(value) { return value }
                                     valueFromText: function(text) { return parseInt(text) || 640 }
 
-                                    contentItem: Label {
-                                        text: imgSizeSpin.textFromValue(imgSizeSpin.value, imgSizeSpin.locale)
-                                        color: Theme.textPrimary
-                                        font.pixelSize: Theme.fontSizeNormal
-                                        font.family: "monospace"
-                                        verticalAlignment: Text.AlignVCenter
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
+                                    contentItem: TextInput {
+                                         text: imgSizeSpin.displayText
+                                         color: Theme.textPrimary
+                                         font.pixelSize: Theme.fontSizeNormal
+                                         font.family: "monospace"
+                                         verticalAlignment: Text.AlignVCenter
+                                         horizontalAlignment: Text.AlignHCenter
+                                         selectByMouse: true
+                                         readOnly: !imgSizeSpin.editable
+                                         validator: imgSizeSpin.validator
+                                         inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                     }
 
                                     up.indicator: Rectangle {
                                         x: imgSizeSpin.mirrored ? 0 : parent.width - width
@@ -945,14 +949,18 @@ Item {
                                     editable: true
                                     Layout.fillWidth: true
 
-                                    contentItem: Label {
-                                        text: batchSpin.textFromValue(batchSpin.value, batchSpin.locale)
-                                        color: Theme.textPrimary
-                                        font.pixelSize: Theme.fontSizeNormal
-                                        font.family: "monospace"
-                                        verticalAlignment: Text.AlignVCenter
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
+                                    contentItem: TextInput {
+                                         text: batchSpin.displayText
+                                         color: Theme.textPrimary
+                                         font.pixelSize: Theme.fontSizeNormal
+                                         font.family: "monospace"
+                                         verticalAlignment: Text.AlignVCenter
+                                         horizontalAlignment: Text.AlignHCenter
+                                         selectByMouse: true
+                                         readOnly: !batchSpin.editable
+                                         validator: batchSpin.validator
+                                         inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                     }
 
                                     up.indicator: Rectangle {
                                         x: batchSpin.mirrored ? 0 : parent.width - width
@@ -1003,14 +1011,18 @@ Item {
                                     editable: true
                                     Layout.fillWidth: true
 
-                                    contentItem: Label {
-                                        text: epochsSpin.textFromValue(epochsSpin.value, epochsSpin.locale)
-                                        color: Theme.textPrimary
-                                        font.pixelSize: Theme.fontSizeNormal
-                                        font.family: "monospace"
-                                        verticalAlignment: Text.AlignVCenter
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
+                                    contentItem: TextInput {
+                                         text: epochsSpin.displayText
+                                         color: Theme.textPrimary
+                                         font.pixelSize: Theme.fontSizeNormal
+                                         font.family: "monospace"
+                                         verticalAlignment: Text.AlignVCenter
+                                         horizontalAlignment: Text.AlignHCenter
+                                         selectByMouse: true
+                                         readOnly: !epochsSpin.editable
+                                         validator: epochsSpin.validator
+                                         inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                     }
 
                                     up.indicator: Rectangle {
                                         x: epochsSpin.mirrored ? 0 : parent.width - width
@@ -1061,14 +1073,18 @@ Item {
                                     editable: true
                                     Layout.fillWidth: true
 
-                                    contentItem: Label {
-                                        text: patienceSpin.textFromValue(patienceSpin.value, patienceSpin.locale)
-                                        color: Theme.textPrimary
-                                        font.pixelSize: Theme.fontSizeNormal
-                                        font.family: "monospace"
-                                        verticalAlignment: Text.AlignVCenter
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
+                                    contentItem: TextInput {
+                                         text: patienceSpin.displayText
+                                         color: Theme.textPrimary
+                                         font.pixelSize: Theme.fontSizeNormal
+                                         font.family: "monospace"
+                                         verticalAlignment: Text.AlignVCenter
+                                         horizontalAlignment: Text.AlignHCenter
+                                         selectByMouse: true
+                                         readOnly: !patienceSpin.editable
+                                         validator: patienceSpin.validator
+                                         inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                     }
 
                                     up.indicator: Rectangle {
                                         x: patienceSpin.mirrored ? 0 : parent.width - width
@@ -1173,14 +1189,18 @@ Item {
                                     editable: true
                                     Layout.fillWidth: true
 
-                                    contentItem: Label {
-                                        text: workersSpin.textFromValue(workersSpin.value, workersSpin.locale)
-                                        color: Theme.textPrimary
-                                        font.pixelSize: Theme.fontSizeNormal
-                                        font.family: "monospace"
-                                        verticalAlignment: Text.AlignVCenter
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
+                                    contentItem: TextInput {
+                                         text: workersSpin.displayText
+                                         color: Theme.textPrimary
+                                         font.pixelSize: Theme.fontSizeNormal
+                                         font.family: "monospace"
+                                         verticalAlignment: Text.AlignVCenter
+                                         horizontalAlignment: Text.AlignHCenter
+                                         selectByMouse: true
+                                         readOnly: !workersSpin.editable
+                                         validator: workersSpin.validator
+                                         inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                     }
 
                                     up.indicator: Rectangle {
                                         x: workersSpin.mirrored ? 0 : parent.width - width
@@ -1502,13 +1522,17 @@ Item {
                                     textFromValue: function(value) { return (value / 10000).toFixed(4) }
                                     valueFromText: function(text) { return Math.round(parseFloat(text) * 10000) || 10 }
 
-                                    contentItem: Label {
-                                        text: lrSpin.textFromValue(lrSpin.value, lrSpin.locale)
+                                    contentItem: TextInput {
+                                        text: lrSpin.displayText
                                         color: Theme.textPrimary
                                         font.pixelSize: Theme.fontSizeNormal
                                         font.family: "monospace"
                                         verticalAlignment: Text.AlignVCenter
                                         horizontalAlignment: Text.AlignHCenter
+                                        selectByMouse: true
+                                        readOnly: !lrSpin.editable
+                                        validator: lrSpin.validator
+                                        inputMethodHints: Qt.ImhFormattedNumbersOnly
                                     }
 
                                     up.indicator: Rectangle {
@@ -1564,13 +1588,17 @@ Item {
                                     textFromValue: function(value) { return (value / 10000).toFixed(4) }
                                     valueFromText: function(text) { return Math.round(parseFloat(text) * 10000) || 0 }
 
-                                    contentItem: Label {
-                                        text: wdSpin.textFromValue(wdSpin.value, wdSpin.locale)
+                                    contentItem: TextInput {
+                                        text: wdSpin.displayText
                                         color: Theme.textPrimary
                                         font.pixelSize: Theme.fontSizeNormal
                                         font.family: "monospace"
                                         verticalAlignment: Text.AlignVCenter
                                         horizontalAlignment: Text.AlignHCenter
+                                        selectByMouse: true
+                                        readOnly: !wdSpin.editable
+                                        validator: wdSpin.validator
+                                        inputMethodHints: Qt.ImhFormattedNumbersOnly
                                     }
 
                                     up.indicator: Rectangle {
@@ -1750,13 +1778,17 @@ Item {
                                     textFromValue: function(value) { return (value / 100).toFixed(2) }
                                     valueFromText: function(text) { return Math.round(parseFloat(text) * 100) || 50 }
 
-                                    contentItem: Label {
-                                        text: thresholdSpin.textFromValue(thresholdSpin.value, thresholdSpin.locale)
+                                    contentItem: TextInput {
+                                        text: thresholdSpin.displayText
                                         color: Theme.textPrimary
                                         font.pixelSize: Theme.fontSizeNormal
                                         font.family: "monospace"
                                         verticalAlignment: Text.AlignVCenter
                                         horizontalAlignment: Text.AlignHCenter
+                                        selectByMouse: true
+                                        readOnly: !thresholdSpin.editable
+                                        validator: thresholdSpin.validator
+                                        inputMethodHints: Qt.ImhFormattedNumbersOnly
                                     }
 
                                     up.indicator: Rectangle {
@@ -2421,12 +2453,16 @@ Item {
                         return parseInt(text)
                     }
 
-                    contentItem: Label {
-                        text: trainRatioSpin.textFromValue(trainRatioSpin.value, trainRatioSpin.locale)
+                    contentItem: TextInput {
+                        text: trainRatioSpin.displayText
                         color: Theme.textPrimary
                         font.pixelSize: Theme.fontSizeNormal
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
+                        selectByMouse: true
+                        readOnly: !trainRatioSpin.editable
+                        validator: trainRatioSpin.validator
+                        inputMethodHints: Qt.ImhFormattedNumbersOnly
                     }
 
                     up.indicator: Rectangle {
