@@ -45,6 +45,8 @@ private:
     QMap<QString, QString> m_pendingCommands;
     QTimer *m_watchdog = nullptr;
     bool m_autoRestart = true;
+    int m_restartCount = 0;
+    static constexpr int MAX_RESTART = 5;
     QString m_lastPythonPath;
     QString m_lastScriptPath;
 };

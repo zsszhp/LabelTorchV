@@ -88,6 +88,11 @@ QSqlDatabase Database::database() const
     return m_db;
 }
 
+QString Database::dbPath() const
+{
+    return m_dbPath;
+}
+
 bool Database::createTables()
 {
     ltTrace(LT_LOG_DB()) << "Creating tables";

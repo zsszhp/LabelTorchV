@@ -38,3 +38,13 @@ void AppController::closeProject()
     emit currentProjectNameChanged();
     ltInfo(LT_LOG_APP()) << "Project closed";
 }
+
+void AppController::setPythonBackendReady(bool ready)
+{
+    if (m_pythonBackendReady != ready) {
+        m_pythonBackendReady = ready;
+        emit pythonBackendReadyChanged();
+        ltInfo(LT_LOG_APP()) << "Python backend ready changed to:" << ready;
+    }
+}
+

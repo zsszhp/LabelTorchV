@@ -141,6 +141,7 @@ QStringList Schema::createTableStatements()
         "  options_snapshot_json TEXT,"
         "  output_path TEXT NOT NULL,"
         "  validation_result TEXT,"
+        "  status TEXT NOT NULL DEFAULT 'pending',"
         "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
         ")",
 

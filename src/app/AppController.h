@@ -24,6 +24,7 @@ public:
     bool projectOpen() const { return !m_currentProjectId.isEmpty(); }
 
     bool pythonBackendReady() const { return m_pythonBackendReady; }
+    void setPythonBackendReady(bool ready);
 
     Q_INVOKABLE void openProject(const QString &projectId, const QString &projectName);
     Q_INVOKABLE void closeProject();

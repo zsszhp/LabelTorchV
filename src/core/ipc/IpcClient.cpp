@@ -14,7 +14,7 @@ IpcClient::IpcClient(QObject *parent)
     ltTrace(LT_LOG_IPC()) << "IpcClient created";
 
     m_watchdog = new QTimer(this);
-    m_watchdog->setInterval(5000);
+    m_watchdog->setInterval(30000);
     connect(m_watchdog, &QTimer::timeout, this, [this]() {
         if (m_connected) {
             sendRequest("environment.check", {});
@@ -38,19 +38,23 @@ void IpcClient::startBackend(const QString &pythonPath, const QString &scriptPat
     m_lastScriptPath = scriptPath;
     ltInfo(LT_LOG_IPC()) << "startBackend python=" << pythonPath << "script=" << scriptPath;
 
-    if (m_process && m_process->state() != QProcess::NotRunning) {
-        ltWarning(LT_LOG_IPC()) << "Backend already running";
-        return;
+    if (m_process) {
+        if (m_process->state() != QProcess::NotRunning) {
+            ltWarning(LT_LOG_IPC()) << "Backend already running";
+            return;
+        }
+        m_process->deleteLater();
+        m_process = nullptr;
     }
 
     m_process = new QProcess(this);
     m_process->setProcessChannelMode(QProcess::ForwardedErrorChannel);
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert(QStringLiteral("PYTHONUNBUFFERED"), QStringLiteral("1"));
     QStringList candidateDirs = {
         QCoreApplication::applicationDirPath() + QStringLiteral("/../backend"),
         QCoreApplication::applicationDirPath() + QStringLiteral("/../../../backend"),
-        QStringLiteral("D:/project/LabelTorchV/backend"),
     };
     for (const auto &dir : candidateDirs) {
         QString canonical = QDir(dir).canonicalPath();
@@ -83,6 +87,7 @@ void IpcClient::startBackend(const QString &pythonPath, const QString &scriptPat
     if (m_process->waitForStarted(5000)) {
         ltInfo(LT_LOG_IPC()) << "Backend process started, pid=" << m_process->processId();
         m_connected = true;
+        m_restartCount = 0; // 重置重启计数器
         emit connectedChanged();
         m_watchdog->start();
     } else {
@@ -184,13 +189,17 @@ void IpcClient::onBackendFinished(int exitCode, QProcess::ExitStatus exitStatus)
     emit connectedChanged();
     m_watchdog->stop();
 
-    if (m_autoRestart) {
-        ltInfo(LT_LOG_IPC()) << "Auto-restarting backend in 3s...";
+    if (m_autoRestart && m_restartCount < MAX_RESTART) {
+        m_restartCount++;
+        ltInfo(LT_LOG_IPC()) << "Auto-restarting backend (attempt" << m_restartCount << "/" << MAX_RESTART << ") in 3s...";
         QTimer::singleShot(3000, this, [this]() {
             if (m_autoRestart) {
                 tryStartBackend();
             }
         });
+    } else if (m_restartCount >= MAX_RESTART) {
+        ltError(LT_LOG_IPC()) << "Max restart attempts reached, giving up";
+        emit backendError(QStringLiteral("Python 后端多次重启失败，请检查 Python 环境配置"));
     }
 }
 

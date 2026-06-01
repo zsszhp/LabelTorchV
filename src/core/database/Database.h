@@ -25,6 +25,7 @@ public:
     bool migrate();
 
     QSqlDatabase database() const;
+    QString dbPath() const;
 
 private:
     explicit Database(QObject *parent = nullptr);
