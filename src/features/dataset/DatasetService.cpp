@@ -43,18 +43,26 @@ QString DatasetService::importDataset(const QString &projectId, const QString &n
     // 步骤1: 创建数据集记录，状态为 scanning
     QString datasetId = Id::generate();
 
-    QSqlQuery query(Database::instance().database());
+    // 使用事务保证原子性：多表关联操作必须在同一事务内完成
+    auto db = Database::instance().database();
+    if (!db.transaction()) {
+        ltError(LT_LOG_DATASET()) << "Failed to start transaction";
+        return {};
+    }
+
+    QSqlQuery query(db);
     query.prepare("INSERT INTO datasets (id, project_id, name, image_root, label_root, format, sample_count, import_status) "
                   "VALUES (?, ?, ?, ?, ?, ?, 0, 'scanning')");
     query.addBindValue(datasetId);
     query.addBindValue(projectId);
     query.addBindValue(name);
     query.addBindValue(imageDir);
-    query.addBindValue(hasLabelDir ? labelDir : QVariant());
+    query.addBindValue(hasLabelDir ? labelDir : QString());
     query.addBindValue(format);
 
     if (!query.exec()) {
         ltError(LT_LOG_DATASET()) << "创建数据集记录失败:" << query.lastError().text();
+        db.rollback();
         return {};
     }
 
@@ -66,6 +74,7 @@ QString DatasetService::importDataset(const QString &projectId, const QString &n
     if (scanResult.contains("error")) {
         ltError(LT_LOG_DATASET()) << "扫描失败:" << scanResult["error"].toString();
         updateImportStatus(datasetId, QStringLiteral("failed"));
+        db.rollback();
         return {};
     }
 
@@ -88,6 +97,7 @@ QString DatasetService::importDataset(const QString &projectId, const QString &n
     if (!updateImportStatus(datasetId, QStringLiteral("importing"))) {
         ltError(LT_LOG_DATASET()) << "更新状态为导入中失败";
         updateImportStatus(datasetId, QStringLiteral("failed"));
+        db.rollback();
         return {};
     }
 
@@ -95,6 +105,7 @@ QString DatasetService::importDataset(const QString &projectId, const QString &n
     if (!insertSamples(datasetId, matchedSamples)) {
         ltError(LT_LOG_DATASET()) << "插入样本失败";
         updateImportStatus(datasetId, QStringLiteral("failed"));
+        db.rollback();
         return {};
     }
 
@@ -110,6 +121,7 @@ QString DatasetService::importDataset(const QString &projectId, const QString &n
         if (!extractAndStoreSchema(datasetId, labeledSamples)) {
             ltError(LT_LOG_DATASET()) << "提取类别体系失败";
             updateImportStatus(datasetId, QStringLiteral("failed"));
+            db.rollback();
             return {};
         }
     }
@@ -123,8 +135,15 @@ QString DatasetService::importDataset(const QString &projectId, const QString &n
     if (!updateQuery.exec()) {
         ltError(LT_LOG_DATASET()) << "完成数据集更新失败:" << updateQuery.lastError().text();
         updateImportStatus(datasetId, QStringLiteral("failed"));
+        db.rollback();
         return {};
     }
+
+    // 步骤7: 将导入的类别同步到项目 taxonomy
+    syncClassesToTaxonomy(datasetId);
+
+    // 提交事务
+    db.commit();
 
     ltInfo(LT_LOG_DATASET()) << "导入完成:" << datasetId
                              << "共" << matchedSamples.size() << "个样本";
@@ -819,6 +838,124 @@ bool DatasetService::extractAndStoreSchema(const QString &datasetId, const QVari
     return true;
 }
 
+bool DatasetService::syncClassesToTaxonomy(const QString &datasetId)
+{
+    ltTrace(LT_LOG_DATASET()) << "syncClassesToTaxonomy datasetId=" << datasetId;
+
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return false;
+
+    // 1. 从 imported_label_schemas 读取类别名
+    QSqlQuery schemaQuery(db);
+    schemaQuery.prepare("SELECT raw_class_names_json FROM imported_label_schemas "
+                        "WHERE dataset_id = ? ORDER BY created_at DESC LIMIT 1");
+    schemaQuery.addBindValue(datasetId);
+    if (!schemaQuery.exec() || !schemaQuery.next()) {
+        ltDebug(LT_LOG_DATASET()) << "No imported schema found for dataset:" << datasetId;
+        return true; // 无 schema 不是错误，可能只是无标签数据集
+    }
+
+    QString classNamesJson = schemaQuery.value(0).toString();
+    QJsonDocument doc = QJsonDocument::fromJson(classNamesJson.toUtf8());
+    if (!doc.isArray()) {
+        ltWarning(LT_LOG_DATASET()) << "Invalid class names JSON for dataset:" << datasetId;
+        return false;
+    }
+
+    QStringList importedClasses;
+    QJsonArray arr = doc.array();
+    for (const auto &v : arr) {
+        importedClasses.append(v.toString());
+    }
+
+    if (importedClasses.isEmpty()) {
+        ltDebug(LT_LOG_DATASET()) << "Empty class list in schema for dataset:" << datasetId;
+        return true;
+    }
+
+    // 2. 获取数据集所属项目 ID
+    QSqlQuery datasetQuery(db);
+    datasetQuery.prepare("SELECT project_id FROM datasets WHERE id = ?");
+    datasetQuery.addBindValue(datasetId);
+    if (!datasetQuery.exec() || !datasetQuery.next()) {
+        ltError(LT_LOG_DATASET()) << "Dataset not found:" << datasetId;
+        return false;
+    }
+    QString projectId = datasetQuery.value(0).toString();
+
+    // 3. 查找项目的 taxonomy（取第一个）
+    QSqlQuery taxonomyQuery(db);
+    taxonomyQuery.prepare("SELECT id, class_definitions_json FROM taxonomies "
+                          "WHERE project_id = ? ORDER BY version DESC LIMIT 1");
+    taxonomyQuery.addBindValue(projectId);
+    if (!taxonomyQuery.exec() || !taxonomyQuery.next()) {
+        ltWarning(LT_LOG_DATASET()) << "No taxonomy found for project:" << projectId
+                                    << ", creating one with imported classes";
+        // 项目没有 taxonomy，创建一个
+        QSqlQuery createQuery(db);
+        QString taxonomyId = Id::generate();
+        createQuery.prepare("INSERT INTO taxonomies (id, project_id, name, version, class_definitions_json) "
+                            "VALUES (?, ?, '默认类别体系', 1, ?)");
+        createQuery.addBindValue(taxonomyId);
+        createQuery.addBindValue(projectId);
+        createQuery.addBindValue(classNamesJson);
+        if (!createQuery.exec()) {
+            ltError(LT_LOG_DATASET()) << "Failed to create taxonomy:" << createQuery.lastError().text();
+            return false;
+        }
+        ltInfo(LT_LOG_DATASET()) << "Created taxonomy" << taxonomyId << "with" << importedClasses.size() << "classes";
+        return true;
+    }
+
+    // 4. 合并新类别到已有 taxonomy
+    QString taxonomyId = taxonomyQuery.value(0).toString();
+    QString existingClassesJson = taxonomyQuery.value(1).toString();
+
+    QStringList existingClasses;
+    if (!existingClassesJson.isEmpty()) {
+        QJsonDocument existingDoc = QJsonDocument::fromJson(existingClassesJson.toUtf8());
+        if (existingDoc.isArray()) {
+            for (const auto &v : existingDoc.array()) {
+                existingClasses.append(v.toString());
+            }
+        }
+    }
+
+    // 追加不重复的类别
+    QSet<QString> existingSet(existingClasses.begin(), existingClasses.end());
+    int addedCount = 0;
+    for (const QString &cls : importedClasses) {
+        if (!existingSet.contains(cls)) {
+            existingClasses.append(cls);
+            existingSet.insert(cls);
+            addedCount++;
+        }
+    }
+
+    if (addedCount == 0) {
+        ltDebug(LT_LOG_DATASET()) << "No new classes to merge into taxonomy" << taxonomyId;
+        return true;
+    }
+
+    // 5. 更新 taxonomy
+    QJsonArray mergedArray;
+    for (const auto &name : existingClasses) mergedArray.append(name);
+    QString mergedJson = QJsonDocument(mergedArray).toJson(QJsonDocument::Compact);
+
+    QSqlQuery updateQuery(db);
+    updateQuery.prepare("UPDATE taxonomies SET class_definitions_json = ?, version = version + 1 WHERE id = ?");
+    updateQuery.addBindValue(mergedJson);
+    updateQuery.addBindValue(taxonomyId);
+    if (!updateQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "Failed to update taxonomy:" << updateQuery.lastError().text();
+        return false;
+    }
+
+    ltInfo(LT_LOG_DATASET()) << "Synced" << addedCount << "new classes to taxonomy" << taxonomyId
+                             << ", total:" << existingClasses.size() << "classes";
+    return true;
+}
+
 QString DatasetService::appendImport(const QString &datasetId, const QString &imageDir, const QString &labelDir)
 {
     ltTrace(LT_LOG_DATASET()) << "appendImport datasetId=" << datasetId
@@ -1222,6 +1359,8 @@ QString DatasetService::importDatasetJson(const QString &projectId, const QStrin
 
     ltInfo(LT_LOG_DATASET()) << "JSON import completed:" << datasetId
                              << "with" << matchedSamples.size() << "samples";
+
+    syncClassesToTaxonomy(datasetId);
     return datasetId;
 }
 
@@ -1290,6 +1429,7 @@ QString DatasetService::importDatasetSeparate(const QString &projectId,
                 return {};
             }
 
+            syncClassesToTaxonomy(datasetId);
             return datasetId;
         }
 
@@ -1487,6 +1627,7 @@ QString DatasetService::importDatasetV2(const QString &projectId,
             return {};
         }
 
+        syncClassesToTaxonomy(datasetId);
         return datasetId;
     }
 

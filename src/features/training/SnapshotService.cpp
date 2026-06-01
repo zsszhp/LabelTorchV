@@ -500,6 +500,16 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
                     file.open(QIODevice::WriteOnly);
                     file.close();
                 }
+            } else {
+                // 无标签样本：创建空 .txt 文件，Ultralytics 要求每张图片都有对应的标签文件
+                QFileInfo imgInfo(srcImg);
+                QString dstLbl = snapshotDir + QStringLiteral("/labels/") + splitName + QStringLiteral("/")
+                                 + imgInfo.completeBaseName() + QStringLiteral(".txt");
+                if (!QFile::exists(dstLbl)) {
+                    QFile file(dstLbl);
+                    file.open(QIODevice::WriteOnly);
+                    file.close();
+                }
             }
         }
         return true;

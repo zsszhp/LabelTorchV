@@ -189,6 +189,18 @@ private:
     bool importAnomalyDataset(const QString &datasetId, const QString &folderPath);
 
     /**
+     * @brief 将导入的类别名同步到项目的 taxonomy
+     *
+     * 从 imported_label_schemas 读取数据集的类别名，
+     * 合并到项目 taxonomy 的 class_definitions_json 中。
+     * 新类别追加到末尾，已有类别不重复添加。
+     *
+     * @param datasetId 数据集 ID
+     * @return true 同步成功，false 失败
+     */
+    bool syncClassesToTaxonomy(const QString &datasetId);
+
+    /**
      * @brief 导入 LabelMe JSON 格式数据集
      *
      * LabelMe 格式：每张图片对应一个 JSON 标签文件，包含 shapes 数组

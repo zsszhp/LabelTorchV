@@ -23,7 +23,7 @@ async def handle_start(payload: dict) -> dict:
 
     adapter_class = TrainingAdapterRegistry.get(adapter_name)
     if adapter_class is None:
-        return {"task_id": task_id, "status": "error",
+        return {"task_id": task_id, "status": "failed",
                 "error": f"Unknown adapter: {adapter_name}. Available: {TrainingAdapterRegistry.list_adapters()}"}
 
     adapter = adapter_class()

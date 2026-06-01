@@ -9,6 +9,7 @@
 #include <QJsonObject>
 #include <QUuid>
 #include <QDateTime>
+#include <QDir>
 
 ExportService::ExportService(QObject *parent) : QObject(parent)
 {
@@ -95,18 +96,13 @@ QString ExportService::exportModel(const QString &modelVersionId,
 
     QString artifactId = QUuid::createUuid().toString(QUuid::WithoutBraces);
 
-    // 组装最终导出文件名
-    QString outputPath = bestWeightPath;
-    if (!outputPath.isEmpty()) {
-        int dotPos = outputPath.lastIndexOf('.');
-        if (dotPos > 0) {
-            outputPath = outputPath.left(dotPos) + "." + format;
-        } else {
-            outputPath += "." + format;
-        }
-    } else {
-        outputPath = projectRoot + "/exports/export_" + artifactId.left(8) + "." + format;
+    // 导出文件放在项目的 exports/ 目录下，避免与训练权重目录混淆
+    QDir exportsDir(projectRoot + QStringLiteral("/exports"));
+    if (!exportsDir.exists()) {
+        exportsDir.mkpath(QStringLiteral("."));
     }
+    QString outputPath = exportsDir.absoluteFilePath(
+        QStringLiteral("export_%1.%2").arg(artifactId.left(8), format));
 
     QJsonObject optionsObj = QJsonDocument::fromJson(validatedOptionsJson.toUtf8()).object();
     // options_snapshot_json 只存储导出选项配置，不存储运行时状态
