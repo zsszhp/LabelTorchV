@@ -53,6 +53,7 @@ void IpcClient::startBackend(const QString &pythonPath, const QString &scriptPat
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     env.insert(QStringLiteral("PYTHONUNBUFFERED"), QStringLiteral("1"));
     QStringList candidateDirs = {
+        QCoreApplication::applicationDirPath() + QStringLiteral("/backend"),
         QCoreApplication::applicationDirPath() + QStringLiteral("/../backend"),
         QCoreApplication::applicationDirPath() + QStringLiteral("/../../../backend"),
     };

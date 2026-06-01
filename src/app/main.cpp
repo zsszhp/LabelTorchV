@@ -203,8 +203,8 @@ int main(int argc, char *argv[])
 
     QString pythonExec = appSettings.pythonPath();
     if (pythonExec.isEmpty() || !QFile::exists(pythonExec)) {
-        // 优先检查 runtime/python/python.exe（绿色版）
-        QString embeddedPy = QCoreApplication::applicationDirPath() + QStringLiteral("/runtime/python/python.exe");
+        // 优先检查 python/python.exe（绿色版内嵌环境）
+        QString embeddedPy = QCoreApplication::applicationDirPath() + QStringLiteral("/python/python.exe");
         if (QFile::exists(embeddedPy)) {
             pythonExec = embeddedPy;
         } else {
