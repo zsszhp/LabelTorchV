@@ -48,6 +48,13 @@ async def handle_start(payload: dict) -> dict:
                 "mAP50-95": map50_95,
                 "precision": epoch_data.get("precision(B)", epoch_data.get("precision", 0)),
                 "recall": epoch_data.get("recall(B)", epoch_data.get("recall", 0)),
+                "metrics": {
+                    "mAP50": map50,
+                    "mAP50-95": map50_95,
+                    "precision": epoch_data.get("precision(B)", epoch_data.get("precision", 0)),
+                    "recall": epoch_data.get("recall(B)", epoch_data.get("recall", 0)),
+                    "map50": map50,
+                }
             })
 
             # 同时发送日志事件，让UI层实时显示训练进度

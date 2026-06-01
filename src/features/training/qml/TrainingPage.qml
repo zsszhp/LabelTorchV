@@ -661,13 +661,6 @@ Item {
                                     currentIndex: 1
                                     Layout.fillWidth: true
 
-                                    function indexOfValue(val) {
-                                        for (var i = 0; i < count; i++) {
-                                            if (model.get(i) === val) return i
-                                        }
-                                        return -1
-                                    }
-
                                     contentItem: Label {
                                         text: modelFamilyCombo.displayText
                                         color: Theme.textPrimary

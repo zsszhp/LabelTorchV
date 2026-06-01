@@ -173,6 +173,29 @@ void TrainingService::handleTrainingEvent(const QVariantMap &event)
         // 训练进度事件，转发给QML层
         int epoch = payload[QStringLiteral("epoch")].toInt();
         QVariantMap metrics = payload[QStringLiteral("metrics")].toMap();
+        if (metrics.isEmpty()) {
+            if (payload.contains(QStringLiteral("mAP50"))) {
+                metrics[QStringLiteral("mAP50")] = payload[QStringLiteral("mAP50")];
+            }
+            if (payload.contains(QStringLiteral("mAP50-95"))) {
+                metrics[QStringLiteral("mAP50-95")] = payload[QStringLiteral("mAP50-95")];
+            }
+            if (payload.contains(QStringLiteral("precision"))) {
+                metrics[QStringLiteral("precision")] = payload[QStringLiteral("precision")];
+            }
+            if (payload.contains(QStringLiteral("recall"))) {
+                metrics[QStringLiteral("recall")] = payload[QStringLiteral("recall")];
+            }
+            if (payload.contains(QStringLiteral("auroc"))) {
+                metrics[QStringLiteral("auroc")] = payload[QStringLiteral("auroc")];
+            }
+            if (payload.contains(QStringLiteral("image_auroc"))) {
+                metrics[QStringLiteral("image_auroc")] = payload[QStringLiteral("image_auroc")];
+            }
+            if (payload.contains(QStringLiteral("pixel_auroc"))) {
+                metrics[QStringLiteral("pixel_auroc")] = payload[QStringLiteral("pixel_auroc")];
+            }
+        }
 
         emit trainingProgress(taskId,
                                epoch,
