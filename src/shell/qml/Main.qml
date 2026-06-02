@@ -450,6 +450,128 @@ ApplicationWindow {
         easing.type: Easing.OutCubic
     }
 
+    property bool reallyClose: false
+
+    onClosing: (close) => {
+        if (!reallyClose) {
+            close.accepted = false
+            closeConfirmDialog.open()
+        }
+    }
+
+    Dialog {
+        id: closeConfirmDialog
+        title: "确认退出"
+        modal: true
+        anchors.centerIn: parent
+        width: 360
+        standardButtons: Dialog.NoButton
+        
+        background: Rectangle {
+            color: Theme.bgCard
+            border.color: Theme.border
+            border.width: 1
+            radius: Theme.radiusLarge
+            
+            Rectangle {
+                width: parent.width
+                height: 4
+                color: Theme.accentPrimary
+                radius: Theme.radiusLarge
+                anchors.top: parent.top
+            }
+        }
+        
+        header: Rectangle {
+            color: "transparent"
+            implicitHeight: 48
+            
+            Label {
+                text: "⚠️ 确认退出"
+                font.bold: true
+                font.pixelSize: Theme.fontSizeSubheading
+                font.family: Theme.fontFamily
+                color: Theme.textPrimary
+                anchors.left: parent.left
+                anchors.leftMargin: Theme.spacingLarge
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+        
+        contentItem: ColumnLayout {
+            spacing: Theme.spacingLarge
+            
+            Label {
+                text: "有未完成的任务或工作，您确定要关闭并退出软件吗？"
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeNormal
+                font.family: Theme.fontFamily
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                Layout.leftMargin: Theme.spacingLarge
+                Layout.rightMargin: Theme.spacingLarge
+                Layout.topMargin: Theme.spacingNormal
+                Layout.bottomMargin: Theme.spacingNormal
+            }
+            
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: Theme.spacingLarge
+                Layout.rightMargin: Theme.spacingLarge
+                Layout.bottomMargin: Theme.spacingLarge
+                spacing: Theme.spacingLarge
+                
+                Button {
+                    text: "取消"
+                    Layout.fillWidth: true
+                    flat: true
+                    background: Rectangle {
+                        color: parent.hovered ? Theme.bgHover : Theme.bgTertiary
+                        border.color: Theme.border
+                        border.width: 1
+                        radius: Theme.radiusSmall
+                        implicitHeight: 36
+                    }
+                    contentItem: Label {
+                        text: parent.text
+                        color: Theme.textSecondary
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.family: Theme.fontFamily
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    onClicked: {
+                        closeConfirmDialog.close()
+                    }
+                }
+                
+                Button {
+                    text: "确定退出"
+                    Layout.fillWidth: true
+                    background: Rectangle {
+                        color: parent.pressed ? Qt.darker(Theme.accentError, 1.2) : (parent.hovered ? Qt.lighter(Theme.accentError, 1.1) : Theme.accentError)
+                        radius: Theme.radiusSmall
+                        implicitHeight: 36
+                    }
+                    contentItem: Label {
+                        text: parent.text
+                        color: Theme.textPrimary
+                        font.bold: true
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.family: Theme.fontFamily
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    onClicked: {
+                        reallyClose = true
+                        closeConfirmDialog.close()
+                        root.close()
+                    }
+                }
+            }
+        }
+    }
+
     Component.onCompleted: {
         logPanel.appendLog("[标炬] LabelTorch v0.1.0 启动")
         logPanel.appendLog("[标炬] 正在连接 Python 后端...")
