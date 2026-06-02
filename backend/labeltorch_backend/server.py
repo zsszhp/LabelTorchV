@@ -40,6 +40,8 @@ class IpcServer:
     """JSON-RPC IPC服务端"""
 
     def __init__(self):
+        global _server_instance
+        _server_instance = self
         _import_handlers()
         # 启动时注册所有内置训练适配器（仅注册一次）
         from .adapters.registry import register_builtin_adapters
@@ -166,6 +168,16 @@ _server_instance = None
 
 def get_server():
     global _server_instance
+    if _server_instance is None:
+        import sys
+        main_mod = sys.modules.get('__main__')
+        if main_mod and hasattr(main_mod, '_server_instance') and main_mod._server_instance is not None:
+            return main_mod._server_instance
+        # Also check other loaded names for safety
+        for mod_name in ['labeltorch_backend.server', 'server']:
+            mod = sys.modules.get(mod_name)
+            if mod and hasattr(mod, '_server_instance') and mod._server_instance is not None:
+                return mod._server_instance
     return _server_instance
 
 

@@ -48,7 +48,7 @@ void IpcClient::startBackend(const QString &pythonPath, const QString &scriptPat
     }
 
     m_process = new QProcess(this);
-    m_process->setProcessChannelMode(QProcess::ForwardedErrorChannel);
+    m_process->setProcessChannelMode(QProcess::SeparateChannels);
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     env.insert(QStringLiteral("PYTHONUNBUFFERED"), QStringLiteral("1"));
@@ -70,6 +70,21 @@ void IpcClient::startBackend(const QString &pythonPath, const QString &scriptPat
 
     connect(m_process, &QProcess::readyReadStandardOutput,
             this, &IpcClient::onBackendReadyRead);
+    connect(m_process, &QProcess::readyReadStandardError, this, [this]() {
+        if (m_process) {
+            QByteArray errData = m_process->readAllStandardError();
+            if (!errData.isEmpty()) {
+                QString errStr = QString::fromUtf8(errData).trimmed();
+                QStringList lines = errStr.split(QStringLiteral("\n"));
+                for (const QString &line : lines) {
+                    QString cleanLine = line.trimmed();
+                    if (!cleanLine.isEmpty()) {
+                        ltError(LT_LOG_IPC()) << "[Python Stderr]" << cleanLine;
+                    }
+                }
+            }
+        }
+    });
     connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &IpcClient::onBackendFinished);
     connect(m_process, &QProcess::errorOccurred,

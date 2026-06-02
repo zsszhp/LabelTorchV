@@ -225,7 +225,7 @@ Item {
             ctx.textAlign = "right"
             ctx.fillText(yVal.toFixed(2), padL - 6, yPx + 3)
         }
-        var xSteps = Math.min(modelCount, 10)
+        var xSteps = modelCount === 0 ? 5 : Math.min(modelCount, 10)
         for (var s = 0; s <= xSteps; s++) {
             var xVal = xMin + (xMax - xMin) * s / xSteps
             var xPx = toX(xVal)
@@ -339,7 +339,21 @@ Item {
         ctx.fillStyle = Theme.bgTertiary
         ctx.fillRect(0, 0, w, h)
 
+        var isLossModel = (model === lossModel)
+
         if (model.count === 0) {
+            // Draw empty grid and axes for better UI feedback
+            var xMin = 0
+            var xMax = epochsSpin.value || 100
+            var yMin = 0.0
+            var yMax = isLossModel ? 2.0 : 1.0
+            var emptyMappers = createCoordinateMappers(padL, padR, padT, padB, w, h, xMin, xMax, yMin, yMax)
+
+            drawGridLines(ctx, padL, padR, padT, padB, w, h, xMin, xMax, yMin, yMax, emptyMappers.toX, emptyMappers.toY, 0)
+            drawAxes(ctx, padL, padR, padT, padB, w, h)
+            drawThresholdLine(ctx, padL, padR, w, emptyMappers.toY, threshVal, yMin, yMax, showThresh)
+            drawAxisLabels(ctx, padL, padR, padT, padB, w, h, yLabel)
+
             ctx.fillStyle = Theme.textMuted
             ctx.font = "13px sans-serif"
             ctx.textAlign = "center"
@@ -347,7 +361,6 @@ Item {
             return
         }
 
-        var isLossModel = (model === lossModel)
         var range = calculateDataRange(model, isLossModel)
         var mappers = createCoordinateMappers(padL, padR, padT, padB, w, h, range.xMin, range.xMax, range.yMin, range.yMax)
 
