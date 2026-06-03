@@ -21,19 +21,21 @@ export = None
 
 def _import_handlers():
     """延迟导入处理器模块"""
-    global environment, training, inference, export, anomaly, active_learning
+    global environment, training, inference, export, anomaly, active_learning, testing
     from .handlers import environment as env_module
     from .handlers import training as train_module
     from .handlers import inference as inf_module
     from .handlers import export as exp_module
     from .handlers import anomaly as anomaly_module
     from .handlers import active_learning as al_module
+    from .handlers import testing as testing_module
     environment = env_module
     training = train_module
     inference = inf_module
     export = exp_module
     anomaly = anomaly_module
     active_learning = al_module
+    testing = testing_module
 
 
 class IpcServer:
@@ -60,6 +62,9 @@ class IpcServer:
             "active_learning.collect_low_conf": active_learning.handle_collect_low_conf,
             "active_learning.prioritize_queue": active_learning.handle_prioritize_queue,
             "active_learning.queue_stats": active_learning.handle_queue_stats,
+            "testing.start": testing.handle_start,
+            "testing.stop": testing.handle_stop,
+            "testing.status": testing.handle_status,
             "shutdown": self._handle_shutdown,
         }
         self.running = True
