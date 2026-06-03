@@ -1,712 +1,873 @@
-// ExportPage.qml - 导出中心
+// ExportPage.qml - V5 导出页：模型导出与产物验证
+// 像素级对标参考UI：左侧模型列表sidebar(240px) + 中心左右分栏(参数面板280px + 展示区)
 import QtQuick
 import QtQuick.Controls
-import LabelTorch.Theme
 import QtQuick.Layouts
+import LabelTorch.Theme
+import LabelTorch.Components
 
 Item {
     id: root
+    anchors.fill: parent
 
     property string currentProjectId: appController.currentProjectId
     property string selectedVersionId: ""
     property var exportHistory: []
+    property string exportStatus: "idle"
 
+    // 切换项目时重置状态
     onCurrentProjectIdChanged: {
-        modelVersionModel.setProjectId(currentProjectId)
+        if (currentProjectId !== "") {
+            modelVersionModel.setProjectId(currentProjectId)
+        }
         selectedVersionId = ""
         exportHistory = []
-        refreshExports()
     }
 
-    // 页面可见时自动刷新导出历史
+    // 页面可见时刷新数据
     onVisibleChanged: {
         if (visible && currentProjectId !== "") {
+            modelVersionModel.setProjectId(currentProjectId)
             refreshExports()
         }
     }
 
+    // 刷新导出历史列表
     function refreshExports() {
         if (selectedVersionId !== "") {
             exportHistory = exportService.listExports(selectedVersionId)
-        } else if (currentProjectId !== "" && modelVersionModel.rowCount() > 0) {
-            // 未选择版本时，自动选择第一个版本并刷新
-            var firstIdx = modelVersionModel.index(0, 0)
-            var firstId = modelVersionModel.data(firstIdx, Qt.UserRole + 1)
-            if (firstId) {
-                selectedVersionId = firstId
-                versionCombo.currentIndex = 0
-                exportHistory = exportService.listExports(firstId)
-            }
         } else {
             exportHistory = []
         }
     }
 
-    // 监听导出状态变更，自动刷新列表并更新状态提示
+    // 监听导出状态变更信号
     Connections {
         target: exportService
         function onExportStatusChanged(artifactId, status) {
             refreshExports()
-            if (status === "verifying") {
-                statusLabel.text = "导出完成，正在验证产物:" + artifactId.substring(0, 8) + "..."
-                statusLabel.color = Theme.accentWarning
-                validationResultBox.visible = false
-            } else if (status === "succeeded") {
-                statusLabel.text = "导出并验证完成:" + artifactId.substring(0, 8) + "..."
-                statusLabel.color = Theme.accentSuccess
-                // 获取验证结果并显示
-                var details = exportService.getExportStatus(artifactId)
-                if (details.validationResult && details.validationResult.length > 0) {
-                    try {
-                        var vr = JSON.parse(details.validationResult)
-                        validationResultBox.isVerified = vr.verified !== false
-                        validationResultBox.resultText = details.validationResult
-                        validationResultBox.visible = true
-                    } catch (e) {
-                        validationResultBox.resultText = details.validationResult
-                        validationResultBox.isVerified = true
-                        validationResultBox.visible = true
-                    }
-                }
-            } else if (status === "failed") {
-                statusLabel.text = "导出或验证失败:" + artifactId.substring(0, 8) + "..."
-                statusLabel.color = Theme.accentError
-                var details2 = exportService.getExportStatus(artifactId)
-                if (details2.validationResult && details2.validationResult.length > 0) {
-                    try {
-                        var vr2 = JSON.parse(details2.validationResult)
-                        validationResultBox.isVerified = false
-                        validationResultBox.resultText = vr2.error || details2.validationResult
-                        validationResultBox.visible = true
-                    } catch (e2) {
-                        validationResultBox.resultText = details2.validationResult
-                        validationResultBox.isVerified = false
-                        validationResultBox.visible = true
-                    }
-                }
-            } else if (status === "running") {
-                statusLabel.text = "正在导出:" + artifactId.substring(0, 8) + "..."
-                statusLabel.color = Theme.accentWarning
-                validationResultBox.visible = false
-            }
-        }
-    }
-
-    // 未打开项目时的空状态提示
-    ColumnLayout {
-        anchors.centerIn: parent
-        visible: currentProjectId === ""
-        spacing: 16
-
-        Label {
-            text: "📦 请先打开一个项目"
-            color: Theme.textSecondary
-            font.pixelSize: Theme.fontSizeTitle
-            font.bold: true
-            Layout.alignment: Qt.AlignHCenter
-        }
-
-        Label {
-            text: "完成训练后，在此导出模型"
-            color: Theme.textMuted
-            font.pixelSize: Theme.fontSizeNormal
-            Layout.alignment: Qt.AlignHCenter
-        }
-
-        Button {
-            text: "前往项目中心"
-            font.family: Theme.fontFamily
-            Layout.alignment: Qt.AlignHCenter
-            background: Rectangle {
-                color: parent.hovered ? Theme.accentPrimary : Theme.bgTertiary
-                radius: Theme.radiusSmall
-                border.color: Theme.accentPrimary
-                border.width: 1
-                implicitWidth: 140
-                implicitHeight: 36
-            }
-            contentItem: Label {
-                text: parent.text
-                color: Theme.accentPrimary
-                font.pixelSize: Theme.fontSizeNormal
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-            onClicked: appController.currentPageIndex = 0
+            exportStatus = status
         }
     }
 
     RowLayout {
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 12
-        visible: currentProjectId !== ""
+        spacing: 0
 
-        // 左侧面板：导出配置
+        // ============================================================
+        // 左侧模型列表 Sidebar (240px, padding:0)
+        // ============================================================
         Rectangle {
-            Layout.preferredWidth: 400
+            Layout.preferredWidth: 240
             Layout.fillHeight: true
-            color: Theme.bgCard
-            radius: 8
+            color: Theme.bgSide
+
+            // 右侧分割线
+            Rectangle {
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: 1
+                color: Theme.borderColor
+            }
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 12
-                spacing: 8
+                spacing: 0
 
-                // 区域标题
-                Label {
-                    text: "导出模型"
-                    color: Theme.accentPrimary
-                    font.pixelSize: 16
-                    font.bold: true
+                // 区块标题 "模型列表"
+                Text {
+                    text: "模型列表"
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.weight: Font.DemiBold
+                    font.family: Theme.fontFamily
+                    color: Theme.textMain
+                    Layout.topMargin: 16
+                    Layout.leftMargin: 16
+                    Layout.bottomMargin: 8
                 }
 
-                    // 模型版本选择器
-                RowLayout {
+                // 模型版本列表
+                ListView {
+                    id: modelVersionList
                     Layout.fillWidth: true
-                    spacing: 8
+                    Layout.fillHeight: true
+                    Layout.leftMargin: 0
+                    Layout.rightMargin: 0
+                    clip: true
+                    spacing: 0
 
-                    Label {
-                        text: "模型版本:"
-                        color: Theme.textPrimary
-                        font.pixelSize: 13
-                        Layout.preferredWidth: 100
-                    }
-
-                    ComboBox {
-                        id: versionCombo
-                        Layout.fillWidth: true
-                        model: modelVersionModel
-                        textRole: "versionId"
-                        valueRole: "versionId"
-                        displayText: currentIndex >= 0 ?
-                            modelVersionModel.data(modelVersionModel.index(currentIndex, 0), Qt.UserRole + 1) ?
-                            modelVersionModel.data(modelVersionModel.index(currentIndex, 0), Qt.UserRole + 1).substring(0, 8) + "..." :
-                            "选择版本" : "选择版本"
-
-                        contentItem: Label {
-                            text: versionCombo.displayText
-                            color: Theme.textPrimary
-                            font.pixelSize: 13
-                            verticalAlignment: Text.AlignVCenter
-                            leftPadding: 8
+                    model: modelVersionModel
+                    delegate: Rectangle {
+                        id: listDelegate
+                        width: modelVersionList.width
+                        height: 52
+                        // 选中态：左边框3px primaryGlow + 半透明背景
+                        color: {
+                            if (root.selectedVersionId === model.versionId) return Qt.alpha(Theme.primaryGlow, 0.05)
+                            if (delegateMouse.containsMouse) return Theme.bgHover
+                            return "transparent"
                         }
 
-                        background: Rectangle {
-                            color: Theme.bgInput
-                            radius: 4
-                            border.color: versionCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
-                            border.width: 1
+                        // 选中态左边框高亮
+                        Rectangle {
+                            visible: root.selectedVersionId === model.versionId
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: 3
+                            color: Theme.primaryGlow
                         }
 
-                        popup: Popup {
-                            y: versionCombo.height
-                            width: versionCombo.width
-                            implicitHeight: Math.min(contentItem.implicitHeight, 300)
-                            padding: 1
+                        // 内容：模型名(bold) + 状态行
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 16
+                            anchors.rightMargin: 16
+                            anchors.topMargin: 8
+                            anchors.bottomMargin: 8
+                            spacing: 2
 
-                            contentItem: ListView {
-                                clip: true
-                                implicitHeight: contentHeight
-                                model: versionCombo.popup.visible ? versionCombo.delegateModel : null
-                                currentIndex: versionCombo.highlightedIndex
-                            }
-
-                            background: Rectangle {
-                                color: Theme.bgPrimary
-                                border.color: Theme.borderNormal
-                                radius: 4
-                            }
-                        }
-
-                        delegate: ItemDelegate {
-                            width: versionCombo.width
-                            contentItem: Label {
-                                text: model.versionId.substring(0, 8) + "..." + (model.bestWeightPath ? " (" + model.bestWeightPath + ")" : "")
-                                color: highlighted ? Theme.accentPrimary : Theme.textPrimary
-                                font.pixelSize: 12
-                                font.family: "monospace"
-                                verticalAlignment: Text.AlignVCenter
+                            Text {
+                                text: model.bestWeightPath ? model.bestWeightPath.split("/").pop().split("\\").pop() : "版本 " + model.versionId.substring(0, 8)
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Font.DemiBold
+                                font.family: Theme.fontFamily
+                                color: root.selectedVersionId === model.versionId ? Theme.primaryGlow : Theme.textMain
                                 elide: Text.ElideRight
-                            }
-                            highlighted: versionCombo.highlightedIndex === index
-                            background: Rectangle {
-                                color: highlighted ? Theme.bgInput : Theme.bgPrimary
-                            }
-                        }
-
-                        onActivated: {
-                            selectedVersionId = currentValue
-                            refreshExports()
-                        }
-                    }
-                }
-
-                    // 格式选择器
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    Label {
-                        text: "导出格式:"
-                        color: Theme.textPrimary
-                        font.pixelSize: 13
-                        Layout.preferredWidth: 100
-                    }
-
-                    ComboBox {
-                        id: formatCombo
-                        Layout.fillWidth: true
-                        model: ["pt", "onnx", "tflite", "engine"]
-                        currentIndex: 1
-
-                        contentItem: Label {
-                            text: formatCombo.displayText
-                            color: Theme.textPrimary
-                            font.pixelSize: 13
-                            verticalAlignment: Text.AlignVCenter
-                            leftPadding: 8
-                        }
-
-                        background: Rectangle {
-                            color: Theme.bgInput
-                            radius: 4
-                            border.color: formatCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
-                            border.width: 1
-                        }
-
-                        popup: Popup {
-                            y: formatCombo.height
-                            width: formatCombo.width
-                            implicitHeight: Math.min(contentItem.implicitHeight, 200)
-                            padding: 1
-
-                            contentItem: ListView {
-                                clip: true
-                                implicitHeight: contentHeight
-                                model: formatCombo.popup.visible ? formatCombo.delegateModel : null
-                                currentIndex: formatCombo.highlightedIndex
+                                Layout.fillWidth: true
                             }
 
-                            background: Rectangle {
-                                color: Theme.bgPrimary
-                                border.color: Theme.borderNormal
-                                radius: 4
+                            Text {
+                                text: {
+                                    var metrics = model.metricsJson ? JSON.parse(model.metricsJson) : {}
+                                    if (metrics.mAP50 !== undefined) return "mAP50: " + (metrics.mAP50 * 100).toFixed(1) + "%"
+                                    return "未评估"
+                                }
+                                font.pixelSize: Theme.fontSizeCaption
+                                font.family: Theme.fontFamily
+                                color: Theme.textMuted
+                                Layout.fillWidth: true
                             }
                         }
 
-                        delegate: ItemDelegate {
-                            width: formatCombo.width
-                            contentItem: Label {
-                                text: modelData.toUpperCase()
-                                color: highlighted ? Theme.accentPrimary : Theme.textPrimary
-                                font.pixelSize: 13
-                                font.bold: true
-                                verticalAlignment: Text.AlignVCenter
+                        MouseArea {
+                            id: delegateMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                root.selectedVersionId = model.versionId
+                                refreshExports()
                             }
-                            highlighted: formatCombo.highlightedIndex === index
-                            background: Rectangle {
-                                color: highlighted ? Theme.bgInput : Theme.bgPrimary
-                            }
-                        }
-                    }
-                }
-
-                // ONNX 配置面板（仅格式为 onnx 时可见）
-                OnnxConfigPanel {
-                    id: onnxConfigPanel
-                    Layout.fillWidth: true
-                    visible: formatCombo.currentText === "onnx"
-                }
-
-                // 非 ONNX 格式的提示信息
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 40
-                    visible: formatCombo.currentText !== "onnx"
-                    color: Theme.bgInput
-                    radius: 6
-
-                    Label {
-                        anchors.centerIn: parent
-                        text: {
-                            switch (formatCombo.currentText) {
-                            case "pt": return "PyTorch .pt 格式 - 无额外选项"
-                            case "tflite": return "TensorFlow Lite 格式 - 无额外选项"
-                            case "engine": return "TensorRT Engine 格式 - 无额外选项"
-                            default: return ""
-                            }
-                        }
-                        color: Theme.textMuted
-                        font.pixelSize: 12
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-                }
-
-                Item { Layout.fillHeight: true }
-
-                // 导出按钮
-                Button {
-                    id: exportBtn
-                    text: "开始导出"
-                    highlighted: true
-                    enabled: versionCombo.currentIndex >= 0 && selectedVersionId !== ""
-                    Layout.fillWidth: true
-
-                    background: Rectangle {
-                        color: parent.enabled ? (parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess) : Theme.borderNormal
-                        radius: 6
-                        implicitHeight: 40
-                    }
-
-                    contentItem: Label {
-                        text: parent.text
-                        color: parent.enabled ? Theme.bgPrimary : Theme.textMuted
-                        font.pixelSize: 14
-                        font.bold: true
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-
-                    onClicked: {
-                        if (selectedVersionId === "") return
-                        var format = formatCombo.currentText
-                        var optionsJson = "{}"
-                        if (format === "onnx") {
-                            optionsJson = onnxConfigPanel.getConfigJson()
-                        }
-                        var artifactId = exportService.exportModel(selectedVersionId, format, optionsJson)
-                        if (artifactId !== "") {
-                            statusLabel.text = "导出已启动:" + artifactId.substring(0, 8) + "..."
-                            statusLabel.color = Theme.accentSuccess
-                            refreshExports()
-                        } else {
-                            statusLabel.text = "导出启动失败"
-                            statusLabel.color = Theme.accentError
-                        }
-                    }
-                }
-
-                // 状态标签 - 显示导出/验证进度
-                Label {
-                    id: statusLabel
-                    Layout.fillWidth: true
-                    text: ""
-                    color: Theme.accentSuccess
-                    font.pixelSize: 12
-                    wrapMode: Text.WordWrap
-                }
-
-                // 验证结果详情
-                Rectangle {
-                    id: validationResultBox
-                    Layout.fillWidth: true
-                    visible: false
-                    height: validationResultContent.implicitHeight + 16
-                    color: Theme.bgInput
-                    radius: Theme.radiusSmall
-
-                    property string resultText: ""
-                    property bool isVerified: false
-
-                    Column {
-                        id: validationResultContent
-                        anchors.fill: parent
-                        anchors.margins: 8
-                        spacing: 4
-
-                        Label {
-                            text: validationResultBox.isVerified ? "✅ 验证通过" : "❌ 验证失败"
-                            color: validationResultBox.isVerified ? Theme.accentSuccess : Theme.accentError
-                            font.pixelSize: Theme.fontSizeNormal
-                            font.bold: true
-                        }
-
-                        Label {
-                            text: validationResultBox.resultText
-                            color: Theme.textSecondary
-                            font.pixelSize: Theme.fontSizeSmall
-                            font.family: Theme.fontFamilyMono
-                            wrapMode: Text.WordWrap
-                            width: parent.width
                         }
                     }
                 }
             }
         }
 
-        // 右侧面板：导出历史
+        // ============================================================
+        // 竖向 Resizer (4px)
+        // ============================================================
+        Rectangle {
+            Layout.preferredWidth: 4
+            Layout.fillHeight: true
+            color: Theme.dividerColor
+        }
+
+        // ============================================================
+        // 中心内容区（左右分栏）
+        // ============================================================
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: Theme.bgCard
-            radius: 8
+            color: Theme.bgMain
 
-            ColumnLayout {
+            RowLayout {
                 anchors.fill: parent
-                anchors.margins: 12
-                spacing: 8
+                spacing: 0
 
-                // 标题栏
-                RowLayout {
-                    Layout.fillWidth: true
-
-                    Label {
-                        text: "导出历史"
-                        color: Theme.accentPrimary
-                        font.pixelSize: 16
-                        font.bold: true
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    Label {
-                        text: exportHistory.length + " 个产物"
-                        color: Theme.textMuted
-                        font.pixelSize: 12
-                    }
-
-                    Button {
-                        text: "刷新"
-                        flat: true
-                        palette.buttonText: Theme.accentPrimary
-                        font.pixelSize: 12
-                        onClicked: refreshExports()
-                    }
-                }
-
-                // 版本信息标签
-                Label {
-                    Layout.fillWidth: true
-                    visible: selectedVersionId !== ""
-                    text: "当前版本的导出记录:" + selectedVersionId.substring(0, 8) + "..."
-                    color: Theme.textSecondary
-                    font.pixelSize: 12
-                    font.family: "monospace"
-                }
-
-                // 导出列表
-                ListView {
-                    id: exportList
-                    Layout.fillWidth: true
+                // ========================================================
+                // 左侧参数面板 (280px, bgSide, border-right 1px borderColor)
+                // ========================================================
+                Rectangle {
+                    Layout.preferredWidth: 280
                     Layout.fillHeight: true
-                    clip: true
-                    model: exportHistory
-                    spacing: 4
+                    color: Theme.bgSide
 
-                    Label {
-                        anchors.centerIn: parent
-                        visible: exportList.count === 0
-                        text: selectedVersionId === "" ?
-                            "选择一个模型版本查看导出记录" :
-                            "该版本暂无导出记录"
-                        color: Theme.textMuted
-                        font.pixelSize: 14
-                        horizontalAlignment: Text.AlignHCenter
+                    // 右侧分割线
+                    Rectangle {
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        width: 1
+                        color: Theme.borderColor
                     }
 
-                    delegate: Rectangle {
-                        width: exportList.width
-                        height: 72
-                        radius: 6
-                        color: delegateMouseArea.containsMouse ? Theme.bgInput : Theme.bgSecondary
+                    ScrollView {
+                        anchors.fill: parent
+                        clip: true
+                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: 12
-                            spacing: 12
+                        ColumnLayout {
+                            width: 280
+                            spacing: Theme.spacingLarge
+                            padding: 16
 
-                            // 状态指示圆点
-                            Rectangle {
-                                width: 10
-                                height: 10
-                                radius: 5
-                                color: {
-                                    switch (modelData.status) {
-                                    case "pending": return Theme.accentPrimary
-                                    case "running": return Theme.accentWarning
-                                    case "verifying": return Theme.accentWarning
-                                    case "succeeded": return Theme.accentSuccess
-                                    case "failed": return Theme.accentError
-                                    default: return Theme.textMuted
-                                    }
-                                }
-                            }
-
-                            // 产物信息
+                            // ---- Card 1: 导出模型 ----
                             ColumnLayout {
                                 Layout.fillWidth: true
-                                spacing: 2
+                                spacing: Theme.spacingNormal
 
-                                RowLayout {
+                                // section-title "导出模型" (border-left 2px primaryGlow)
+                                Rectangle {
                                     Layout.fillWidth: true
-                                    spacing: 8
+                                    height: 20
+                                    color: "transparent"
 
-                                    Label {
-                                        text: modelData.id.substring(0, 8) + "..."
-                                        color: Theme.accentPrimary
-                                        font.pixelSize: 13
-                                        font.family: "monospace"
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.top: parent.top
+                                        anchors.bottom: parent.bottom
+                                        width: 2
+                                        color: Theme.primaryGlow
                                     }
 
-                                    // 格式标签
-                                    Rectangle {
-                                        Layout.preferredHeight: 20
-                                        Layout.preferredWidth: formatBadgeText.implicitWidth + 12
-                                        radius: 4
-                                        color: Theme.accentPrimary
-                                        border.color: Theme.accentPrimary
-                                        border.width: 1
+                                    Text {
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 10
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "导出模型"
+                                        font.pixelSize: Theme.fontSizeNormal
+                                        font.weight: Font.DemiBold
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMain
+                                    }
+                                }
 
-                                        Label {
-                                            id: formatBadgeText
-                                            anchors.centerIn: parent
-                                            text: modelData.format ? modelData.format.toUpperCase() : ""
-                                            color: Theme.accentPrimary
-                                            font.pixelSize: 10
-                                            font.bold: true
+                                // 设备 ComboBox
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+
+                                    Text {
+                                        text: "设备"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMuted
+                                    }
+
+                                    ComboBox {
+                                        id: deviceCombo
+                                        Layout.fillWidth: true
+                                        model: ["auto", "cpu", "0"]
+                                    }
+                                }
+
+                                // 测试权重 ComboBox
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+
+                                    Text {
+                                        text: "测试权重"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMuted
+                                    }
+
+                                    ComboBox {
+                                        id: weightCombo
+                                        Layout.fillWidth: true
+                                        model: ["最佳权重", "最末权重"]
+                                    }
+                                }
+
+                                // 导出格式 ComboBox
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+
+                                    Text {
+                                        text: "导出格式"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMuted
+                                    }
+
+                                    ComboBox {
+                                        id: formatCombo
+                                        Layout.fillWidth: true
+                                        model: ["pt", "onnx", "tflite", "engine"]
+                                        currentIndex: 1
+                                    }
+                                }
+
+                                // 导出路径: input + "选择"按钮
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+
+                                    Text {
+                                        text: "导出路径"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMuted
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: Theme.spacingSmall
+
+                                        TextField {
+                                            id: outputPathField
+                                            Layout.fillWidth: true
+                                            placeholderText: "自动生成"
+                                            color: Theme.textMain
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.family: Theme.fontFamilyMono
+                                            background: Rectangle {
+                                                color: Theme.bgInput
+                                                border.color: Theme.borderColor
+                                                border.width: 1
+                                                radius: Theme.radiusSmall
+                                            }
+                                        }
+
+                                        // "选择"按钮
+                                        Rectangle {
+                                            width: 48
+                                            height: 32
+                                            radius: Theme.radiusSmall
+                                            color: browseMouse.containsMouse ? Theme.bgHover : Theme.bgCard
+                                            border.color: Theme.borderColor
+                                            border.width: 1
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "选择"
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamily
+                                                color: Theme.textSecondary
+                                            }
+
+                                            MouseArea {
+                                                id: browseMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // ONNX 附加配置（仅 onnx 格式显示）
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    visible: formatCombo.currentText === "onnx"
+                                    spacing: Theme.spacingSmall
+
+                                    // 分割线
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 1
+                                        color: Theme.borderColor
+                                    }
+
+                                    // Opset版本
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Text {
+                                            text: "Opset版本"
+                                            font.pixelSize: Theme.fontSizeCaption
+                                            font.family: Theme.fontFamily
+                                            color: Theme.textMuted
+                                        }
+
+                                        Stepper {
+                                            id: opsetStepper
+                                            value: 12
+                                            minValue: 9
+                                            maxValue: 17
+                                            stepSize: 1
                                         }
                                     }
 
-                                    // 状态标签
-                                    Rectangle {
-                                        Layout.preferredHeight: 20
-                                        Layout.preferredWidth: statusBadgeText.implicitWidth + 12
-                                        radius: 4
-                                        color: {
-                                            switch (modelData.status) {
-                                            case "pending": return Theme.accentPrimary
-                                            case "running": return Theme.accentWarning
-                                            case "verifying": return Theme.accentWarning
-                                            case "succeeded": return Theme.accentSuccess
-                                            case "failed": return Theme.accentError
-                                            default: return Theme.textMuted
-                                            }
-                                        }
-                                        border.color: {
-                                            switch (modelData.status) {
-                                            case "pending": return Theme.accentPrimary
-                                            case "running": return Theme.accentWarning
-                                            case "verifying": return Theme.accentWarning
-                                            case "succeeded": return Theme.accentSuccess
-                                            case "failed": return Theme.accentError
-                                            default: return Theme.borderNormal
-                                            }
-                                        }
-                                        border.width: 1
+                                    // 简化模型
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: Theme.spacingNormal
 
-                                        Label {
-                                            id: statusBadgeText
+                                        Text {
+                                            text: "简化模型"
+                                            font.pixelSize: Theme.fontSizeCaption
+                                            font.family: Theme.fontFamily
+                                            color: Theme.textMuted
+                                            Layout.fillWidth: true
+                                        }
+
+                                        ToggleSwitch {
+                                            id: simplifySwitch
+                                            checked: true
+                                        }
+                                    }
+
+                                    // 动态轴
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: Theme.spacingNormal
+
+                                        Text {
+                                            text: "动态轴"
+                                            font.pixelSize: Theme.fontSizeCaption
+                                            font.family: Theme.fontFamily
+                                            color: Theme.textMuted
+                                            Layout.fillWidth: true
+                                        }
+
+                                        ToggleSwitch {
+                                            id: dynamicSwitch
+                                            checked: false
+                                        }
+                                    }
+                                }
+
+                                // 导出模型按钮 (btn-secondary)
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 36
+                                    Layout.topMargin: Theme.spacingSmall
+                                    radius: Theme.radiusNormal
+                                    color: {
+                                        if (!root.selectedVersionId) return Theme.bgCard
+                                        if (exportBtnMouse.pressed) return Qt.darker(Theme.primary, 1.3)
+                                        if (exportBtnMouse.containsMouse) return Qt.lighter(Theme.primary, 1.1)
+                                        return Theme.primary
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: exportStatus === "running" ? "导出中..." : "导出模型"
+                                        font.pixelSize: Theme.fontSizeNormal
+                                        font.weight: Font.DemiBold
+                                        font.family: Theme.fontFamily
+                                        color: root.selectedVersionId ? "#FFFFFF" : Theme.textDisabled
+                                    }
+
+                                    MouseArea {
+                                        id: exportBtnMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: root.selectedVersionId ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+                                        onClicked: {
+                                            if (!root.selectedVersionId || exportStatus === "running") return
+                                            var format = formatCombo.currentText
+                                            var optionsJson = "{}"
+                                            if (format === "onnx") {
+                                                optionsJson = JSON.stringify({
+                                                    "opset": opsetStepper.value,
+                                                    "simplify": simplifySwitch.checked,
+                                                    "dynamic": dynamicSwitch.checked
+                                                })
+                                            }
+                                            var artifactId = exportService.exportModel(root.selectedVersionId, format, optionsJson)
+                                            if (artifactId !== "") {
+                                                exportStatus = "running"
+                                                refreshExports()
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // ---- Card 2: 导出报告 ----
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingNormal
+
+                                // section-title "导出报告" (border-left 2px primaryGlow)
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    height: 20
+                                    color: "transparent"
+
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.top: parent.top
+                                        anchors.bottom: parent.bottom
+                                        width: 2
+                                        color: Theme.primaryGlow
+                                    }
+
+                                    Text {
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 10
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "导出报告"
+                                        font.pixelSize: Theme.fontSizeNormal
+                                        font.weight: Font.DemiBold
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMain
+                                    }
+                                }
+
+                                // 报告类型 ComboBox
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+
+                                    Text {
+                                        text: "报告类型"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMuted
+                                    }
+
+                                    ComboBox {
+                                        id: reportTypeCombo
+                                        Layout.fillWidth: true
+                                        model: ["训练报告", "评估报告", "对比报告"]
+                                    }
+                                }
+
+                                // 导出报告按钮 (btn-secondary)
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 36
+                                    Layout.topMargin: Theme.spacingSmall
+                                    radius: Theme.radiusNormal
+                                    color: reportBtnMouse.containsMouse ? Theme.bgHover : Theme.bgCard
+                                    border.color: Theme.borderColor
+                                    border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "导出报告"
+                                        font.pixelSize: Theme.fontSizeNormal
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textSecondary
+                                    }
+
+                                    MouseArea {
+                                        id: reportBtnMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            // 导出报告功能预留
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 底部弹性空间
+                            Item { Layout.fillHeight: true }
+                        }
+                    }
+                }
+
+                // ========================================================
+                // 右侧展示区 (flex-grow:1, bgMain)
+                // ========================================================
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    color: Theme.bgMain
+
+                    ScrollView {
+                        anchors.fill: parent
+                        clip: true
+                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
+                        ColumnLayout {
+                            width: Math.max(parent.width, 400)
+                            anchors.margins: Theme.spacingLarge
+                            spacing: Theme.spacingNormal
+
+                            // 未选择模型时的空状态提示
+                            Item {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 200
+                                visible: root.selectedVersionId === ""
+
+                                Column {
+                                    anchors.centerIn: parent
+                                    spacing: Theme.spacingNormal
+
+                                    Text {
+                                        text: "← 请从左侧选择模型版本"
+                                        font.pixelSize: Theme.fontSizeSubheading
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMuted
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                    }
+
+                                    Text {
+                                        text: "选择模型后可查看导出历史与版本信息"
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textDisabled
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                    }
+                                }
+                            }
+
+                            // ---- 版本信息卡片 ----
+                            CollapsibleSection {
+                                title: "版本信息"
+                                Layout.fillWidth: true
+                                expanded: true
+                                visible: root.selectedVersionId !== ""
+
+                                ColumnLayout {
+                                    width: parent.width
+                                    spacing: Theme.spacingSmall
+
+                                    // 版本号
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: Theme.spacingNormal
+
+                                        Text {
+                                            text: "版本号"
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.family: Theme.fontFamily
+                                            color: Theme.textMuted
+                                            Layout.preferredWidth: 80
+                                        }
+
+                                        Text {
+                                            text: root.selectedVersionId ? root.selectedVersionId.substring(0, 8) : "N/A"
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.family: Theme.fontFamilyMono
+                                            font.weight: Font.Bold
+                                            color: Theme.primaryGlow
+                                        }
+                                    }
+
+                                    // 训练任务ID
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: Theme.spacingNormal
+
+                                        Text {
+                                            text: "训练任务"
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.family: Theme.fontFamily
+                                            color: Theme.textMuted
+                                            Layout.preferredWidth: 80
+                                        }
+
+                                        Text {
+                                            text: {
+                                                if (!root.selectedVersionId) return "N/A"
+                                                var idx = modelVersionModel.index(modelVersionList.currentIndex, 0)
+                                                var runId = modelVersionModel.data(idx, Qt.UserRole + 1)
+                                                return runId ? runId.substring(0, 8) + "..." : "N/A"
+                                            }
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.family: Theme.fontFamilyMono
+                                            color: Theme.textMain
+                                        }
+                                    }
+
+                                    // 数据快照ID
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: Theme.spacingNormal
+
+                                        Text {
+                                            text: "数据快照"
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.family: Theme.fontFamily
+                                            color: Theme.textMuted
+                                            Layout.preferredWidth: 80
+                                        }
+
+                                        Text {
+                                            text: "N/A"
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.family: Theme.fontFamilyMono
+                                            color: Theme.textMain
+                                        }
+                                    }
+                                }
+                            }
+
+                            // ---- 导出历史卡片 ----
+                            CollapsibleSection {
+                                title: "导出历史"
+                                Layout.fillWidth: true
+                                expanded: true
+                                visible: root.selectedVersionId !== ""
+
+                                ColumnLayout {
+                                    width: parent.width
+                                    spacing: Theme.spacingSmall
+
+                                    // 导出历史列表
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: exportHistory.length > 0 ? Math.min(exportHistoryList.contentHeight + 40, 300) : 60
+                                        color: Theme.bgInput
+                                        radius: Theme.radiusSmall
+
+                                        // 空状态
+                                        Text {
+                                            visible: exportHistory.length === 0
                                             anchors.centerIn: parent
-                                            text: modelData.status || "pending"
-                                            color: {
-                                                switch (modelData.status) {
-                                                case "pending": return Theme.accentPrimary
-                                                case "running": return Theme.accentWarning
-                                                case "verifying": return Theme.accentWarning
-                                                case "succeeded": return Theme.accentSuccess
-                                                case "failed": return Theme.accentError
-                                                default: return Theme.textMuted
+                                            text: "暂无导出记录"
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.family: Theme.fontFamily
+                                            color: Theme.textDisabled
+                                        }
+
+                                        // 有数据时显示列表
+                                        ColumnLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: Theme.spacingSmall
+                                            visible: exportHistory.length > 0
+                                            spacing: 2
+
+                                            Text {
+                                                text: "共 " + exportHistory.length + " 条导出记录"
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamily
+                                                color: Theme.textMuted
+                                            }
+
+                                            ListView {
+                                                id: exportHistoryList
+                                                Layout.fillWidth: true
+                                                Layout.fillHeight: true
+                                                clip: true
+                                                model: exportHistory
+                                                spacing: 2
+
+                                                delegate: Rectangle {
+                                                    width: exportHistoryList.width
+                                                    height: 36
+                                                    radius: Theme.radiusSmall
+                                                    color: Theme.bgCard
+
+                                                    RowLayout {
+                                                        anchors.fill: parent
+                                                        anchors.leftMargin: Theme.spacingSmall
+                                                        anchors.rightMargin: Theme.spacingSmall
+                                                        spacing: Theme.spacingSmall
+
+                                                        // 状态圆点
+                                                        Rectangle {
+                                                            width: 8
+                                                            height: 8
+                                                            radius: 4
+                                                            Layout.alignment: Qt.AlignVCenter
+                                                            color: {
+                                                                switch (modelData.status) {
+                                                                    case "succeeded": return Theme.success
+                                                                    case "failed": return Theme.danger
+                                                                    case "running": return Theme.warning
+                                                                    default: return Theme.textMuted
+                                                                }
+                                                            }
+                                                        }
+
+                                                        // 格式标签
+                                                        Text {
+                                                            text: modelData.format ? modelData.format.toUpperCase() : "?"
+                                                            font.pixelSize: Theme.fontSizeCaption
+                                                            font.family: Theme.fontFamilyMono
+                                                            font.weight: Font.Bold
+                                                            color: Theme.primaryGlow
+                                                        }
+
+                                                        // 产物ID
+                                                        Text {
+                                                            text: modelData.id ? modelData.id.substring(0, 8) + "..." : ""
+                                                            font.pixelSize: Theme.fontSizeCaption
+                                                            font.family: Theme.fontFamilyMono
+                                                            color: Theme.textMuted
+                                                            Layout.fillWidth: true
+                                                            elide: Text.ElideRight
+                                                        }
+
+                                                        // 状态文字
+                                                        Text {
+                                                            text: {
+                                                                switch (modelData.status) {
+                                                                    case "succeeded": return "成功"
+                                                                    case "failed": return "失败"
+                                                                    case "running": return "导出中"
+                                                                    case "verifying": return "验证中"
+                                                                    case "pending": return "等待中"
+                                                                    default: return modelData.status || "未知"
+                                                                }
+                                                            }
+                                                            font.pixelSize: Theme.fontSizeCaption
+                                                            font.family: Theme.fontFamily
+                                                            color: {
+                                                                switch (modelData.status) {
+                                                                    case "succeeded": return Theme.success
+                                                                    case "failed": return Theme.danger
+                                                                    case "running": return Theme.warning
+                                                                    default: return Theme.textMuted
+                                                                }
+                                                            }
+                                                        }
+
+                                                        // 验证按钮（仅 succeeded 状态显示）
+                                                        Rectangle {
+                                                            visible: modelData.status === "succeeded"
+                                                            width: 48
+                                                            height: 22
+                                                            radius: Theme.radiusSmall
+                                                            color: verifyMouse.containsMouse ? Theme.bgHover : "transparent"
+                                                            border.color: Theme.borderColor
+                                                            border.width: 1
+
+                                                            Text {
+                                                                anchors.centerIn: parent
+                                                                text: "验证"
+                                                                font.pixelSize: Theme.fontSizeCaption - 1
+                                                                font.family: Theme.fontFamily
+                                                                color: Theme.textSecondary
+                                                            }
+
+                                                            MouseArea {
+                                                                id: verifyMouse
+                                                                anchors.fill: parent
+                                                                hoverEnabled: true
+                                                                cursorShape: Qt.PointingHandCursor
+                                                                onClicked: {
+                                                                    if (modelData.id) {
+                                                                        exportService.verifyExport(modelData.id)
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
-                                            font.pixelSize: 10
-                                            font.bold: true
                                         }
                                     }
-
-                                    Item { Layout.fillWidth: true }
-                                }
-
-                                // 输出路径
-                                Label {
-                                    Layout.fillWidth: true
-                                    text: modelData.outputPath || "N/A"
-                                    color: Theme.textSecondary
-                                    font.pixelSize: 11
-                                    font.family: "monospace"
-                                    elide: Text.ElideMiddle
-                                }
-
-                                // 验证结果摘要
-                                Label {
-                                    Layout.fillWidth: true
-                                    visible: modelData.validationResult && modelData.validationResult.length > 0
-                                    text: {
-                                        if (!modelData.validationResult || modelData.validationResult.length === 0) return ""
-                                        try {
-                                            var vr = JSON.parse(modelData.validationResult)
-                                            if (vr.verified === false && vr.error) return "验证错误: " + vr.error
-                                            if (vr.verified !== undefined) return "验证结果: " + (vr.verified ? "通过" : "未通过")
-                                            return "验证信息: " + modelData.validationResult.substring(0, 60)
-                                        } catch (e) {
-                                            return "验证信息: " + modelData.validationResult.substring(0, 60)
-                                        }
-                                    }
-                                    color: modelData.status === "succeeded" ? Theme.accentSuccess : Theme.accentError
-                                    font.pixelSize: 10
-                                    elide: Text.ElideRight
-                                }
-
-                                // 时间戳
-                                Label {
-                                    text: modelData.createdAt || "N/A"
-                                    color: Theme.textMuted
-                                    font.pixelSize: 10
                                 }
                             }
 
-                            // 验证/重试按钮
-                            Button {
-                                text: {
-                                    if (modelData.status === "failed") return "重试验证"
-                                    if (modelData.status === "succeeded") return "重新验证"
-                                    return "验证"
-                                }
-                                visible: modelData.status === "succeeded" || modelData.status === "failed"
-                                flat: true
-                                Layout.preferredWidth: 72
-
-                                background: Rectangle {
-                                    color: parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess
-                                    radius: 4
-                                    border.color: modelData.status === "failed" ? Theme.accentError : Theme.accentSuccess
-                                    border.width: 1
-                                    implicitHeight: 28
-                                }
-
-                                contentItem: Label {
-                                    text: parent.text
-                                    color: modelData.status === "failed" ? Theme.accentError : Theme.accentSuccess
-                                    font.pixelSize: 11
-                                    font.bold: true
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                onClicked: {
-                                    if (exportService.verifyExport(modelData.id)) {
-                                        statusLabel.text = "验证已启动:" + modelData.id.substring(0, 8) + "..."
-                                        statusLabel.color = Theme.accentWarning
-                                        validationResultBox.visible = false
-                                        refreshExports()
-                                    } else {
-                                        statusLabel.text = "验证启动失败"
-                                        statusLabel.color = Theme.accentError
-                                    }
-                                }
-                            }
-                        }
-
-                        MouseArea {
-                            id: delegateMouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
+                            // 底部留白
+                            Item { Layout.preferredHeight: Theme.spacingLarge }
                         }
                     }
                 }
             }
+        }
+    }
+
+    // 初始化时加载数据
+    Component.onCompleted: {
+        if (currentProjectId !== "") {
+            modelVersionModel.setProjectId(currentProjectId)
         }
     }
 }
