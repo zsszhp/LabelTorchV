@@ -28,6 +28,7 @@ public:
     static constexpr const char *EXPORT_ARTIFACTS = "export_artifacts";
     static constexpr const char *TASK_EVENTS = "task_events";
     static constexpr const char *RUN_METRICS = "run_metrics";
+    static constexpr const char *TESTING_RUNS = "testing_runs";
 };
 
 #endif // SCHEMA_H

@@ -32,6 +32,9 @@ constexpr const char *CMD_ANOMALY_INFER = "anomaly.infer";
 constexpr const char *CMD_AL_COLLECT_LOW_CONF = "active_learning.collect_low_conf";
 constexpr const char *CMD_AL_PRIORITIZE_QUEUE = "active_learning.prioritize_queue";
 constexpr const char *CMD_AL_QUEUE_STATS = "active_learning.queue_stats";
+constexpr const char *CMD_TESTING_START = "testing.start";
+constexpr const char *CMD_TESTING_STOP = "testing.stop";
+constexpr const char *CMD_TESTING_STATUS = "testing.status";
 
 // 事件类型
 constexpr const char *EVENT_TASK_STARTED = "task.started";

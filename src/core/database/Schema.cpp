@@ -163,6 +163,22 @@ QStringList Schema::createTableStatements()
         "  metric_name TEXT NOT NULL,"
         "  metric_value REAL NOT NULL,"
         "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+        ")",
+
+        // 测试运行表
+        "CREATE TABLE IF NOT EXISTS testing_runs ("
+        "  id TEXT PRIMARY KEY,"
+        "  project_id TEXT NOT NULL REFERENCES projects(id),"
+        "  model_version_id TEXT NOT NULL REFERENCES model_versions(id),"
+        "  snapshot_id TEXT NOT NULL REFERENCES dataset_snapshots(id),"
+        "  config_json TEXT NOT NULL,"
+        "  status TEXT NOT NULL DEFAULT 'draft',"
+        "  metrics_json TEXT,"
+        "  confusion_matrix_json TEXT,"
+        "  pr_curve_json TEXT,"
+        "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+        "  started_at DATETIME,"
+        "  finished_at DATETIME"
         ")"
     };
 }

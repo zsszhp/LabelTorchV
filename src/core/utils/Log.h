@@ -17,6 +17,7 @@
 #define LT_LOG_MODEL()     QLoggingCategory("lt.model")
 #define LT_LOG_INFERENCE() QLoggingCategory("lt.inference")
 #define LT_LOG_EXPORT()    QLoggingCategory("lt.export")
+#define LT_LOG_TESTING()   QLoggingCategory("lt.testing")
 #define LT_LOG_APP()       QLoggingCategory("lt.app")
 
 // Convenience macros with function name
