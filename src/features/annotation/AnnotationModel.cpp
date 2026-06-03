@@ -36,6 +36,17 @@ QVariant AnnotationModel::data(const QModelIndex &index, int role) const
     case SourceTypeRole:  return ann.sourceType;
     case IsConfirmedRole: return ann.isConfirmed;
     case IsSelectedRole:  return ann.isSelected;
+    case ShapeTypeRole:   return ann.shapeType;
+    case PointsRole: {
+        QVariantList pts;
+        for (const auto &pt : ann.polygonPoints) {
+            QVariantMap m;
+            m[QStringLiteral("x")] = pt.x();
+            m[QStringLiteral("y")] = pt.y();
+            pts.append(m);
+        }
+        return pts;
+    }
     default:              return {};
     }
 }
@@ -62,6 +73,7 @@ bool AnnotationModel::setData(const QModelIndex &index, const QVariant &value, i
     case SourceTypeRole:  ann.sourceType  = value.toString(); break;
     case IsConfirmedRole: ann.isConfirmed = value.toBool();   break;
     case IsSelectedRole:  ann.isSelected  = value.toBool();   break;
+    case ShapeTypeRole:   ann.shapeType   = value.toInt();    break;
     default:              return false;
     }
 
@@ -83,7 +95,9 @@ QHash<int, QByteArray> AnnotationModel::roleNames() const
         {ConfidenceRole,  "confidence"},
         {SourceTypeRole,  "sourceType"},
         {IsConfirmedRole, "isConfirmed"},
-        {IsSelectedRole,  "isSelected"}
+        {IsSelectedRole,  "isSelected"},
+        {ShapeTypeRole,   "shapeType"},
+        {PointsRole,      "points"}
     };
 }
 
@@ -118,6 +132,12 @@ void AnnotationModel::loadFromLabel(const QString &labelPath)
         entry.sourceType  = m[QStringLiteral("sourceType")].toString();
         entry.isConfirmed = m[QStringLiteral("isConfirmed")].toBool();
         entry.isSelected  = false;
+        entry.shapeType   = m[QStringLiteral("shapeType")].toInt();
+        QVariantList pts = m[QStringLiteral("points")].toList();
+        for (const QVariant &pt : pts) {
+            QVariantMap pm = pt.toMap();
+            entry.polygonPoints.append(QPointF(pm[QStringLiteral("x")].toFloat(), pm[QStringLiteral("y")].toFloat()));
+        }
         m_annotations.append(entry);
     }
 
@@ -274,6 +294,15 @@ QVariantList AnnotationModel::toVariantList() const
         m[QStringLiteral("confidence")]  = ann.confidence;
         m[QStringLiteral("sourceType")]  = ann.sourceType;
         m[QStringLiteral("isConfirmed")] = ann.isConfirmed;
+        m[QStringLiteral("shapeType")]   = ann.shapeType;
+        QVariantList pts;
+        for (const auto &pt : ann.polygonPoints) {
+            QVariantMap pm;
+            pm[QStringLiteral("x")] = pt.x();
+            pm[QStringLiteral("y")] = pt.y();
+            pts.append(pm);
+        }
+        m[QStringLiteral("points")] = pts;
         result.append(m);
     }
 
@@ -284,4 +313,126 @@ void AnnotationModel::emitDataChanged(int row)
 {
     QModelIndex idx = index(row);
     emit dataChanged(idx, idx);
+}
+
+void AnnotationModel::addPolygonAnnotation(int classIndex, const QString &className,
+                                            const QVector<QPointF> &points)
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "classIndex=" << classIndex << "className=" << className
+                                 << "points=" << points.size();
+
+    int newRow = m_annotations.size();
+    beginInsertRows(QModelIndex(), newRow, newRow);
+
+    AnnotationEntry entry;
+    entry.id          = Id::generate();
+    entry.classIndex  = classIndex;
+    entry.className   = className;
+    entry.shapeType   = 2;
+    entry.polygonPoints = points;
+    entry.confidence  = 0.0f;
+    entry.sourceType  = QStringLiteral("manual");
+    entry.isConfirmed = false;
+    entry.isSelected  = false;
+
+    if (points.size() >= 3) {
+        float minX = 1.0f, minY = 1.0f, maxX = 0.0f, maxY = 0.0f;
+        for (const auto &pt : points) {
+            minX = qMin(minX, static_cast<float>(pt.x()));
+            minY = qMin(minY, static_cast<float>(pt.y()));
+            maxX = qMax(maxX, static_cast<float>(pt.x()));
+            maxY = qMax(maxY, static_cast<float>(pt.y()));
+        }
+        entry.cx = (minX + maxX) / 2.0f;
+        entry.cy = (minY + maxY) / 2.0f;
+        entry.w  = maxX - minX;
+        entry.h  = maxY - minY;
+    }
+
+    m_annotations.append(entry);
+
+    endInsertRows();
+    emit countChanged();
+
+    ltInfo(LT_LOG_ANNOTATION()) << "Added polygon annotation id=" << entry.id
+                                << "class=" << className << "row=" << newRow
+                                << "points=" << points.size();
+}
+
+void AnnotationModel::updatePolygonPoint(int row, int pointIndex, float x, float y)
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "row=" << row << "pointIndex=" << pointIndex
+                                 << "x=" << x << "y=" << y;
+
+    if (row < 0 || row >= m_annotations.size()) return;
+    AnnotationEntry &ann = m_annotations[row];
+    if (pointIndex < 0 || pointIndex >= ann.polygonPoints.size()) return;
+
+    ann.polygonPoints[pointIndex] = QPointF(x, y);
+
+    float minX = 1.0f, minY = 1.0f, maxX = 0.0f, maxY = 0.0f;
+    for (const auto &pt : ann.polygonPoints) {
+        minX = qMin(minX, static_cast<float>(pt.x()));
+        minY = qMin(minY, static_cast<float>(pt.y()));
+        maxX = qMax(maxX, static_cast<float>(pt.x()));
+        maxY = qMax(maxY, static_cast<float>(pt.y()));
+    }
+    ann.cx = (minX + maxX) / 2.0f;
+    ann.cy = (minY + maxY) / 2.0f;
+    ann.w  = maxX - minX;
+    ann.h  = maxY - minY;
+
+    emitDataChanged(row);
+}
+
+void AnnotationModel::addPolygonPoint(int row, int insertIndex, float x, float y)
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "row=" << row << "insertIndex=" << insertIndex
+                                 << "x=" << x << "y=" << y;
+
+    if (row < 0 || row >= m_annotations.size()) return;
+    AnnotationEntry &ann = m_annotations[row];
+
+    int idx = qBound(0, insertIndex, ann.polygonPoints.size());
+    ann.polygonPoints.insert(idx, QPointF(x, y));
+
+    float minX = 1.0f, minY = 1.0f, maxX = 0.0f, maxY = 0.0f;
+    for (const auto &pt : ann.polygonPoints) {
+        minX = qMin(minX, static_cast<float>(pt.x()));
+        minY = qMin(minY, static_cast<float>(pt.y()));
+        maxX = qMax(maxX, static_cast<float>(pt.x()));
+        maxY = qMax(maxY, static_cast<float>(pt.y()));
+    }
+    ann.cx = (minX + maxX) / 2.0f;
+    ann.cy = (minY + maxY) / 2.0f;
+    ann.w  = maxX - minX;
+    ann.h  = maxY - minY;
+
+    emitDataChanged(row);
+}
+
+void AnnotationModel::removePolygonPoint(int row, int pointIndex)
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "row=" << row << "pointIndex=" << pointIndex;
+
+    if (row < 0 || row >= m_annotations.size()) return;
+    AnnotationEntry &ann = m_annotations[row];
+    if (ann.polygonPoints.size() <= 3) return;
+    if (pointIndex < 0 || pointIndex >= ann.polygonPoints.size()) return;
+
+    ann.polygonPoints.removeAt(pointIndex);
+
+    float minX = 1.0f, minY = 1.0f, maxX = 0.0f, maxY = 0.0f;
+    for (const auto &pt : ann.polygonPoints) {
+        minX = qMin(minX, static_cast<float>(pt.x()));
+        minY = qMin(minY, static_cast<float>(pt.y()));
+        maxX = qMax(maxX, static_cast<float>(pt.x()));
+        maxY = qMax(maxY, static_cast<float>(pt.y()));
+    }
+    ann.cx = (minX + maxX) / 2.0f;
+    ann.cy = (minY + maxY) / 2.0f;
+    ann.w  = maxX - minX;
+    ann.h  = maxY - minY;
+
+    emitDataChanged(row);
 }

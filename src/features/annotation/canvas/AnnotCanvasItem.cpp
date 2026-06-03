@@ -4,6 +4,7 @@
 #include "utils/Log.h"
 
 #include <QPainter>
+#include <QPainterPath>
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QHoverEvent>
@@ -161,7 +162,11 @@ void AnnotCanvasItem::paint(QPainter* painter)
         drawDrawingRect(painter);
     }
 
-    if (m_interactionMode == QStringLiteral("draw") && !m_isDrawing && m_imageWidth > 0) {
+    if (m_isDrawingPolygon) {
+        drawDrawingPolygon(painter);
+    }
+
+    if (m_interactionMode == QStringLiteral("draw") && !m_isDrawing && !m_isDrawingPolygon && m_imageWidth > 0) {
         drawCrosshair(painter);
     }
 }
@@ -204,48 +209,84 @@ void AnnotCanvasItem::drawSingleAnnotation(QPainter* painter, int row)
     if (!m_model) return;
     QModelIndex idx = m_model->index(row, 0);
 
-    float cx = m_model->data(idx, AnnotationModel::CxRole).toFloat();
-    float cy = m_model->data(idx, AnnotationModel::CyRole).toFloat();
-    float w = m_model->data(idx, AnnotationModel::WRole).toFloat();
-    float h = m_model->data(idx, AnnotationModel::HRole).toFloat();
-    float angle = m_model->data(idx, AnnotationModel::AngleRole).toFloat();
     int classIdx = m_model->data(idx, AnnotationModel::ClassIndexRole).toInt();
     QString className = m_model->data(idx, AnnotationModel::ClassNameRole).toString();
     bool selected = m_model->data(idx, AnnotationModel::IsSelectedRole).toBool();
-
-    if (cx < 0 || cy < 0 || w <= 0 || h <= 0) return;
+    int shapeType = m_model->data(idx, AnnotationModel::ShapeTypeRole).toInt();
 
     QColor color = classColor(classIdx);
 
-    QPointF center = imageToCanvas(cx, cy);
-    QPointF halfSize(
-        (w * m_imageWidth * (m_controller ? m_controller->zoom() : 1.0)) / 2.0,
-        (h * m_imageHeight * (m_controller ? m_controller->zoom() : 1.0)) / 2.0
-    );
-
-    QRectF rect(center.x() - halfSize.x(), center.y() - halfSize.y(),
-                halfSize.x() * 2, halfSize.y() * 2);
-
     painter->save();
 
-    if (m_shapeMode == 1 && angle != 0) {
-        painter->translate(center);
-        painter->rotate(angle);
-        painter->translate(-center);
-    }
+    if (shapeType == 2) {
+        QVariantList pts = m_model->data(idx, AnnotationModel::PointsRole).toList();
+        if (pts.size() < 3) { painter->restore(); return; }
 
-    painter->setPen(Qt::NoPen);
-    painter->setBrush(QColor(color.red(), color.green(), color.blue(), 35));
-    painter->drawRect(rect);
+        QPainterPath path;
+        QPointF firstPt = imageToCanvas(pts[0].toMap()["x"].toFloat(), pts[0].toMap()["y"].toFloat());
+        path.moveTo(firstPt);
+        for (int i = 1; i < pts.size(); i++) {
+            QPointF pt = imageToCanvas(pts[i].toMap()["x"].toFloat(), pts[i].toMap()["y"].toFloat());
+            path.lineTo(pt);
+        }
+        path.closeSubpath();
 
-    QPen outlinePen(color, selected ? 2.5 : 1.5);
-    painter->setPen(outlinePen);
-    painter->setBrush(Qt::NoBrush);
-    painter->drawRect(rect);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(QColor(color.red(), color.green(), color.blue(), 40));
+        painter->drawPath(path);
 
-    if (m_shapeMode == 1 && angle != 0) {
-        painter->setPen(QPen(QColor(255, 255, 255, 100), 1, Qt::DashLine));
-        painter->drawLine(center, QPointF(center.x() + halfSize.x(), center.y()));
+        QPen outlinePen(color, selected ? 2.5 : 1.5);
+        painter->setPen(outlinePen);
+        painter->setBrush(Qt::NoBrush);
+        painter->drawPath(path);
+
+        if (selected) {
+            painter->setPen(QPen(QColor("#FFFFFF"), 1));
+            painter->setBrush(color);
+            for (const QVariant &ptVar : pts) {
+                QVariantMap pm = ptVar.toMap();
+                QPointF canvasPt = imageToCanvas(pm["x"].toFloat(), pm["y"].toFloat());
+                painter->drawRect(QRectF(canvasPt.x() - HANDLE_SIZE / 2, canvasPt.y() - HANDLE_SIZE / 2,
+                                         HANDLE_SIZE, HANDLE_SIZE));
+            }
+        }
+    } else {
+        float cx = m_model->data(idx, AnnotationModel::CxRole).toFloat();
+        float cy = m_model->data(idx, AnnotationModel::CyRole).toFloat();
+        float w = m_model->data(idx, AnnotationModel::WRole).toFloat();
+        float h = m_model->data(idx, AnnotationModel::HRole).toFloat();
+        float angle = m_model->data(idx, AnnotationModel::AngleRole).toFloat();
+
+        if (cx < 0 || cy < 0 || w <= 0 || h <= 0) { painter->restore(); return; }
+
+        QPointF center = imageToCanvas(cx, cy);
+        QPointF halfSize(
+            (w * m_imageWidth * (m_controller ? m_controller->zoom() : 1.0)) / 2.0,
+            (h * m_imageHeight * (m_controller ? m_controller->zoom() : 1.0)) / 2.0
+        );
+
+        QRectF rect(center.x() - halfSize.x(), center.y() - halfSize.y(),
+                    halfSize.x() * 2, halfSize.y() * 2);
+
+        if (m_shapeMode == 1 && angle != 0) {
+            painter->translate(center);
+            painter->rotate(angle);
+            painter->translate(-center);
+        }
+
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(QColor(color.red(), color.green(), color.blue(), 35));
+        painter->drawRect(rect);
+
+        QPen outlinePen(color, selected ? 2.5 : 1.5);
+        painter->setPen(outlinePen);
+        painter->setBrush(Qt::NoBrush);
+        painter->drawRect(rect);
+
+        if (m_shapeMode == 1 && angle != 0) {
+            painter->setPen(QPen(QColor(255, 255, 255, 100), 1, Qt::DashLine));
+            painter->drawLine(center, QPointF(center.x() + halfSize.x(), center.y()));
+        }
     }
 
     painter->restore();
@@ -256,11 +297,32 @@ void AnnotCanvasItem::drawSingleAnnotation(QPainter* painter, int row)
     qreal textW = fm.horizontalAdvance(label) + 8;
     qreal textH = fm.height() + 4;
 
-    QPointF labelPos = center - halfSize;
-    if (m_shapeMode == 1 && angle != 0) {
-        qreal rad = angle * M_PI / 180.0;
-        labelPos = center + QPointF(-halfSize.x() * cos(rad) + halfSize.y() * sin(rad),
-                                    -halfSize.x() * sin(rad) - halfSize.y() * cos(rad));
+    QPointF labelPos;
+    if (shapeType == 2) {
+        QVariantList pts = m_model->data(idx, AnnotationModel::PointsRole).toList();
+        if (!pts.isEmpty()) {
+            QPointF firstCanvas = imageToCanvas(pts[0].toMap()["x"].toFloat(), pts[0].toMap()["y"].toFloat());
+            labelPos = firstCanvas;
+        }
+    } else {
+        float cx = m_model->data(idx, AnnotationModel::CxRole).toFloat();
+        float cy = m_model->data(idx, AnnotationModel::CyRole).toFloat();
+        float w = m_model->data(idx, AnnotationModel::WRole).toFloat();
+        float h = m_model->data(idx, AnnotationModel::HRole).toFloat();
+        float angle = m_model->data(idx, AnnotationModel::AngleRole).toFloat();
+
+        QPointF center = imageToCanvas(cx, cy);
+        QPointF halfSize(
+            (w * m_imageWidth * (m_controller ? m_controller->zoom() : 1.0)) / 2.0,
+            (h * m_imageHeight * (m_controller ? m_controller->zoom() : 1.0)) / 2.0
+        );
+
+        labelPos = center - halfSize;
+        if (m_shapeMode == 1 && angle != 0) {
+            qreal rad = angle * M_PI / 180.0;
+            labelPos = center + QPointF(-halfSize.x() * cos(rad) + halfSize.y() * sin(rad),
+                                        -halfSize.x() * sin(rad) - halfSize.y() * cos(rad));
+        }
     }
     labelPos.setY(labelPos.y() - textH);
 
@@ -384,22 +446,36 @@ int AnnotCanvasItem::hitTestAnnotation(const QPointF& canvasPos)
 
     for (int i = m_model->rowCount() - 1; i >= 0; i--) {
         QModelIndex idx = m_model->index(i, 0);
-        float cx = m_model->data(idx, AnnotationModel::CxRole).toFloat();
-        float cy = m_model->data(idx, AnnotationModel::CyRole).toFloat();
-        float w = m_model->data(idx, AnnotationModel::WRole).toFloat();
-        float h = m_model->data(idx, AnnotationModel::HRole).toFloat();
-        float angle = m_model->data(idx, AnnotationModel::AngleRole).toFloat();
+        int shapeType = m_model->data(idx, AnnotationModel::ShapeTypeRole).toInt();
 
-        if (m_shapeMode == 1 && angle != 0) {
-            float dx = imgPos.x() - cx;
-            float dy = imgPos.y() - cy;
-            float rad = -angle * M_PI / 180.0f;
-            float localX = dx * cos(rad) - dy * sin(rad);
-            float localY = dx * sin(rad) + dy * cos(rad);
-            if (qAbs(localX) <= w / 2 && qAbs(localY) <= h / 2) return i;
+        if (shapeType == 2) {
+            QVariantList pts = m_model->data(idx, AnnotationModel::PointsRole).toList();
+            if (pts.size() < 3) continue;
+            QPainterPath path;
+            path.moveTo(pts[0].toMap()["x"].toFloat(), pts[0].toMap()["y"].toFloat());
+            for (int j = 1; j < pts.size(); j++) {
+                path.lineTo(pts[j].toMap()["x"].toFloat(), pts[j].toMap()["y"].toFloat());
+            }
+            path.closeSubpath();
+            if (path.contains(imgPos)) return i;
         } else {
-            if (imgPos.x() >= cx - w / 2 && imgPos.x() <= cx + w / 2 &&
-                imgPos.y() >= cy - h / 2 && imgPos.y() <= cy + h / 2) return i;
+            float cx = m_model->data(idx, AnnotationModel::CxRole).toFloat();
+            float cy = m_model->data(idx, AnnotationModel::CyRole).toFloat();
+            float w = m_model->data(idx, AnnotationModel::WRole).toFloat();
+            float h = m_model->data(idx, AnnotationModel::HRole).toFloat();
+            float angle = m_model->data(idx, AnnotationModel::AngleRole).toFloat();
+
+            if (m_shapeMode == 1 && angle != 0) {
+                float dx = imgPos.x() - cx;
+                float dy = imgPos.y() - cy;
+                float rad = -angle * M_PI / 180.0f;
+                float localX = dx * cos(rad) - dy * sin(rad);
+                float localY = dx * sin(rad) + dy * cos(rad);
+                if (qAbs(localX) <= w / 2 && qAbs(localY) <= h / 2) return i;
+            } else {
+                if (imgPos.x() >= cx - w / 2 && imgPos.x() <= cx + w / 2 &&
+                    imgPos.y() >= cy - h / 2 && imgPos.y() <= cy + h / 2) return i;
+            }
         }
     }
     return -1;
@@ -452,6 +528,21 @@ void AnnotCanvasItem::mousePressEvent(QMouseEvent* event)
     if (event->button() == Qt::LeftButton) {
         QPointF pos = event->position();
 
+        if (m_interactionMode == QStringLiteral("draw") && m_shapeMode == 2) {
+            if (m_nearStartPoint && m_polygonPoints.size() >= 3) {
+                finishDrawing();
+            } else {
+                if (!m_isDrawingPolygon) {
+                    m_isDrawingPolygon = true;
+                    m_polygonPoints.clear();
+                }
+                m_polygonPoints.append(pos);
+                m_nearStartPoint = false;
+            }
+            event->accept();
+            return;
+        }
+
         if (m_interactionMode == QStringLiteral("draw")) {
             m_isDrawing = true;
             m_drawStart = pos;
@@ -483,10 +574,17 @@ void AnnotCanvasItem::mousePressEvent(QMouseEvent* event)
 
         int hitRow = hitTestAnnotation(pos);
         if (hitRow >= 0) {
-            for (int i = 0; i < (m_model ? m_model->rowCount() : 0); i++) {
-                m_model->setSelected(i, false);
+            // Ctrl+点击：多选模式（对标 X-AnyLabeling）
+            if (event->modifiers() & Qt::ControlModifier) {
+                bool wasSelected = m_model->data(m_model->index(hitRow, 0), AnnotationModel::IsSelectedRole).toBool();
+                m_model->setSelected(hitRow, !wasSelected);
+            } else {
+                // 普通点击：清除其他选中，仅选中当前
+                for (int i = 0; i < (m_model ? m_model->rowCount() : 0); i++) {
+                    m_model->setSelected(i, false);
+                }
+                m_model->setSelected(hitRow, true);
             }
-            m_model->setSelected(hitRow, true);
 
             pushUndo();
             m_isDragging = true;
@@ -527,6 +625,25 @@ void AnnotCanvasItem::mouseMoveEvent(QMouseEvent* event)
 
     if (m_isDrawing) {
         m_drawCurrent = pos;
+        update();
+        event->accept();
+        return;
+    }
+
+    if (m_isDrawingPolygon) {
+        m_polygonHoverPoint = pos;
+        if (m_polygonPoints.size() >= 3) {
+            QPointF start = m_polygonPoints.first();
+            qreal dx = pos.x() - start.x();
+            qreal dy = pos.y() - start.y();
+            bool wasNear = m_nearStartPoint;
+            m_nearStartPoint = (dx * dx + dy * dy) <= SNAP_THRESHOLD * SNAP_THRESHOLD;
+            if (m_nearStartPoint != wasNear) {
+                setCursor(Qt::PointingHandCursor);
+            } else if (!m_nearStartPoint) {
+                setCursor(Qt::CrossCursor);
+            }
+        }
         update();
         event->accept();
         return;
@@ -624,6 +741,26 @@ void AnnotCanvasItem::mouseMoveEvent(QMouseEvent* event)
     event->accept();
 }
 
+// 双击标注弹出编辑标签对话框（参考 X-AnyLabeling）
+void AnnotCanvasItem::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    if (event->button() != Qt::LeftButton || !m_model) {
+        event->ignore();
+        return;
+    }
+
+    QPointF pos = event->position();
+    int hitRow = hitTestAnnotation(pos);
+
+    if (hitRow >= 0) {
+        // 双击已有标注：发出编辑标签信号
+        emit editLabelRequested(hitRow);
+        event->accept();
+    } else {
+        event->ignore();
+    }
+}
+
 void AnnotCanvasItem::mouseReleaseEvent(QMouseEvent* event)
 {
     if (m_isPanning) {
@@ -662,7 +799,7 @@ void AnnotCanvasItem::mouseReleaseEvent(QMouseEvent* event)
                 emit annotationModified();
             }
         }
-        update();
+        finishDrawing();
         event->accept();
         return;
     }
@@ -715,12 +852,6 @@ void AnnotCanvasItem::keyPressEvent(QKeyEvent* event)
         return;
     }
 
-    if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
-        deleteSelected();
-        event->accept();
-        return;
-    }
-
     if (event->modifiers() & Qt::ControlModifier) {
         if (event->key() == Qt::Key_Z) {
             if (event->modifiers() & Qt::ShiftModifier) {
@@ -736,6 +867,133 @@ void AnnotCanvasItem::keyPressEvent(QKeyEvent* event)
             event->accept();
             return;
         }
+        if (event->key() == Qt::Key_S) {
+            emit saveRequested();
+            event->accept();
+            return;
+        }
+        if (event->key() == Qt::Key_C) {
+            copySelected();
+            event->accept();
+            return;
+        }
+        if (event->key() == Qt::Key_V) {
+            pasteClipboard();
+            event->accept();
+            return;
+        }
+        if (event->key() == Qt::Key_D) {
+            duplicateSelected();
+            event->accept();
+            return;
+        }
+    }
+
+    switch (event->key()) {
+    case Qt::Key_Escape:
+        if (m_isDrawingPolygon) {
+            m_isDrawingPolygon = false;
+            m_polygonPoints.clear();
+            m_nearStartPoint = false;
+            update();
+        } else {
+            setInteractionMode(QStringLiteral("select"));
+        }
+        event->accept();
+        return;
+    case Qt::Key_Delete:
+        deleteSelected();
+        event->accept();
+        return;
+    case Qt::Key_Backspace:
+        if (m_isDrawingPolygon && !m_polygonPoints.isEmpty()) {
+            m_polygonPoints.removeLast();
+            m_nearStartPoint = false;
+            update();
+        } else {
+            deleteSelected();
+        }
+        event->accept();
+        return;
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+        if (m_isDrawingPolygon && m_polygonPoints.size() >= 3) {
+            finishDrawing();
+        }
+        event->accept();
+        return;
+    case Qt::Key_R:
+        setShapeMode(0);
+        setInteractionMode(QStringLiteral("draw"));
+        event->accept();
+        return;
+    case Qt::Key_O:
+        setShapeMode(1);
+        setInteractionMode(QStringLiteral("draw"));
+        event->accept();
+        return;
+    case Qt::Key_P:
+        setShapeMode(2);
+        setInteractionMode(QStringLiteral("draw"));
+        event->accept();
+        return;
+    case Qt::Key_F:
+        fitToView();
+        event->accept();
+        return;
+    case Qt::Key_A:
+        if (!m_isDrawingPolygon) {
+            emit navigatePrevious();
+        }
+        event->accept();
+        return;
+    case Qt::Key_D:
+        if (!m_isDrawingPolygon) {
+            emit navigateNext();
+        }
+        event->accept();
+        return;
+    case Qt::Key_Z:
+        rotateSelected(-1.0f);
+        event->accept();
+        return;
+    case Qt::Key_X:
+        rotateSelected(-0.1f);
+        event->accept();
+        return;
+    case Qt::Key_C:
+        rotateSelected(0.1f);
+        event->accept();
+        return;
+    case Qt::Key_V:
+        rotateSelected(1.0f);
+        event->accept();
+        return;
+    // 方向键微调移动选中标注（5像素步长，对标 X-AnyLabeling）
+    case Qt::Key_Left:
+        nudgeSelected(-5, 0);
+        event->accept();
+        return;
+    case Qt::Key_Right:
+        nudgeSelected(5, 0);
+        event->accept();
+        return;
+    case Qt::Key_Up:
+        nudgeSelected(0, -5);
+        event->accept();
+        return;
+    case Qt::Key_Down:
+        nudgeSelected(0, 5);
+        event->accept();
+        return;
+    default:
+        break;
+    }
+
+    if (event->key() >= Qt::Key_1 && event->key() <= Qt::Key_9) {
+        setCurrentClassIndex(event->key() - Qt::Key_1);
+        event->accept();
+        return;
     }
 
     event->ignore();
@@ -800,6 +1058,12 @@ void AnnotCanvasItem::pushUndo()
         snap.h = m_model->data(idx, AnnotationModel::HRole).toFloat();
         snap.angle = m_model->data(idx, AnnotationModel::AngleRole).toFloat();
         snap.isSelected = m_model->data(idx, AnnotationModel::IsSelectedRole).toBool();
+        snap.shapeType = m_model->data(idx, AnnotationModel::ShapeTypeRole).toInt();
+        QVariantList pts = m_model->data(idx, AnnotationModel::PointsRole).toList();
+        for (const QVariant &pt : pts) {
+            QVariantMap pm = pt.toMap();
+            snap.polygonPoints.append(QPointF(pm["x"].toFloat(), pm["y"].toFloat()));
+        }
         entry.state.append(snap);
     }
 
@@ -825,7 +1089,9 @@ void AnnotCanvasItem::applyUndoState(const UndoEntry& entry)
     }
 
     for (const auto& snap : entry.state) {
-        if (m_shapeMode == 1 || snap.angle != 0) {
+        if (snap.shapeType == 2) {
+            m_model->addPolygonAnnotation(snap.classIndex, snap.className, snap.polygonPoints);
+        } else if (snap.shapeType == 1 || snap.angle != 0) {
             m_model->addOBBAnnotation(snap.classIndex, snap.className,
                                        snap.cx, snap.cy, snap.w, snap.h, snap.angle);
         } else {
@@ -896,4 +1162,209 @@ void AnnotCanvasItem::deleteSelected()
 void AnnotCanvasItem::commitUndoState()
 {
     pushUndo();
+}
+
+void AnnotCanvasItem::rotateSelected(float deltaAngle)
+{
+    if (!m_model) return;
+    pushUndo();
+    for (int i = 0; i < m_model->rowCount(); i++) {
+        QModelIndex idx = m_model->index(i, 0);
+        if (m_model->data(idx, AnnotationModel::IsSelectedRole).toBool()) {
+            float cx = m_model->data(idx, AnnotationModel::CxRole).toFloat();
+            float cy = m_model->data(idx, AnnotationModel::CyRole).toFloat();
+            float w = m_model->data(idx, AnnotationModel::WRole).toFloat();
+            float h = m_model->data(idx, AnnotationModel::HRole).toFloat();
+            float angle = m_model->data(idx, AnnotationModel::AngleRole).toFloat();
+            m_model->updateOBBGeometry(i, cx, cy, w, h, angle + deltaAngle);
+        }
+    }
+    if (m_controller) m_controller->markDirty();
+    emit annotationModified();
+    update();
+}
+
+void AnnotCanvasItem::copySelected()
+{
+    if (!m_model) return;
+    m_clipboard.clear();
+    for (int i = 0; i < m_model->rowCount(); i++) {
+        QModelIndex idx = m_model->index(i, 0);
+        if (m_model->data(idx, AnnotationModel::IsSelectedRole).toBool()) {
+            AnnotationSnapshot snap;
+            snap.classIndex = m_model->data(idx, AnnotationModel::ClassIndexRole).toInt();
+            snap.className = m_model->data(idx, AnnotationModel::ClassNameRole).toString();
+            snap.cx = m_model->data(idx, AnnotationModel::CxRole).toFloat();
+            snap.cy = m_model->data(idx, AnnotationModel::CyRole).toFloat();
+            snap.w = m_model->data(idx, AnnotationModel::WRole).toFloat();
+            snap.h = m_model->data(idx, AnnotationModel::HRole).toFloat();
+            snap.angle = m_model->data(idx, AnnotationModel::AngleRole).toFloat();
+            snap.isSelected = false;
+            snap.shapeType = 0;
+            m_clipboard.append(snap);
+        }
+    }
+}
+
+void AnnotCanvasItem::pasteClipboard()
+{
+    if (!m_model || m_clipboard.isEmpty()) return;
+    pushUndo();
+    for (int i = 0; i < m_model->rowCount(); i++) {
+        m_model->setSelected(i, false);
+    }
+    qreal offset = 5.0 / (m_imageWidth > 0 ? m_imageWidth * (m_controller ? m_controller->zoom() : 1.0) : 1.0);
+    for (const auto& snap : m_clipboard) {
+        float newCx = qMin(1.0f - snap.w / 2.0f, snap.cx + offset);
+        float newCy = qMin(1.0f - snap.h / 2.0f, snap.cy + offset);
+        if (snap.angle != 0 || m_shapeMode == 1) {
+            m_model->addOBBAnnotation(snap.classIndex, snap.className, newCx, newCy, snap.w, snap.h, snap.angle);
+        } else {
+            m_model->addAnnotation(snap.classIndex, snap.className, newCx, newCy, snap.w, snap.h);
+        }
+        m_model->setSelected(m_model->rowCount() - 1, true);
+    }
+    if (m_controller) m_controller->markDirty();
+    emit annotationModified();
+    update();
+}
+
+void AnnotCanvasItem::duplicateSelected()
+{
+    if (!m_model) return;
+    pushUndo();
+    QVector<AnnotationSnapshot> toDuplicate;
+    for (int i = 0; i < m_model->rowCount(); i++) {
+        QModelIndex idx = m_model->index(i, 0);
+        if (m_model->data(idx, AnnotationModel::IsSelectedRole).toBool()) {
+            AnnotationSnapshot snap;
+            snap.classIndex = m_model->data(idx, AnnotationModel::ClassIndexRole).toInt();
+            snap.className = m_model->data(idx, AnnotationModel::ClassNameRole).toString();
+            snap.cx = m_model->data(idx, AnnotationModel::CxRole).toFloat();
+            snap.cy = m_model->data(idx, AnnotationModel::CyRole).toFloat();
+            snap.w = m_model->data(idx, AnnotationModel::WRole).toFloat();
+            snap.h = m_model->data(idx, AnnotationModel::HRole).toFloat();
+            snap.angle = m_model->data(idx, AnnotationModel::AngleRole).toFloat();
+            snap.isSelected = false;
+            snap.shapeType = 0;
+            toDuplicate.append(snap);
+        }
+        m_model->setSelected(i, false);
+    }
+    qreal offset = 2.0 / (m_imageWidth > 0 ? m_imageWidth * (m_controller ? m_controller->zoom() : 1.0) : 1.0);
+    for (const auto& snap : toDuplicate) {
+        float newCx = qMin(1.0f - snap.w / 2.0f, snap.cx + offset);
+        float newCy = qMin(1.0f - snap.h / 2.0f, snap.cy + offset);
+        if (snap.angle != 0 || m_shapeMode == 1) {
+            m_model->addOBBAnnotation(snap.classIndex, snap.className, newCx, newCy, snap.w, snap.h, snap.angle);
+        } else {
+            m_model->addAnnotation(snap.classIndex, snap.className, newCx, newCy, snap.w, snap.h);
+        }
+        m_model->setSelected(m_model->rowCount() - 1, true);
+    }
+    if (m_controller) m_controller->markDirty();
+    emit annotationModified();
+    update();
+}
+
+void AnnotCanvasItem::finishDrawing()
+{
+    if (m_isDrawing) {
+        m_isDrawing = false;
+        setInteractionMode(QStringLiteral("select"));
+    }
+    if (m_isDrawingPolygon) {
+        if (m_polygonPoints.size() >= 3 && m_model) {
+            pushUndo();
+            QVector<QPointF> imgPoints;
+            for (const auto& pt : m_polygonPoints) {
+                imgPoints.append(canvasToImage(pt.x(), pt.y()));
+            }
+            m_model->addPolygonAnnotation(m_currentClassIndex, m_currentClassName, imgPoints);
+            if (m_controller) m_controller->markDirty();
+            emit annotationModified();
+        }
+        m_isDrawingPolygon = false;
+        m_polygonPoints.clear();
+        m_nearStartPoint = false;
+        setInteractionMode(QStringLiteral("select"));
+        update();
+    }
+}
+
+// 方向键微调移动选中标注（像素步长，对标 X-AnyLabeling）
+void AnnotCanvasItem::nudgeSelected(int dxPixels, int dyPixels)
+{
+    if (!m_model || !m_controller) return;
+
+    bool anySelected = false;
+    for (int i = 0; i < m_model->rowCount(); i++) {
+        QModelIndex idx = m_model->index(i, 0);
+        if (m_model->data(idx, AnnotationModel::IsSelectedRole).toBool()) {
+            if (!anySelected) {
+                pushUndo();
+                anySelected = true;
+            }
+            float cx = m_model->data(idx, AnnotationModel::CxRole).toFloat();
+            float cy = m_model->data(idx, AnnotationModel::CyRole).toFloat();
+            float w = m_model->data(idx, AnnotationModel::WRole).toFloat();
+            float h = m_model->data(idx, AnnotationModel::HRole).toFloat();
+            float angle = m_model->data(idx, AnnotationModel::AngleRole).toFloat();
+
+            // 将像素偏移转换为归一化坐标偏移
+            qreal z = m_controller->zoom();
+            float dxCx = dxPixels / (m_imageWidth * z);
+            float dyCy = dyPixels / (m_imageHeight * z);
+
+            float newCx = qBound(w / 2.0f, cx + dxCx, 1.0f - w / 2.0f);
+            float newCy = qBound(h / 2.0f, cy + dyCy, 1.0f - h / 2.0f);
+
+            if (m_shapeMode == 1 || angle != 0) {
+                m_model->updateOBBGeometry(i, newCx, newCy, w, h, angle);
+            } else {
+                m_model->updateGeometry(i, newCx, newCy, w, h);
+            }
+        }
+    }
+    if (anySelected) {
+        if (m_controller) m_controller->markDirty();
+        emit annotationModified();
+        update();
+    }
+}
+
+void AnnotCanvasItem::drawDrawingPolygon(QPainter* painter)
+{
+    if (m_polygonPoints.isEmpty()) return;
+
+    QColor color = classColor(m_currentClassIndex);
+
+    QPen linePen(color, 2);
+    painter->setPen(linePen);
+    painter->setBrush(Qt::NoBrush);
+
+    for (int i = 0; i < m_polygonPoints.size() - 1; i++) {
+        painter->drawLine(m_polygonPoints[i], m_polygonPoints[i + 1]);
+    }
+
+    if (!m_polygonPoints.isEmpty()) {
+        QPointF lastPt = m_polygonPoints.last();
+        QPointF hoverPt = m_nearStartPoint ? m_polygonPoints.first() : m_polygonHoverPoint;
+        QPen dashPen(color, 1.5, Qt::DashLine);
+        painter->setPen(dashPen);
+        painter->drawLine(lastPt, hoverPt);
+    }
+
+    painter->setPen(QPen(QColor("#FFFFFF"), 1));
+    painter->setBrush(color);
+    for (const auto& pt : m_polygonPoints) {
+        painter->drawRect(QRectF(pt.x() - 3, pt.y() - 3, 6, 6));
+    }
+
+    if (m_nearStartPoint && m_polygonPoints.size() >= 3) {
+        QPointF start = m_polygonPoints.first();
+        painter->setPen(QPen(color, 2));
+        painter->setBrush(QColor(color.red(), color.green(), color.blue(), 80));
+        painter->drawEllipse(start, 8, 8);
+    }
 }

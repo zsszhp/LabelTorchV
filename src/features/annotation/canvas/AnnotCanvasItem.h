@@ -74,6 +74,12 @@ public:
     Q_INVOKABLE void selectAll();
     Q_INVOKABLE void deleteSelected();
     Q_INVOKABLE void commitUndoState();
+    Q_INVOKABLE void rotateSelected(float deltaAngle);
+    Q_INVOKABLE void copySelected();
+    Q_INVOKABLE void pasteClipboard();
+    Q_INVOKABLE void duplicateSelected();
+    Q_INVOKABLE void finishDrawing();
+    Q_INVOKABLE void nudgeSelected(int dxPixels, int dyPixels);
 
 signals:
     void controllerChanged();
@@ -84,11 +90,16 @@ signals:
     void interactionModeChanged();
     void annotationModified();
     void undoAvailabilityChanged();
+    void navigatePrevious();
+    void navigateNext();
+    void saveRequested();
+    void editLabelRequested(int annotationIndex);
 
 protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+    void mouseDoubleClickEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void hoverMoveEvent(QHoverEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
@@ -100,6 +111,8 @@ private:
         QString className;
         float cx, cy, w, h, angle;
         bool isSelected;
+        int shapeType = 0;
+        QVector<QPointF> polygonPoints;
     };
 
     struct UndoEntry {
@@ -111,6 +124,7 @@ private:
     void drawSingleAnnotation(QPainter* painter, int row);
     void drawHandles(QPainter* painter, int row);
     void drawDrawingRect(QPainter* painter);
+    void drawDrawingPolygon(QPainter* painter);
     void drawCrosshair(QPainter* painter);
 
     QPointF imageToCanvas(float imgX, float imgY) const;
@@ -141,6 +155,12 @@ private:
     QPointF m_drawStart;
     QPointF m_drawCurrent;
 
+    bool m_isDrawingPolygon = false;
+    QVector<QPointF> m_polygonPoints;
+    QPointF m_polygonHoverPoint;
+    bool m_nearStartPoint = false;
+    static constexpr float SNAP_THRESHOLD = 10.0f;
+
     bool m_isDragging = false;
     int m_dragAnnotationRow = -1;
     HandlePosition m_dragHandle = NoHandle;
@@ -155,6 +175,8 @@ private:
     HandlePosition m_hoveredHandle = NoHandle;
 
     bool m_spaceHeld = false;
+
+    QVector<AnnotationSnapshot> m_clipboard;
 
     QVector<UndoEntry> m_undoStack;
     int m_undoIndex = -1;

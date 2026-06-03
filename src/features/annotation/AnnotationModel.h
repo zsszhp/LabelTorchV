@@ -6,6 +6,7 @@
 #include <QVariantList>
 #include <QVariantMap>
 #include <QVector>
+#include <QPointF>
 
 struct AxisAlignedBox;
 
@@ -36,7 +37,9 @@ public:
         ConfidenceRole,
         SourceTypeRole,
         IsConfirmedRole,
-        IsSelectedRole
+        IsSelectedRole,
+        ShapeTypeRole,      // 0=HBB, 1=OBB, 2=Polygon
+        PointsRole          // QVariantList, polygon vertex list [{x,y},...]
     };
     Q_ENUM(Roles)
 
@@ -57,9 +60,14 @@ public:
                                    float cx, float cy, float w, float h);
     Q_INVOKABLE void addOBBAnnotation(int classIndex, const QString &className,
                                        float cx, float cy, float w, float h, float angle);
+    Q_INVOKABLE void addPolygonAnnotation(int classIndex, const QString &className,
+                                           const QVector<QPointF> &points);
     Q_INVOKABLE void removeAnnotation(int row);
     Q_INVOKABLE void updateGeometry(int row, float cx, float cy, float w, float h);
     Q_INVOKABLE void updateOBBGeometry(int row, float cx, float cy, float w, float h, float angle);
+    Q_INVOKABLE void updatePolygonPoint(int row, int pointIndex, float x, float y);
+    Q_INVOKABLE void addPolygonPoint(int row, int insertIndex, float x, float y);
+    Q_INVOKABLE void removePolygonPoint(int row, int pointIndex);
     Q_INVOKABLE void setClassIndex(int row, int classIndex, const QString &className);
     Q_INVOKABLE void setSelected(int row, bool selected);
     Q_INVOKABLE QVariantList toVariantList() const;
@@ -81,6 +89,8 @@ private:
         QString sourceType  = QStringLiteral("manual");
         bool    isConfirmed = true;
         bool    isSelected  = false;
+        int     shapeType   = 0;       // 0=HBB, 1=OBB, 2=Polygon
+        QVector<QPointF> polygonPoints; // polygon vertices (normalized)
     };
 
     void emitDataChanged(int row);
