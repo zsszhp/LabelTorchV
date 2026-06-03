@@ -17,6 +17,7 @@ class CanvasController : public QObject
     Q_PROPERTY(qreal panY READ panY WRITE setPanY NOTIFY panChanged)
     Q_PROPERTY(bool dirty READ dirty NOTIFY dirtyChanged)
     Q_PROPERTY(QString drawMode READ drawMode WRITE setDrawMode NOTIFY drawModeChanged)
+    Q_PROPERTY(bool polygonDrawing READ polygonDrawing NOTIFY polygonDrawingChanged)
 
 public:
     explicit CanvasController(QObject *parent = nullptr);
@@ -32,6 +33,8 @@ public:
     bool dirty() const { return m_dirty; }
     QString drawMode() const { return m_drawMode; }
     void setDrawMode(const QString &mode);
+    bool polygonDrawing() const { return m_polygonDrawing; }
+    void setPolygonDrawing(bool drawing);
 
     Q_INVOKABLE void loadImage(const QString &imagePath, const QString &labelPath);
     Q_INVOKABLE void fitToView(qreal viewWidth, qreal viewHeight);
@@ -45,6 +48,7 @@ public:
 
     Q_INVOKABLE void markDirty();
     Q_INVOKABLE void clearDirty();
+    Q_INVOKABLE void cancelDrawing();
 
 signals:
     void currentImageChanged();
@@ -52,6 +56,7 @@ signals:
     void panChanged();
     void dirtyChanged();
     void drawModeChanged();
+    void polygonDrawingChanged();
     void canvasUpdateRequested();
 
 private:
@@ -62,6 +67,7 @@ private:
     qreal m_panY = 0;
     bool m_dirty = false;
     QString m_drawMode = "select";  // "select" or "draw"
+    bool m_polygonDrawing = false;
     qreal m_imageWidth = 0;
     qreal m_imageHeight = 0;
 };

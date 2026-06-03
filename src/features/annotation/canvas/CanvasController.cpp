@@ -148,3 +148,28 @@ void CanvasController::clearDirty()
         ltInfo(LT_LOG_ANNOTATION()) << "Canvas dirty flag cleared";
     }
 }
+
+void CanvasController::setPolygonDrawing(bool drawing)
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "drawing=" << drawing << "current=" << m_polygonDrawing;
+    if (m_polygonDrawing == drawing) return;
+    m_polygonDrawing = drawing;
+    emit polygonDrawingChanged();
+    ltInfo(LT_LOG_ANNOTATION()) << "Polygon drawing changed to" << drawing;
+}
+
+void CanvasController::cancelDrawing()
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "cancelDrawing";
+    if (m_polygonDrawing) {
+        m_polygonDrawing = false;
+        emit polygonDrawingChanged();
+    }
+    // 切换回选择模式
+    if (m_drawMode != QStringLiteral("select")) {
+        m_drawMode = QStringLiteral("select");
+        emit drawModeChanged();
+    }
+    emit canvasUpdateRequested();
+    ltInfo(LT_LOG_ANNOTATION()) << "Drawing cancelled, switched to select mode";
+}

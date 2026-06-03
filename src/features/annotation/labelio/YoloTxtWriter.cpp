@@ -155,3 +155,81 @@ QString YoloTxtWriter::formatOBBLine(const RotatedBox &ann)
         .arg(ann.classIndex)
         .arg(corners);
 }
+
+// ---------------------------------------------------------------------------
+// Polygon methods
+// ---------------------------------------------------------------------------
+
+bool YoloTxtWriter::writePolygon(const QString &filePath, const QVector<Polygon> &annotations)
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "filePath=" << filePath << "count=" << annotations.size();
+
+    // 确保父目录存在
+    QFileInfo fi(filePath);
+    QDir dir = fi.absoluteDir();
+    if (!dir.exists()) {
+        if (!dir.mkpath(QLatin1String("."))) {
+            ltError(LT_LOG_ANNOTATION()) << "cannot create directory for Polygon:" << dir.absolutePath();
+            return false;
+        }
+    }
+
+    // --- 原子写入：临时文件 + 重命名 ---
+    const QString tempPath = filePath + QStringLiteral(".tmp");
+
+    {
+        QFile tempFile(tempPath);
+        if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+            ltError(LT_LOG_ANNOTATION()) << "cannot open temp file for Polygon writing:" << tempPath;
+            return false;
+        }
+
+        QTextStream out(&tempFile);
+        for (const Polygon &ann : annotations) {
+            out << formatPolygonLine(ann) << QLatin1Char('\n');
+        }
+
+        out.flush();
+        if (!tempFile.flush()) {
+            ltError(LT_LOG_ANNOTATION()) << "flush failed for Polygon temp file:" << tempPath;
+            QFile::remove(tempPath);
+            return false;
+        }
+    }   // tempFile closed here
+
+    // 删除已有目标文件
+    if (QFile::exists(filePath)) {
+        if (!QFile::remove(filePath)) {
+            ltError(LT_LOG_ANNOTATION()) << "cannot remove existing file for Polygon:" << filePath;
+            QFile::remove(tempPath);
+            return false;
+        }
+    }
+
+    // 重命名临时文件到目标路径
+    if (!QFile::rename(tempPath, filePath)) {
+        ltError(LT_LOG_ANNOTATION()) << "cannot rename temp file to Polygon:" << filePath;
+        QFile::remove(tempPath);
+        return false;
+    }
+
+    ltInfo(LT_LOG_ANNOTATION()) << "Wrote" << annotations.size() << "Polygon annotations to" << filePath;
+    return true;
+}
+
+QString YoloTxtWriter::formatPolygonLine(const Polygon &ann)
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "classIndex=" << ann.classIndex << "points=" << ann.points.size();
+
+    // 格式：class_id x1 y1 x2 y2 ... xn yn（6位小数）
+    if (ann.points.size() < 3)
+        return {};
+
+    QString line = QString::number(ann.classIndex);
+    for (const QPointF &pt : ann.points) {
+        line += QStringLiteral(" %1 %2")
+            .arg(static_cast<double>(pt.x()), 0, 'f', 6)
+            .arg(static_cast<double>(pt.y()), 0, 'f', 6);
+    }
+    return line;
+}

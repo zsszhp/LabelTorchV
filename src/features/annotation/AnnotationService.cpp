@@ -3,6 +3,7 @@
 #include "labelio/YoloTxtWriter.h"
 #include "geometry/AxisAlignedBox.h"
 #include "geometry/RotatedBox.h"
+#include "geometry/Polygon.h"
 #include "database/Database.h"
 #include "utils/Id.h"
 #include "utils/Log.h"
@@ -32,6 +33,11 @@ QVariantList AnnotationService::loadAnnotations(const QString &labelPath)
     if (m_shapeType == 1) {
         // OBB mode
         return loadOBBAnnotations(labelPath);
+    }
+
+    if (m_shapeType == 2) {
+        // Polygon mode
+        return loadPolygonAnnotations(labelPath);
     }
 
     // HBB mode (default)
@@ -67,6 +73,11 @@ bool AnnotationService::saveAnnotations(const QString &labelPath, const QString 
     if (m_shapeType == 1) {
         // OBB mode
         return saveOBBAnnotations(labelPath, datasetId, sampleId, annotations);
+    }
+
+    if (m_shapeType == 2) {
+        // Polygon mode
+        return savePolygonAnnotations(labelPath, datasetId, sampleId, annotations);
     }
 
     // HBB mode (default)
@@ -471,7 +482,8 @@ void AnnotationService::setShapeType(int shapeType)
 {
     ltTrace(LT_LOG_ANNOTATION()) << "shapeType=" << shapeType;
     m_shapeType = shapeType;
-    ltInfo(LT_LOG_ANNOTATION()) << "Shape type set to" << (shapeType == 1 ? "OBB" : "HBB");
+    const char* names[] = {"HBB", "OBB", "Polygon"};
+    ltInfo(LT_LOG_ANNOTATION()) << "Shape type set to" << names[shapeType % 3];
 }
 
 QString AnnotationService::createRevision(const QString &datasetId, const QString &sampleId,
@@ -610,4 +622,117 @@ QVariantMap AnnotationService::getSample(const QString &sampleId)
     ltWarning(LT_LOG_ANNOTATION()) << "Sample not found or query error:" << sampleId
                << query.lastError().text();
     return {};
+}
+
+// ---------------------------------------------------------------------------
+// Polygon methods
+// ---------------------------------------------------------------------------
+
+QVariantList AnnotationService::loadPolygonAnnotations(const QString &labelPath)
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath;
+
+    QVariantList result;
+
+    QVector<Polygon> polygons = YoloTxtReader::readPolygon(labelPath);
+    result.reserve(polygons.size());
+
+    for (const Polygon &poly : polygons) {
+        QVariantMap m;
+        m[QStringLiteral("id")]          = poly.id;
+        m[QStringLiteral("classIndex")]  = poly.classIndex;
+        m[QStringLiteral("className")]   = poly.className;
+        m[QStringLiteral("shapeType")]   = 2;  // Polygon
+
+        // 将顶点列表转换为QVariantList [{x, y}, ...]
+        QVariantList pts;
+        for (const QPointF &pt : poly.points) {
+            QVariantMap pm;
+            pm[QStringLiteral("x")] = pt.x();
+            pm[QStringLiteral("y")] = pt.y();
+            pts.append(pm);
+        }
+        m[QStringLiteral("points")]      = pts;
+
+        // 计算包围盒（用于兼容性）
+        if (!poly.points.isEmpty()) {
+            float minX = 1.0f, minY = 1.0f, maxX = 0.0f, maxY = 0.0f;
+            for (const QPointF &pt : poly.points) {
+                minX = qMin(minX, static_cast<float>(pt.x()));
+                minY = qMin(minY, static_cast<float>(pt.y()));
+                maxX = qMax(maxX, static_cast<float>(pt.x()));
+                maxY = qMax(maxY, static_cast<float>(pt.y()));
+            }
+            m[QStringLiteral("cx")] = (minX + maxX) / 2.0f;
+            m[QStringLiteral("cy")] = (minY + maxY) / 2.0f;
+            m[QStringLiteral("w")]  = maxX - minX;
+            m[QStringLiteral("h")]  = maxY - minY;
+        } else {
+            m[QStringLiteral("cx")] = 0.0f;
+            m[QStringLiteral("cy")] = 0.0f;
+            m[QStringLiteral("w")]  = 0.0f;
+            m[QStringLiteral("h")]  = 0.0f;
+        }
+
+        m[QStringLiteral("angle")]       = 0.0f;
+        m[QStringLiteral("confidence")]  = poly.confidence;
+        m[QStringLiteral("sourceType")]  = poly.sourceType;
+        m[QStringLiteral("isConfirmed")] = poly.isConfirmed;
+        result.append(m);
+    }
+
+    ltInfo(LT_LOG_ANNOTATION()) << "Loaded" << polygons.size() << "Polygon annotations from" << labelPath;
+    return result;
+}
+
+bool AnnotationService::savePolygonAnnotations(const QString &labelPath, const QString &datasetId,
+                                                const QString &sampleId, const QVariantList &annotations)
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath << "datasetId=" << datasetId
+                                 << "sampleId=" << sampleId << "count=" << annotations.size();
+
+    // 将QVariantList转换为QVector<Polygon>
+    QVector<Polygon> polygons;
+    polygons.reserve(annotations.size());
+
+    for (const QVariant &item : annotations) {
+        QVariantMap m = item.toMap();
+        Polygon poly;
+        poly.id          = m[QStringLiteral("id")].toString();
+        poly.classIndex  = m[QStringLiteral("classIndex")].toInt();
+        poly.className   = m[QStringLiteral("className")].toString();
+        poly.confidence  = static_cast<float>(m[QStringLiteral("confidence")].toDouble());
+        poly.sourceType  = m[QStringLiteral("sourceType")].toString();
+        poly.isConfirmed = m[QStringLiteral("isConfirmed")].toBool();
+
+        // 从points字段提取顶点
+        QVariantList pts = m[QStringLiteral("points")].toList();
+        for (const QVariant &ptVar : pts) {
+            QVariantMap pm = ptVar.toMap();
+            poly.points.append(QPointF(
+                static_cast<float>(pm[QStringLiteral("x")].toDouble()),
+                static_cast<float>(pm[QStringLiteral("y")].toDouble())
+            ));
+        }
+
+        polygons.append(poly);
+    }
+
+    // 原子写入
+    if (!YoloTxtWriter::writePolygon(labelPath, polygons)) {
+        ltError(LT_LOG_ANNOTATION()) << "Failed to write Polygon annotations to:" << labelPath;
+        return false;
+    }
+
+    // 记录修订
+    QString revId = createRevision(datasetId, sampleId,
+                                   QStringLiteral("manual"),
+                                   QVariantList(),
+                                   annotations);
+    if (revId.isEmpty()) {
+        ltWarning(LT_LOG_ANNOTATION()) << "Polygon file saved but revision record failed for sample:" << sampleId;
+    }
+
+    ltInfo(LT_LOG_ANNOTATION()) << "Saved" << polygons.size() << "Polygon annotations to" << labelPath;
+    return true;
 }

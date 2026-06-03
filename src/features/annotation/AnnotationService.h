@@ -149,9 +149,36 @@ public:
 
     /**
      * @brief Set the current shape type for annotation operations.
-     * @param shapeType  0 = HBB, 1 = OBB
+     * @param shapeType  0 = HBB, 1 = OBB, 2 = Polygon
      */
     Q_INVOKABLE void setShapeType(int shapeType);
+
+    /**
+     * @brief Load polygon annotations from a YOLO txt label file.
+     *
+     * Uses YoloTxtReader::readPolygon to parse the file, then converts each
+     * Polygon to a QVariantMap with keys: id, classIndex, className, shapeType=2,
+     * points (QVariantList of {x,y} maps), confidence, sourceType, isConfirmed.
+     *
+     * @param labelPath  Absolute path to the .txt label file.
+     * @return QVariantList of QVariantMap entries.
+     */
+    Q_INVOKABLE QVariantList loadPolygonAnnotations(const QString &labelPath);
+
+    /**
+     * @brief Save polygon annotations to a YOLO txt label file and record a revision.
+     *
+     * Converts the QVariantList to Polygon objects, writes atomically
+     * via YoloTxtWriter::writePolygon, then creates an annotation_revision record.
+     *
+     * @param labelPath    Destination file path.
+     * @param datasetId    Dataset ID for the revision record.
+     * @param sampleId     Sample ID for the revision record.
+     * @param annotations  QVariantList of annotation maps (polygon format with points).
+     * @return true on success, false on any I/O or database error.
+     */
+    Q_INVOKABLE bool savePolygonAnnotations(const QString &labelPath, const QString &datasetId,
+                                             const QString &sampleId, const QVariantList &annotations);
 
     /**
      * @brief Create an annotation_revision record.
@@ -186,7 +213,7 @@ public:
     Q_INVOKABLE QVariantMap getSample(const QString &sampleId);
 
 private:
-    int m_shapeType = 0;  // 0 = HBB, 1 = OBB
+    int m_shapeType = 0;  // 0 = HBB, 1 = OBB, 2 = Polygon
 };
 
 #endif // ANNOTATIONSERVICE_H

@@ -3,6 +3,7 @@
 
 #include "geometry/AxisAlignedBox.h"
 #include "geometry/RotatedBox.h"
+#include "geometry/Polygon.h"
 #include "geometry/Geometry.h"
 
 #include <QString>
@@ -71,12 +72,38 @@ public:
      * @brief Detect format from file content.
      *
      * Reads the first non-empty, non-comment line and checks the number
-     * of whitespace-separated tokens: 5 = HBB, 9 = OBB.
+     * of whitespace-separated tokens: 5 = HBB, 9 = OBB, >9 odd = Polygon.
      *
      * @param filePath  Absolute path to the .txt label file.
-     * @return  Geometry::ShapeType (HBB, OBB, or HBB as fallback).
+     * @return  Geometry::ShapeType (HBB, OBB, Polygon, or HBB as fallback).
      */
     static Geometry::ShapeType detectFormat(const QString &filePath);
+
+    // --- Polygon methods ---
+
+    /**
+     * @brief Read polygon annotations from a YOLO txt file.
+     *
+     * YOLO polygon format: class_id x1 y1 x2 y2 ... xn yn
+     * Each line has >9 tokens and an odd total count (1 + 2N, N>=3).
+     *
+     * @param filePath  Absolute path to the .txt label file.
+     * @return  Vector of parsed Polygon annotations.
+     *          Empty vector on file-open failure.
+     */
+    static QVector<Polygon> readPolygon(const QString &filePath);
+
+    /**
+     * @brief Parse a single polygon line.
+     *
+     * Format: class_id x1 y1 x2 y2 ... xn yn
+     * Token count must be >9 and odd (1 + 2N where N>=3).
+     *
+     * @param line  A trimmed line from a YOLO label file.
+     * @return  Parsed Polygon with a generated UUID.
+     *          On parse failure classIndex is set to -1.
+     */
+    static Polygon parsePolygonLine(const QString &line);
 };
 
 #endif // YOLOTXTREADER_H

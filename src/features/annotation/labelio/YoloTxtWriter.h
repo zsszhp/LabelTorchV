@@ -3,6 +3,7 @@
 
 #include "geometry/AxisAlignedBox.h"
 #include "geometry/RotatedBox.h"
+#include "geometry/Polygon.h"
 
 #include <QString>
 #include <QVector>
@@ -71,6 +72,30 @@ public:
      * @return  String in DOTA format.
      */
     static QString formatOBBLine(const RotatedBox &ann);
+
+    // --- Polygon methods ---
+
+    /**
+     * @brief Write polygon annotations to a YOLO txt file atomically.
+     *
+     * Same atomic write strategy as write().
+     * Format: class_id x1 y1 x2 y2 ... xn yn (6 decimal places).
+     *
+     * @param filePath     Destination file path.
+     * @param annotations  Polygon annotations to write.
+     * @return  true on success, false on any I/O error.
+     */
+    static bool writePolygon(const QString &filePath, const QVector<Polygon> &annotations);
+
+    /**
+     * @brief Format a single polygon annotation as a YOLO polygon line.
+     *
+     * Format: "class_id x1 y1 x2 y2 ... xn yn"
+     *
+     * @param ann  The Polygon annotation to format.
+     * @return  String in YOLO polygon format.
+     */
+    static QString formatPolygonLine(const Polygon &ann);
 };
 
 #endif // YOLOTXTWRITER_H

@@ -219,6 +219,12 @@ Geometry::ShapeType YoloTxtReader::detectFormat(const QString &filePath)
             ltInfo(LT_LOG_ANNOTATION()) << "Detected HBB format for" << filePath;
             return Geometry::HBB;
         }
+        // 多边形格式：token数>9且为奇数（1 + 2N，N>=3）
+        if (parts.size() > 9 && (parts.size() % 2) == 1) {
+            ltInfo(LT_LOG_ANNOTATION()) << "Detected Polygon format for" << filePath
+                                        << "(parts=" << parts.size() << ")";
+            return Geometry::Polygon;
+        }
 
         // Unknown format, default to HBB
         ltWarning(LT_LOG_ANNOTATION()) << "Unknown format (parts=" << parts.size() << "), defaulting to HBB for" << filePath;
@@ -228,4 +234,91 @@ Geometry::ShapeType YoloTxtReader::detectFormat(const QString &filePath)
     file.close();
     ltDebug(LT_LOG_ANNOTATION()) << "Empty file, defaulting to HBB for" << filePath;
     return Geometry::HBB;  // empty file defaults to HBB
+}
+
+// ---------------------------------------------------------------------------
+// Polygon methods
+// ---------------------------------------------------------------------------
+
+QVector<Polygon> YoloTxtReader::readPolygon(const QString &filePath)
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "filePath=" << filePath;
+
+    QVector<Polygon> result;
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        ltError(LT_LOG_ANNOTATION()) << "cannot open file for Polygon:" << filePath;
+        return result;
+    }
+
+    QTextStream in(&file);
+    while (!in.atEnd()) {
+        QString line = in.readLine().trimmed();
+
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
+            continue;
+
+        Polygon ann = parsePolygonLine(line);
+        if (ann.classIndex >= 0) {
+            result.append(ann);
+        } else {
+            ltWarning(LT_LOG_ANNOTATION()) << "skipping invalid Polygon line:" << line;
+        }
+    }
+
+    file.close();
+
+    ltInfo(LT_LOG_ANNOTATION()) << "Read" << result.size() << "Polygon annotations from" << filePath;
+    return result;
+}
+
+Polygon YoloTxtReader::parsePolygonLine(const QString &line)
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "line=" << line;
+
+    Polygon ann;
+    ann.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+
+    QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+
+    // 多边形格式：class_id x1 y1 x2 y2 ... xn yn
+    // token数必须>9且为奇数（1 + 2N，N>=3）
+    if (parts.size() <= 9 || (parts.size() % 2) != 1) {
+        ann.classIndex = -1;
+        ltWarning(LT_LOG_ANNOTATION()) << "Invalid Polygon line: expected odd token count >9, got" << parts.size();
+        return ann;
+    }
+
+    // --- class_id ---
+    bool ok = false;
+    int classId = parts[0].toInt(&ok);
+    if (!ok || classId < 0) {
+        ann.classIndex = -1;
+        ltWarning(LT_LOG_ANNOTATION()) << "Invalid class_id in Polygon line:" << parts[0];
+        return ann;
+    }
+    ann.classIndex = classId;
+
+    // --- 顶点坐标 ---
+    const int numPoints = (parts.size() - 1) / 2;
+    ann.points.reserve(numPoints);
+
+    for (int i = 0; i < numPoints; ++i) {
+        bool xOk = false, yOk = false;
+        float x = parts[1 + 2 * i].toFloat(&xOk);
+        float y = parts[2 + 2 * i].toFloat(&yOk);
+
+        if (!xOk || !yOk || x < 0.0f || x > 1.0f || y < 0.0f || y > 1.0f) {
+            ann.classIndex = -1;
+            ltWarning(LT_LOG_ANNOTATION()) << "Invalid coordinate at point" << i
+                                           << "x=" << parts[1 + 2 * i]
+                                           << "y=" << parts[2 + 2 * i];
+            return ann;
+        }
+
+        ann.points.append(QPointF(x, y));
+    }
+
+    return ann;
 }
