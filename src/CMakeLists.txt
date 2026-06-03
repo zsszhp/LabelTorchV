@@ -3,6 +3,7 @@
 
 add_subdirectory(core)
 add_subdirectory(theme)
+add_subdirectory(components)
 add_subdirectory(app)
 add_subdirectory(shell)
 add_subdirectory(features/project)
@@ -12,3 +13,4 @@ add_subdirectory(features/training)
 add_subdirectory(features/model)
 add_subdirectory(features/inference)
 add_subdirectory(features/export)
+add_subdirectory(features/testing)

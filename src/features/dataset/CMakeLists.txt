@@ -3,11 +3,13 @@ qt_add_qml_module(labeltorch_dataset
     STATIC
     RESOURCE_PREFIX /qt/qml
     QML_FILES
+        qml/DatasetPage.qml
         qml/ImportPage.qml
         qml/ClassMappingPage.qml
         qml/DatasetStatsView.qml
         qml/DatasetBrowserPage.qml
         qml/ClassManagerPanel.qml
+        qml/CheckPage.qml
     SOURCES
         DatasetService.h
         DatasetService.cpp

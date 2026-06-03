@@ -39,6 +39,8 @@
 #include "AnomalyDetector.h"
 #include "ExportService.h"
 #include "ActiveLearningService.h"
+#include "TestingService.h"
+#include "TestingModel.h"
 #include "Database.h"
 #include "utils/Log.h"
 #include "utils/AppSettings.h"
@@ -211,6 +213,8 @@ int main(int argc, char *argv[])
     AnomalyDetector anomalyDetector;
     ExportService exportService;
     ActiveLearningService activeLearningService;
+    TestingService testingService;
+    TestingModel testingModel;
 
     QString pythonExec = appSettings.pythonPath();
     if (pythonExec.isEmpty() || !QFile::exists(pythonExec)) {
@@ -233,13 +237,17 @@ int main(int argc, char *argv[])
     anomalyService.setIpcClient(&ipcClient);
     exportService.setIpcClient(&ipcClient);
     activeLearningService.setIpcClient(&ipcClient);
+    testingService.setIpcClient(&ipcClient);
+    testingService.setModelRegistry(&modelRegistry);
 
     // 冷启动自检：修正上次异常退出遗留的 running / preparing / verifying 状态
     int trainingFixed = trainingService.reconcileStaleRuns();
     int exportFixed = exportService.reconcileStaleExports();
-    if (trainingFixed > 0 || exportFixed > 0) {
+    int testingFixed = testingService.reconcileStaleTasks();
+    if (trainingFixed > 0 || exportFixed > 0 || testingFixed > 0) {
         ltWarning(LT_LOG_APP()) << "Cold boot: reconciled" << trainingFixed << "training runs,"
-                                << exportFixed << "export artifacts";
+                                << exportFixed << "export artifacts,"
+                                << testingFixed << "testing tasks";
     }
 
     QObject::connect(&controller, &AppController::currentProjectIdChanged, [&]() {
@@ -281,6 +289,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("anomalyDetector", &anomalyDetector);
     engine.rootContext()->setContextProperty("exportService", &exportService);
     engine.rootContext()->setContextProperty("activeLearningService", &activeLearningService);
+    engine.rootContext()->setContextProperty("testingService", &testingService);
+    engine.rootContext()->setContextProperty("testingModel", &testingModel);
 
     const QUrl url(QStringLiteral("qrc:/qt/qml/LabelTorch/Shell/qml/Main.qml"));
 

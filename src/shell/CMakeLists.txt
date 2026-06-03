@@ -15,4 +15,5 @@ qt_add_qml_module(labeltorch_shell
 
 target_link_libraries(labeltorch_shell PUBLIC
     labeltorch_theme
+    labeltorch_components
 )

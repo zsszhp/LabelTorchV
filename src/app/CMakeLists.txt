@@ -27,6 +27,8 @@ target_link_libraries(${EXECUTABLE_NAME} PRIVATE
     labeltorch_core
     labeltorch_theme
     labeltorch_themeplugin
+    labeltorch_components
+    labeltorch_componentsplugin
     labeltorch_shell
     labeltorch_shellplugin
     labeltorch_project
@@ -43,6 +45,8 @@ target_link_libraries(${EXECUTABLE_NAME} PRIVATE
     labeltorch_inferenceplugin
     labeltorch_export
     labeltorch_exportplugin
+    labeltorch_testing
+    labeltorch_testingplugin
     Qt6::Core
     Qt6::Gui
     Qt6::Quick
@@ -73,6 +77,7 @@ if(WIN32)
                 --no-opengl-sw
                 --compiler-runtime
                 --qmldir "${CMAKE_SOURCE_DIR}/src/theme"
+                --qmldir "${CMAKE_SOURCE_DIR}/src/components/qml"
                 --qmldir "${CMAKE_SOURCE_DIR}/src/shell/qml"
                 --qmldir "${CMAKE_SOURCE_DIR}/src/features/project/qml"
                 --qmldir "${CMAKE_SOURCE_DIR}/src/features/dataset/qml"
@@ -81,6 +86,7 @@ if(WIN32)
                 --qmldir "${CMAKE_SOURCE_DIR}/src/features/model/qml"
                 --qmldir "${CMAKE_SOURCE_DIR}/src/features/inference/qml"
                 --qmldir "${CMAKE_SOURCE_DIR}/src/features/export/qml"
+                --qmldir "${CMAKE_SOURCE_DIR}/src/features/testing/qml"
                 "$<TARGET_FILE:${EXECUTABLE_NAME}>"
             COMMENT "Running windeployqt to deploy Qt DLLs, MSVC runtime and QML modules..."
         )
