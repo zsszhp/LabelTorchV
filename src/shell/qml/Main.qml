@@ -1,18 +1,21 @@
-// Main.qml - V4 主布局：赛博蓝科技风侧边栏 + 内容区 + 日志面板
+// Main.qml - V5 主布局：对标 Dihuge DLTools 工业缺陷检测平台
+// 顶栏(50px) + 全宽中心内容 + 底栏(34px)
+// 每个页面内部自行管理左侧边栏 + 分割线 + 中心内容
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import LabelTorch.Shell
 import LabelTorch.Theme
 
 ApplicationWindow {
     id: root
-    width: 1280
-    height: 800
-    minimumWidth: 960
-    minimumHeight: 600
+    width: 1440
+    height: 900
+    minimumWidth: 1024
+    minimumHeight: 680
     title: "标炬 LabelTorch"
-    color: Theme.bgPrimary
+    color: Theme.bgMain
     visible: true
     x: 100
     y: 100
@@ -21,16 +24,18 @@ ApplicationWindow {
     property string gpuStatusText: "GPU: 检测中..."
     property color gpuStatusColor: Theme.textMuted
     property bool hasRunningTraining: false
+    property string selectedFileName: ""
+    property real annotationProgress: 0
 
     ListModel {
         id: navModel
-        ListElement { pageId: "project"; title: "项目管理"; icon: "project"; needsProject: false }
-        ListElement { pageId: "taxonomy"; title: "类别体系"; icon: "taxonomy"; needsProject: false }
-        ListElement { pageId: "dataset"; title: "数据导入"; icon: "dataset"; needsProject: true }
-        ListElement { pageId: "annotation"; title: "标注工作台"; icon: "annotation"; needsProject: true }
-        ListElement { pageId: "training"; title: "训练工作台"; icon: "training"; needsProject: true }
-        ListElement { pageId: "model"; title: "版本中心"; icon: "model"; needsProject: true }
-        ListElement { pageId: "export"; title: "导出中心"; icon: "export"; needsProject: true }
+        ListElement { pageId: "project"; title: "项目"; icon: "📂"; needsProject: false }
+        ListElement { pageId: "dataset"; title: "数据集"; icon: "🖼"; needsProject: true }
+        ListElement { pageId: "annotation"; title: "标注"; icon: "✏"; needsProject: true }
+        ListElement { pageId: "check"; title: "检查"; icon: "✓"; needsProject: true }
+        ListElement { pageId: "training"; title: "训练"; icon: "🧠"; needsProject: true }
+        ListElement { pageId: "test"; title: "测试"; icon: "🔬"; needsProject: true }
+        ListElement { pageId: "export"; title: "导出"; icon: "📤"; needsProject: true }
     }
 
     Connections {
@@ -55,231 +60,198 @@ ApplicationWindow {
                         var gpuName = result.gpu_name || "Unknown GPU"
                         var cudaVer = result.cuda_version || result.torch_cuda || "?"
                         gpuStatusText = "GPU: " + gpuName + " (CUDA " + cudaVer + ")"
-                        gpuStatusColor = Theme.accentSuccess
+                        gpuStatusColor = Theme.success
                     } else {
                         gpuStatusText = "GPU: 不可用 (仅CPU)"
-                        gpuStatusColor = Theme.accentWarning
+                        gpuStatusColor = Theme.warning
                     }
-                    logPanel.appendLog("[环境] Python " + (result.python_version || result.torch_version || "?"))
-                    logPanel.appendLog("[环境] PyTorch " + (result.torch_version || "?"))
-                    logPanel.appendLog("[环境] Ultralytics " + (result.ultralytics_version || "?"))
-                    logPanel.appendLog("[环境] CUDA " + (result.cuda_available ? "可用" : "不可用"))
                 }
             } else {
                 if (cmd === "environment.check") {
                     gpuStatusText = "GPU: 检测失败"
-                    gpuStatusColor = Theme.accentError
+                    gpuStatusColor = Theme.danger
                 }
             }
         }
         function onConnectedChanged() {
             if (ipcClient.connected) {
                 gpuStatusText = "GPU: 已连接，检测中..."
-                gpuStatusColor = Theme.accentPrimary
+                gpuStatusColor = Theme.primary
                 ipcClient.sendRequest("environment.check", {})
             } else {
                 gpuStatusText = "Python 后端: 未连接"
-                gpuStatusColor = Theme.accentError
+                gpuStatusColor = Theme.danger
             }
         }
         function onEventReceived(event) {
             var eventType = event.event_type || ""
             var payload = event.payload || {}
             if (eventType === "task.progress") {
-                var epoch = payload.epoch || 0
-                var total = payload.total_epochs || 0
-                var metrics = payload.metrics || {}
-                var boxLoss = (typeof metrics.box_loss === 'number' && isFinite(metrics.box_loss)) ? metrics.box_loss.toFixed(4) : "?"
-                var clsLoss = (typeof metrics.cls_loss === 'number' && isFinite(metrics.cls_loss)) ? metrics.cls_loss.toFixed(4) : "?"
-                logPanel.appendLog("[训练] Epoch " + epoch + "/" + total +
-                    " box_loss=" + boxLoss +
-                    " cls_loss=" + clsLoss)
                 root.hasRunningTraining = true
-            } else if (eventType === "task.succeeded") {
-                logPanel.appendLog("[训练] 训练完成! epochs=" + (payload.epochs_completed || "?") +
-                    " early_stopped=" + (payload.early_stopped || false))
-                if (payload.metrics) {
-                    var map50 = (typeof payload.metrics.mAP50 === 'number' && isFinite(payload.metrics.mAP50)) ? payload.metrics.mAP50.toFixed(4) : "?"
-                    var map5095 = (typeof payload.metrics["mAP50-95"] === 'number' && isFinite(payload.metrics["mAP50-95"])) ? payload.metrics["mAP50-95"].toFixed(4) : "?"
-                    logPanel.appendLog("[训练] mAP50=" + map50 +
-                        " mAP50-95=" + map5095)
-                }
-                root.hasRunningTraining = false
-            } else if (eventType === "task.failed") {
-                logPanel.appendLog("[训练] 训练失败: " + (payload.error || "未知错误"))
-                root.hasRunningTraining = false
-            } else if (eventType === "task.stopped") {
+            } else if (eventType === "task.succeeded" || eventType === "task.failed" || eventType === "task.stopped") {
                 root.hasRunningTraining = false
             }
         }
-        function onBackendError(error) {
-            logPanel.appendLog("[错误] " + error)
-        }
+        function onBackendError(error) {}
     }
 
-    function onTaskTypeChanged(taskType) {
-        if (appController.projectOpen && taskType !== root.currentTaskType) {
-            root.currentTaskType = taskType
-            projectService.setTaskType(appController.currentProjectId, taskType)
-        }
-    }
-
-    // 主布局：顶部导航栏 + 内容区 + 日志面板
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
 
-        // === 顶部导航栏 ===
+        // === 顶栏 (50px) ===
         Rectangle {
-            id: topNavigation
+            id: header
             Layout.fillWidth: true
-            Layout.preferredHeight: 64
-            color: Theme.bgSecondary
+            Layout.preferredHeight: Theme.headerHeight
+            color: Theme.bgSide
 
-            // 底部霓虹线
+            // 底部分割线
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 height: 1
-                color: Theme.divider
+                color: Theme.borderColor
             }
 
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.spacingLarge
+                anchors.leftMargin: 0
                 anchors.rightMargin: Theme.spacingLarge
-                spacing: Theme.spacingXLarge
+                spacing: 0
 
-                // 左侧 Logo + 标题
-                RowLayout {
-                    spacing: Theme.spacingNormal
+                // Logo 区域（对标参考UI logo-icon + logo-text）
+                Row {
                     Layout.alignment: Qt.AlignVCenter
+                    Layout.leftMargin: Theme.spacingLarge
+                    Layout.rightMargin: 12
+                    spacing: 10
 
                     Rectangle {
-                        width: 36
-                        height: 36
-                        radius: Theme.radiusNormal
+                        width: 26
+                        height: 26
+                        radius: 6
+                        anchors.verticalCenter: parent.verticalCenter
                         gradient: Gradient {
-                            GradientStop { position: 0.0; color: Theme.accentPrimary }
-                            GradientStop { position: 1.0; color: Theme.accentSecondary }
+                            GradientStop { position: 0.0; color: Theme.primary }
+                            GradientStop { position: 1.0; color: Theme.primaryGlow }
                         }
 
-                        Label {
+                        Text {
                             anchors.centerIn: parent
                             text: "LT"
-                            font.pixelSize: 14
+                            font.pixelSize: 12
                             font.bold: true
-                            color: Theme.textPrimary
                             font.family: Theme.fontFamily
+                            color: "#FFFFFF"
+                        }
+
+                        // 发光阴影
+                        layer.enabled: true
+                        layer.effect: MultiEffect {
+                            shadowEnabled: true
+                            shadowColor: Theme.glowCyan
+                            shadowBlur: 0.4
                         }
                     }
 
-                    Label {
-                        text: "标炬 LabelTorch"
-                        font.pixelSize: Theme.fontSizeLarge
-                        font.bold: true
-                        color: Theme.textPrimary
+                    Text {
+                        text: "标炬"
+                        font.pixelSize: 16
+                        font.weight: Font.DemiBold
                         font.family: Theme.fontFamily
+                        anchors.verticalCenter: parent.verticalCenter
+                        style: Text.Outline
+                        styleColor: "transparent"
+
+                        // 渐变文字效果
+                        ColorAnimation on color {
+                            from: "#FFFFFF"
+                            to: "#94A3B8"
+                            duration: 0
+                        }
+                        color: "#E2E8F0"
                     }
                 }
 
-                // 中间导航项
-                RowLayout {
-                    Layout.fillHeight: true
-                    spacing: Theme.spacingSmall
+                // 导航标签
+                Row {
                     Layout.alignment: Qt.AlignVCenter
+                    spacing: 0
 
                     Repeater {
                         model: navModel
 
                         delegate: ItemDelegate {
                             id: navDelegate
-                            Layout.fillHeight: true
-                            implicitWidth: 100
+                            height: Theme.headerHeight
+                            implicitWidth: navContentRow.width + 44
                             enabled: !model.needsProject || appController.projectOpen
 
-                            contentItem: ColumnLayout {
+                            contentItem: Row {
+                                id: navContentRow
                                 anchors.centerIn: parent
-                                spacing: 2
+                                spacing: Theme.spacingSmall
 
-                                Label {
-                                    text: {
-                                        switch(model.icon) {
-                                            case "project": return "📂"
-                                            case "taxonomy": return "🏷"
-                                            case "dataset": return "📁"
-                                            case "annotation": return "✏"
-                                            case "training": return "🎯"
-                                            case "model": return "📦"
-                                            case "export": return "📤"
-                                            default: return "●"
-                                        }
-                                    }
-                                    font.pixelSize: 16
-                                    horizontalAlignment: Text.AlignHCenter
-                                    Layout.alignment: Qt.AlignHCenter
-                                    color: {
-                                        if (!navDelegate.enabled) return Theme.textDisabled
-                                        if (appController.currentPage === model.pageId) return Theme.accentPrimary
-                                        return Theme.textSecondary
-                                    }
+                                Text {
+                                    text: model.icon
+                                    font.pixelSize: 13
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    opacity: navDelegate.enabled ? 1.0 : 0.4
                                 }
 
-                                RowLayout {
-                                    spacing: 4
-                                    Layout.alignment: Qt.AlignHCenter
-
-                                    Label {
-                                        text: model.title
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        font.family: Theme.fontFamily
-                                        font.bold: appController.currentPage === model.pageId
-                                        horizontalAlignment: Text.AlignHCenter
-                                        color: {
-                                            if (!navDelegate.enabled) return Theme.textDisabled
-                                            if (appController.currentPage === model.pageId) return Theme.textPrimary
-                                            return Theme.textSecondary
-                                        }
+                                Text {
+                                    text: model.title
+                                    font.pixelSize: 13
+                                    font.weight: appController.currentPage === model.pageId ? Font.DemiBold : Font.Normal
+                                    font.family: Theme.fontFamily
+                                    color: {
+                                        if (!navDelegate.enabled) return Theme.textDisabled
+                                        if (appController.currentPage === model.pageId) return Theme.primaryGlow
+                                        if (navDelegate.hovered) return Theme.textMain
+                                        return Theme.textMuted
                                     }
+                                    anchors.verticalCenter: parent.verticalCenter
 
-                                    // 训练进行中呼吸态绿色圆点
-                                    Rectangle {
-                                        visible: model.pageId === "training" && root.hasRunningTraining
-                                        width: 6
-                                        height: 6
-                                        radius: 3
-                                        color: Theme.accentSuccess
-                                        Layout.alignment: Qt.AlignVCenter
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
 
-                                        SequentialAnimation on opacity {
-                                            running: parent.visible
-                                            loops: Animation.Infinite
-                                            NumberAnimation { from: 1.0; to: 0.3; duration: 1000; easing.type: Easing.InOutQuad }
-                                            NumberAnimation { from: 0.3; to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
-                                        }
+                                // 训练中脉冲指示灯
+                                Rectangle {
+                                    visible: model.pageId === "training" && root.hasRunningTraining
+                                    width: 6
+                                    height: 6
+                                    radius: 3
+                                    color: Theme.success
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    SequentialAnimation on opacity {
+                                        running: parent.visible
+                                        loops: Animation.Infinite
+                                        NumberAnimation { from: 1.0; to: 0.3; duration: 1000; easing.type: Easing.InOutQuad }
+                                        NumberAnimation { from: 0.3; to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
                                     }
                                 }
                             }
 
                             background: Rectangle {
+                                // 激活标签：底部渐变高亮
                                 color: {
                                     if (!navDelegate.enabled) return "transparent"
-                                    if (appController.currentPage === model.pageId) return Qt.alpha(Theme.accentPrimary, 0.08)
-                                    if (navDelegate.hovered) return Theme.bgHover
+                                    if (appController.currentPage === model.pageId) return Qt.alpha(Theme.primaryGlow, 0.05)
+                                    if (navDelegate.hovered) return Qt.alpha(Theme.textMain, 0.02)
                                     return "transparent"
                                 }
-                                radius: Theme.radiusSmall
 
-                                // 底部霓虹线
+                                // 激活标签底部指示线
                                 Rectangle {
                                     visible: appController.currentPage === model.pageId
-                                    height: 3
+                                    height: 2
                                     anchors.left: parent.left
                                     anchors.right: parent.right
                                     anchors.bottom: parent.bottom
-                                    color: Theme.accentPrimary
-                                    radius: 1.5
+                                    color: Theme.primaryGlow
                                 }
                             }
 
@@ -296,151 +268,198 @@ ApplicationWindow {
 
                 Item { Layout.fillWidth: true }
 
-                // 右侧状态与信息
-                RowLayout {
-                    spacing: Theme.spacingLarge
+                // 右侧工具图标
+                Row {
                     Layout.alignment: Qt.AlignVCenter
+                    spacing: Theme.spacingLarge
 
-                    // 当前打开项目标签
-                    Label {
-                        text: appController.projectOpen ? "当前项目: " + appController.currentProjectName : "未打开项目"
-                        font.pixelSize: Theme.fontSizeNormal
-                        font.family: Theme.fontFamily
-                        color: appController.projectOpen ? Theme.accentPrimary : Theme.textDisabled
-                        font.bold: appController.projectOpen
-                    }
-
-                    // GPU状态
-                    RowLayout {
+                    // GPU 状态指示灯
+                    Row {
                         spacing: Theme.spacingSmall
                         Rectangle {
                             width: 8
                             height: 8
                             radius: 4
+                            anchors.verticalCenter: parent.verticalCenter
                             color: gpuStatusColor
 
                             SequentialAnimation on opacity {
-                                running: gpuStatusColor === Theme.accentSuccess
+                                running: gpuStatusColor === Theme.success
                                 loops: Animation.Infinite
                                 NumberAnimation { from: 1.0; to: 0.4; duration: 1000; easing.type: Easing.InOutQuad }
                                 NumberAnimation { from: 0.4; to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
                             }
                         }
-                        Label {
+                        Text {
                             text: gpuStatusText
                             font.pixelSize: Theme.fontSizeCaption
                             font.family: Theme.fontFamily
                             color: gpuStatusColor
+                            anchors.verticalCenter: parent.verticalCenter
                         }
                     }
 
-                    // Python后端连接
-                    RowLayout {
+                    // Python 后端连接状态
+                    Row {
                         spacing: Theme.spacingSmall
                         Rectangle {
                             width: 8
                             height: 8
                             radius: 4
-                            color: ipcClient.connected ? Theme.accentSuccess : Theme.accentError
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: ipcClient.connected ? Theme.success : Theme.danger
                         }
-                        Label {
-                            text: ipcClient.connected ? "后端已就绪" : "后端断开"
+                        Text {
+                            text: ipcClient.connected ? "后端就绪" : "后端断开"
                             font.pixelSize: Theme.fontSizeCaption
                             font.family: Theme.fontFamily
                             color: ipcClient.connected ? Theme.textSecondary : Theme.textDisabled
+                            anchors.verticalCenter: parent.verticalCenter
                         }
                     }
                 }
             }
         }
 
-        // === 主内容区与日志面板 ===
-        RowLayout {
+        // === 主内容区：全宽 StackLayout，各页面内部自行管理侧边栏 ===
+        StackLayout {
+            id: contentStack
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 0
+            currentIndex: {
+                switch(appController.currentPage) {
+                    case "project": return 0
+                    case "dataset": return 1
+                    case "annotation": return 2
+                    case "check": return 3
+                    case "training": return 4
+                    case "test": return 5
+                    case "export": return 6
+                    default: return 0
+                }
+            }
 
-            StackLayout {
-                id: contentStack
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                currentIndex: {
-                    switch(appController.currentPage) {
-                        case "project": return 0
-                        case "taxonomy": return 1
-                        case "dataset": return 2
-                        case "annotation": return 3
-                        case "training": return 4
-                        case "model": return 5
-                        case "export": return 6
-                        default: return 0
+            property var pageSources: [
+                "qrc:/qt/qml/LabelTorch/Project/qml/ProjectPage.qml",
+                "qrc:/qt/qml/LabelTorch/Dataset/qml/DatasetPage.qml",
+                "qrc:/qt/qml/LabelTorch/Annotation/qml/AnnotationPage.qml",
+                "qrc:/qt/qml/LabelTorch/Dataset/qml/CheckPage.qml",
+                "qrc:/qt/qml/LabelTorch/Training/qml/TrainingPage.qml",
+                "qrc:/qt/qml/LabelTorch/Testing/qml/TestingPage.qml",
+                "qrc:/qt/qml/LabelTorch/Export/qml/ExportPage.qml"
+            ]
+
+            property var loadedFlags: [true, false, false, false, false, false, false]
+
+            onCurrentIndexChanged: {
+                if (currentIndex >= 0 && currentIndex < pageSources.length) {
+                    var loader = itemAt(currentIndex)
+                    if (loader && !loader.source.toString() && !loadedFlags[currentIndex] && pageSources[currentIndex]) {
+                        loader.source = pageSources[currentIndex]
+                        loadedFlags[currentIndex] = true
                     }
                 }
+            }
 
-                property var pageSources: [
-                    "qrc:/qt/qml/LabelTorch/Project/qml/ProjectPage.qml",
-                    "qrc:/qt/qml/LabelTorch/Project/qml/TaxonomyPage.qml",
-                    "qrc:/qt/qml/LabelTorch/Dataset/qml/ImportPage.qml",
-                    "qrc:/qt/qml/LabelTorch/Annotation/qml/AnnotationPage.qml",
-                    "qrc:/qt/qml/LabelTorch/Training/qml/TrainingPage.qml",
-                    "qrc:/qt/qml/LabelTorch/Model/qml/ModelPage.qml",
-                    "qrc:/qt/qml/LabelTorch/Export/qml/ExportPage.qml"
-                ]
-
-                // 记录各页面是否已加载过，已加载的页面保留不卸载
-                property var loadedFlags: [true, false, false, false, false, false, false]
-
-                onCurrentIndexChanged: {
-                    if (currentIndex >= 0 && currentIndex < pageSources.length) {
-                        var loader = itemAt(currentIndex)
-                        if (loader && !loader.source.toString() && !loadedFlags[currentIndex]) {
-                            loader.source = pageSources[currentIndex]
-                            loadedFlags[currentIndex] = true
-                        }
-                    }
-                }
-
-                Loader {
-                    property bool wasLoaded: false
-                    source: contentStack.pageSources[0]
-                    onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
-                }
-                Loader {
-                    property bool wasLoaded: false
-                    onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
-                }
-                Loader {
-                    property bool wasLoaded: false
-                    onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
-                }
-                Loader {
-                    property bool wasLoaded: false
-                    onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
-                }
-                Loader {
-                    property bool wasLoaded: false
-                    onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
-                }
-                Loader {
-                    property bool wasLoaded: false
-                    onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
-                }
-                Loader {
-                    property bool wasLoaded: false
-                    onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
-                }
+            Loader {
+                source: contentStack.pageSources[0]
+                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
+            }
+            Loader {
+                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
+            }
+            Loader {
+                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
+            }
+            Loader {
+                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
+            }
+            Loader {
+                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
+            }
+            Loader {
+                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
+            }
+            Loader {
+                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
         }
 
-        // 底部日志面板
-        LogPanel {
-            id: logPanel
+        // === 底栏 (34px) ===
+        Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: logPanel.collapsed ? 28 : Theme.logPanelHeight
+            Layout.preferredHeight: Theme.footerHeight
+            color: Theme.bgSide
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: 1
+                color: Theme.borderColor
+            }
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: Theme.spacingLarge
+                anchors.rightMargin: Theme.spacingLarge
+                spacing: Theme.spacingNormal
+
+                // 左侧：工作区名称 + 选中文件
+                Text {
+                    text: appController.projectOpen ? appController.currentProjectName : "未打开项目"
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    color: appController.projectOpen ? Theme.primaryGlow : Theme.textMuted
+                    font.weight: Font.DemiBold
+                }
+
+                Text {
+                    visible: root.selectedFileName !== ""
+                    text: root.selectedFileName
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    color: Theme.textMuted
+                }
+
+                Item { Layout.fillWidth: true }
+
+                // 右侧：标注进度条 + 百分比
+                Row {
+                    visible: appController.currentPage === "annotation"
+                    spacing: Theme.spacingSmall
+
+                    Rectangle {
+                        width: 150
+                        height: 6
+                        radius: 3
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: Theme.borderColor
+
+                        Rectangle {
+                            width: parent.width * root.annotationProgress / 100
+                            height: parent.height
+                            radius: 3
+                            gradient: Gradient {
+                                GradientStop { position: 0.0; color: Theme.primary }
+                                GradientStop { position: 1.0; color: Theme.primaryGlow }
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: Math.round(root.annotationProgress) + "%"
+                        font.pixelSize: Theme.fontSizeCaption
+                        font.family: Theme.fontFamilyMono
+                        font.weight: Font.Bold
+                        color: Theme.primaryGlow
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+            }
         }
     }
 
-    // 页面切换淡入动画
     NumberAnimation {
         id: fadeInAnim
         property: "opacity"
@@ -466,73 +485,44 @@ ApplicationWindow {
         anchors.centerIn: parent
         width: 360
         standardButtons: Dialog.NoButton
-        
+
         background: Rectangle {
             color: Theme.bgCard
-            border.color: Theme.border
+            border.color: Theme.borderColor
             border.width: 1
             radius: Theme.radiusLarge
-            
-            Rectangle {
-                width: parent.width
-                height: 4
-                color: Theme.accentPrimary
-                radius: Theme.radiusLarge
-                anchors.top: parent.top
-            }
         }
-        
-        header: Rectangle {
-            color: "transparent"
-            implicitHeight: 48
-            
-            Label {
-                text: "⚠️ 确认退出"
-                font.bold: true
-                font.pixelSize: Theme.fontSizeSubheading
-                font.family: Theme.fontFamily
-                color: Theme.textPrimary
-                anchors.left: parent.left
-                anchors.leftMargin: Theme.spacingLarge
-                anchors.verticalCenter: parent.verticalCenter
-            }
-        }
-        
+
         contentItem: ColumnLayout {
             spacing: Theme.spacingLarge
-            
-            Label {
+
+            Text {
                 text: "有未完成的任务或工作，您确定要关闭并退出软件吗？"
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeNormal
                 font.family: Theme.fontFamily
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
-                Layout.leftMargin: Theme.spacingLarge
-                Layout.rightMargin: Theme.spacingLarge
-                Layout.topMargin: Theme.spacingNormal
-                Layout.bottomMargin: Theme.spacingNormal
+                Layout.margins: Theme.spacingLarge
             }
-            
+
             RowLayout {
                 Layout.fillWidth: true
-                Layout.leftMargin: Theme.spacingLarge
-                Layout.rightMargin: Theme.spacingLarge
-                Layout.bottomMargin: Theme.spacingLarge
+                Layout.margins: Theme.spacingLarge
                 spacing: Theme.spacingLarge
-                
+
                 Button {
                     text: "取消"
                     Layout.fillWidth: true
                     flat: true
                     background: Rectangle {
-                        color: parent.hovered ? Theme.bgHover : Theme.bgTertiary
-                        border.color: Theme.border
+                        color: parent.hovered ? Theme.bgHover : Theme.bgCard
+                        border.color: Theme.borderColor
                         border.width: 1
                         radius: Theme.radiusSmall
                         implicitHeight: 36
                     }
-                    contentItem: Label {
+                    contentItem: Text {
                         text: parent.text
                         color: Theme.textSecondary
                         font.pixelSize: Theme.fontSizeNormal
@@ -540,22 +530,20 @@ ApplicationWindow {
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
-                    onClicked: {
-                        closeConfirmDialog.close()
-                    }
+                    onClicked: closeConfirmDialog.close()
                 }
-                
+
                 Button {
                     text: "确定退出"
                     Layout.fillWidth: true
                     background: Rectangle {
-                        color: parent.pressed ? Qt.darker(Theme.accentError, 1.2) : (parent.hovered ? Qt.lighter(Theme.accentError, 1.1) : Theme.accentError)
+                        color: parent.pressed ? Qt.darker(Theme.danger, 1.2) : (parent.hovered ? Qt.lighter(Theme.danger, 1.1) : Theme.danger)
                         radius: Theme.radiusSmall
                         implicitHeight: 36
                     }
-                    contentItem: Label {
+                    contentItem: Text {
                         text: parent.text
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.bold: true
                         font.pixelSize: Theme.fontSizeNormal
                         font.family: Theme.fontFamily
@@ -573,7 +561,5 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
-        logPanel.appendLog("[标炬] LabelTorch v0.1.0 启动")
-        logPanel.appendLog("[标炬] 正在连接 Python 后端...")
     }
 }

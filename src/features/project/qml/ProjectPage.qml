@@ -1,14 +1,16 @@
-// ProjectPage.qml - V4 项目中心（赛博蓝科技风）
+// ProjectPage.qml - V6 项目中心（像素级复刻参考UI）
+// 左侧边栏(240px) + 可拖拽分割线(4px) + 中心内容区
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import LabelTorch.Theme
+import LabelTorch.Components
 
 Item {
     id: pageRoot
 
-    // 路径校验结果状态
+    // 路径校验结果存储
     QtObject {
         id: pathValidationResult
         property var errors: []
@@ -16,342 +18,558 @@ Item {
         property bool valid: true
     }
 
-    // 背景装饰光晕
-    Rectangle {
+    // 侧边栏宽度（可拖拽调整）
+    property real sidebarW: Theme.sidebarWidth
+
+    RowLayout {
         anchors.fill: parent
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: Theme.bgPrimary }
-            GradientStop { position: 1.0; color: Theme.bgPrimary }
-        }
+        spacing: 0
 
-        // 右上角装饰光晕
+        // === 左侧边栏 ===
         Rectangle {
-            width: 500
-            height: 500
-            radius: 250
-            color: Qt.alpha(Theme.accentPrimary, 0.06)
-            x: parent.width - 300
-            y: -250
-        }
+            id: sidebar
+            Layout.preferredWidth: sidebarW
+            Layout.fillHeight: true
+            color: Theme.bgSide
 
-        // 左下角装饰光晕
-        Rectangle {
-            width: 400
-            height: 400
-            radius: 200
-            color: Qt.alpha(Theme.accentSecondary, 0.05)
-            x: -150
-            y: parent.height - 250
-        }
-    }
-
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: Theme.spacingXLarge
-        spacing: Theme.spacingLarge
-
-        // === 顶栏：标题与操作 ===
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Theme.spacingNormal
+            // 右侧边线
+            Rectangle {
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: 1
+                color: Theme.borderColor
+            }
 
             ColumnLayout {
-                spacing: 2
-                Label {
-                    text: "项目中心"
-                    font.pixelSize: Theme.fontSizeDisplay
-                    font.bold: true
-                    color: Theme.textPrimary
-                    font.family: Theme.fontFamily
+                anchors.fill: parent
+                anchors.margins: Theme.spacingNormal
+                spacing: Theme.spacingNormal
+
+                // 区块标题：项目管理
+                SectionTitle {
+                    Layout.fillWidth: true
+                    text: "项目管理"
                 }
-                Label {
-                    text: "创建或选择一个缺陷检测项目，开启 AI 智能分析与数据集治理"
+
+                // 新建项目按钮（渐变背景 primary→primaryDark）
+                Button {
+                    id: newProjectBtn
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 36
+                    Layout.bottomMargin: Theme.spacingNormal
+                    text: "+ 新建项目"
                     font.pixelSize: Theme.fontSizeNormal
-                    color: Theme.textSecondary
+                    font.bold: true
                     font.family: Theme.fontFamily
-                }
-            }
 
-            Item { Layout.fillWidth: true }
-
-            // 刷新按钮
-            Button {
-                id: refreshBtn
-                text: "刷新 ↻"
-                font.family: Theme.fontFamily
-                font.bold: true
-                palette.buttonText: Theme.textSecondary
-                background: Rectangle {
-                    color: refreshBtn.hovered ? Theme.bgHover : Theme.bgTertiary
-                    border.color: Theme.border
-                    border.width: 1
-                    radius: Theme.radiusNormal
-                }
-                onClicked: projectModel.refresh()
-            }
-
-            // 新建项目按钮
-            Button {
-                id: newProjectBtn
-                text: "+ 新建项目"
-                font.family: Theme.fontFamily
-                font.bold: true
-                background: Rectangle {
-                    gradient: Gradient {
-                        GradientStop { position: 0.0; color: Theme.accentPrimary }
-                        GradientStop { position: 1.0; color: Theme.accentPrimary }
-                    }
-                    radius: Theme.radiusNormal
-                }
-                contentItem: Label {
-                    text: newProjectBtn.text
-                    color: Theme.textPrimary
-                    font: newProjectBtn.font
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-                onClicked: newProjectDialog.open()
-            }
-
-            // 导入项目按钮
-            Button {
-                id: importProjectBtn
-                text: "导入项目"
-                font.family: Theme.fontFamily
-                font.bold: true
-                palette.buttonText: Theme.accentPrimary
-                background: Rectangle {
-                    color: importProjectBtn.hovered ? Theme.bgHover : Theme.bgTertiary
-                    border.color: Theme.accentPrimary
-                    border.width: 1
-                    radius: Theme.radiusNormal
-                }
-                onClicked: importFolderDialog.open()
-            }
-        }
-
-        // 分割线
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 1
-            color: Theme.divider
-        }
-
-        // === 项目卡片网格布局 ===
-        GridView {
-            id: projectGrid
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
-            cellWidth: 340
-            cellHeight: 200
-            model: projectModel
-
-            // 空状态提示
-            Label {
-                anchors.centerIn: parent
-                visible: projectGrid.count === 0
-                text: "还没有项目\n点击「+ 新建项目」开始"
-                color: Theme.textMuted
-                font.pixelSize: Theme.fontSizeSubheading
-                font.family: Theme.fontFamily
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-
-            delegate: Item {
-                width: 320
-                height: 180
-
-                Rectangle {
-                    id: cardBg
-                    anchors.fill: parent
-                    color: cardMouseArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    radius: Theme.radiusLarge
-                    border.color: {
-                        if (appController.currentProjectId === model.projectId) {
-                            return Theme.accentPrimary
+                    background: Rectangle {
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: Theme.primary }
+                            GradientStop { position: 1.0; color: Theme.primaryDark }
                         }
-                        return cardMouseArea.containsMouse ? Theme.accentPrimary : Theme.border
+                        radius: Theme.radiusNormal
                     }
-                    border.width: appController.currentProjectId === model.projectId ? 2 : 1
 
-                    // 顶部渐变装饰条
-                    Rectangle {
-                        anchors.top: parent.top
+                    contentItem: Text {
+                        text: parent.text
+                        color: Theme.textMain
+                        font: parent.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    onClicked: newProjectDialog.open()
+                }
+
+                // 打开项目按钮（bgCard + border）
+                Button {
+                    id: openProjectBtn
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 36
+                    text: "打开项目"
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.family: Theme.fontFamily
+
+                    background: Rectangle {
+                        color: openProjectBtn.hovered ? Theme.bgHover : Theme.bgCard
+                        border.color: Theme.borderColor
+                        border.width: 1
+                        radius: Theme.radiusNormal
+                    }
+
+                    contentItem: Text {
+                        text: parent.text
+                        color: Theme.textMain
+                        font: parent.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    onClicked: importFolderDialog.open()
+                }
+
+                // 分割线
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 1
+                    color: Theme.dividerColor
+                }
+
+                // 类别体系管理（可折叠区块）
+                CollapsibleSection {
+                    id: taxonomySection
+                    Layout.fillWidth: true
+                    title: "类别体系"
+                    expanded: appController.projectOpen
+
+                    ColumnLayout {
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        height: 3
-                        radius: Theme.radiusLarge
-                        visible: appController.currentProjectId === model.projectId
-                        gradient: Gradient {
-                            orientation: Gradient.Horizontal
-                            GradientStop { position: 0.0; color: Theme.accentPrimary }
-                            GradientStop { position: 1.0; color: Theme.accentSecondary }
+                        spacing: Theme.spacingSmall
+
+                        // 未打开项目提示
+                        Text {
+                            visible: !appController.projectOpen
+                            text: "请先打开项目"
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.family: Theme.fontFamily
+                            color: Theme.textMuted
                         }
-                    }
 
-                    Behavior on border.color {
-                        ColorAnimation { duration: Theme.animDuration }
-                    }
+                        // 添加类别输入行
+                        RowLayout {
+                            visible: appController.projectOpen
+                            Layout.fillWidth: true
+                            spacing: Theme.spacingSmall
 
-                    MouseArea {
-                        id: cardMouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onDoubleClicked: {
-                            if (appController.currentProjectId !== model.projectId) {
-                                projectService.openProject(model.projectId)
-                                appController.openProject(model.projectId, model.name)
-                                var taxonomies = taxonomyService.listTaxonomies(model.projectId)
-                                if (taxonomies.length > 0) {
-                                    taxonomyModel.taxonomyId = taxonomies[0].id
+                            TextField {
+                                id: newClassField
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 28
+                                placeholderText: "类别名称"
+                                placeholderTextColor: Theme.textDisabled
+                                color: Theme.textMain
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.family: Theme.fontFamily
+
+                                background: Rectangle {
+                                    color: Theme.bgInput
+                                    radius: Theme.radiusSmall
+                                    border.color: newClassField.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                                    border.width: 1
+                                }
+
+                                onAccepted: addClassBtn.clicked()
+                            }
+
+                            Button {
+                                id: addClassBtn
+                                Layout.preferredWidth: 28
+                                Layout.preferredHeight: 28
+                                text: "+"
+                                font.pixelSize: Theme.fontSizeNormal
+                                font.bold: true
+
+                                background: Rectangle {
+                                    color: addClassBtn.hovered ? Theme.primary : Theme.bgCard
+                                    radius: Theme.radiusSmall
+                                    border.color: Theme.primary
+                                    border.width: 1
+                                }
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: addClassBtn.hovered ? Theme.textMain : Theme.primary
+                                    font: parent.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                onClicked: {
+                                    if (newClassField.text.trim()) {
+                                        taxonomyModel.addClass(newClassField.text.trim())
+                                        newClassField.clear()
+                                    }
                                 }
                             }
                         }
+
+                        // 类别列表
+                        ListView {
+                            visible: appController.projectOpen
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: Math.min(contentHeight, 300)
+                            clip: true
+                            model: taxonomyModel
+                            spacing: Theme.spacingTiny
+
+                            delegate: Rectangle {
+                                width: ListView.view.width
+                                height: 32
+                                color: classMouseArea.containsMouse ? Theme.bgHover : "transparent"
+                                radius: Theme.radiusSmall
+
+                                MouseArea {
+                                    id: classMouseArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                }
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: Theme.spacingSmall
+                                    anchors.rightMargin: Theme.spacingSmall
+                                    spacing: Theme.spacingSmall
+
+                                    // 类别色块
+                                    Rectangle {
+                                        width: 14
+                                        height: 14
+                                        radius: 2
+                                        color: Theme.classColors[model.classIndex % Theme.classColors.length]
+                                    }
+
+                                    // 类别名称
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: model.className
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMain
+                                        elide: Text.ElideRight
+                                    }
+
+                                    // 重命名按钮
+                                    Text {
+                                        text: "✎"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        color: classEditBtn.containsMouse ? Theme.primaryGlow : Theme.textMuted
+                                        visible: classMouseArea.containsMouse
+
+                                        MouseArea {
+                                            id: classEditBtn
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            hoverEnabled: true
+                                            onClicked: taxonomyModel.renameClass(model.classIndex, model.className + "_new")
+                                        }
+                                    }
+
+                                    // 删除按钮
+                                    Text {
+                                        text: "✕"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        color: classDelBtn.containsMouse ? Theme.danger : Theme.textMuted
+                                        visible: classMouseArea.containsMouse
+
+                                        MouseArea {
+                                            id: classDelBtn
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            hoverEnabled: true
+                                            onClicked: taxonomyModel.removeClass(model.classIndex)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 类别统计
+                        Text {
+                            visible: appController.projectOpen
+                            text: "共 " + taxonomyModel.rowCount() + " 个类别"
+                            font.pixelSize: Theme.fontSizeCaption
+                            font.family: Theme.fontFamily
+                            color: Theme.textMuted
+                        }
+                    }
+                }
+
+                // 弹性占位
+                Item { Layout.fillHeight: true }
+
+                // 刷新列表按钮
+                Button {
+                    id: refreshBtn
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 32
+                    text: "刷新列表"
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+
+                    background: Rectangle {
+                        color: refreshBtn.hovered ? Theme.bgHover : "transparent"
+                        border.color: Theme.borderColor
+                        border.width: 1
+                        radius: Theme.radiusSmall
                     }
 
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: Theme.spacingLarge
-                        spacing: Theme.spacingSmall
+                    contentItem: Text {
+                        text: parent.text
+                        color: Theme.textMuted
+                        font: parent.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
 
-                        // 第一行：项目图标与激活标签
+                    onClicked: projectModel.refresh()
+                }
+            }
+        }
+
+        // === 可拖拽垂直分割线（4px宽） ===
+        Rectangle {
+            id: resizer
+            Layout.preferredWidth: 4
+            Layout.fillHeight: true
+            color: resizerMouseArea.containsMouse || resizerMouseArea.drag.active
+                   ? Theme.primaryGlow
+                   : Theme.dividerColor
+
+            Behavior on color { ColorAnimation { duration: Theme.animDuration } }
+
+            MouseArea {
+                id: resizerMouseArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.SplitHCursor
+
+                drag.target: resizer
+                drag.axis: Drag.XAxis
+                drag.minimumX: Theme.sidebarMinWidth
+                drag.maximumX: pageRoot.width * 0.4
+
+                // 拖拽时实时更新侧边栏宽度
+                onPositionChanged: {
+                    if (drag.active) {
+                        var newWidth = sidebarW + mouseX
+                        if (newWidth >= Theme.sidebarMinWidth && newWidth <= pageRoot.width * 0.4) {
+                            sidebarW = newWidth
+                        }
+                    }
+                }
+            }
+        }
+
+        // === 中心内容区 ===
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            color: Theme.bgMain
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Theme.spacingXLarge
+                spacing: 0
+
+                // 区块标题：最近使用项（14px，底部20px间距）
+                SectionTitle {
+                    Layout.fillWidth: true
+                    Layout.bottomMargin: Theme.spacingLarge + Theme.spacingNormal
+                    text: "最近使用项"
+                }
+
+                // 项目卡片列表
+                ListView {
+                    id: projectList
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    model: projectModel
+                    spacing: Theme.spacingSmall
+
+                    // 空状态提示
+                    Text {
+                        anchors.centerIn: parent
+                        visible: projectList.count === 0
+                        text: "还没有项目\n点击左侧「新建项目」开始"
+                        color: Theme.textMuted
+                        font.pixelSize: Theme.fontSizeSubheading
+                        font.family: Theme.fontFamily
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    delegate: Rectangle {
+                        width: projectList.width
+                        height: 56
+                        color: {
+                            if (appController.currentProjectId === model.projectId) return Theme.bgSelected
+                            if (cardMouseArea.containsMouse) return Theme.bgHover
+                            return Theme.bgCard
+                        }
+                        radius: Theme.radiusNormal
+                        border.color: {
+                            if (appController.currentProjectId === model.projectId) return Theme.primaryGlow
+                            if (cardMouseArea.containsMouse) return Theme.primaryGlow
+                            return Theme.borderColor
+                        }
+                        border.width: 1
+
+                        // 选中态左边框高亮
+                        Rectangle {
+                            visible: appController.currentProjectId === model.projectId
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: 3
+                            radius: 1
+                            color: Theme.primaryGlow
+                        }
+
+                        // 颜色过渡动画
+                        Behavior on color { ColorAnimation { duration: Theme.animDuration } }
+                        Behavior on border.color { ColorAnimation { duration: Theme.animDuration } }
+
+                        // 鼠标交互区域
+                        MouseArea {
+                            id: cardMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onDoubleClicked: openProject(model.projectId, model.name)
+                        }
+
+                        // 卡片内容布局
                         RowLayout {
-                            Layout.fillWidth: true
+                            anchors.fill: parent
+                            anchors.leftMargin: Theme.spacingNormal
+                            anchors.rightMargin: Theme.spacingNormal
+                            spacing: Theme.spacingNormal
 
-                            // 装饰性项目首字母图标
+                            // 项目首字母图标（26×26，渐变背景）
                             Rectangle {
-                                width: 40
-                                height: 40
-                                radius: Theme.radiusNormal
-                                gradient: Gradient {
-                                    GradientStop { position: 0.0; color: appController.currentProjectId === model.projectId ? Theme.accentPrimary : Theme.accentSecondary }
-                                    GradientStop { position: 1.0; color: appController.currentProjectId === model.projectId ? Theme.accentPrimary : Theme.accentSecondary }
-                                }
-                                opacity: appController.currentProjectId === model.projectId ? 1.0 : 0.6
+                                Layout.preferredWidth: 26
+                                Layout.preferredHeight: 26
+                                radius: Theme.radiusSmall
 
-                                Label {
+                                gradient: Gradient {
+                                    GradientStop { position: 0.0; color: Theme.primary }
+                                    GradientStop { position: 1.0; color: Theme.primaryGlow }
+                                }
+                                opacity: appController.currentProjectId === model.projectId ? 1.0 : 0.7
+
+                                Text {
                                     anchors.centerIn: parent
                                     text: model.name ? model.name.charAt(0).toUpperCase() : "P"
                                     font.bold: true
-                                    font.pixelSize: Theme.fontSizeLarge
-                                    color: Theme.textPrimary
+                                    font.pixelSize: Theme.fontSizeSmall
                                     font.family: Theme.fontFamily
+                                    color: Theme.textMain
                                 }
                             }
 
+                            // 项目名 + 路径（左列）
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingTiny
+
+                                // 项目名（14px bold white）
+                                Text {
+                                    text: model.name
+                                    font.bold: true
+                                    font.pixelSize: Theme.fontSizeNormal + 1
+                                    font.family: Theme.fontFamily
+                                    color: Theme.textMain
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                }
+
+                                // 路径（11px muted）
+                                Text {
+                                    text: model.path
+                                    font.pixelSize: Theme.fontSizeCaption
+                                    font.family: Theme.fontFamilyMono
+                                    color: Theme.textMuted
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideMiddle
+                                }
+                            }
+
+                            // 弹性占位，将右侧内容推到最右
                             Item { Layout.fillWidth: true }
 
-                            // 激活徽章
+                            // 最后修改时间（12px muted）
+                            Text {
+                                text: "最后修改: " + model.createdAt
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.family: Theme.fontFamilyMono
+                                color: Theme.textMuted
+                            }
+
+                            // ACTIVE 徽章
                             Rectangle {
                                 visible: appController.currentProjectId === model.projectId
-                                color: Qt.alpha(Theme.accentPrimary, 0.15)
-                                border.color: Theme.accentPrimary
+                                color: Qt.alpha(Theme.primary, 0.15)
+                                border.color: Theme.primary
                                 border.width: 1
                                 radius: Theme.radiusSmall
                                 width: 56
                                 height: 22
 
-                                Label {
+                                Text {
                                     anchors.centerIn: parent
                                     text: "ACTIVE"
                                     font.pixelSize: Theme.fontSizeCaption
                                     font.bold: true
-                                    color: Theme.accentPrimary
                                     font.family: Theme.fontFamilyMono
+                                    color: Theme.primaryGlow
                                 }
                             }
-                        }
 
-                        // 第二行：项目名称及路径
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 2
-
-                            Label {
-                                text: model.name
-                                font.bold: true
-                                color: Theme.textPrimary
-                                font.pixelSize: Theme.fontSizeNormal
-                                font.family: Theme.fontFamily
-                                Layout.fillWidth: true
-                                elide: Text.ElideRight
-                            }
-
-                            Label {
-                                text: model.path
-                                color: Theme.textMuted
-                                font.pixelSize: Theme.fontSizeCaption
-                                font.family: Theme.fontFamilyMono
-                                Layout.fillWidth: true
-                                elide: Text.ElideMiddle
-                            }
-                        }
-
-                        Item { Layout.fillHeight: true }
-
-                        // 第三行：创建时间与按钮组
-                        RowLayout {
-                            Layout.fillWidth: true
-
-                            Label {
-                                text: model.createdAt
-                                color: Theme.textDisabled
-                                font.pixelSize: Theme.fontSizeCaption
-                                font.family: Theme.fontFamilyMono
-                            }
-
-                            Item { Layout.fillWidth: true }
-
-                            // 打开/进入按钮
+                            // 打开按钮（非激活项目显示）
                             Button {
-                                id: openBtn
-                                text: appController.currentProjectId === model.projectId ? "当前激活" : "打开项目"
+                                id: openItemBtn
+                                visible: appController.currentProjectId !== model.projectId
+                                Layout.preferredHeight: 28
+                                text: "打开"
                                 font.pixelSize: Theme.fontSizeSmall
                                 font.family: Theme.fontFamily
                                 font.bold: true
+
                                 background: Rectangle {
-                                    color: {
-                                        if (appController.currentProjectId === model.projectId) {
-                                            return Theme.accentSuccess
-                                        }
-                                        return openBtn.hovered ? Theme.accentPrimary : Theme.bgTertiary
-                                    }
+                                    color: openItemBtn.hovered ? Theme.primary : Theme.bgCard
                                     radius: Theme.radiusSmall
-                                    border.color: appController.currentProjectId === model.projectId ? Theme.accentSuccess : (openBtn.hovered ? Theme.accentPrimary : Theme.border)
+                                    border.color: Theme.primary
                                     border.width: 1
                                 }
-                                contentItem: Label {
-                                    text: openBtn.text
-                                    color: appController.currentProjectId === model.projectId ? Theme.textPrimary : (openBtn.hovered ? Theme.textPrimary : Theme.textSecondary)
-                                    font: openBtn.font
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: openItemBtn.hovered ? Theme.textMain : Theme.primary
+                                    font: parent.font
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }
-                                onClicked: {
-                                    if (appController.currentProjectId !== model.projectId) {
-                                        projectService.openProject(model.projectId)
-                                        appController.openProject(model.projectId, model.name)
-                                        var taxonomies = taxonomyService.listTaxonomies(model.projectId)
-                                        if (taxonomies.length > 0) {
-                                            taxonomyModel.taxonomyId = taxonomies[0].id
-                                        }
-                                    }
-                                }
+
+                                onClicked: openProject(model.projectId, model.name)
                             }
 
                             // 删除按钮
                             Button {
-                                id: delBtn
-                                text: "删除"
-                                font.pixelSize: Theme.fontSizeSmall
-                                font.family: Theme.fontFamily
-                                palette.buttonText: delBtn.hovered ? Theme.accentError : Theme.textMuted
+                                id: delItemBtn
+                                Layout.preferredWidth: 28
+                                Layout.preferredHeight: 28
+                                text: "✕"
+                                font.pixelSize: Theme.fontSizeCaption
+
                                 background: Rectangle {
-                                    color: "transparent"
+                                    color: delItemBtn.hovered ? Qt.alpha(Theme.danger, 0.15) : "transparent"
+                                    radius: Theme.radiusSmall
                                 }
-                                onClicked: deleteConfirmDialog.projectId = model.projectId
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: delItemBtn.hovered ? Theme.danger : Theme.textMuted
+                                    font: parent.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                onClicked: {
+                                    deleteConfirmDialog.projectId = model.projectId
+                                    deleteConfirmDialog.open()
+                                }
                             }
                         }
                     }
@@ -360,18 +578,18 @@ Item {
         }
     }
 
-    // === 新建项目对话框 ===
+    // === 新建项目对话框（6个字段） ===
     Dialog {
         id: newProjectDialog
-        title: "新建检测项目"
+        title: "新建项目"
         modal: true
         anchors.centerIn: parent
-        width: 440
-        standardButtons: Dialog.Ok | Dialog.Cancel
+        width: 500
+        standardButtons: Dialog.NoButton
 
         background: Rectangle {
-            color: Theme.bgSecondary
-            border.color: Theme.border
+            color: Theme.bgCard
+            border.color: Theme.borderColor
             border.width: 1
             radius: Theme.radiusLarge
         }
@@ -380,59 +598,82 @@ Item {
             width: parent.width
             spacing: Theme.spacingLarge
 
-            Label {
+            // 对话框标题
+            Text {
                 text: "创建新的缺陷检测治理项目"
                 font.pixelSize: Theme.fontSizeSubheading
                 font.bold: true
-                color: Theme.textPrimary
                 font.family: Theme.fontFamily
+                color: Theme.textMain
             }
 
+            // 1. 项目名称
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: Theme.spacingSmall
 
-                Label { text: "项目名称"; color: Theme.textSecondary; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall }
+                Text {
+                    text: "项目名称 *"
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    color: Theme.textMuted
+                }
+
                 TextField {
                     id: projectNameField
                     Layout.fillWidth: true
                     placeholderText: "例如: 电池表面缺陷检测"
-                    color: Theme.textPrimary
+                    placeholderTextColor: Theme.textDisabled
+                    color: Theme.textMain
+                    font.pixelSize: Theme.fontSizeNormal
                     font.family: Theme.fontFamily
+
                     background: Rectangle {
                         color: Theme.bgInput
                         radius: Theme.radiusSmall
-                        border.color: projectNameField.activeFocus ? Theme.borderFocus : Theme.borderNormal
+                        border.color: projectNameField.activeFocus ? Theme.primaryGlow : Theme.borderColor
                         border.width: 1
                     }
                 }
             }
 
+            // 2. 存储路径（含路径校验）
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: Theme.spacingSmall
 
-                Label { text: "存储路径"; color: Theme.textSecondary; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall }
+                Text {
+                    text: "存储路径 *"
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    color: Theme.textMuted
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Theme.spacingNormal
+
                     TextField {
                         id: projectPathField
                         Layout.fillWidth: true
                         placeholderText: "选择一个本地文件夹路径"
-                        color: Theme.textPrimary
+                        placeholderTextColor: Theme.textDisabled
+                        color: Theme.textMain
+                        font.pixelSize: Theme.fontSizeNormal
                         font.family: Theme.fontFamily
+
                         background: Rectangle {
                             color: Theme.bgInput
                             radius: Theme.radiusSmall
                             border.color: {
-                                if (projectPathField.activeFocus) return Theme.borderFocus
-                                if (pathValidationResult.errors.length > 0) return Theme.accentError
-                                if (pathValidationResult.warnings.length > 0) return Theme.accentWarning
-                                return Theme.borderNormal
+                                if (projectPathField.activeFocus) return Theme.primaryGlow
+                                if (pathValidationResult.errors.length > 0) return Theme.danger
+                                if (pathValidationResult.warnings.length > 0) return Theme.warning
+                                return Theme.borderColor
                             }
                             border.width: 1
                         }
+
                         onTextChanged: {
                             if (text.length > 0) {
                                 var result = projectService.validateProjectPath(text)
@@ -446,17 +687,28 @@ Item {
                             }
                         }
                     }
+
                     Button {
-                        id: browseBtn
+                        Layout.preferredHeight: 36
                         text: "浏览..."
+                        font.pixelSize: Theme.fontSizeSmall
                         font.family: Theme.fontFamily
-                        palette.buttonText: Theme.textPrimary
+
                         background: Rectangle {
-                            color: browseBtn.hovered ? Theme.bgHover : Theme.bgTertiary
+                            color: parent.hovered ? Theme.bgHover : Theme.bgCard
                             radius: Theme.radiusSmall
-                            border.color: Theme.border
+                            border.color: Theme.borderColor
                             border.width: 1
                         }
+
+                        contentItem: Text {
+                            text: parent.text
+                            color: Theme.textMain
+                            font: parent.font
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
                         onClicked: folderDialog.open()
                     }
                 }
@@ -464,14 +716,14 @@ Item {
                 // 路径校验结果提示
                 ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: 2
+                    spacing: Theme.spacingTiny
                     visible: pathValidationResult.errors.length > 0 || pathValidationResult.warnings.length > 0
 
                     Repeater {
                         model: pathValidationResult.errors
-                        delegate: Label {
+                        delegate: Text {
                             text: "✗ " + modelData
-                            color: Theme.accentError
+                            color: Theme.danger
                             font.pixelSize: Theme.fontSizeCaption
                             font.family: Theme.fontFamily
                             Layout.fillWidth: true
@@ -480,9 +732,9 @@ Item {
                     }
                     Repeater {
                         model: pathValidationResult.warnings
-                        delegate: Label {
+                        delegate: Text {
                             text: "⚠ " + modelData
-                            color: Theme.accentWarning
+                            color: Theme.warning
                             font.pixelSize: Theme.fontSizeCaption
                             font.family: Theme.fontFamily
                             Layout.fillWidth: true
@@ -491,14 +743,247 @@ Item {
                     }
                 }
             }
+
+            // 3. 项目描述
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingSmall
+
+                Text {
+                    text: "项目描述"
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    color: Theme.textMuted
+                }
+
+                TextField {
+                    id: projectDescField
+                    Layout.fillWidth: true
+                    placeholderText: "可选，简要描述项目用途"
+                    placeholderTextColor: Theme.textDisabled
+                    color: Theme.textMain
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.family: Theme.fontFamily
+
+                    background: Rectangle {
+                        color: Theme.bgInput
+                        radius: Theme.radiusSmall
+                        border.color: projectDescField.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                        border.width: 1
+                    }
+                }
+            }
+
+            // 4. 初始图库名称 + 5. 图库类型（一行两列）
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingLarge
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingSmall
+
+                    Text {
+                        text: "初始图库名称"
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.family: Theme.fontFamily
+                        color: Theme.textMuted
+                    }
+
+                    TextField {
+                        id: galleryNameField
+                        Layout.fillWidth: true
+                        text: "默认图库"
+                        color: Theme.textMain
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.family: Theme.fontFamily
+
+                        background: Rectangle {
+                            color: Theme.bgInput
+                            radius: Theme.radiusSmall
+                            border.color: galleryNameField.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                            border.width: 1
+                        }
+                    }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingSmall
+
+                    Text {
+                        text: "图库类型"
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.family: Theme.fontFamily
+                        color: Theme.textMuted
+                    }
+
+                    ComboBox {
+                        id: taskTypeCombo
+                        Layout.fillWidth: true
+                        model: ["目标检测", "旋转框检测", "分类", "异常检测"]
+                        currentIndex: 0
+
+                        background: Rectangle {
+                            color: Theme.bgInputDropdown
+                            radius: Theme.radiusSmall
+                            border.color: taskTypeCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                            border.width: 1
+                        }
+
+                        contentItem: Text {
+                            text: taskTypeCombo.displayText
+                            color: Theme.textMain
+                            font.pixelSize: Theme.fontSizeNormal
+                            font.family: Theme.fontFamily
+                            leftPadding: Theme.spacingNormal
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        delegate: ItemDelegate {
+                            width: taskTypeCombo.width
+                            contentItem: Text {
+                                text: modelData
+                                color: highlighted ? Theme.textMain : Theme.textMuted
+                                font.pixelSize: Theme.fontSizeNormal
+                                font.family: Theme.fontFamily
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            highlighted: taskTypeCombo.highlightedIndex === index
+                            background: Rectangle {
+                                color: highlighted ? Theme.bgHover : Theme.bgInputDropdown
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 6. 基准路径
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingSmall
+
+                Text {
+                    text: "基准路径"
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    color: Theme.textMuted
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingNormal
+
+                    TextField {
+                        id: basePathField
+                        Layout.fillWidth: true
+                        placeholderText: "可选，指定基准数据路径"
+                        placeholderTextColor: Theme.textDisabled
+                        color: Theme.textMain
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.family: Theme.fontFamily
+
+                        background: Rectangle {
+                            color: Theme.bgInput
+                            radius: Theme.radiusSmall
+                            border.color: basePathField.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                            border.width: 1
+                        }
+                    }
+
+                    Button {
+                        Layout.preferredHeight: 36
+                        text: "浏览..."
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.family: Theme.fontFamily
+
+                        background: Rectangle {
+                            color: parent.hovered ? Theme.bgHover : Theme.bgCard
+                            radius: Theme.radiusSmall
+                            border.color: Theme.borderColor
+                            border.width: 1
+                        }
+
+                        contentItem: Text {
+                            text: parent.text
+                            color: Theme.textMain
+                            font: parent.font
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        onClicked: baseFolderDialog.open()
+                    }
+                }
+            }
+
+            // 底部操作按钮
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingNormal
+
+                Item { Layout.fillWidth: true }
+
+                Button {
+                    id: cancelBtn
+                    Layout.preferredHeight: 36
+                    Layout.preferredWidth: 100
+                    text: "取消"
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.family: Theme.fontFamily
+
+                    background: Rectangle {
+                        color: cancelBtn.hovered ? Theme.bgHover : Theme.bgCard
+                        border.color: Theme.borderColor
+                        border.width: 1
+                        radius: Theme.radiusSmall
+                    }
+
+                    contentItem: Text {
+                        text: parent.text
+                        color: Theme.textMain
+                        font: parent.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    onClicked: newProjectDialog.reject()
+                }
+
+                Button {
+                    id: confirmCreateBtn
+                    Layout.preferredHeight: 36
+                    Layout.preferredWidth: 120
+                    text: "确认创建"
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.bold: true
+                    font.family: Theme.fontFamily
+
+                    background: Rectangle {
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: Theme.primary }
+                            GradientStop { position: 1.0; color: Theme.primaryDark }
+                        }
+                        radius: Theme.radiusSmall
+                    }
+
+                    contentItem: Text {
+                        text: parent.text
+                        color: Theme.textMain
+                        font: parent.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    onClicked: newProjectDialog.accept()
+                }
+            }
         }
 
+        // 确认创建
         onAccepted: {
             if (projectNameField.text && projectPathField.text) {
-                // 路径校验不通过时阻止创建
-                if (!pathValidationResult.valid) {
-                    return
-                }
+                if (!pathValidationResult.valid) return
                 var pid = projectService.createProject(projectNameField.text, projectPathField.text)
                 if (pid) {
                     projectModel.refresh()
@@ -511,29 +996,40 @@ Item {
                 } else {
                     projectModel.refresh()
                 }
-                projectNameField.clear()
-                projectPathField.clear()
-                pathValidationResult.errors = []
-                pathValidationResult.warnings = []
-                pathValidationResult.valid = true
+                resetDialogFields()
             }
+        }
+
+        onRejected: resetDialogFields()
+
+        // 重置对话框所有字段
+        function resetDialogFields() {
+            projectNameField.clear()
+            projectPathField.clear()
+            projectDescField.clear()
+            galleryNameField.text = "默认图库"
+            taskTypeCombo.currentIndex = 0
+            basePathField.clear()
+            pathValidationResult.errors = []
+            pathValidationResult.warnings = []
+            pathValidationResult.valid = true
         }
     }
 
-    // === 删除确认对话框 ===
+    // === 删除项目确认对话框 ===
     Dialog {
         id: deleteConfirmDialog
-        title: "确认移除项目"
+        title: "确认删除项目"
         modal: true
         anchors.centerIn: parent
-        width: 360
-        standardButtons: Dialog.Yes | Dialog.No
+        width: 400
+        standardButtons: Dialog.NoButton
 
         property string projectId: ""
 
         background: Rectangle {
-            color: Theme.bgSecondary
-            border.color: Theme.border
+            color: Theme.bgCard
+            border.color: Theme.borderColor
             border.width: 1
             radius: Theme.radiusLarge
         }
@@ -542,20 +1038,77 @@ Item {
             width: parent.width
             spacing: Theme.spacingLarge
 
-            Label {
+            Text {
                 text: "确定要彻底删除此项目吗？"
                 font.bold: true
-                color: Theme.accentError
-                font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSubheading
+                font.family: Theme.fontFamily
+                color: Theme.danger
             }
 
-            Label {
+            Text {
                 text: "警告：此操作不可撤销。对应的本地工程数据将不再受管辖。"
-                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeNormal
                 font.family: Theme.fontFamily
+                color: Theme.textMuted
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingNormal
+
+                Item { Layout.fillWidth: true }
+
+                Button {
+                    Layout.preferredHeight: 36
+                    Layout.preferredWidth: 80
+                    text: "取消"
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.family: Theme.fontFamily
+
+                    background: Rectangle {
+                        color: parent.hovered ? Theme.bgHover : Theme.bgCard
+                        border.color: Theme.borderColor
+                        border.width: 1
+                        radius: Theme.radiusSmall
+                    }
+
+                    contentItem: Text {
+                        text: parent.text
+                        color: Theme.textMain
+                        font: parent.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    onClicked: deleteConfirmDialog.reject()
+                }
+
+                Button {
+                    Layout.preferredHeight: 36
+                    Layout.preferredWidth: 80
+                    text: "删除"
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.bold: true
+                    font.family: Theme.fontFamily
+
+                    background: Rectangle {
+                        color: parent.hovered ? Qt.lighter(Theme.danger, 1.1) : Theme.danger
+                        radius: Theme.radiusSmall
+                    }
+
+                    contentItem: Text {
+                        text: parent.text
+                        color: Theme.textMain
+                        font: parent.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    onClicked: deleteConfirmDialog.accept()
+                }
             }
         }
 
@@ -569,14 +1122,12 @@ Item {
         onRejected: projectId = ""
     }
 
-    // URL 转本地路径工具函数（兼容中文路径和特殊字符）
-    // Windows: file:///C:/Users/... → C:/Users/...
-    // Linux: file:///home/... → /home/...
+    // === 工具函数：URL转本地路径 ===
     function urlToPath(url) {
         var s = url.toString()
         if (s.startsWith("file:///")) {
             s = s.substring(7)
-            // Windows 路径: /C:/... → C:/...
+            // Windows路径：/C:/xxx → C:/xxx
             if (s.length >= 3 && s.charAt(0) === "/" && s.charAt(2) === ":") {
                 var driveLetter = s.charAt(1).toUpperCase()
                 if (driveLetter >= 'A' && driveLetter <= 'Z') {
@@ -589,7 +1140,21 @@ Item {
         return decodeURIComponent(s)
     }
 
-    // === 文件夹选择 ===
+    // === 打开项目：设置 currentProjectId + taxonomyId ===
+    function openProject(projectId, projectName) {
+        if (appController.currentProjectId !== projectId) {
+            projectService.openProject(projectId)
+            appController.openProject(projectId, projectName)
+            var taxonomies = taxonomyService.listTaxonomies(projectId)
+            if (taxonomies.length > 0) {
+                taxonomyModel.taxonomyId = taxonomies[0].id
+            }
+        }
+    }
+
+    // === 文件夹选择对话框 × 3 ===
+
+    // 项目存储路径选择
     FolderDialog {
         id: folderDialog
         title: "选择项目存储路径"
@@ -598,7 +1163,16 @@ Item {
         }
     }
 
-    // === 导入项目文件夹选择 ===
+    // 基准数据路径选择
+    FolderDialog {
+        id: baseFolderDialog
+        title: "选择基准数据路径"
+        onAccepted: {
+            basePathField.text = urlToPath(baseFolderDialog.selectedFolder)
+        }
+    }
+
+    // 导入已有项目目录选择
     FolderDialog {
         id: importFolderDialog
         title: "选择已有项目目录"
