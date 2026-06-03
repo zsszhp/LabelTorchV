@@ -1,0 +1,61 @@
+{
+  "flags": {},
+  "imageData": null,
+  "imageHeight": 1808,
+  "imagePath": "Image_20260330113817521.bmp",
+  "imageWidth": 1558,
+  "shapes": [
+    {
+      "flags": {},
+      "group_id": null,
+      "label": "划痕",
+      "points": [
+        [
+          389.71,
+          514.71
+        ],
+        [
+          1327.92,
+          918.6600000000001
+        ]
+      ],
+      "severe": -1,
+      "shape_type": "rectangle"
+    },
+    {
+      "flags": {},
+      "group_id": null,
+      "label": "划痕",
+      "points": [
+        [
+          331.07,
+          1228.14
+        ],
+        [
+          865.3299999999999,
+          1638.6000000000001
+        ]
+      ],
+      "severe": -1,
+      "shape_type": "rectangle"
+    },
+    {
+      "flags": {},
+      "group_id": null,
+      "label": "划痕",
+      "points": [
+        [
+          34.63,
+          1553.9
+        ],
+        [
+          187.74,
+          1635.3400000000001
+        ]
+      ],
+      "severe": -1,
+      "shape_type": "rectangle"
+    }
+  ],
+  "version": "5.0.0"
+}
