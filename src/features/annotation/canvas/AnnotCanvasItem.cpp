@@ -862,6 +862,11 @@ void AnnotCanvasItem::keyPressEvent(QKeyEvent* event)
             event->accept();
             return;
         }
+        if (event->key() == Qt::Key_Y) {
+            redo();
+            event->accept();
+            return;
+        }
         if (event->key() == Qt::Key_A) {
             selectAll();
             event->accept();
@@ -922,6 +927,7 @@ void AnnotCanvasItem::keyPressEvent(QKeyEvent* event)
         }
         event->accept();
         return;
+    case Qt::Key_W:
     case Qt::Key_R:
         setShapeMode(0);
         setInteractionMode(QStringLiteral("draw"));
@@ -966,7 +972,32 @@ void AnnotCanvasItem::keyPressEvent(QKeyEvent* event)
         event->accept();
         return;
     case Qt::Key_V:
-        rotateSelected(1.0f);
+        {
+            bool hasSelectedObb = false;
+            if (m_model) {
+                for (int i = 0; i < m_model->rowCount(); ++i) {
+                    QModelIndex idx = m_model->index(i, 0);
+                    if (m_model->data(idx, AnnotationModel::IsSelectedRole).toBool() &&
+                        m_model->data(idx, AnnotationModel::ShapeTypeRole).toInt() == 1) {
+                        hasSelectedObb = true;
+                        break;
+                    }
+                }
+            }
+            if (hasSelectedObb) {
+                rotateSelected(1.0f);
+            } else {
+                setInteractionMode(QStringLiteral("select"));
+            }
+            event->accept();
+            return;
+        }
+    case Qt::Key_BracketLeft:
+        emit changeClassRequested(-1);
+        event->accept();
+        return;
+    case Qt::Key_BracketRight:
+        emit changeClassRequested(1);
         event->accept();
         return;
     // 方向键微调移动选中标注（5像素步长，对标 X-AnyLabeling）

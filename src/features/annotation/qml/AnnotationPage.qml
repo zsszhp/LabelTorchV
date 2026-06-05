@@ -1191,6 +1191,36 @@ Item {
                             editLabelTargetIndex = annotationIndex
                             editLabelDialog.open()
                         }
+
+                        onChangeClassRequested: function(direction) {
+                            if (!appController.projectOpen || taxonomyModel.rowCount() === 0) return
+                            var selectedRow = -1
+                            for (var i = 0; i < annotationModel.rowCount(); i++) {
+                                var idx = annotationModel.index(i, 0)
+                                if (annotationModel.data(idx, Qt.UserRole + 12)) {
+                                    selectedRow = i
+                                    break
+                                }
+                            }
+                            if (selectedRow >= 0) {
+                                var idxSelected = annotationModel.index(selectedRow, 0)
+                                var currentClass = annotationModel.data(idxSelected, Qt.UserRole + 2)
+                                var totalClasses = taxonomyModel.rowCount()
+                                var newClassIdx = (currentClass + direction + totalClasses) % totalClasses
+                                
+                                // 获取新类别的名字
+                                var idxTax = taxonomyModel.index(newClassIdx, 0)
+                                var newClassName = taxonomyModel.data(idxTax, 1) || ("class_" + newClassIdx)
+                                
+                                // 更新该标注的类别
+                                annotationModel.setClassIndex(selectedRow, newClassIdx, newClassName)
+                                
+                                // 顺便更新当前画笔的默认类别
+                                selectedClassId = newClassIdx
+                                canvasItem.currentClassIndex = newClassIdx
+                                canvasItem.currentClassName = newClassName
+                            }
+                        }
                     }
 
                     // 分类模式浮层

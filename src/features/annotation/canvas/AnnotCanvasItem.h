@@ -94,6 +94,7 @@ signals:
     void navigateNext();
     void saveRequested();
     void editLabelRequested(int annotationIndex);
+    void changeClassRequested(int direction);
 
 protected:
     void mousePressEvent(QMouseEvent* event) override;
