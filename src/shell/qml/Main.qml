@@ -308,6 +308,13 @@ ApplicationWindow {
                             radius: 4
                             anchors.verticalCenter: parent.verticalCenter
                             color: ipcClient.connected ? Theme.success : Theme.danger
+
+                            SequentialAnimation on opacity {
+                                running: ipcClient.connected
+                                loops: Animation.Infinite
+                                NumberAnimation { from: 1.0; to: 0.4; duration: 1000; easing.type: Easing.InOutQuad }
+                                NumberAnimation { from: 0.4; to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
+                            }
                         }
                         Text {
                             text: ipcClient.connected ? "后端就绪" : "后端断开"
@@ -454,6 +461,13 @@ ApplicationWindow {
                         font.weight: Font.Bold
                         color: Theme.primaryGlow
                         anchors.verticalCenter: parent.verticalCenter
+
+                        layer.enabled: true
+                        layer.effect: MultiEffect {
+                            shadowEnabled: true
+                            shadowColor: Theme.primaryGlow
+                            shadowBlur: 0.3
+                        }
                     }
                 }
             }
