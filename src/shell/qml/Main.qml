@@ -29,13 +29,13 @@ ApplicationWindow {
 
     ListModel {
         id: navModel
-        ListElement { pageId: "project"; title: "项目"; icon: "📂"; needsProject: false }
-        ListElement { pageId: "dataset"; title: "数据集"; icon: "🖼"; needsProject: true }
-        ListElement { pageId: "annotation"; title: "标注"; icon: "✏"; needsProject: true }
-        ListElement { pageId: "check"; title: "检查"; icon: "✓"; needsProject: true }
-        ListElement { pageId: "training"; title: "训练"; icon: "🧠"; needsProject: true }
-        ListElement { pageId: "test"; title: "测试"; icon: "🔬"; needsProject: true }
-        ListElement { pageId: "export"; title: "导出"; icon: "📤"; needsProject: true }
+        ListElement { pageId: "project"; title: "项目"; icon: "folder"; needsProject: false }
+        ListElement { pageId: "dataset"; title: "数据集"; icon: "images"; needsProject: true }
+        ListElement { pageId: "annotation"; title: "标注"; icon: "edit"; needsProject: true }
+        ListElement { pageId: "check"; title: "检查"; icon: "check"; needsProject: true }
+        ListElement { pageId: "training"; title: "训练"; icon: "brain"; needsProject: true }
+        ListElement { pageId: "test"; title: "测试"; icon: "flask"; needsProject: true }
+        ListElement { pageId: "export"; title: "导出"; icon: "export"; needsProject: true }
     }
 
     Connections {
@@ -151,8 +151,8 @@ ApplicationWindow {
                         layer.enabled: true
                         layer.effect: MultiEffect {
                             shadowEnabled: true
-                            shadowColor: Theme.glowCyan
-                            shadowBlur: 0.4
+                            shadowColor: Theme.primaryGlow
+                            shadowBlur: 0.3
                         }
                     }
 
@@ -186,19 +186,26 @@ ApplicationWindow {
                         delegate: ItemDelegate {
                             id: navDelegate
                             height: Theme.headerHeight
-                            implicitWidth: navContentRow.width + 44
+                            leftPadding: 22
+                            rightPadding: 22
                             enabled: !model.needsProject || appController.projectOpen
 
                             contentItem: Row {
                                 id: navContentRow
-                                anchors.centerIn: parent
                                 spacing: Theme.spacingSmall
 
-                                Text {
-                                    text: model.icon
-                                    font.pixelSize: 13
+                                SvgIcon {
+                                    icon: model.icon
+                                    width: 14
+                                    height: 14
                                     anchors.verticalCenter: parent.verticalCenter
-                                    opacity: navDelegate.enabled ? 1.0 : 0.4
+                                    color: {
+                                        if (!navDelegate.enabled) return Theme.textDisabled
+                                        if (appController.currentPage === model.pageId) return Theme.primaryGlow
+                                        if (navDelegate.hovered) return Theme.textMain
+                                        return Theme.textMuted
+                                    }
+                                    Behavior on color { ColorAnimation { duration: 150 } }
                                 }
 
                                 Text {
@@ -233,20 +240,29 @@ ApplicationWindow {
                                         NumberAnimation { from: 0.3; to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
                                     }
                                 }
+
+                                // 选中的标签文字外发光效果
+                                layer.enabled: navDelegate.enabled && appController.currentPage === model.pageId
+                                layer.effect: MultiEffect {
+                                    shadowEnabled: true
+                                    shadowColor: Theme.primaryGlow
+                                    shadowBlur: 0.3
+                                }
                             }
 
                             background: Rectangle {
-                                // 激活标签：底部渐变高亮
-                                color: {
-                                    if (!navDelegate.enabled) return "transparent"
-                                    if (appController.currentPage === model.pageId) return Qt.alpha(Theme.primaryGlow, 0.05)
-                                    if (navDelegate.hovered) return Qt.alpha(Theme.textMain, 0.02)
-                                    return "transparent"
-                                }
+                                color: !navDelegate.enabled ? "transparent" : (navDelegate.hovered && appController.currentPage !== model.pageId ? Qt.alpha(Theme.textMain, 0.02) : "transparent")
+
+                                // 激活状态下：垂直亮青渐变背景
+                                gradient: navDelegate.enabled && appController.currentPage === model.pageId ? Gradient {
+                                    GradientStop { position: 0.0; color: "transparent" }
+                                    GradientStop { position: 0.7; color: "transparent" }
+                                    GradientStop { position: 1.0; color: Qt.rgba(0, 0.898, 1, 0.05) }
+                                } : null
 
                                 // 激活标签底部指示线
                                 Rectangle {
-                                    visible: appController.currentPage === model.pageId
+                                    visible: navDelegate.enabled && appController.currentPage === model.pageId
                                     height: 2
                                     anchors.left: parent.left
                                     anchors.right: parent.right
@@ -271,7 +287,41 @@ ApplicationWindow {
                 // 右侧工具图标
                 Row {
                     Layout.alignment: Qt.AlignVCenter
-                    spacing: Theme.spacingLarge
+                    spacing: 18
+                    Layout.rightMargin: Theme.spacingLarge
+
+                    SvgIcon {
+                        icon: "signal"
+                        width: 14
+                        height: 14
+                        color: signalMouse.containsMouse ? Theme.textMain : Theme.textMuted
+                        anchors.verticalCenter: parent.verticalCenter
+                        MouseArea { id: signalMouse; anchors.fill: parent; hoverEnabled: true }
+                    }
+                    SvgIcon {
+                        icon: "gear"
+                        width: 14
+                        height: 14
+                        color: gearMouse.containsMouse ? Theme.textMain : Theme.textMuted
+                        anchors.verticalCenter: parent.verticalCenter
+                        MouseArea { id: gearMouse; anchors.fill: parent; hoverEnabled: true }
+                    }
+                    SvgIcon {
+                        icon: "user"
+                        width: 14
+                        height: 14
+                        color: userMouse.containsMouse ? Theme.textMain : Theme.textMuted
+                        anchors.verticalCenter: parent.verticalCenter
+                        MouseArea { id: userMouse; anchors.fill: parent; hoverEnabled: true }
+                    }
+
+                    // 分割线
+                    Rectangle {
+                        width: 1
+                        height: 14
+                        color: Theme.borderColor
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
 
                     // GPU 状态指示灯
                     Row {
