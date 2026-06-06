@@ -7,6 +7,7 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import LabelTorch.Shell
 import LabelTorch.Theme
+import LabelTorch.Components
 
 ApplicationWindow {
     id: root
@@ -121,57 +122,55 @@ ApplicationWindow {
                 anchors.rightMargin: Theme.spacingLarge
                 spacing: 0
 
-                // Logo 区域（对标参考UI logo-icon + logo-text）
+                // Logo 区域（对标参考UI：26x26渐变方块 + 渐变文字）
                 Row {
                     Layout.alignment: Qt.AlignVCenter
                     Layout.leftMargin: Theme.spacingLarge
                     Layout.rightMargin: 12
                     spacing: 10
 
+                    // 26x26 渐变方块图标（对标参考UI logo-icon）
                     Rectangle {
                         width: 26
                         height: 26
                         radius: 6
-                        anchors.verticalCenter: parent.verticalCenter
                         gradient: Gradient {
+                            orientation: Gradient.Horizontal
                             GradientStop { position: 0.0; color: Theme.primary }
                             GradientStop { position: 1.0; color: Theme.primaryGlow }
                         }
+                        anchors.verticalCenter: parent.verticalCenter
 
+                        // 方块内文字缩写
                         Text {
                             anchors.centerIn: parent
                             text: "LT"
                             font.pixelSize: 12
-                            font.bold: true
+                            font.weight: Font.Bold
                             font.family: Theme.fontFamily
                             color: "#FFFFFF"
                         }
 
-                        // 发光阴影
+                        // 发光效果（对标参考UI box-shadow: 0 0 10px rgba(0,229,255,0.3)）
                         layer.enabled: true
                         layer.effect: MultiEffect {
                             shadowEnabled: true
                             shadowColor: Theme.primaryGlow
-                            shadowBlur: 0.3
+                            shadowBlur: 0.4
+                            shadowVerticalOffset: 0
+                            shadowHorizontalOffset: 0
                         }
                     }
 
+                    // 渐变文字（对标参考UI: linear-gradient(to right, #ffffff, #94A3B8)）
                     Text {
                         text: "标炬"
                         font.pixelSize: 16
                         font.weight: Font.DemiBold
                         font.family: Theme.fontFamily
                         anchors.verticalCenter: parent.verticalCenter
-                        style: Text.Outline
-                        styleColor: "transparent"
-
-                        // 渐变文字效果
-                        ColorAnimation on color {
-                            from: "#FFFFFF"
-                            to: "#94A3B8"
-                            duration: 0
-                        }
-                        color: "#E2E8F0"
+                        // QML Text 不支持渐变，用近似色 #C8D4E0 模拟渐变中值
+                        color: "#C8D4E0"
                     }
                 }
 
@@ -188,7 +187,7 @@ ApplicationWindow {
                             height: Theme.headerHeight
                             leftPadding: 22
                             rightPadding: 22
-                            enabled: !model.needsProject || appController.projectOpen
+                            enabled: true
 
                             contentItem: Row {
                                 id: navContentRow
@@ -378,6 +377,157 @@ ApplicationWindow {
             }
         }
 
+        // === 全局筛选显示栏 (FilterBar) ===
+        Rectangle {
+            id: globalFilterBar
+            Layout.fillWidth: true
+            Layout.preferredHeight: 38
+            color: Theme.bgMain
+            visible: appController.currentPage === "dataset" || appController.currentPage === "annotation" || appController.currentPage === "check"
+
+            // 底部分割线
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Theme.borderColor
+            }
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 20
+                spacing: 15
+
+                // 数据集筛选
+                Rectangle {
+                    height: 26
+                    implicitWidth: dsLabel.implicitWidth + dsCombo.implicitWidth + 30
+                    color: Theme.bgSide
+                    border.color: Theme.borderColor
+                    radius: 6
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 8
+
+                        Text {
+                            id: dsLabel
+                            text: "数据集"
+                            font.pixelSize: 11
+                            color: Theme.textMuted
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        ComboBox {
+                            id: dsCombo
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 20
+                            model: appController.projectOpen ? datasetService.listDatasets(appController.currentProjectId || "") : []
+                            textRole: "name"
+                            valueRole: "id"
+                            currentIndex: -1
+
+                            background: Rectangle { color: "transparent" }
+                            contentItem: Text {
+                                text: dsCombo.displayText
+                                font.pixelSize: 12
+                                color: Theme.textMain
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            indicator: Item { width: 0; height: 0 }
+                        }
+                    }
+                }
+
+                // Tag 过滤
+                Rectangle {
+                    height: 26
+                    implicitWidth: tagLabel.implicitWidth + tagCombo.implicitWidth + 30
+                    color: Theme.bgSide
+                    border.color: Theme.borderColor
+                    radius: 6
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 8
+
+                        Text {
+                            id: tagLabel
+                            text: "TAG 过滤"
+                            font.pixelSize: 11
+                            color: Theme.textMuted
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        ComboBox {
+                            id: tagCombo
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 20
+                            model: ["全选", "默认", "良品", "漏检", "误检", "待定", "重要"]
+                            currentIndex: 0
+
+                            background: Rectangle { color: "transparent" }
+                            contentItem: Text {
+                                text: tagCombo.displayText
+                                font.pixelSize: 12
+                                color: Theme.textMain
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            indicator: Item { width: 0; height: 0 }
+                        }
+                    }
+                }
+
+                // 标签类别筛选
+                Rectangle {
+                    height: 26
+                    implicitWidth: classLabel.implicitWidth + classCombo.implicitWidth + 30
+                    color: Theme.bgSide
+                    border.color: Theme.borderColor
+                    radius: 6
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 8
+
+                        Text {
+                            id: classLabel
+                            text: "标签类别"
+                            font.pixelSize: 11
+                            color: Theme.textMuted
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        ComboBox {
+                            id: classCombo
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 20
+                            model: appController.projectOpen ? taxonomyModel : []
+                            textRole: "className"
+                            valueRole: "classIndex"
+                            currentIndex: -1
+
+                            background: Rectangle { color: "transparent" }
+                            contentItem: Text {
+                                text: classCombo.displayText === "" ? "未指定过滤" : classCombo.displayText
+                                font.pixelSize: 12
+                                color: Theme.textMain
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            indicator: Item { width: 0; height: 0 }
+                        }
+                    }
+                }
+            }
+        }
+
         // === 主内容区：全宽 StackLayout，各页面内部自行管理侧边栏 ===
         StackLayout {
             id: contentStack
@@ -419,25 +569,32 @@ ApplicationWindow {
             }
 
             Loader {
+                asynchronous: true
                 source: contentStack.pageSources[0]
                 onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
+                asynchronous: true
                 onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
+                asynchronous: true
                 onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
+                asynchronous: true
                 onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
+                asynchronous: true
                 onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
+                asynchronous: true
                 onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
+                asynchronous: true
                 onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
         }
@@ -462,7 +619,14 @@ ApplicationWindow {
                 anchors.rightMargin: Theme.spacingLarge
                 spacing: Theme.spacingNormal
 
-                // 左侧：工作区名称 + 选中文件
+                // 左侧：工作区名称 + 选中文件（对标参考UI: "工作区: **Battery_v1** | 选中: CAM_001.png"）
+                Text {
+                    text: "工作区: "
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    color: Theme.textMuted
+                }
+
                 Text {
                     text: appController.projectOpen ? appController.currentProjectName : "未打开项目"
                     font.pixelSize: Theme.fontSizeSmall
@@ -473,7 +637,7 @@ ApplicationWindow {
 
                 Text {
                     visible: root.selectedFileName !== ""
-                    text: root.selectedFileName
+                    text: " | 选中: " + root.selectedFileName
                     font.pixelSize: Theme.fontSizeSmall
                     font.family: Theme.fontFamily
                     color: Theme.textMuted
@@ -481,38 +645,58 @@ ApplicationWindow {
 
                 Item { Layout.fillWidth: true }
 
-                // 右侧：标注进度条 + 百分比
+                // 右侧：标注进度条 + 百分比（对标参考UI: "标注进度:" + progress bar + percentage）
                 Row {
-                    visible: appController.currentPage === "annotation"
                     spacing: Theme.spacingSmall
+                    anchors.verticalCenter: parent.verticalCenter
 
+                    Text {
+                        text: "标注进度:"
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.family: Theme.fontFamily
+                        color: Theme.textMuted
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    // 进度条（对标参考UI: 150px, 6px, bgMain背景, 渐变填充+glow shadow）
                     Rectangle {
                         width: 150
                         height: 6
                         radius: 3
                         anchors.verticalCenter: parent.verticalCenter
-                        color: Theme.borderColor
+                        color: Theme.bgMain  // 对标参考UI background:var(--bg-main)
 
                         Rectangle {
-                            width: parent.width * root.annotationProgress / 100
+                            width: parent.width * (appController.projectOpen ? root.annotationProgress / 100 : 0)
                             height: parent.height
                             radius: 3
                             gradient: Gradient {
+                                orientation: Gradient.Horizontal
                                 GradientStop { position: 0.0; color: Theme.primary }
                                 GradientStop { position: 1.0; color: Theme.primaryGlow }
+                            }
+
+                            // 发光效果（对标参考UI box-shadow: 0 0 6px var(--primary-glow)）
+                            layer.enabled: appController.projectOpen && root.annotationProgress > 0
+                            layer.effect: MultiEffect {
+                                shadowEnabled: true
+                                shadowColor: Theme.primaryGlow
+                                shadowBlur: 0.3
+                                shadowVerticalOffset: 0
+                                shadowHorizontalOffset: 0
                             }
                         }
                     }
 
                     Text {
-                        text: Math.round(root.annotationProgress) + "%"
+                        text: (appController.projectOpen ? Math.round(root.annotationProgress) : 0) + "%"
                         font.pixelSize: Theme.fontSizeCaption
                         font.family: Theme.fontFamilyMono
                         font.weight: Font.Bold
                         color: Theme.primaryGlow
                         anchors.verticalCenter: parent.verticalCenter
 
-                        layer.enabled: true
+                        layer.enabled: appController.projectOpen
                         layer.effect: MultiEffect {
                             shadowEnabled: true
                             shadowColor: Theme.primaryGlow
@@ -542,84 +726,96 @@ ApplicationWindow {
         }
     }
 
-    Dialog {
+    ModalDialog {
         id: closeConfirmDialog
         title: "确认退出"
-        modal: true
-        anchors.centerIn: parent
-        width: 360
-        standardButtons: Dialog.NoButton
+        dialogWidth: 360
 
-        background: Rectangle {
-            color: Theme.bgCard
-            border.color: Theme.borderColor
-            border.width: 1
-            radius: Theme.radiusLarge
-        }
-
-        contentItem: ColumnLayout {
+        ColumnLayout {
+            width: parent.width - Theme.spacingLarge * 2
+            anchors.horizontalCenter: parent.horizontalCenter
             spacing: Theme.spacingLarge
 
             Text {
-                text: "有未完成的任务或工作，您确定要关闭并退出软件吗？"
+                text: "是否确实关闭"
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeNormal
                 font.family: Theme.fontFamily
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
-                Layout.margins: Theme.spacingLarge
+                Layout.topMargin: Theme.spacingLarge
+                Layout.bottomMargin: Theme.spacingLarge
+            }
+        }
+
+        footerContent: Row {
+            spacing: Theme.spacingLarge
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+
+            Button {
+                text: "取消"
+                width: 90
+                background: Rectangle {
+                    color: parent.hovered ? Theme.bgHover : Theme.bgCard
+                    border.color: Theme.borderColor
+                    border.width: 1
+                    radius: Theme.radiusSmall
+                    implicitHeight: 32
+                }
+                contentItem: Text {
+                    text: parent.text
+                    color: Theme.textSecondary
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.family: Theme.fontFamily
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                onClicked: closeConfirmDialog.close()
             }
 
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.margins: Theme.spacingLarge
-                spacing: Theme.spacingLarge
-
-                Button {
-                    text: "取消"
-                    Layout.fillWidth: true
-                    flat: true
-                    background: Rectangle {
-                        color: parent.hovered ? Theme.bgHover : Theme.bgCard
-                        border.color: Theme.borderColor
-                        border.width: 1
-                        radius: Theme.radiusSmall
-                        implicitHeight: 36
-                    }
-                    contentItem: Text {
-                        text: parent.text
-                        color: Theme.textSecondary
-                        font.pixelSize: Theme.fontSizeNormal
-                        font.family: Theme.fontFamily
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                    onClicked: closeConfirmDialog.close()
+            Button {
+                text: "确定退出"
+                width: 90
+                background: Rectangle {
+                    color: parent.pressed ? Qt.darker(Theme.danger, 1.2) : (parent.hovered ? Qt.lighter(Theme.danger, 1.1) : Theme.danger)
+                    radius: Theme.radiusSmall
+                    implicitHeight: 32
                 }
-
-                Button {
-                    text: "确定退出"
-                    Layout.fillWidth: true
-                    background: Rectangle {
-                        color: parent.pressed ? Qt.darker(Theme.danger, 1.2) : (parent.hovered ? Qt.lighter(Theme.danger, 1.1) : Theme.danger)
-                        radius: Theme.radiusSmall
-                        implicitHeight: 36
-                    }
-                    contentItem: Text {
-                        text: parent.text
-                        color: Theme.textMain
-                        font.bold: true
-                        font.pixelSize: Theme.fontSizeNormal
-                        font.family: Theme.fontFamily
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                    onClicked: {
-                        reallyClose = true
-                        closeConfirmDialog.close()
-                        root.close()
-                    }
+                contentItem: Text {
+                    text: parent.text
+                    color: Theme.textMain
+                    font.bold: true
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.family: Theme.fontFamily
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
+                onClicked: {
+                    reallyClose = true
+                    closeConfirmDialog.close()
+                    root.close()
+                }
+            }
+        }
+    }
+
+    Timer {
+        id: preloadTimer
+        interval: 300
+        repeat: true
+        running: true
+        property int nextIndex: 1
+        onTriggered: {
+            if (nextIndex < contentStack.pageSources.length) {
+                var loader = contentStack.itemAt(nextIndex)
+                if (loader && !loader.source.toString() && !contentStack.loadedFlags[nextIndex]) {
+                    loader.source = contentStack.pageSources[nextIndex]
+                    contentStack.loadedFlags[nextIndex] = true
+                }
+                nextIndex++
+            } else {
+                running = false
             }
         }
     }
