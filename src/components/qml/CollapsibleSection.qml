@@ -20,29 +20,39 @@ Item {
 
         Rectangle {
             width: parent.width
-            height: 28
-            color: "transparent"
+            height: 36
+            color: Qt.rgba(1, 1, 1, 0.01)
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.spacingNormal
+                anchors.leftMargin: 14
+                anchors.rightMargin: 14
+                anchors.topMargin: 10
+                anchors.bottomMargin: 10
                 spacing: Theme.spacingSmall
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.expanded ? "▾" : "▸"
-                    font.pixelSize: Theme.fontSizeSmall
+                    font.pixelSize: 12
                     color: Theme.textMuted
                 }
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.title
-                    font.pixelSize: Theme.fontSizeSmall
+                    font.pixelSize: 12
                     font.weight: Font.DemiBold
                     color: Theme.textMuted
-                    font.letterSpacing: 0.5
                 }
+            }
+
+            // 底部分割线
+            Rectangle {
+                anchors.bottom: parent.bottom
+                width: parent.width
+                height: 1
+                color: Theme.borderColor
             }
 
             MouseArea {

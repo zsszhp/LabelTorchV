@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Controls
 import LabelTorch.Theme
 import QtQuick.Layouts
+import QtQuick.Effects
 
 Rectangle {
     id: root
@@ -85,9 +86,16 @@ Rectangle {
 
                 background: Rectangle {
                     color: Theme.bgInput
-                    radius: 4
-                    border.color: modelFamilyCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                    radius: Theme.radiusSmall
+                    border.color: modelFamilyCombo.activeFocus ? Theme.primaryGlow : (modelFamilyCombo.hovered ? Theme.primary : Theme.borderColor)
                     border.width: 1
+
+                    layer.enabled: modelFamilyCombo.activeFocus || modelFamilyCombo.hovered
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: modelFamilyCombo.activeFocus ? Theme.primaryGlow : Theme.primary
+                        shadowBlur: 0.15
+                    }
                 }
 
                 popup: Popup {
@@ -104,9 +112,9 @@ Rectangle {
                     }
 
                     background: Rectangle {
-                        color: Theme.bgPrimary
-                        border.color: Theme.borderNormal
-                        radius: 4
+                        color: Theme.bgInputDropdown
+                        border.color: Theme.borderColor
+                        radius: Theme.radiusSmall
                     }
                 }
 
@@ -114,13 +122,14 @@ Rectangle {
                     width: modelFamilyCombo.width
                     contentItem: Label {
                         text: modelData
-                        color: highlighted ? Theme.accentPrimary : Theme.textPrimary
+                        color: highlighted ? Theme.primaryGlow : Theme.textPrimary
                         font.pixelSize: 13
                         verticalAlignment: Text.AlignVCenter
+                        leftPadding: 8
                     }
                     highlighted: modelFamilyCombo.highlightedIndex === index
                     background: Rectangle {
-                        color: highlighted ? Theme.bgInput : Theme.bgPrimary
+                        color: highlighted ? Theme.bgHover : "transparent"
                     }
                 }
             }
@@ -154,9 +163,16 @@ Rectangle {
 
                 background: Rectangle {
                     color: Theme.bgInput
-                    radius: 4
-                    border.color: trainingTypeCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                    radius: Theme.radiusSmall
+                    border.color: trainingTypeCombo.activeFocus ? Theme.primaryGlow : (trainingTypeCombo.hovered ? Theme.primary : Theme.borderColor)
                     border.width: 1
+
+                    layer.enabled: trainingTypeCombo.activeFocus || trainingTypeCombo.hovered
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: trainingTypeCombo.activeFocus ? Theme.primaryGlow : Theme.primary
+                        shadowBlur: 0.15
+                    }
                 }
 
                 popup: Popup {
@@ -173,9 +189,9 @@ Rectangle {
                     }
 
                     background: Rectangle {
-                        color: Theme.bgPrimary
-                        border.color: Theme.borderNormal
-                        radius: 4
+                        color: Theme.bgInputDropdown
+                        border.color: Theme.borderColor
+                        radius: Theme.radiusSmall
                     }
                 }
 
@@ -183,13 +199,14 @@ Rectangle {
                     width: trainingTypeCombo.width
                     contentItem: Label {
                         text: modelData
-                        color: highlighted ? Theme.accentPrimary : Theme.textPrimary
+                        color: highlighted ? Theme.primaryGlow : Theme.textPrimary
                         font.pixelSize: 13
                         verticalAlignment: Text.AlignVCenter
+                        leftPadding: 8
                     }
                     highlighted: trainingTypeCombo.highlightedIndex === index
                     background: Rectangle {
-                        color: highlighted ? Theme.bgInput : Theme.bgPrimary
+                        color: highlighted ? Theme.bgHover : "transparent"
                     }
                 }
             }
@@ -228,9 +245,16 @@ Rectangle {
 
                 background: Rectangle {
                     color: Theme.bgInput
-                    radius: 4
-                    border.color: parentVersionCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                    radius: Theme.radiusSmall
+                    border.color: parentVersionCombo.activeFocus ? Theme.primaryGlow : (parentVersionCombo.hovered ? Theme.primary : Theme.borderColor)
                     border.width: 1
+
+                    layer.enabled: parentVersionCombo.activeFocus || parentVersionCombo.hovered
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: parentVersionCombo.activeFocus ? Theme.primaryGlow : Theme.primary
+                        shadowBlur: 0.15
+                    }
                 }
 
                 popup: Popup {
@@ -247,9 +271,9 @@ Rectangle {
                     }
 
                     background: Rectangle {
-                        color: Theme.bgPrimary
-                        border.color: Theme.borderNormal
-                        radius: 4
+                        color: Theme.bgInputDropdown
+                        border.color: Theme.borderColor
+                        radius: Theme.radiusSmall
                     }
                 }
 
@@ -257,14 +281,14 @@ Rectangle {
                     width: parentVersionCombo.width
                     contentItem: Label {
                         text: model.versionId.substring(0, 8) + "... (" + model.bestWeight + ")"
-                        color: highlighted ? Theme.accentPrimary : Theme.textPrimary
+                        color: highlighted ? Theme.primaryGlow : Theme.textPrimary
                         font.pixelSize: 12
                         font.family: "monospace"
                         verticalAlignment: Text.AlignVCenter
                     }
                     highlighted: parentVersionCombo.highlightedIndex === index
                     background: Rectangle {
-                        color: highlighted ? Theme.bgInput : Theme.bgPrimary
+                        color: highlighted ? Theme.bgHover : "transparent"
                     }
                 }
             }
@@ -310,39 +334,51 @@ Rectangle {
                 up.indicator: Rectangle {
                     x: imgSizeSpin.mirrored ? 0 : parent.width - width
                     height: parent.height
-                    implicitWidth: 32
-                    color: imgSizeSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
-                    radius: 2
+                    implicitWidth: 28
+                    color: imgSizeSpin.up.pressed ? Theme.primary : (imgSizeSpin.up.hovered ? Theme.bgHover : Theme.bgInput)
+                    border.color: Theme.borderColor
+                    radius: Theme.radiusSmall
+                    Behavior on color { ColorAnimation { duration: 100 } }
 
                     Label {
                         anchors.centerIn: parent
                         text: "+"
-                        color: Theme.textPrimary
+                        color: imgSizeSpin.up.hovered ? Theme.primaryGlow : Theme.textPrimary
                         font.pixelSize: 14
+                        font.bold: true
                     }
                 }
 
                 down.indicator: Rectangle {
                     x: imgSizeSpin.mirrored ? parent.width - width : 0
                     height: parent.height
-                    implicitWidth: 32
-                    color: imgSizeSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
-                    radius: 2
+                    implicitWidth: 28
+                    color: imgSizeSpin.down.pressed ? Theme.primary : (imgSizeSpin.down.hovered ? Theme.bgHover : Theme.bgInput)
+                    border.color: Theme.borderColor
+                    radius: Theme.radiusSmall
+                    Behavior on color { ColorAnimation { duration: 100 } }
 
                     Label {
                         anchors.centerIn: parent
                         text: "-"
-                        color: Theme.textPrimary
+                        color: imgSizeSpin.down.hovered ? Theme.primaryGlow : Theme.textPrimary
                         font.pixelSize: 14
+                        font.bold: true
                     }
                 }
 
                 background: Rectangle {
                     color: Theme.bgInput
-                    border.color: imgSizeSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
-                    radius: 4
+                    border.color: imgSizeSpin.activeFocus ? Theme.primaryGlow : (imgSizeSpin.hovered ? Theme.primary : Theme.borderColor)
+                    radius: Theme.radiusSmall
+                    border.width: 1
+
+                    layer.enabled: imgSizeSpin.activeFocus || imgSizeSpin.hovered
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: imgSizeSpin.activeFocus ? Theme.primaryGlow : Theme.primary
+                        shadowBlur: 0.15
+                    }
                 }
             }
         }
@@ -384,27 +420,37 @@ Rectangle {
                 up.indicator: Rectangle {
                     x: batchSpin.mirrored ? 0 : parent.width - width
                     height: parent.height
-                    implicitWidth: 32
-                    color: batchSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
-                    radius: 2
-                    Label { anchors.centerIn: parent; text: "+"; color: Theme.textPrimary; font.pixelSize: 14 }
+                    implicitWidth: 28
+                    color: batchSpin.up.pressed ? Theme.primary : (batchSpin.up.hovered ? Theme.bgHover : Theme.bgInput)
+                    border.color: Theme.borderColor
+                    radius: Theme.radiusSmall
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Label { anchors.centerIn: parent; text: "+"; color: batchSpin.up.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
                 }
 
                 down.indicator: Rectangle {
                     x: batchSpin.mirrored ? parent.width - width : 0
                     height: parent.height
-                    implicitWidth: 32
-                    color: batchSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
-                    radius: 2
-                    Label { anchors.centerIn: parent; text: "-"; color: Theme.textPrimary; font.pixelSize: 14 }
+                    implicitWidth: 28
+                    color: batchSpin.down.pressed ? Theme.primary : (batchSpin.down.hovered ? Theme.bgHover : Theme.bgInput)
+                    border.color: Theme.borderColor
+                    radius: Theme.radiusSmall
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Label { anchors.centerIn: parent; text: "-"; color: batchSpin.down.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
                 }
 
                 background: Rectangle {
                     color: Theme.bgInput
-                    border.color: batchSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
-                    radius: 4
+                    border.color: batchSpin.activeFocus ? Theme.primaryGlow : (batchSpin.hovered ? Theme.primary : Theme.borderColor)
+                    radius: Theme.radiusSmall
+                    border.width: 1
+
+                    layer.enabled: batchSpin.activeFocus || batchSpin.hovered
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: batchSpin.activeFocus ? Theme.primaryGlow : Theme.primary
+                        shadowBlur: 0.15
+                    }
                 }
             }
         }
@@ -446,27 +492,37 @@ Rectangle {
                 up.indicator: Rectangle {
                     x: epochsSpin.mirrored ? 0 : parent.width - width
                     height: parent.height
-                    implicitWidth: 32
-                    color: epochsSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
-                    radius: 2
-                    Label { anchors.centerIn: parent; text: "+"; color: Theme.textPrimary; font.pixelSize: 14 }
+                    implicitWidth: 28
+                    color: epochsSpin.up.pressed ? Theme.primary : (epochsSpin.up.hovered ? Theme.bgHover : Theme.bgInput)
+                    border.color: Theme.borderColor
+                    radius: Theme.radiusSmall
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Label { anchors.centerIn: parent; text: "+"; color: epochsSpin.up.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
                 }
 
                 down.indicator: Rectangle {
                     x: epochsSpin.mirrored ? parent.width - width : 0
                     height: parent.height
-                    implicitWidth: 32
-                    color: epochsSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
-                    radius: 2
-                    Label { anchors.centerIn: parent; text: "-"; color: Theme.textPrimary; font.pixelSize: 14 }
+                    implicitWidth: 28
+                    color: epochsSpin.down.pressed ? Theme.primary : (epochsSpin.down.hovered ? Theme.bgHover : Theme.bgInput)
+                    border.color: Theme.borderColor
+                    radius: Theme.radiusSmall
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Label { anchors.centerIn: parent; text: "-"; color: epochsSpin.down.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
                 }
 
                 background: Rectangle {
                     color: Theme.bgInput
-                    border.color: epochsSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
-                    radius: 4
+                    border.color: epochsSpin.activeFocus ? Theme.primaryGlow : (epochsSpin.hovered ? Theme.primary : Theme.borderColor)
+                    radius: Theme.radiusSmall
+                    border.width: 1
+
+                    layer.enabled: epochsSpin.activeFocus || epochsSpin.hovered
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: epochsSpin.activeFocus ? Theme.primaryGlow : Theme.primary
+                        shadowBlur: 0.15
+                    }
                 }
             }
         }
@@ -508,27 +564,37 @@ Rectangle {
                 up.indicator: Rectangle {
                     x: patienceSpin.mirrored ? 0 : parent.width - width
                     height: parent.height
-                    implicitWidth: 32
-                    color: patienceSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
-                    radius: 2
-                    Label { anchors.centerIn: parent; text: "+"; color: Theme.textPrimary; font.pixelSize: 14 }
+                    implicitWidth: 28
+                    color: patienceSpin.up.pressed ? Theme.primary : (patienceSpin.up.hovered ? Theme.bgHover : Theme.bgInput)
+                    border.color: Theme.borderColor
+                    radius: Theme.radiusSmall
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Label { anchors.centerIn: parent; text: "+"; color: patienceSpin.up.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
                 }
 
                 down.indicator: Rectangle {
                     x: patienceSpin.mirrored ? parent.width - width : 0
                     height: parent.height
-                    implicitWidth: 32
-                    color: patienceSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
-                    radius: 2
-                    Label { anchors.centerIn: parent; text: "-"; color: Theme.textPrimary; font.pixelSize: 14 }
+                    implicitWidth: 28
+                    color: patienceSpin.down.pressed ? Theme.primary : (patienceSpin.down.hovered ? Theme.bgHover : Theme.bgInput)
+                    border.color: Theme.borderColor
+                    radius: Theme.radiusSmall
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Label { anchors.centerIn: parent; text: "-"; color: patienceSpin.down.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
                 }
 
                 background: Rectangle {
                     color: Theme.bgInput
-                    border.color: patienceSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
-                    radius: 4
+                    border.color: patienceSpin.activeFocus ? Theme.primaryGlow : (patienceSpin.hovered ? Theme.primary : Theme.borderColor)
+                    radius: Theme.radiusSmall
+                    border.width: 1
+
+                    layer.enabled: patienceSpin.activeFocus || patienceSpin.hovered
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: patienceSpin.activeFocus ? Theme.primaryGlow : Theme.primary
+                        shadowBlur: 0.15
+                    }
                 }
             }
         }
@@ -570,27 +636,37 @@ Rectangle {
                 up.indicator: Rectangle {
                     x: workersSpin.mirrored ? 0 : parent.width - width
                     height: parent.height
-                    implicitWidth: 32
-                    color: workersSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
-                    radius: 2
-                    Label { anchors.centerIn: parent; text: "+"; color: Theme.textPrimary; font.pixelSize: 14 }
+                    implicitWidth: 28
+                    color: workersSpin.up.pressed ? Theme.primary : (workersSpin.up.hovered ? Theme.bgHover : Theme.bgInput)
+                    border.color: Theme.borderColor
+                    radius: Theme.radiusSmall
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Label { anchors.centerIn: parent; text: "+"; color: workersSpin.up.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
                 }
 
                 down.indicator: Rectangle {
                     x: workersSpin.mirrored ? parent.width - width : 0
                     height: parent.height
-                    implicitWidth: 32
-                    color: workersSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
-                    radius: 2
-                    Label { anchors.centerIn: parent; text: "-"; color: Theme.textPrimary; font.pixelSize: 14 }
+                    implicitWidth: 28
+                    color: workersSpin.down.pressed ? Theme.primary : (workersSpin.down.hovered ? Theme.bgHover : Theme.bgInput)
+                    border.color: Theme.borderColor
+                    radius: Theme.radiusSmall
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Label { anchors.centerIn: parent; text: "-"; color: workersSpin.down.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
                 }
 
                 background: Rectangle {
                     color: Theme.bgInput
-                    border.color: workersSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
-                    radius: 4
+                    border.color: workersSpin.activeFocus ? Theme.primaryGlow : (workersSpin.hovered ? Theme.primary : Theme.borderColor)
+                    radius: Theme.radiusSmall
+                    border.width: 1
+
+                    layer.enabled: workersSpin.activeFocus || workersSpin.hovered
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: workersSpin.activeFocus ? Theme.primaryGlow : Theme.primary
+                        shadowBlur: 0.15
+                    }
                 }
             }
         }
@@ -615,18 +691,25 @@ Rectangle {
                 indicator: Rectangle {
                     x: ampSwitch.leftPadding
                     y: parent.height / 2 - height / 2
-                    implicitWidth: 40
-                    implicitHeight: 20
-                    radius: 10
-                    color: ampSwitch.checked ? Theme.accentPrimary : Theme.borderNormal
+                    implicitWidth: Theme.toggleWidth
+                    implicitHeight: Theme.toggleHeight
+                    radius: implicitHeight / 2
+                    color: ampSwitch.checked ? Theme.primary : Theme.bgInput
+                    border.color: ampSwitch.checked ? Theme.primaryGlow : Theme.borderColor
+                    border.width: 1
+
+                    Behavior on color { ColorAnimation { duration: 150 } }
 
                     Rectangle {
                         x: ampSwitch.checked ? parent.width - width - 2 : 2
                         y: parent.height / 2 - height / 2
-                        implicitWidth: 16
-                        implicitHeight: 16
-                        radius: 8
-                        color: Theme.textPrimary
+                        implicitWidth: 14
+                        implicitHeight: 14
+                        radius: 7
+                        color: ampSwitch.checked ? Theme.primaryGlow : Theme.textMuted
+                        
+                        Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.InOutQuad } }
+                        Behavior on color { ColorAnimation { duration: 150 } }
                     }
                 }
             }
@@ -652,18 +735,25 @@ Rectangle {
                 indicator: Rectangle {
                     x: resumeSwitch.leftPadding
                     y: parent.height / 2 - height / 2
-                    implicitWidth: 40
-                    implicitHeight: 20
-                    radius: 10
-                    color: resumeSwitch.checked ? Theme.accentPrimary : Theme.borderNormal
+                    implicitWidth: Theme.toggleWidth
+                    implicitHeight: Theme.toggleHeight
+                    radius: implicitHeight / 2
+                    color: resumeSwitch.checked ? Theme.primary : Theme.bgInput
+                    border.color: resumeSwitch.checked ? Theme.primaryGlow : Theme.borderColor
+                    border.width: 1
+
+                    Behavior on color { ColorAnimation { duration: 150 } }
 
                     Rectangle {
                         x: resumeSwitch.checked ? parent.width - width - 2 : 2
                         y: parent.height / 2 - height / 2
-                        implicitWidth: 16
-                        implicitHeight: 16
-                        radius: 8
-                        color: Theme.textPrimary
+                        implicitWidth: 14
+                        implicitHeight: 14
+                        radius: 7
+                        color: resumeSwitch.checked ? Theme.primaryGlow : Theme.textMuted
+                        
+                        Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.InOutQuad } }
+                        Behavior on color { ColorAnimation { duration: 150 } }
                     }
                 }
             }
@@ -697,9 +787,16 @@ Rectangle {
 
                 background: Rectangle {
                     color: Theme.bgInput
-                    radius: 4
-                    border.color: deviceCombo.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                    radius: Theme.radiusSmall
+                    border.color: deviceCombo.activeFocus ? Theme.primaryGlow : (deviceCombo.hovered ? Theme.primary : Theme.borderColor)
                     border.width: 1
+
+                    layer.enabled: deviceCombo.activeFocus || deviceCombo.hovered
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: deviceCombo.activeFocus ? Theme.primaryGlow : Theme.primary
+                        shadowBlur: 0.15
+                    }
                 }
 
                 popup: Popup {
@@ -716,9 +813,9 @@ Rectangle {
                     }
 
                     background: Rectangle {
-                        color: Theme.bgPrimary
-                        border.color: Theme.borderNormal
-                        radius: 4
+                        color: Theme.bgInputDropdown
+                        border.color: Theme.borderColor
+                        radius: Theme.radiusSmall
                     }
                 }
 
@@ -726,13 +823,14 @@ Rectangle {
                     width: deviceCombo.width
                     contentItem: Label {
                         text: modelData
-                        color: highlighted ? Theme.accentPrimary : Theme.textPrimary
+                        color: highlighted ? Theme.primaryGlow : Theme.textPrimary
                         font.pixelSize: 13
                         verticalAlignment: Text.AlignVCenter
+                        leftPadding: 8
                     }
                     highlighted: deviceCombo.highlightedIndex === index
                     background: Rectangle {
-                        color: highlighted ? Theme.bgInput : Theme.bgPrimary
+                        color: highlighted ? Theme.bgHover : "transparent"
                     }
                 }
             }

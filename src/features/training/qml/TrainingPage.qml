@@ -483,7 +483,7 @@ Item {
                         width: modelListView.width
                         height: 48
                         radius: Theme.radiusSmall
-                        color: model.runId === currentRunId ? Theme.bgSelected : "transparent"
+                        color: model.runId === currentRunId ? Qt.alpha(Theme.primaryGlow, 0.05) : "transparent"
                         border.color: model.runId === currentRunId ? Theme.primaryGlow : "transparent"
                         border.width: model.runId === currentRunId ? 1 : 0
 
@@ -779,13 +779,13 @@ Item {
                     RowLayout {
                         anchors.fill: parent
                         anchors.margins: Theme.spacingNormal
-                        spacing: Theme.spacingNormal
+                        spacing: 1
 
                         // 左列
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            spacing: Theme.spacingNormal
+                            spacing: 1
 
                             // === 左上：数据集配置 ===
                             Rectangle {
@@ -794,123 +794,127 @@ Item {
                                 color: Theme.bgCard
                                 radius: Theme.radiusNormal
 
-                                ColumnLayout {
+                                ScrollView {
                                     anchors.fill: parent
                                     anchors.margins: Theme.spacingNormal
-                                    spacing: Theme.spacingNormal
+                                    clip: true
+                                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
-                                    // 区块标题
-                                    SectionTitle {
-                                        text: "数据集配置"
-                                        Layout.fillWidth: true
-                                    }
+                                    ColumnLayout {
+                                        width: parent.width - Theme.spacingNormal * 2
+                                        spacing: Theme.spacingNormal
 
-                                    // 训练集（数据快照）选择
-                                    ParamRow {
-                                        label: "训练集"
-                                        labelWidth: 80
-                                        Layout.fillWidth: true
+                                        // 区块标题
+                                        SectionTitle {
+                                            text: "数据集配置"
+                                            Layout.fillWidth: true
+                                        }
 
-                                        ComboBox {
-                                            id: snapshotCombo
-                                            anchors.fill: parent
-                                            model: snapshotModel
-                                            textRole: "snapshotId"
-                                            valueRole: "snapshotId"
-                                            displayText: currentIndex >= 0 && currentValue ?
-                                                currentValue.substring(0, 8) + "..." : "选择数据快照"
+                                        // 训练集（数据快照）选择
+                                        ParamRow {
+                                            label: "训练集"
+                                            labelWidth: 80
+                                            Layout.fillWidth: true
 
-                                            contentItem: Text {
-                                                text: snapshotCombo.displayText
-                                                color: Theme.textMain
-                                                font.pixelSize: Theme.fontSizeSmall
-                                                verticalAlignment: Text.AlignVCenter
-                                                leftPadding: 8
-                                                elide: Text.ElideRight
-                                            }
+                                            ComboBox {
+                                                id: snapshotCombo
+                                                anchors.fill: parent
+                                                model: snapshotModel
+                                                textRole: "snapshotId"
+                                                valueRole: "snapshotId"
+                                                displayText: currentIndex >= 0 && currentValue ?
+                                                    currentValue.substring(0, 8) + "..." : "选择数据快照"
 
-                                            background: Rectangle {
-                                                color: Theme.bgInput
-                                                radius: Theme.radiusSmall
-                                                border.color: snapshotCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
-                                                border.width: 1
-                                            }
-
-                                            delegate: ItemDelegate {
-                                                width: snapshotCombo.width
                                                 contentItem: Text {
-                                                    text: model.snapshotId.substring(0, 8) + "... (" + model.sampleCount + " 样本, train:" + model.trainCount + " val:" + model.valCount + ")"
-                                                    color: highlighted ? Theme.primaryGlow : Theme.textMain
-                                                    font.pixelSize: Theme.fontSizeCaption
-                                                    font.family: Theme.fontFamilyMono
+                                                    text: snapshotCombo.displayText
+                                                    color: Theme.textMain
+                                                    font.pixelSize: Theme.fontSizeSmall
+                                                    verticalAlignment: Text.AlignVCenter
+                                                    leftPadding: 8
                                                     elide: Text.ElideRight
                                                 }
-                                                highlighted: snapshotCombo.highlightedIndex === index
+
                                                 background: Rectangle {
-                                                    color: highlighted ? Theme.bgHover : Theme.bgMain
+                                                    color: Theme.bgInput
+                                                    radius: Theme.radiusSmall
+                                                    border.color: snapshotCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                                                    border.width: 1
+                                                }
+
+                                                delegate: ItemDelegate {
+                                                    width: snapshotCombo.width
+                                                    contentItem: Text {
+                                                        text: model.snapshotId.substring(0, 8) + "... (" + model.sampleCount + " 样本, train:" + model.trainCount + " val:" + model.valCount + ")"
+                                                        color: highlighted ? Theme.primaryGlow : Theme.textMain
+                                                        font.pixelSize: Theme.fontSizeCaption
+                                                        font.family: Theme.fontFamilyMono
+                                                        elide: Text.ElideRight
+                                                    }
+                                                    highlighted: snapshotCombo.highlightedIndex === index
+                                                    background: Rectangle {
+                                                        color: highlighted ? Theme.bgHover : Theme.bgMain
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
 
-                                    // 快照信息
-                                    Text {
-                                        id: snapshotInfoLabel
-                                        Layout.fillWidth: true
-                                        color: Theme.textMuted
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        wrapMode: Text.WordWrap
-                                        visible: text !== ""
-
-                                        text: {
-                                            if (snapshotCombo.currentIndex < 0) return ""
-                                            var idx = snapshotCombo.currentIndex
-                                            var trainCount = snapshotModel.data(snapshotModel.index(idx, 0), Qt.UserRole + 3)
-                                            var valCount = snapshotModel.data(snapshotModel.index(idx, 0), Qt.UserRole + 4)
-                                            var taxVer = snapshotModel.data(snapshotModel.index(idx, 0), Qt.UserRole + 5)
-                                            if (trainCount === undefined) return ""
-                                            return "Train: " + trainCount + " | Val: " + valCount + " | Taxonomy: " + (taxVer || "unknown")
-                                        }
-                                    }
-
-                                    // 创建快照按钮
-                                    Button {
-                                        text: "+ 创建快照"
-                                        font.family: Theme.fontFamily
-                                        Layout.fillWidth: true
-                                        Layout.preferredHeight: 28
-                                        background: Rectangle {
-                                            color: parent.hovered ? Theme.bgHover : Theme.bgInput
-                                            radius: Theme.radiusSmall
-                                            border.color: Theme.primary
-                                            border.width: 1
-                                        }
-                                        contentItem: Text {
-                                            text: parent.text
-                                            color: Theme.primary
-                                            font.pixelSize: Theme.fontSizeSmall
-                                            horizontalAlignment: Text.AlignHCenter
-                                            verticalAlignment: Text.AlignVCenter
-                                        }
-                                        onClicked: createSnapshotDialog.open()
-                                    }
-
-                                    // 验证集（与训练集同快照，只读显示）
-                                    ParamRow {
-                                        label: "验证集"
-                                        labelWidth: 80
-                                        Layout.fillWidth: true
-
+                                        // 快照信息
                                         Text {
-                                            anchors.fill: parent
-                                            verticalAlignment: Text.AlignVCenter
-                                            text: snapshotCombo.currentIndex >= 0 ? "同快照验证集" : "—"
+                                            id: snapshotInfoLabel
+                                            Layout.fillWidth: true
                                             color: Theme.textMuted
-                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.pixelSize: Theme.fontSizeCaption
+                                            wrapMode: Text.WordWrap
+                                            visible: text !== ""
+
+                                            text: {
+                                                if (snapshotCombo.currentIndex < 0) return ""
+                                                var idx = snapshotCombo.currentIndex
+                                                var trainCount = snapshotModel.data(snapshotModel.index(idx, 0), Qt.UserRole + 3)
+                                                var valCount = snapshotModel.data(snapshotModel.index(idx, 0), Qt.UserRole + 4)
+                                                var taxVer = snapshotModel.data(snapshotModel.index(idx, 0), Qt.UserRole + 5)
+                                                if (trainCount === undefined) return ""
+                                                return "Train: " + trainCount + " | Val: " + valCount + " | Taxonomy: " + (taxVer || "unknown")
+                                            }
+                                        }
+
+                                        // 创建快照按钮
+                                        Button {
+                                            text: "+ 创建快照"
+                                            font.family: Theme.fontFamily
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: 28
+                                            background: Rectangle {
+                                                color: parent.hovered ? Theme.bgHover : Theme.bgInput
+                                                radius: Theme.radiusSmall
+                                                border.color: Theme.primary
+                                                border.width: 1
+                                            }
+                                            contentItem: Text {
+                                                text: parent.text
+                                                color: Theme.primary
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                            }
+                                            onClicked: createSnapshotDialog.open()
+                                        }
+
+                                        // 验证集（与训练集同快照，只读显示）
+                                        ParamRow {
+                                            label: "验证集"
+                                            labelWidth: 80
+                                            Layout.fillWidth: true
+
+                                            Text {
+                                                anchors.fill: parent
+                                                verticalAlignment: Text.AlignVCenter
+                                                text: snapshotCombo.currentIndex >= 0 ? "同快照验证集" : "—"
+                                                color: Theme.textMuted
+                                                font.pixelSize: Theme.fontSizeSmall
+                                            }
                                         }
                                     }
-
-                                    Item { Layout.fillHeight: true }
                                 }
                             }
 
@@ -1328,7 +1332,7 @@ Item {
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            spacing: Theme.spacingNormal
+                            spacing: 1
 
                             // === 右上：网络配置 ===
                             Rectangle {
@@ -1337,205 +1341,211 @@ Item {
                                 color: Theme.bgCard
                                 radius: Theme.radiusNormal
 
-                                ColumnLayout {
+                                ScrollView {
                                     anchors.fill: parent
                                     anchors.margins: Theme.spacingNormal
-                                    spacing: Theme.spacingNormal
+                                    clip: true
+                                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
-                                    SectionTitle {
-                                        text: "网络配置"
-                                        Layout.fillWidth: true
-                                    }
+                                    ColumnLayout {
+                                        width: parent.width - Theme.spacingNormal * 2
+                                        spacing: Theme.spacingNormal
 
-                                    // 适配器选择
-                                    ParamRow {
-                                        label: "训练适配器"
-                                        labelWidth: 80
-                                        Layout.fillWidth: true
+                                        SectionTitle {
+                                            text: "网络配置"
+                                            Layout.fillWidth: true
+                                        }
 
-                                        ComboBox {
-                                            id: adapterCombo
-                                            anchors.fill: parent
-                                            model: trainingService.listAdapters()
-                                            valueRole: "value"
+                                        // 适配器选择
+                                        ParamRow {
+                                            label: "训练适配器"
+                                            labelWidth: 80
+                                            Layout.fillWidth: true
 
-                                            contentItem: Text {
-                                                text: adapterCombo.displayText
-                                                color: Theme.textMain
-                                                font.pixelSize: Theme.fontSizeSmall
-                                                verticalAlignment: Text.AlignVCenter
-                                                leftPadding: 8
-                                            }
-                                            background: Rectangle {
-                                                color: Theme.bgInput
-                                                radius: Theme.radiusSmall
-                                                border.color: adapterCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
-                                                border.width: 1
-                                            }
-                                            delegate: ItemDelegate {
-                                                width: adapterCombo.width
+                                            ComboBox {
+                                                id: adapterCombo
+                                                anchors.fill: parent
+                                                model: trainingService.listAdapters()
+                                                valueRole: "value"
+
                                                 contentItem: Text {
-                                                    text: modelData
-                                                    color: highlighted ? Theme.primaryGlow : Theme.textMain
+                                                    text: adapterCombo.displayText
+                                                    color: Theme.textMain
                                                     font.pixelSize: Theme.fontSizeSmall
+                                                    verticalAlignment: Text.AlignVCenter
+                                                    leftPadding: 8
                                                 }
-                                                highlighted: adapterCombo.highlightedIndex === index
-                                                background: Rectangle { color: highlighted ? Theme.bgHover : Theme.bgMain }
-                                            }
+                                                background: Rectangle {
+                                                    color: Theme.bgInput
+                                                    radius: Theme.radiusSmall
+                                                    border.color: adapterCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                                                    border.width: 1
+                                                }
+                                                delegate: ItemDelegate {
+                                                    width: adapterCombo.width
+                                                    contentItem: Text {
+                                                        text: modelData
+                                                        color: highlighted ? Theme.primaryGlow : Theme.textMain
+                                                        font.pixelSize: Theme.fontSizeSmall
+                                                    }
+                                                    highlighted: adapterCombo.highlightedIndex === index
+                                                    background: Rectangle { color: highlighted ? Theme.bgHover : Theme.bgMain }
+                                                }
 
-                                            onActivated: {
-                                                if (currentText === "anomalib") {
-                                                    modelFamilyCombo.model = ["anomaly"]
-                                                    modelFamilyCombo.currentIndex = 0
-                                                } else {
-                                                    modelFamilyCombo.model = ["yolov5", "yolov8", "yolov8_obb", "yolov8_cls", "yolov10", "yolov11"]
-                                                    modelFamilyCombo.currentIndex = 1
+                                                onActivated: {
+                                                    if (currentText === "anomalib") {
+                                                        modelFamilyCombo.model = ["anomaly"]
+                                                        modelFamilyCombo.currentIndex = 0
+                                                    } else {
+                                                        modelFamilyCombo.model = ["yolov5", "yolov8", "yolov8_obb", "yolov8_cls", "yolov10", "yolov11"]
+                                                        modelFamilyCombo.currentIndex = 1
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
 
-                                    // 网络结构（模型系列）
-                                    ParamRow {
-                                        label: "网络结构"
-                                        labelWidth: 80
-                                        Layout.fillWidth: true
+                                        // 网络结构（模型系列）
+                                        ParamRow {
+                                            label: "网络结构"
+                                            labelWidth: 80
+                                            Layout.fillWidth: true
 
-                                        ComboBox {
-                                            id: modelFamilyCombo
-                                            anchors.fill: parent
-                                            model: ["yolov5", "yolov8", "yolov8_obb", "yolov8_cls", "yolov10", "yolov11"]
-                                            currentIndex: 1
+                                            ComboBox {
+                                                id: modelFamilyCombo
+                                                anchors.fill: parent
+                                                model: ["yolov5", "yolov8", "yolov8_obb", "yolov8_cls", "yolov10", "yolov11"]
+                                                currentIndex: 1
 
-                                            contentItem: Text {
-                                                text: modelFamilyCombo.displayText
-                                                color: Theme.textMain
-                                                font.pixelSize: Theme.fontSizeSmall
-                                                verticalAlignment: Text.AlignVCenter
-                                                leftPadding: 8
-                                            }
-                                            background: Rectangle {
-                                                color: Theme.bgInput
-                                                radius: Theme.radiusSmall
-                                                border.color: modelFamilyCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
-                                                border.width: 1
-                                            }
-                                            delegate: ItemDelegate {
-                                                width: modelFamilyCombo.width
                                                 contentItem: Text {
-                                                    text: modelData
-                                                    color: highlighted ? Theme.primaryGlow : Theme.textMain
+                                                    text: modelFamilyCombo.displayText
+                                                    color: Theme.textMain
                                                     font.pixelSize: Theme.fontSizeSmall
+                                                    verticalAlignment: Text.AlignVCenter
+                                                    leftPadding: 8
                                                 }
-                                                highlighted: modelFamilyCombo.highlightedIndex === index
-                                                background: Rectangle { color: highlighted ? Theme.bgHover : Theme.bgMain }
+                                                background: Rectangle {
+                                                    color: Theme.bgInput
+                                                    radius: Theme.radiusSmall
+                                                    border.color: modelFamilyCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                                                    border.width: 1
+                                                }
+                                                delegate: ItemDelegate {
+                                                    width: modelFamilyCombo.width
+                                                    contentItem: Text {
+                                                        text: modelData
+                                                        color: highlighted ? Theme.primaryGlow : Theme.textMain
+                                                        font.pixelSize: Theme.fontSizeSmall
+                                                    }
+                                                    highlighted: modelFamilyCombo.highlightedIndex === index
+                                                    background: Rectangle { color: highlighted ? Theme.bgHover : Theme.bgMain }
+                                                }
                                             }
                                         }
-                                    }
 
-                                    // 预训练模型
-                                    ParamRow {
-                                        label: "预训练模型"
-                                        labelWidth: 80
-                                        Layout.fillWidth: true
+                                        // 预训练模型
+                                        ParamRow {
+                                            label: "预训练模型"
+                                            labelWidth: 80
+                                            Layout.fillWidth: true
 
-                                        ComboBox {
-                                            id: pretrainedCombo
-                                            anchors.fill: parent
-                                            model: ["默认", "COCO预训练"]
-                                            currentIndex: 1
+                                            ComboBox {
+                                                id: pretrainedCombo
+                                                anchors.fill: parent
+                                                model: ["默认", "COCO预训练"]
+                                                currentIndex: 1
 
-                                            contentItem: Text {
-                                                text: pretrainedCombo.displayText
-                                                color: Theme.textMain
-                                                font.pixelSize: Theme.fontSizeSmall
-                                                verticalAlignment: Text.AlignVCenter
-                                                leftPadding: 8
-                                            }
-                                            background: Rectangle {
-                                                color: Theme.bgInput
-                                                radius: Theme.radiusSmall
-                                                border.color: pretrainedCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
-                                                border.width: 1
-                                            }
-                                            delegate: ItemDelegate {
-                                                width: pretrainedCombo.width
                                                 contentItem: Text {
-                                                    text: modelData
-                                                    color: highlighted ? Theme.primaryGlow : Theme.textMain
+                                                    text: pretrainedCombo.displayText
+                                                    color: Theme.textMain
                                                     font.pixelSize: Theme.fontSizeSmall
+                                                    verticalAlignment: Text.AlignVCenter
+                                                    leftPadding: 8
                                                 }
-                                                highlighted: pretrainedCombo.highlightedIndex === index
-                                                background: Rectangle { color: highlighted ? Theme.bgHover : Theme.bgMain }
+                                                background: Rectangle {
+                                                    color: Theme.bgInput
+                                                    radius: Theme.radiusSmall
+                                                    border.color: pretrainedCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                                                    border.width: 1
+                                                }
+                                                delegate: ItemDelegate {
+                                                    width: pretrainedCombo.width
+                                                    contentItem: Text {
+                                                        text: modelData
+                                                        color: highlighted ? Theme.primaryGlow : Theme.textMain
+                                                        font.pixelSize: Theme.fontSizeSmall
+                                                    }
+                                                    highlighted: pretrainedCombo.highlightedIndex === index
+                                                    background: Rectangle { color: highlighted ? Theme.bgHover : Theme.bgMain }
+                                                }
                                             }
                                         }
-                                    }
 
-                                    // 图像大小
-                                    ParamRow {
-                                        label: "图像大小"
-                                        labelWidth: 80
-                                        Layout.fillWidth: true
+                                        // 图像大小
+                                        ParamRow {
+                                            label: "图像大小"
+                                            labelWidth: 80
+                                            Layout.fillWidth: true
 
-                                        Stepper {
-                                            id: imgSizeStepper
-                                            value: 640
-                                            minValue: 320
-                                            maxValue: 1280
-                                            stepSize: 32
+                                            Stepper {
+                                                id: imgSizeStepper
+                                                anchors.right: parent.right
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                value: 640
+                                                minValue: 320
+                                                maxValue: 1280
+                                                stepSize: 32
+                                            }
                                         }
-                                    }
 
-                                    // 图像通道
-                                    ParamRow {
-                                        label: "图像通道"
-                                        labelWidth: 80
-                                        Layout.fillWidth: true
+                                        // 图像通道
+                                        ParamRow {
+                                            label: "图像通道"
+                                            labelWidth: 80
+                                            Layout.fillWidth: true
 
-                                        ComboBox {
-                                            id: channelCombo
-                                            anchors.fill: parent
-                                            model: ["3 (RGB)", "1 (灰度)"]
-                                            currentIndex: 0
+                                            ComboBox {
+                                                id: channelCombo
+                                                anchors.fill: parent
+                                                model: ["3 (RGB)", "1 (灰度)"]
+                                                currentIndex: 0
 
-                                            contentItem: Text {
-                                                text: channelCombo.displayText
-                                                color: Theme.textMain
-                                                font.pixelSize: Theme.fontSizeSmall
-                                                verticalAlignment: Text.AlignVCenter
-                                                leftPadding: 8
-                                            }
-                                            background: Rectangle {
-                                                color: Theme.bgInput
-                                                radius: Theme.radiusSmall
-                                                border.color: channelCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
-                                                border.width: 1
-                                            }
-                                            delegate: ItemDelegate {
-                                                width: channelCombo.width
                                                 contentItem: Text {
-                                                    text: modelData
-                                                    color: highlighted ? Theme.primaryGlow : Theme.textMain
+                                                    text: channelCombo.displayText
+                                                    color: Theme.textMain
                                                     font.pixelSize: Theme.fontSizeSmall
+                                                    verticalAlignment: Text.AlignVCenter
+                                                    leftPadding: 8
                                                 }
-                                                highlighted: channelCombo.highlightedIndex === index
-                                                background: Rectangle { color: highlighted ? Theme.bgHover : Theme.bgMain }
+                                                background: Rectangle {
+                                                    color: Theme.bgInput
+                                                    radius: Theme.radiusSmall
+                                                    border.color: channelCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                                                    border.width: 1
+                                                }
+                                                delegate: ItemDelegate {
+                                                    width: channelCombo.width
+                                                    contentItem: Text {
+                                                        text: modelData
+                                                        color: highlighted ? Theme.primaryGlow : Theme.textMain
+                                                        font.pixelSize: Theme.fontSizeSmall
+                                                    }
+                                                    highlighted: channelCombo.highlightedIndex === index
+                                                    background: Rectangle { color: highlighted ? Theme.bgHover : Theme.bgMain }
+                                                }
                                             }
                                         }
-                                    }
 
-                                    // OBB 任务类型指示器
-                                    Text {
-                                        Layout.fillWidth: true
-                                        visible: modelFamilyCombo.currentText === "yolov8_obb"
-                                        text: "[OBB] 旋转边界框训练模式"
-                                        color: Theme.warning
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        font.bold: true
-                                        wrapMode: Text.WordWrap
+                                        // OBB 任务类型指示器
+                                        Text {
+                                            Layout.fillWidth: true
+                                            visible: modelFamilyCombo.currentText === "yolov8_obb"
+                                            text: "[OBB] 旋转边界框训练模式"
+                                            color: Theme.warning
+                                            font.pixelSize: Theme.fontSizeCaption
+                                            font.bold: true
+                                            wrapMode: Text.WordWrap
+                                        }
                                     }
-
-                                    Item { Layout.fillHeight: true }
                                 }
                             }
 
@@ -1946,7 +1956,7 @@ Item {
                                             width: runHistoryList.width
                                             height: 40
                                             radius: Theme.radiusSmall
-                                            color: model.runId === currentRunId ? Theme.bgSelected : "transparent"
+                                            color: model.runId === currentRunId ? Qt.alpha(Theme.primaryGlow, 0.05) : "transparent"
                                             border.color: model.runId === currentRunId ? Theme.primaryGlow : "transparent"
                                             border.width: model.runId === currentRunId ? 1 : 0
 
