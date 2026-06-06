@@ -431,6 +431,7 @@ cd backend && python -m ruff check .
 - C++/Python/QML 代码**必须加注释**（除非用户明确要求不加）
 - 界面语言：**仅中文**
 - 提交信息：**详细中文注释**
+- **交互与文档语言**：与用户的交互、生成的所有计划（如 `implementation_plan.md`）、任务列表（如 `task.md`）和总结文档（如 `walkthrough.md`）**必须全部使用中文**。
 - **禁止占位符**：绝不写 dummy 路径或占位符实现
 - **禁止硬编码路径**：项目路径通过 `ProjectFs` 管理，Python路径通过 `AppSettings` 管理
 

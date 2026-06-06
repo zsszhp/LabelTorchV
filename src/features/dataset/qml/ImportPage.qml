@@ -5,6 +5,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import LabelTorch.Theme
 import QtQuick.Dialogs
+import QtQuick.Effects
 
 Item {
     id: root
@@ -178,19 +179,30 @@ Item {
                         font.bold: root.importMode === "auto"
                         background: Rectangle {
                             color: {
-                                if (root.importMode === "auto") return Theme.accentPrimary
-                                return autoBtn.hovered ? Theme.bgHover : Theme.bgTertiary
+                                if (root.importMode === "auto") return Theme.primary
+                                return autoBtn.hovered ? Theme.bgHover : Theme.bgInput
                             }
                             radius: Theme.radiusSmall
-                            border.color: root.importMode === "auto" ? Theme.accentPrimary : Theme.border
+                            border.color: root.importMode === "auto" ? Theme.primaryGlow : (autoBtn.hovered ? Theme.primary : Theme.borderColor)
                             border.width: 1
+                            
+                            layer.enabled: root.importMode === "auto" || autoBtn.hovered
+                            layer.effect: MultiEffect {
+                                shadowEnabled: true
+                                shadowColor: root.importMode === "auto" ? Theme.primaryGlow : Theme.primary
+                                shadowBlur: 0.15
+                            }
+                            
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Behavior on border.color { ColorAnimation { duration: 150 } }
                         }
                         contentItem: Label {
                             text: autoBtn.text
-                            color: root.importMode === "auto" ? Theme.textPrimary : (autoBtn.hovered ? Theme.textPrimary : Theme.textSecondary)
+                            color: root.importMode === "auto" ? "#ffffff" : (autoBtn.hovered ? Theme.primaryGlow : Theme.textSecondary)
                             font: autoBtn.font
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
+                            Behavior on color { ColorAnimation { duration: 150 } }
                         }
                         onClicked: {
                             root.importMode = "auto"
@@ -205,19 +217,30 @@ Item {
                         font.bold: root.importMode === "separate"
                         background: Rectangle {
                             color: {
-                                if (root.importMode === "separate") return Theme.accentPrimary
-                                return sepBtn.hovered ? Theme.bgHover : Theme.bgTertiary
+                                if (root.importMode === "separate") return Theme.primary
+                                return sepBtn.hovered ? Theme.bgHover : Theme.bgInput
                             }
                             radius: Theme.radiusSmall
-                            border.color: root.importMode === "separate" ? Theme.accentPrimary : Theme.border
+                            border.color: root.importMode === "separate" ? Theme.primaryGlow : (sepBtn.hovered ? Theme.primary : Theme.borderColor)
                             border.width: 1
+
+                            layer.enabled: root.importMode === "separate" || sepBtn.hovered
+                            layer.effect: MultiEffect {
+                                shadowEnabled: true
+                                shadowColor: root.importMode === "separate" ? Theme.primaryGlow : Theme.primary
+                                shadowBlur: 0.15
+                            }
+
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Behavior on border.color { ColorAnimation { duration: 150 } }
                         }
                         contentItem: Label {
                             text: sepBtn.text
-                            color: root.importMode === "separate" ? Theme.textPrimary : (sepBtn.hovered ? Theme.textPrimary : Theme.textSecondary)
+                            color: root.importMode === "separate" ? "#ffffff" : (sepBtn.hovered ? Theme.primaryGlow : Theme.textSecondary)
                             font: sepBtn.font
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
+                            Behavior on color { ColorAnimation { duration: 150 } }
                         }
                         onClicked: {
                             root.importMode = "separate"
@@ -260,10 +283,20 @@ Item {
                             id: dropArea
                             Layout.fillWidth: true
                             Layout.preferredHeight: 120
-                            color: dropAreaDrag.containsDrag ? Theme.bgTertiary : Theme.bgInput
+                            color: dropAreaDrag.containsDrag ? Theme.bgSelected : (dropAreaMouse.containsMouse ? Theme.bgHover : Theme.bgInput)
                             radius: Theme.radiusNormal
-                            border.color: dropAreaDrag.containsDrag ? Theme.accentPrimary : Theme.borderNormal
+                            border.color: dropAreaDrag.containsDrag ? Theme.primaryGlow : (dropAreaMouse.containsMouse ? Theme.primary : Theme.borderColor)
                             border.width: 1
+
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                            layer.enabled: dropAreaDrag.containsDrag || dropAreaMouse.containsMouse
+                            layer.effect: MultiEffect {
+                                shadowEnabled: true
+                                shadowColor: dropAreaDrag.containsDrag ? Theme.primaryGlow : Theme.primary
+                                shadowBlur: 0.2
+                            }
 
                             DropArea {
                                 id: dropAreaDrag
@@ -288,14 +321,17 @@ Item {
                                     text: "📁"
                                     font.pixelSize: 32
                                     Layout.alignment: Qt.AlignHCenter
+                                    scale: dropAreaMouse.containsMouse || dropAreaDrag.containsDrag ? 1.15 : 1.0
+                                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
                                 }
 
                                 Label {
                                     text: "点击或拖拽文件夹到此处"
                                     font.pixelSize: Theme.fontSizeNormal
                                     font.family: Theme.fontFamily
-                                    color: Theme.textSecondary
+                                    color: dropAreaMouse.containsMouse || dropAreaDrag.containsDrag ? Theme.primaryGlow : Theme.textSecondary
                                     Layout.alignment: Qt.AlignHCenter
+                                    Behavior on color { ColorAnimation { duration: 150 } }
                                 }
 
                                 Label {
@@ -308,7 +344,9 @@ Item {
                             }
 
                             MouseArea {
+                                id: dropAreaMouse
                                 anchors.fill: parent
+                                hoverEnabled: true
                                 onClicked: folderDialog.open()
                             }
                         }
@@ -328,15 +366,39 @@ Item {
                                 background: Rectangle {
                                     color: Theme.bgInput
                                     radius: Theme.radiusSmall
-                                    border.color: folderPathField.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                                    border.color: folderPathField.activeFocus ? Theme.primaryGlow : (folderPathField.hovered ? Theme.primary : Theme.borderColor)
                                     border.width: 1
+
+                                    layer.enabled: folderPathField.activeFocus || folderPathField.hovered
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: folderPathField.activeFocus ? Theme.primaryGlow : Theme.primary
+                                        shadowBlur: 0.15
+                                    }
                                 }
                                 onTextChanged: root.selectedImagePath = text
                             }
 
                             Button {
+                                id: browseAutoBtn
                                 text: "浏览"
                                 font.family: Theme.fontFamily
+                                background: Rectangle {
+                                    color: browseAutoBtn.hovered ? Theme.bgHover : Theme.bgInput
+                                    radius: Theme.radiusSmall
+                                    border.color: browseAutoBtn.hovered ? Theme.primaryGlow : Theme.borderColor
+                                    border.width: 1
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Behavior on border.color { ColorAnimation { duration: 150 } }
+                                }
+                                contentItem: Label {
+                                    text: browseAutoBtn.text
+                                    color: browseAutoBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
+                                    font: browseAutoBtn.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
                                 onClicked: folderDialog.open()
                             }
 
@@ -347,17 +409,28 @@ Item {
                                 font.family: Theme.fontFamily
                                 font.bold: true
                                 background: Rectangle {
-                                    color: analyzeAutoBtn.enabled ? (analyzeAutoBtn.hovered ? Qt.lighter(Theme.accentPrimary, 1.1) : Theme.accentPrimary) : Theme.bgTertiary
+                                    color: analyzeAutoBtn.enabled ? (analyzeAutoBtn.hovered ? Theme.primaryGlow : Theme.primary) : Theme.bgCard
                                     radius: Theme.radiusSmall
-                                    border.color: analyzeAutoBtn.enabled ? Theme.accentPrimary : Theme.border
+                                    border.color: analyzeAutoBtn.enabled ? Theme.primaryGlow : Theme.borderColor
                                     border.width: 1
+                                    
+                                    layer.enabled: analyzeAutoBtn.enabled && analyzeAutoBtn.hovered
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: Theme.primaryGlow
+                                        shadowBlur: 0.15
+                                    }
+                                    
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Behavior on border.color { ColorAnimation { duration: 150 } }
                                 }
                                 contentItem: Label {
                                     text: analyzeAutoBtn.text
-                                    color: enabled ? Theme.textPrimary : Theme.textDisabled
+                                    color: analyzeAutoBtn.enabled ? (analyzeAutoBtn.hovered ? Theme.bgMain : "#ffffff") : Theme.textDisabled
                                     font: analyzeAutoBtn.font
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
+                                    Behavior on color { ColorAnimation { duration: 150 } }
                                 }
                                 onClicked: startScanAuto()
                             }
@@ -410,15 +483,39 @@ Item {
                                 background: Rectangle {
                                     color: Theme.bgInput
                                     radius: Theme.radiusSmall
-                                    border.color: imagePathField.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                                    border.color: imagePathField.activeFocus ? Theme.primaryGlow : (imagePathField.hovered ? Theme.primary : Theme.borderColor)
                                     border.width: 1
+
+                                    layer.enabled: imagePathField.activeFocus || imagePathField.hovered
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: imagePathField.activeFocus ? Theme.primaryGlow : Theme.primary
+                                        shadowBlur: 0.15
+                                    }
                                 }
                                 onTextChanged: root.selectedImagePath = text
                             }
 
                             Button {
+                                id: browseImgBtn
                                 text: "浏览"
                                 font.family: Theme.fontFamily
+                                background: Rectangle {
+                                    color: browseImgBtn.hovered ? Theme.bgHover : Theme.bgInput
+                                    radius: Theme.radiusSmall
+                                    border.color: browseImgBtn.hovered ? Theme.primaryGlow : Theme.borderColor
+                                    border.width: 1
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Behavior on border.color { ColorAnimation { duration: 150 } }
+                                }
+                                contentItem: Label {
+                                    text: browseImgBtn.text
+                                    color: browseImgBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
+                                    font: browseImgBtn.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
                                 onClicked: imageFolderDialog.open()
                             }
                         }
@@ -446,21 +543,62 @@ Item {
                                 background: Rectangle {
                                     color: Theme.bgInput
                                     radius: Theme.radiusSmall
-                                    border.color: labelPathField.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                                    border.color: labelPathField.activeFocus ? Theme.primaryGlow : (labelPathField.hovered ? Theme.primary : Theme.borderColor)
                                     border.width: 1
+
+                                    layer.enabled: labelPathField.activeFocus || labelPathField.hovered
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: labelPathField.activeFocus ? Theme.primaryGlow : Theme.primary
+                                        shadowBlur: 0.15
+                                    }
                                 }
                                 onTextChanged: root.selectedLabelPath = text
                             }
 
                             Button {
+                                id: browseLabelBtn
                                 text: "浏览"
                                 font.family: Theme.fontFamily
+                                background: Rectangle {
+                                    color: browseLabelBtn.hovered ? Theme.bgHover : Theme.bgInput
+                                    radius: Theme.radiusSmall
+                                    border.color: browseLabelBtn.hovered ? Theme.primaryGlow : Theme.borderColor
+                                    border.width: 1
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Behavior on border.color { ColorAnimation { duration: 150 } }
+                                }
+                                contentItem: Label {
+                                    text: browseLabelBtn.text
+                                    color: browseLabelBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
+                                    font: browseLabelBtn.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
                                 onClicked: labelFolderDialog.open()
                             }
 
                             Button {
+                                id: clearLabelBtn
                                 text: "清空"
                                 font.family: Theme.fontFamily
+                                background: Rectangle {
+                                    color: clearLabelBtn.hovered ? Theme.bgHover : Theme.bgInput
+                                    radius: Theme.radiusSmall
+                                    border.color: clearLabelBtn.hovered ? Theme.primaryGlow : Theme.borderColor
+                                    border.width: 1
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Behavior on border.color { ColorAnimation { duration: 150 } }
+                                }
+                                contentItem: Label {
+                                    text: clearLabelBtn.text
+                                    color: clearLabelBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
+                                    font: clearLabelBtn.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
                                 onClicked: {
                                     labelPathField.clear()
                                     root.selectedLabelPath = ""
@@ -481,17 +619,28 @@ Item {
                                 font.family: Theme.fontFamily
                                 font.bold: true
                                 background: Rectangle {
-                                    color: analyzeBtn.enabled ? (analyzeBtn.hovered ? Qt.lighter(Theme.accentPrimary, 1.1) : Theme.accentPrimary) : Theme.bgTertiary
+                                    color: analyzeBtn.enabled ? (analyzeBtn.hovered ? Theme.primaryGlow : Theme.primary) : Theme.bgCard
                                     radius: Theme.radiusSmall
-                                    border.color: analyzeBtn.enabled ? Theme.accentPrimary : Theme.border
+                                    border.color: analyzeBtn.enabled ? Theme.primaryGlow : Theme.borderColor
                                     border.width: 1
+                                    
+                                    layer.enabled: analyzeBtn.enabled && analyzeBtn.hovered
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: Theme.primaryGlow
+                                        shadowBlur: 0.15
+                                    }
+                                    
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Behavior on border.color { ColorAnimation { duration: 150 } }
                                 }
                                 contentItem: Label {
                                     text: analyzeBtn.text
-                                    color: enabled ? Theme.textPrimary : Theme.textDisabled
+                                    color: analyzeBtn.enabled ? (analyzeBtn.hovered ? Theme.bgMain : "#ffffff") : Theme.textDisabled
                                     font: analyzeBtn.font
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
+                                    Behavior on color { ColorAnimation { duration: 150 } }
                                 }
                                 onClicked: startScanSeparate()
                             }
@@ -535,6 +684,8 @@ Item {
                             Layout.fillWidth: true
                             color: Theme.bgInput
                             radius: Theme.radiusNormal
+                            border.color: Theme.borderColor
+                            border.width: 1
                             implicitHeight: statsRow.implicitHeight + 24
 
                             RowLayout {
@@ -682,6 +833,8 @@ Item {
                             implicitHeight: classFlow.implicitHeight + 24
                             color: Theme.bgInput
                             radius: Theme.radiusNormal
+                            border.color: Theme.borderColor
+                            border.width: 1
 
                             ColumnLayout {
                                 id: classFlow
@@ -773,8 +926,15 @@ Item {
                                 background: Rectangle {
                                     color: Theme.bgInput
                                     radius: Theme.radiusSmall
-                                    border.color: datasetNameField.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                                    border.color: datasetNameField.activeFocus ? Theme.primaryGlow : (datasetNameField.hovered ? Theme.primary : Theme.borderColor)
                                     border.width: 1
+
+                                    layer.enabled: datasetNameField.activeFocus || datasetNameField.hovered
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: datasetNameField.activeFocus ? Theme.primaryGlow : Theme.primary
+                                        shadowBlur: 0.15
+                                    }
                                 }
                             }
 
@@ -788,17 +948,28 @@ Item {
                                 font.family: Theme.fontFamily
                                 font.bold: true
                                 background: Rectangle {
-                                    color: confirmImportBtn.enabled ? (confirmImportBtn.hovered ? Qt.lighter(Theme.accentPrimary, 1.1) : Theme.accentPrimary) : Theme.bgTertiary
+                                    color: confirmImportBtn.enabled ? (confirmImportBtn.hovered ? Theme.primaryGlow : Theme.primary) : Theme.bgCard
                                     radius: Theme.radiusSmall
-                                    border.color: confirmImportBtn.enabled ? Theme.accentPrimary : Theme.border
+                                    border.color: confirmImportBtn.enabled ? Theme.primaryGlow : Theme.borderColor
                                     border.width: 1
+
+                                    layer.enabled: confirmImportBtn.enabled && confirmImportBtn.hovered
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: Theme.primaryGlow
+                                        shadowBlur: 0.15
+                                    }
+
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Behavior on border.color { ColorAnimation { duration: 150 } }
                                 }
                                 contentItem: Label {
                                     text: confirmImportBtn.text
-                                    color: enabled ? Theme.textPrimary : Theme.textDisabled
+                                    color: confirmImportBtn.enabled ? (confirmImportBtn.hovered ? Theme.bgMain : "#ffffff") : Theme.textDisabled
                                     font: confirmImportBtn.font
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
+                                    Behavior on color { ColorAnimation { duration: 150 } }
                                 }
                                 onClicked: {
                                     var dsId = ""
@@ -881,12 +1052,25 @@ Item {
                 Repeater {
                     model: datasetModel
                     delegate: Rectangle {
+                        id: listDelegateRect
                         Layout.fillWidth: true
                         height: 72
-                        color: index % 2 === 0 ? Theme.bgCard : Theme.bgInput
+                        color: hovered ? Theme.bgHover : (index % 2 === 0 ? Theme.bgCard : Theme.bgInput)
                         radius: Theme.radiusNormal
+                        border.color: hovered ? Theme.primaryGlow : Theme.borderColor
+                        border.width: 1
 
                         property bool hovered: mouseArea.containsMouse
+
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                        layer.enabled: hovered
+                        layer.effect: MultiEffect {
+                            shadowEnabled: true
+                            shadowColor: Theme.primaryGlow
+                            shadowBlur: 0.15
+                        }
 
                         MouseArea {
                             id: mouseArea
@@ -926,10 +1110,10 @@ Item {
                                 height: 20
                                 radius: Theme.radiusSmall
                                 color: {
-                                    if (model.format === "yolo_txt") return Theme.accentPrimary
-                                    if (model.format === "coco_json") return Theme.accentSecondary
-                                    if (model.format === "labelme_json") return Theme.accentWarning
-                                    if (model.format === "anomaly_unsupervised") return Theme.accentWarning
+                                    if (model.format === "yolo_txt") return Theme.primary
+                                    if (model.format === "coco_json") return Theme.primaryGlow
+                                    if (model.format === "labelme_json") return Theme.warning
+                                    if (model.format === "anomaly_unsupervised") return Theme.warning
                                     if (model.format === "image_only") return Theme.textMuted
                                     return Theme.textMuted
                                 }
@@ -947,16 +1131,35 @@ Item {
                                     }
                                     font.pixelSize: 10
                                     font.family: Theme.fontFamily
-                                    color: Theme.textPrimary
+                                    color: (model.format === "coco_json") ? Theme.bgMain : Theme.textPrimary
+                                    font.bold: true
                                 }
                             }
 
-                            Rectangle {
-                                width: 12
-                                height: 12
-                                radius: 6
-                                color: model.importStatus === "completed" ? Theme.accentSuccess :
-                                       model.importStatus === "failed" ? Theme.accentError : Theme.accentWarning
+                            // 状态指示灯
+                            Item {
+                                width: 16
+                                height: 16
+                                Layout.alignment: Qt.AlignVCenter
+
+                                Rectangle {
+                                    id: statusLed
+                                    anchors.centerIn: parent
+                                    width: 10
+                                    height: 10
+                                    radius: 5
+                                    color: model.importStatus === "completed" ? Theme.success :
+                                           model.importStatus === "failed" ? Theme.danger : Theme.warning
+                                    
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: parent.width + 4
+                                        height: parent.height + 4
+                                        radius: width / 2
+                                        color: parent.color
+                                        opacity: 0.3
+                                    }
+                                }
                             }
 
                             Label {
@@ -980,8 +1183,26 @@ Item {
                             }
 
                             Button {
+                                id: deleteBtn
                                 text: "删除"
                                 font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                background: Rectangle {
+                                    color: deleteBtn.hovered ? Theme.danger : "transparent"
+                                    radius: Theme.radiusSmall
+                                    border.color: deleteBtn.hovered ? Theme.danger : Theme.borderColor
+                                    border.width: 1
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Behavior on border.color { ColorAnimation { duration: 150 } }
+                                }
+                                contentItem: Label {
+                                    text: deleteBtn.text
+                                    color: deleteBtn.hovered ? "#ffffff" : Theme.textSecondary
+                                    font: deleteBtn.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
                                 onClicked: {
                                     datasetService.deleteDataset(model.datasetId)
                                     datasetModel.refresh()

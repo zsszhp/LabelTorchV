@@ -79,10 +79,17 @@ Popup {
             }
 
             Item {
-                id: contentArea
+                id: contentAreaContainer
                 width: parent.width
-                height: childrenRect.height
-                padding: Theme.spacingLarge
+                height: contentArea.height + Theme.spacingLarge * 2
+
+                Item {
+                    id: contentArea
+                    x: Theme.spacingLarge
+                    y: Theme.spacingLarge
+                    width: parent.width - Theme.spacingLarge * 2
+                    height: childrenRect.height
+                }
             }
 
             Rectangle {
