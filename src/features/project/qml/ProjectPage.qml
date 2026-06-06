@@ -6,6 +6,7 @@ import QtQuick.Layouts
 import QtQuick.Dialogs
 import LabelTorch.Theme
 import LabelTorch.Components
+import LabelTorch.Shell
 
 Item {
     id: pageRoot
@@ -58,7 +59,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 36
                     Layout.bottomMargin: Theme.spacingNormal
-                    text: "+ 新建项目"
+                    text: "新建项目"
                     font.pixelSize: Theme.fontSizeNormal
                     font.bold: true
                     font.family: Theme.fontFamily
@@ -71,12 +72,21 @@ Item {
                         radius: Theme.radiusNormal
                     }
 
-                    contentItem: Text {
-                        text: parent.text
-                        color: Theme.textMain
-                        font: parent.font
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                    contentItem: RowLayout {
+                        spacing: 8
+                        anchors.centerIn: parent
+                        SvgIcon {
+                            icon: "plus"
+                            width: 14
+                            height: 14
+                            color: Theme.textMain
+                        }
+                        Text {
+                            text: newProjectBtn.text
+                            color: Theme.textMain
+                            font: newProjectBtn.font
+                            verticalAlignment: Text.AlignVCenter
+                        }
                     }
 
                     onClicked: newProjectDialog.open()
@@ -98,12 +108,21 @@ Item {
                         radius: Theme.radiusNormal
                     }
 
-                    contentItem: Text {
-                        text: parent.text
-                        color: Theme.textMain
-                        font: parent.font
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                    contentItem: RowLayout {
+                        spacing: 8
+                        anchors.centerIn: parent
+                        SvgIcon {
+                            icon: "folder"
+                            width: 14
+                            height: 14
+                            color: Theme.textMain
+                        }
+                        Text {
+                            text: openProjectBtn.text
+                            color: Theme.textMain
+                            font: openProjectBtn.font
+                            verticalAlignment: Text.AlignVCenter
+                        }
                     }
 
                     onClicked: importFolderDialog.open()
@@ -241,11 +260,13 @@ Item {
                                     }
 
                                     // 重命名按钮
-                                    Text {
-                                        text: "✎"
-                                        font.pixelSize: Theme.fontSizeCaption
+                                    SvgIcon {
+                                        icon: "edit"
+                                        width: 12
+                                        height: 12
                                         color: classEditBtn.containsMouse ? Theme.primaryGlow : Theme.textMuted
                                         visible: classMouseArea.containsMouse
+                                        anchors.verticalCenter: parent.verticalCenter
 
                                         MouseArea {
                                             id: classEditBtn
@@ -257,11 +278,13 @@ Item {
                                     }
 
                                     // 删除按钮
-                                    Text {
-                                        text: "✕"
-                                        font.pixelSize: Theme.fontSizeCaption
+                                    SvgIcon {
+                                        icon: "close"
+                                        width: 12
+                                        height: 12
                                         color: classDelBtn.containsMouse ? Theme.danger : Theme.textMuted
                                         visible: classMouseArea.containsMouse
+                                        anchors.verticalCenter: parent.verticalCenter
 
                                         MouseArea {
                                             id: classDelBtn
@@ -392,6 +415,7 @@ Item {
                     }
 
                     delegate: Rectangle {
+                        id: cardRect
                         width: projectList.width
                         height: 56
                         color: {
@@ -406,6 +430,14 @@ Item {
                             return Theme.borderColor
                         }
                         border.width: 1
+
+                        // 悬浮/激活发光阴影
+                        layer.enabled: cardMouseArea.containsMouse || appController.currentProjectId === model.projectId
+                        layer.effect: MultiEffect {
+                            shadowEnabled: true
+                            shadowColor: Theme.primaryGlow
+                            shadowBlur: 0.25
+                        }
 
                         // 选中态左边框高亮
                         Rectangle {
@@ -437,11 +469,15 @@ Item {
                             anchors.rightMargin: Theme.spacingNormal
                             spacing: Theme.spacingNormal
 
-                            // 项目首字母图标（26×26，渐变背景）
+                            // 项目首字母图标（26×26，渐变背景 + 悬浮缩放动效）
                             Rectangle {
+                                id: logoRect
                                 Layout.preferredWidth: 26
                                 Layout.preferredHeight: 26
                                 radius: Theme.radiusSmall
+
+                                scale: cardMouseArea.containsMouse ? 1.1 : 1.0
+                                Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
 
                                 gradient: Gradient {
                                     GradientStop { position: 0.0; color: Theme.primary }
@@ -550,20 +586,18 @@ Item {
                                 id: delItemBtn
                                 Layout.preferredWidth: 28
                                 Layout.preferredHeight: 28
-                                text: "✕"
-                                font.pixelSize: Theme.fontSizeCaption
 
                                 background: Rectangle {
                                     color: delItemBtn.hovered ? Qt.alpha(Theme.danger, 0.15) : "transparent"
                                     radius: Theme.radiusSmall
                                 }
 
-                                contentItem: Text {
-                                    text: parent.text
+                                contentItem: SvgIcon {
+                                    icon: "close"
+                                    width: 10
+                                    height: 10
+                                    anchors.centerIn: parent
                                     color: delItemBtn.hovered ? Theme.danger : Theme.textMuted
-                                    font: parent.font
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
                                 }
 
                                 onClicked: {
