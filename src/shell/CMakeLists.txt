@@ -8,6 +8,7 @@ qt_add_qml_module(labeltorch_shell
         qml/StatusBar.qml
         qml/TaskPanel.qml
         qml/LogPanel.qml
+        qml/SvgIcon.qml
     RESOURCES
         qml/icons/sidebar-collapse.svg
         qml/icons/sidebar-expand.svg
