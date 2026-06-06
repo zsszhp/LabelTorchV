@@ -254,11 +254,11 @@ ApplicationWindow {
                                 color: !navDelegate.enabled ? "transparent" : (navDelegate.hovered && appController.currentPage !== model.pageId ? Qt.alpha(Theme.textMain, 0.02) : "transparent")
 
                                 // 激活状态下：垂直亮青渐变背景
-                                gradient: navDelegate.enabled && appController.currentPage === model.pageId ? Gradient {
+                                gradient: Gradient {
                                     GradientStop { position: 0.0; color: "transparent" }
                                     GradientStop { position: 0.7; color: "transparent" }
-                                    GradientStop { position: 1.0; color: Qt.rgba(0, 0.898, 1, 0.05) }
-                                } : null
+                                    GradientStop { position: 1.0; color: (navDelegate.enabled && appController.currentPage === model.pageId) ? Qt.rgba(0, 0.898, 1, 0.05) : "transparent" }
+                                }
 
                                 // 激活标签底部指示线
                                 Rectangle {
