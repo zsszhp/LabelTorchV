@@ -1754,6 +1754,22 @@ Item {
                                 annotationModel.setSelected(model.index, true)
                                 canvasItem.update()
                             }
+
+                            // 右键删除支持
+                            MouseArea {
+                                anchors.fill: parent
+                                acceptedButtons: Qt.RightButton
+                                onClicked: function(mouse) {
+                                    // 先选中该实例
+                                    for (var i = 0; i < annotationModel.rowCount(); i++) {
+                                        annotationModel.setSelected(i, false)
+                                    }
+                                    annotationModel.setSelected(model.index, true)
+                                    canvasItem.update()
+                                    // 右键删除
+                                    canvasItem.deleteSelected()
+                                }
+                            }
                         }
                     }
                 }
@@ -1819,6 +1835,19 @@ Item {
                                     width: parent.width
                                     height: 2
                                     color: Theme.primaryGlow
+                                }
+
+                                // 已标注指示（绿色勾号）
+                                Text {
+                                    visible: modelData.hasAnnotations === true
+                                    anchors.top: parent.top
+                                    anchors.left: parent.left
+                                    anchors.margins: 4
+                                    text: "✓"
+                                    color: Theme.success
+                                    font.pixelSize: 10
+                                    font.weight: Font.Bold
+                                    z: 1
                                 }
                             }
 
