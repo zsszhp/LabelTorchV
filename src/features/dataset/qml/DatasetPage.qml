@@ -7,6 +7,7 @@ import QtQuick.Layouts
 import QtQuick.Dialogs
 import LabelTorch.Theme
 import LabelTorch.Components
+import LabelTorch.Shell
 
 Item {
     id: pageRoot
@@ -128,9 +129,11 @@ Item {
                                 spacing: Theme.spacingSmall
 
                                 // 左侧图库图标
-                                Text {
-                                    text: "🖼"
-                                    font.pixelSize: Theme.fontSizeNormal
+                                SvgIcon {
+                                    icon: "images"
+                                    width: 14
+                                    height: 14
+                                    color: Theme.primaryGlow
                                     Layout.alignment: Qt.AlignVCenter
                                 }
 
@@ -222,12 +225,11 @@ Item {
                                     border.color: Theme.primary
                                     border.width: 1
 
-                                    Text {
+                                    SvgIcon {
                                         anchors.centerIn: parent
-                                        text: "+"
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        font.bold: true
-                                        font.family: Theme.fontFamily
+                                        icon: "plus"
+                                        width: 10
+                                        height: 10
                                         color: addDsBtnMouse.containsMouse ? Theme.textMain : Theme.primary
                                     }
 
@@ -262,9 +264,10 @@ Item {
                                 Item { Layout.fillWidth: true }
 
                                 // 眼睛图标
-                                Text {
-                                    text: "👁"
-                                    font.pixelSize: Theme.fontSizeCaption
+                                SvgIcon {
+                                    icon: "eye"
+                                    width: 12
+                                    height: 12
                                     color: visBtn.containsMouse ? Theme.primaryGlow : Theme.textMuted
                                     MouseArea {
                                         id: visBtn
@@ -274,9 +277,10 @@ Item {
                                     }
                                 }
                                 // 添加图标
-                                Text {
-                                    text: "➕"
-                                    font.pixelSize: Theme.fontSizeCaption
+                                SvgIcon {
+                                    icon: "plus"
+                                    width: 12
+                                    height: 12
                                     color: addBtn.containsMouse ? Theme.primaryGlow : Theme.textMuted
                                     MouseArea {
                                         id: addBtn
@@ -287,9 +291,10 @@ Item {
                                     }
                                 }
                                 // 导入图标
-                                Text {
-                                    text: "📥"
-                                    font.pixelSize: Theme.fontSizeCaption
+                                SvgIcon {
+                                    icon: "export"
+                                    width: 12
+                                    height: 12
                                     color: impBtn.containsMouse ? Theme.primaryGlow : Theme.textMuted
                                     MouseArea {
                                         id: impBtn
@@ -380,10 +385,12 @@ Item {
                                         }
 
                                         // 定位图标
-                                        Text {
-                                            text: "📍"
-                                            font.pixelSize: Theme.fontSizeCaption
+                                        SvgIcon {
+                                            icon: "marker"
+                                            width: 12
+                                            height: 12
                                             color: Theme.textMuted
+                                            anchors.verticalCenter: parent.verticalCenter
                                         }
                                     }
                                 }
@@ -565,12 +572,11 @@ Item {
                                     border.color: Theme.primary
                                     border.width: 1
 
-                                    Text {
+                                    SvgIcon {
                                         anchors.centerIn: parent
-                                        text: "+"
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        font.bold: true
-                                        font.family: Theme.fontFamily
+                                        icon: "plus"
+                                        width: 10
+                                        height: 10
                                         color: addTagBtnMouse.containsMouse ? Theme.textMain : Theme.primary
                                     }
 

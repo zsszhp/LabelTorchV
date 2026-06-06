@@ -6,6 +6,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import LabelTorch.Theme
 import LabelTorch.Components
+import LabelTorch.Shell
 import LabelTorch.Annotation 1.0
 
 Item {
@@ -255,10 +256,12 @@ Item {
                                 anchors.rightMargin: 10
                                 spacing: 8
 
-                                Text {
-                                    text: "📦"
-                                    font.pixelSize: 13
+                                SvgIcon {
+                                    icon: "images"
+                                    width: 14
+                                    height: 14
                                     color: Theme.primaryGlow
+                                    anchors.verticalCenter: parent.verticalCenter
                                 }
 
                                 ComboBox {
@@ -297,11 +300,12 @@ Item {
                             Layout.bottomMargin: 8
                             spacing: 4
 
-                            Text {
-                                text: "▾"
-                                font.pixelSize: 12
+                            SvgIcon {
+                                icon: "arrow-down"
+                                width: 12
+                                height: 12
                                 color: Theme.textMain
-                                font.family: Theme.fontFamily
+                                anchors.verticalCenter: parent.verticalCenter
                             }
 
                             Text {
@@ -314,10 +318,10 @@ Item {
 
                             Item { Layout.fillWidth: true }
 
-                            // 操作图标（对标参考UI：眼睛/添加/网格）
-                            Text { text: "👁"; font.pixelSize: 12; opacity: 0.5 }
-                            Text { text: "➕"; font.pixelSize: 11; opacity: 0.5 }
-                            Text { text: "🖼"; font.pixelSize: 11; opacity: 0.5 }
+                            // 操作图标
+                            SvgIcon { icon: "eye"; width: 12; height: 12; color: Theme.textMuted; opacity: 0.5; anchors.verticalCenter: parent.verticalCenter }
+                            SvgIcon { icon: "plus"; width: 11; height: 11; color: Theme.textMuted; opacity: 0.5; anchors.verticalCenter: parent.verticalCenter }
+                            SvgIcon { icon: "images"; width: 11; height: 11; color: Theme.textMuted; opacity: 0.5; anchors.verticalCenter: parent.verticalCenter }
                         }
 
                         // 数据集卡片（对标参考UI：名称+进度条+计数）
@@ -416,10 +420,12 @@ Item {
                                 anchors.rightMargin: 12
                                 spacing: 10
 
-                                Text {
-                                    text: "🖼"
-                                    font.pixelSize: 20
+                                SvgIcon {
+                                    icon: "images"
+                                    width: 18
+                                    height: 18
                                     color: Theme.primaryGlow
+                                    anchors.verticalCenter: parent.verticalCenter
                                 }
 
                                 Text {
@@ -437,11 +443,13 @@ Item {
                                     elide: Text.ElideRight
                                 }
 
-                                Text {
-                                    text: "🗑"
-                                    font.pixelSize: 12
+                                SvgIcon {
+                                    icon: "trash"
+                                    width: 12
+                                    height: 12
                                     color: Theme.textMuted
                                     opacity: 0.6
+                                    anchors.verticalCenter: parent.verticalCenter
                                 }
                             }
                         }
@@ -537,11 +545,12 @@ Item {
                             Layout.bottomMargin: 8
                             spacing: 4
 
-                            Text {
-                                text: "▾"
-                                font.pixelSize: 12
+                            SvgIcon {
+                                icon: "arrow-down"
+                                width: 12
+                                height: 12
                                 color: Theme.textMain
-                                font.family: Theme.fontFamily
+                                anchors.verticalCenter: parent.verticalCenter
                             }
 
                             Text {
@@ -554,11 +563,12 @@ Item {
 
                             Item { Layout.fillWidth: true }
 
-                            Text {
-                                text: "+"
-                                font.pixelSize: 12
+                            SvgIcon {
+                                icon: "plus"
+                                width: 12
+                                height: 12
                                 color: Theme.textMuted
-                                font.family: Theme.fontFamily
+                                anchors.verticalCenter: parent.verticalCenter
 
                                 MouseArea {
                                     anchors.fill: parent
@@ -620,18 +630,22 @@ Item {
                                             elide: Text.ElideRight
                                         }
 
-                                        // 编辑/删除图标（选中态白色，未选中灰色）
-                                        Text {
-                                            text: "✎"
-                                            font.pixelSize: 11
+                                        // 编辑/删除图标
+                                        SvgIcon {
+                                            icon: "edit"
+                                            width: 11
+                                            height: 11
                                             color: (annotationMode === "detect" && selectedClassId === model.classIndex) ? Qt.alpha("#FFFFFF", 0.9) : Theme.textMuted
                                             opacity: 0.8
+                                            anchors.verticalCenter: parent.verticalCenter
                                         }
-                                        Text {
-                                            text: "🗑"
-                                            font.pixelSize: 11
+                                        SvgIcon {
+                                            icon: "trash"
+                                            width: 11
+                                            height: 11
                                             color: (annotationMode === "detect" && selectedClassId === model.classIndex) ? Qt.alpha("#FFFFFF", 0.9) : Theme.textMuted
                                             opacity: 0.8
+                                            anchors.verticalCenter: parent.verticalCenter
                                         }
                                     }
 
@@ -682,11 +696,12 @@ Item {
                             Layout.bottomMargin: 8
                             spacing: 4
 
-                            Text {
-                                text: "▾"
-                                font.pixelSize: 12
+                            SvgIcon {
+                                icon: "arrow-down"
+                                width: 12
+                                height: 12
                                 color: Theme.textMain
-                                font.family: Theme.fontFamily
+                                anchors.verticalCenter: parent.verticalCenter
                             }
 
                             Text {
@@ -699,11 +714,12 @@ Item {
 
                             Item { Layout.fillWidth: true }
 
-                            Text {
-                                text: "+"
-                                font.pixelSize: 12
+                            SvgIcon {
+                                icon: "plus"
+                                width: 12
+                                height: 12
                                 color: Theme.textMuted
-                                font.family: Theme.fontFamily
+                                anchors.verticalCenter: parent.verticalCenter
 
                                 MouseArea {
                                     anchors.fill: parent
