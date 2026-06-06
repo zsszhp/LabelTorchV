@@ -18,7 +18,7 @@ Item {
     property var selectedSample: null
     property int totalSamples: 0
     property int labeledSamples: 0
-    property string selectedTag: ""
+    property string selectedTag: "默认"
 
     // === 页面初始化与可见性刷新 ===
     Component.onCompleted: {
@@ -372,7 +372,11 @@ Item {
                                                 width: parent.width * (labeledSamples > 0 && totalSamples > 0 ? labeledSamples / totalSamples : 0)
                                                 height: parent.height
                                                 radius: 3
-                                                color: Theme.primaryGlow
+                                                gradient: Gradient {
+                                                    orientation: Gradient.Horizontal
+                                                    GradientStop { position: 0.0; color: Theme.primary }
+                                                    GradientStop { position: 1.0; color: Theme.primaryGlow }
+                                                }
                                             }
                                         }
 
@@ -746,7 +750,7 @@ Item {
                             Rectangle {
                                 visible: selectedSample && selectedSample.sampleId === model.sampleId
                                 anchors.fill: parent
-                                anchors.margins: -2
+                                anchors.margins: -6
                                 radius: Theme.radiusSmall + 2
                                 color: Theme.glowCyan
                                 z: -1
