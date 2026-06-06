@@ -5,6 +5,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import LabelTorch.Theme
 import LabelTorch.Components
+import LabelTorch.Shell
 
 Item {
     id: root
@@ -145,9 +146,10 @@ Item {
                             spacing: Theme.spacingSmall
 
                             // 图库图标
-                            Text {
-                                text: "📁"
-                                font.pixelSize: Theme.fontSizeNormal
+                            SvgIcon {
+                                icon: "images"
+                                width: 14
+                                height: 14
                                 color: Theme.textMuted
                                 Layout.alignment: Qt.AlignVCenter
                             }
@@ -662,7 +664,8 @@ Item {
                             cache: true
                             layer.enabled: true
                             layer.mipmap: true
-                            // 模拟140%缩放+居中裁切效果
+                            // 模拟140%缩放+居中裁切效果，向上偏移20%实现top:-20%
+                            y: -height * 0.2
                             sourceSize.width: width * 1.4
                             sourceSize.height: height * 1.4
 

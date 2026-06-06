@@ -72,20 +72,26 @@ Item {
                         radius: Theme.radiusNormal
                     }
 
-                    contentItem: RowLayout {
-                        spacing: 8
-                        anchors.centerIn: parent
-                        SvgIcon {
-                            icon: "plus"
-                            width: 14
-                            height: 14
-                            color: Theme.textMain
-                        }
-                        Text {
-                            text: newProjectBtn.text
-                            color: Theme.textMain
-                            font: newProjectBtn.font
-                            verticalAlignment: Text.AlignVCenter
+                    contentItem: Item {
+                        implicitWidth: newProjectRow.implicitWidth
+                        implicitHeight: newProjectRow.implicitHeight
+                        Row {
+                            id: newProjectRow
+                            spacing: 8
+                            anchors.centerIn: parent
+                            SvgIcon {
+                                icon: "plus"
+                                width: 14
+                                height: 14
+                                color: Theme.textMain
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Text {
+                                text: newProjectBtn.text
+                                color: Theme.textMain
+                                font: newProjectBtn.font
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
                         }
                     }
 
@@ -108,20 +114,26 @@ Item {
                         radius: Theme.radiusNormal
                     }
 
-                    contentItem: RowLayout {
-                        spacing: 8
-                        anchors.centerIn: parent
-                        SvgIcon {
-                            icon: "folder"
-                            width: 14
-                            height: 14
-                            color: Theme.textMain
-                        }
-                        Text {
-                            text: openProjectBtn.text
-                            color: Theme.textMain
-                            font: openProjectBtn.font
-                            verticalAlignment: Text.AlignVCenter
+                    contentItem: Item {
+                        implicitWidth: openProjectRow.implicitWidth
+                        implicitHeight: openProjectRow.implicitHeight
+                        Row {
+                            id: openProjectRow
+                            spacing: 8
+                            anchors.centerIn: parent
+                            SvgIcon {
+                                icon: "folder"
+                                width: 14
+                                height: 14
+                                color: Theme.textMain
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Text {
+                                text: openProjectBtn.text
+                                color: Theme.textMain
+                                font: openProjectBtn.font
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
                         }
                     }
 
@@ -487,7 +499,7 @@ Item {
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: model.name ? model.name.charAt(0).toUpperCase() : "P"
+                                    text: model.name ? model.name.substring(0, 2).toUpperCase() : "P"
                                     font.bold: true
                                     font.pixelSize: Theme.fontSizeSmall
                                     font.family: Theme.fontFamily
