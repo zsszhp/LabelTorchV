@@ -7,6 +7,7 @@ import QtQuick.Dialogs
 import LabelTorch.Theme
 import LabelTorch.Components
 import LabelTorch.Shell
+import QtQuick.Effects
 
 Item {
     id: pageRoot
@@ -24,16 +25,21 @@ Item {
     property string projectActionMessage: ""
     property string projectActionTone: "neutral"
 
-    RowLayout {
+    SplitView {
         anchors.fill: parent
-        spacing: 0
+        orientation: Qt.Horizontal
+
+        handle: Rectangle {
+            implicitWidth: 4
+            color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
+            Behavior on color { ColorAnimation { duration: 150 } }
+        }
 
         // === 左侧边栏 ===
         Rectangle {
             id: sidebar
-            width: Theme.sidebarWidth
-            Layout.preferredWidth: width
-            Layout.fillHeight: true
+            SplitView.preferredWidth: Theme.sidebarWidth
+            SplitView.minimumWidth: Theme.sidebarMinWidth
             color: Theme.bgSide
 
             // 右侧边线
@@ -361,21 +367,9 @@ Item {
             }
         }
 
-        // === 可拖拽垂直分割线（4px宽） ===
-        Splitter {
-            id: sidebarResizer
-            Layout.preferredWidth: 4
-            Layout.fillHeight: true
-            vertical: true
-            targetItem: sidebar
-            minSize: Theme.sidebarMinWidth
-            maxSize: pageRoot.width * 0.4
-        }
-
         // === 中心内容区 ===
         Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
+            SplitView.fillWidth: true
             color: Theme.bgMain
 
             ColumnLayout {
