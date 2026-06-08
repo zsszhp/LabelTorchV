@@ -4,14 +4,14 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-    // === 背景色系（极深蓝黑，对标 #0F131A ~ #1E2530） ===
-    readonly property color bgMain: "#0F131A"
-    readonly property color bgSide: "#151A22"
-    readonly property color bgCard: "#1E2530"
-    readonly property color bgInput: "#121720"
-    readonly property color bgInputDropdown: "#181E29"
-    readonly property color bgHover: "#262F3D"
-    readonly property color bgSelected: "#1A2A3A"
+    // === 背景色系（赛博蓝灰，亮度 15-25%，告别纯黑，对标 V4 设计） ===
+    readonly property color bgMain: "#1A1D2E"
+    readonly property color bgSide: "#222639"
+    readonly property color bgCard: "#252A3E"
+    readonly property color bgInput: "#1E2235"
+    readonly property color bgInputDropdown: "#2A2F44"
+    readonly property color bgHover: "#343A52"
+    readonly property color bgSelected: "#3B4263"
     readonly property color bgChart: "#05070A"
     readonly property color bgChartPanel: "#07090D"
     readonly property color bgPreview: "#0C0F14"
@@ -50,8 +50,8 @@ QtObject {
 
     // === 文字色（对标参考UI） ===
     readonly property color textMain: "#E2E8F0"
-    readonly property color textMuted: "#64748B"
-    readonly property color textDisabled: "#475569"
+    readonly property color textMuted: "#8E9AA8"
+    readonly property color textDisabled: "#64748B"
     readonly property color textAccent: primaryGlow
 
     // 兼容旧属性名
@@ -60,9 +60,9 @@ QtObject {
     readonly property color textMutedOld: textMuted
 
     // === 边框与分割线（对标 #262F3D） ===
-    readonly property color borderColor: "#262F3D"
+    readonly property color borderColor: "#3E4C61"
     readonly property color borderHover: primaryGlow
-    readonly property color dividerColor: "#1E2530"
+    readonly property color dividerColor: "#2E3846"
 
     // 兼容旧属性名
     readonly property color border: borderColor

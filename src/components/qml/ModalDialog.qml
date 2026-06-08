@@ -9,6 +9,9 @@ Popup {
     closePolicy: Popup.CloseOnEscape
     padding: 0
 
+    x: parent ? Math.round((parent.width - width) / 2) : 0
+    y: parent ? Math.round((parent.height - height) / 2) : 0
+
     property string title: ""
     property int dialogWidth: 500
     property alias content: contentArea.children
