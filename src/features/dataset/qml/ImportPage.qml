@@ -1310,6 +1310,13 @@ Item {
             radius: Theme.radiusLarge
         }
 
+        property bool hasSourceSchema: false
+
+        onOpened: {
+            var schema = classMappingService.getSourceSchema(root.lastImportedDatasetId)
+            hasSourceSchema = schema && schema.id !== ""
+        }
+
         ColumnLayout {
             width: parent.width
             spacing: Theme.spacingLarge
@@ -1338,6 +1345,16 @@ Item {
                     text: "留在当前页"
                     font.family: Theme.fontFamily
                     onClicked: importSuccessDialog.close()
+                }
+
+                Button {
+                    text: "配置类别映射"
+                    font.family: Theme.fontFamily
+                    visible: importSuccessDialog.hasSourceSchema
+                    onClicked: {
+                        importSuccessDialog.close()
+                        appController.currentPage = "dataset"
+                    }
                 }
 
                 Button {
