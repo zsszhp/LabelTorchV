@@ -169,6 +169,11 @@ Item {
         if (ipcClient && ipcClient.connected) {
             ipcClient.sendRequest("environment.check", {})
         }
+        if (currentProjectId !== "") {
+            testingModel.setProjectId(currentProjectId)
+            modelVersionModel.setProjectId(currentProjectId)
+            snapshotModel.setProjectId(currentProjectId)
+        }
     }
 
     // 加载测试结果
@@ -1510,14 +1515,6 @@ Item {
                     }
                 }
             }
-        }
-    }
-
-    Component.onCompleted: {
-        if (currentProjectId !== "") {
-            testingModel.setProjectId(currentProjectId)
-            modelVersionModel.setProjectId(currentProjectId)
-            snapshotModel.setProjectId(currentProjectId)
         }
     }
 }
