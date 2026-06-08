@@ -138,38 +138,7 @@ ApplicationWindow {
                     Layout.rightMargin: 12
                     spacing: 10
 
-                    // 26x26 渐变方块图标（对标参考UI logo-icon）
-                    Rectangle {
-                        width: 26
-                        height: 26
-                        radius: 6
-                        gradient: Gradient {
-                            orientation: Gradient.Horizontal
-                            GradientStop { position: 0.0; color: Theme.primary }
-                            GradientStop { position: 1.0; color: Theme.primaryGlow }
-                        }
-                        anchors.verticalCenter: parent.verticalCenter
 
-                        // 方块内文字缩写
-                        Text {
-                            anchors.centerIn: parent
-                            text: "LT"
-                            font.pixelSize: 12
-                            font.weight: Font.Bold
-                            font.family: Theme.fontFamily
-                            color: "#FFFFFF"
-                        }
-
-                        // 发光效果（对标参考UI box-shadow: 0 0 10px rgba(0,229,255,0.3)）
-                        layer.enabled: true
-                        layer.effect: MultiEffect {
-                            shadowEnabled: true
-                            shadowColor: Theme.primaryGlow
-                            shadowBlur: 0.4
-                            shadowVerticalOffset: 0
-                            shadowHorizontalOffset: 0
-                        }
-                    }
 
                     // 渐变文字（对标参考UI: linear-gradient(to right, #ffffff, #94A3B8)）
                     Text {
@@ -392,7 +361,7 @@ ApplicationWindow {
             Layout.fillWidth: true
             Layout.preferredHeight: 38
             color: Theme.bgMain
-            visible: appController.currentPage === "dataset" || appController.currentPage === "annotation" || appController.currentPage === "check"
+            visible: appController.currentPage === "check" // 数据集和标注页已内部实现
 
             // 底部分割线
             Rectangle {
@@ -610,6 +579,7 @@ ApplicationWindow {
 
         // === 底栏 (34px) ===
         Rectangle {
+            visible: appController.currentPage !== "annotation"
             Layout.fillWidth: true
             Layout.preferredHeight: Theme.footerHeight
             color: Theme.bgSide
