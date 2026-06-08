@@ -150,18 +150,22 @@ Item {
         }
     }
 
-    RowLayout {
+    SplitView {
         anchors.fill: parent
-        spacing: 0
+        orientation: Qt.Horizontal
 
-        // ============================================================
+        handle: Rectangle {
+            implicitWidth: 4
+            color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
+            Behavior on color { ColorAnimation { duration: 150 } }
+        }
+
         // 左侧模型列表 Sidebar (240px, padding:0)
-        // ============================================================
         Rectangle {
             id: sidebar
-            width: 240
-            Layout.preferredWidth: width
-            Layout.fillHeight: true
+            SplitView.preferredWidth: 240
+            SplitView.minimumWidth: Theme.sidebarMinWidth
+            SplitView.maximumWidth: 400
             color: Theme.bgSide
 
             // 右侧分割线
@@ -277,42 +281,29 @@ Item {
                 }
             }
         }
-    }
-
-    // ============================================================
-    // 竖向 Resizer (4px)
-    // ============================================================
-    Splitter {
-        id: sidebarResizer
-        Layout.preferredWidth: 4
-        Layout.fillHeight: true
-        vertical: true
-        targetItem: sidebar
-        minSize: Theme.sidebarMinWidth
-        maxSize: 400
-    }
+        }
 
         // ============================================================
         // 中心内容区（左右分栏）
         // ============================================================
-        Rectangle {
+        SplitView {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: Theme.bgMain
+            orientation: Qt.Horizontal
 
-            RowLayout {
-                anchors.fill: parent
-                spacing: 0
+            handle: Rectangle {
+                implicitWidth: 4
+                color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
+                Behavior on color { ColorAnimation { duration: 150 } }
+            }
 
-                // ========================================================
-                // 左侧参数面板 (280px, bgSide, border-right 1px borderColor)
-                // ========================================================
-                Rectangle {
-                    id: paramPanel
-                    width: 280
-                    Layout.preferredWidth: width
-                    Layout.fillHeight: true
-                    color: Theme.bgSide
+            // 左侧参数面板 (280px, bgSide, border-right 1px borderColor)
+            Rectangle {
+                id: paramPanel
+                SplitView.preferredWidth: 280
+                SplitView.minimumWidth: 200
+                SplitView.maximumWidth: 400
+                color: Theme.bgSide
 
                     // 右侧分割线
                     Rectangle {
@@ -683,17 +674,6 @@ Item {
                     }
                 }
 
-                // 中间参数面板与右侧展示区的分割线
-                Splitter {
-                    id: paramPanelResizer
-                    Layout.preferredWidth: 4
-                    Layout.fillHeight: true
-                    vertical: true
-                    targetItem: paramPanel
-                    minSize: 200
-                    maxSize: 400
-                }
-
                 // ========================================================
                 // 右侧展示区 (flex-grow:1, bgMain)
                 // ========================================================
@@ -701,8 +681,6 @@ Item {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     color: Theme.bgMain
-
-                    ScrollView {
                         anchors.fill: parent
                         clip: true
                         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
