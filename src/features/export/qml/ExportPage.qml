@@ -983,12 +983,15 @@ Item {
                                             RowLayout {
                                                 Layout.fillWidth: true
 
-                                                Text {
+                                                StatusTag {
                                                     text: root.validationStatusText(root.parsedValidationDetails)
-                                                    font.pixelSize: Theme.fontSizeSmall
-                                                    font.weight: Font.DemiBold
-                                                    font.family: Theme.fontFamily
-                                                    color: root.validationStatusColor(root.parsedValidationDetails)
+                                                    tone: {
+                                                        var details = root.parsedValidationDetails
+                                                        if (details.valid === true) return "success"
+                                                        if (details.verified === false || details.error) return "danger"
+                                                        if (Object.keys(details).length === 0) return "neutral"
+                                                        return "warning"
+                                                    }
                                                 }
 
                                                 Item {

@@ -14,6 +14,7 @@ qt_add_qml_module(labeltorch_components
         qml/FilterBar.qml
         qml/RingProgress.qml
         qml/ColorPicker.qml
+        qml/StatusTag.qml
 )
 
 target_link_libraries(labeltorch_components PUBLIC
