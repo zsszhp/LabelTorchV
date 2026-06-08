@@ -532,16 +532,21 @@ Item {
     }
 
     // === 主布局：左侧模型列表 + 右侧内容区 ===
-    RowLayout {
+    SplitView {
         anchors.fill: parent
-        spacing: 0
-        visible: currentProjectId !== ""
+        orientation: Qt.Horizontal
 
-        // === 左侧模型列表(240px) ===
+        handle: Rectangle {
+            implicitWidth: 4
+            color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
+            Behavior on color { ColorAnimation { duration: 150 } }
+        }
+
+        // 左侧模型列表
         Rectangle {
             id: sidebar
-            width: Theme.sidebarWidth
-            Layout.preferredWidth: width
+            SplitView.preferredWidth: Theme.sidebarWidth
+            SplitView.minimumWidth: Theme.sidebarMinWidth
             Layout.fillHeight: true
             color: Theme.bgSide
 
@@ -785,18 +790,6 @@ Item {
                 }
             }
         }
-    }
-
-    // 左右分割线
-    Splitter {
-        id: sidebarResizer
-        Layout.preferredWidth: 4
-        Layout.fillHeight: true
-        vertical: true
-        targetItem: sidebar
-        minSize: Theme.sidebarMinWidth
-        maxSize: 400
-    }
 
         // === 右侧内容区 ===
         ColumnLayout {

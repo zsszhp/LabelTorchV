@@ -258,18 +258,24 @@ Item {
         }
     }
 
-    RowLayout {
+    SplitView {
         anchors.fill: parent
-        spacing: 0
+        orientation: Qt.Horizontal
+
+        handle: Rectangle {
+            implicitWidth: 4
+            color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
+            Behavior on color { ColorAnimation { duration: 150 } }
+        }
 
         // ========================================
         // 左侧模型列表 (240px, padding:0)
         // ========================================
         Rectangle {
             id: sidebarLeft
-            width: 240
-            Layout.preferredWidth: width
-            Layout.fillHeight: true
+            SplitView.preferredWidth: 240
+            SplitView.minimumWidth: 120
+            SplitView.maximumWidth: 400
             color: Theme.bgSide
 
             // 右侧边线
@@ -472,17 +478,6 @@ Item {
                     }
                 }
             }
-        }
-    }
-
-        // 垂直分割线 (4px)
-        Splitter {
-            Layout.preferredWidth: 4
-            Layout.fillHeight: true
-            vertical: true
-            minSize: 120
-            maxSize: 400
-            targetItem: sidebarLeft
         }
 
         // ========================================
