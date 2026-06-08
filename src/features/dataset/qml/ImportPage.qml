@@ -17,6 +17,7 @@ Item {
     property string selectedLabelPath: ""
     // 导入模式: "auto" = 单目录自动探测, "separate" = 分别指定图片/标签路径
     property string importMode: "auto"
+    property string lastImportedDatasetId: ""
 
     // 未打开项目时的空状态提示
     ColumnLayout {
@@ -58,7 +59,7 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }
-            onClicked: appController.currentPageIndex = 0
+            onClicked: appController.currentPage = "project"
         }
     }
 
@@ -995,6 +996,7 @@ Item {
                                         )
                                     }
                                     if (dsId && dsId.length > 0) {
+                                        root.lastImportedDatasetId = dsId
                                         datasetModel.refresh()
                                         
                                         var formatStr = "未知格式"
@@ -1299,7 +1301,7 @@ Item {
         modal: true
         anchors.centerIn: parent
         width: 320
-        standardButtons: Dialog.Ok
+        standardButtons: Dialog.NoButton
 
         background: Rectangle {
             color: Theme.bgSecondary
@@ -1326,6 +1328,27 @@ Item {
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
                 font.family: Theme.fontFamily
+            }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+                spacing: Theme.spacingNormal
+
+                Button {
+                    text: "留在当前页"
+                    font.family: Theme.fontFamily
+                    onClicked: importSuccessDialog.close()
+                }
+
+                Button {
+                    text: "打开数据集页"
+                    font.family: Theme.fontFamily
+                    font.bold: true
+                    onClicked: {
+                        importSuccessDialog.close()
+                        appController.currentPage = "dataset"
+                    }
+                }
             }
         }
     }
