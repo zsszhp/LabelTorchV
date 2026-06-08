@@ -481,7 +481,7 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
         for (const auto &val : samples) {
             QString sampleId = val.toString();
             QSqlQuery sampleQuery(db);
-            sampleQuery.prepare("SELECT image_path, label_path FROM dataset_samples WHERE id = ?");
+            sampleQuery.prepare("SELECT image_path, label_path, validation_status FROM dataset_samples WHERE id = ?");
             sampleQuery.addBindValue(sampleId);
             if (!sampleQuery.exec() || !sampleQuery.next()) {
                 ltWarning(LT_LOG_TRAINING()) << "Sample not found during snapshot preparation:" << sampleId;
@@ -490,6 +490,7 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
 
             QString srcImg = sampleQuery.value(0).toString();
             QString srcLbl = sampleQuery.value(1).toString();
+            QString validationStatus = sampleQuery.value(2).toString();
 
             QFileInfo imgInfo(srcImg);
             QString dstImg;
@@ -499,11 +500,11 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
                 if (splitName == QStringLiteral("train")) {
                     dstImg = snapshotDir + QStringLiteral("/train/good/") + imgInfo.fileName();
                 } else {
-                    // 验证集：无标签的放 good，有标签的放 defective
-                    if (srcLbl.isEmpty()) {
-                        dstImg = snapshotDir + QStringLiteral("/test/good/") + imgInfo.fileName();
-                    } else {
+                    // 验证集：依据导入阶段记录的样本状态决定 good/defective 目录
+                    if (validationStatus == QStringLiteral("defective")) {
                         dstImg = snapshotDir + QStringLiteral("/test/defective/") + imgInfo.fileName();
+                    } else {
+                        dstImg = snapshotDir + QStringLiteral("/test/good/") + imgInfo.fileName();
                     }
                 }
             } else {

@@ -67,10 +67,18 @@ QVariantMap ProjectService::validateProjectPath(const QString &path)
     return result;
 }
 
-QString ProjectService::createProject(const QString &name, const QString &rootPath)
+QString ProjectService::createProject(const QString &name, const QString &rootPath, const QString &taskType)
 {
     QString cleanPath = QDir::cleanPath(rootPath);
     ltTrace(LT_LOG_PROJECT()) << "createProject name=" << name << "path=" << cleanPath;
+
+    QString normalizedTaskType = taskType;
+    if (normalizedTaskType != QStringLiteral("detect")
+        && normalizedTaskType != QStringLiteral("obb")
+        && normalizedTaskType != QStringLiteral("classify")
+        && normalizedTaskType != QStringLiteral("anomaly")) {
+        normalizedTaskType = QStringLiteral("detect");
+    }
 
     // 路径校验：有 errors 时拒绝创建
     QVariantMap validation = validateProjectPath(cleanPath);
@@ -93,10 +101,11 @@ QString ProjectService::createProject(const QString &name, const QString &rootPa
         QString existingId = checkQuery.value(0).toString();
         ltInfo(LT_LOG_PROJECT()) << "createProject: project path already exists in database, returning existing ID:" << existingId;
         
-        // 自动同步/更新项目名称以防有变更
+        // 自动同步项目名称与任务类型，避免重复创建时保留旧配置
         QSqlQuery updateQuery(Database::instance().database());
-        updateQuery.prepare("UPDATE projects SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        updateQuery.prepare("UPDATE projects SET name = ?, task_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
         updateQuery.addBindValue(name);
+        updateQuery.addBindValue(normalizedTaskType);
         updateQuery.addBindValue(existingId);
         updateQuery.exec();
 
@@ -122,7 +131,7 @@ QString ProjectService::createProject(const QString &name, const QString &rootPa
         return {};
     }
 
-    if (!ProjectFs::createProjectJson(cleanPath, name, QStringLiteral("detect"))) {
+    if (!ProjectFs::createProjectJson(cleanPath, name, normalizedTaskType)) {
         ltError(LT_LOG_PROJECT()) << "Failed to create project.json:" << cleanPath;
         return {};
     }
@@ -134,7 +143,7 @@ QString ProjectService::createProject(const QString &name, const QString &rootPa
     query.addBindValue(projectId);
     query.addBindValue(name);
     query.addBindValue(cleanPath);
-    query.addBindValue(QStringLiteral("detect"));
+    query.addBindValue(normalizedTaskType);
 
     if (!query.exec()) {
         ltError(LT_LOG_PROJECT()) << "Failed to create project:" << query.lastError().text();

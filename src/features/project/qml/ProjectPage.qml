@@ -1013,7 +1013,9 @@ Item {
         onAccepted: {
             if (projectNameField.text && projectPathField.text) {
                 if (!pathValidationResult.valid) return
-                var pid = projectService.createProject(projectNameField.text, projectPathField.text)
+                var taskTypeMap = ["detect", "obb", "classify", "anomaly"]
+                var selectedTaskType = taskTypeMap[Math.max(0, taskTypeCombo.currentIndex)]
+                var pid = projectService.createProject(projectNameField.text, projectPathField.text, selectedTaskType)
                 if (pid) {
                     projectModel.refresh()
                     projectService.openProject(pid)

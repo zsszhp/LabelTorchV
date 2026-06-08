@@ -330,12 +330,12 @@ bool TrainingService::startTraining(const QString &runId)
 
             auto db = Database::instance().database();
 
-            QJsonObject runtimeEnv;
-            runtimeEnv["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-            runtimeEnv["python_version"] = "";
-            runtimeEnv["ultralytics_version"] = "";
-            runtimeEnv["torch_version"] = "";
-            runtimeEnv["cuda_available"] = false;
+            QVariantMap runtimeEnvMap = m_latestEnvironment;
+            runtimeEnvMap[QStringLiteral("timestamp")] = QDateTime::currentDateTime().toString(Qt::ISODate);
+            runtimeEnvMap[QStringLiteral("snapshot_id")] = snapshotId;
+            runtimeEnvMap[QStringLiteral("data_yaml")] = dataYamlPath;
+            runtimeEnvMap[QStringLiteral("project_root")] = capturedProjectRoot;
+            QJsonObject runtimeEnv = QJsonObject::fromVariantMap(runtimeEnvMap);
             QString runtimeEnvJson = QString::fromUtf8(
                 QJsonDocument(runtimeEnv).toJson(QJsonDocument::Compact));
 
@@ -552,8 +552,39 @@ bool TrainingService::updateRunStatus(const QString &runId, const QString &statu
 void TrainingService::onResponseReceived(const QJsonObject &response)
 {
     QString command = response[QStringLiteral("command")].toString();
+    bool success = response[QStringLiteral("success")].toBool();
+
+    if (command == IpcProtocol::CMD_TRAIN_START && !success) {
+        QJsonObject errorObj = response[QStringLiteral("error")].toObject();
+        QString message = errorObj[QStringLiteral("message")].toString();
+
+        // train.start 在进入异步训练前就可能失败，此时后端不会再补发 task.failed 事件。
+        // 这里根据最近一次处于 preparing/running 的任务进行状态回滚，避免 UI 长时间卡在运行中。
+        QSqlQuery query(Database::instance().database());
+        query.prepare(
+            "SELECT id FROM training_runs WHERE status IN ('preparing', 'running') ORDER BY started_at DESC LIMIT 1"
+        );
+
+        if (query.exec() && query.next()) {
+            QString runId = query.value(0).toString();
+            updateRunStatus(runId, QStringLiteral("failed"));
+            emit trainingWarning(runId, message.isEmpty() ? QStringLiteral("训练启动失败") : message);
+            ltError(LT_LOG_TRAINING()) << "train.start failed for run:" << runId << "error:" << message;
+        } else {
+            ltError(LT_LOG_TRAINING()) << "train.start failed but no preparing/running run found:" << message;
+        }
+        return;
+    }
+
+    if (command == IpcProtocol::CMD_ENV_CHECK) {
+        if (success) {
+            m_latestEnvironment = response[QStringLiteral("result")].toObject().toVariantMap();
+            ltInfo(LT_LOG_TRAINING()) << "Cached runtime environment snapshot from backend check";
+        }
+        return;
+    }
+
     if (command == IpcProtocol::CMD_TRAIN_LIST_ADAPTERS) {
-        bool success = response[QStringLiteral("success")].toBool();
         if (success) {
             QJsonObject result = response[QStringLiteral("result")].toObject();
             QJsonArray adapters = result[QStringLiteral("adapters")].toArray();

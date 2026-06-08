@@ -51,6 +51,15 @@ ApplicationWindow {
     }
 
     Connections {
+        target: projectService
+        function onTaskTypeChanged(projectId, taskType) {
+            if (projectId === appController.currentProjectId) {
+                root.currentTaskType = taskType
+            }
+        }
+    }
+
+    Connections {
         target: ipcClient
         function onResponseReceived(response) {
             var cmd = response.command || ""

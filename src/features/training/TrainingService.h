@@ -134,6 +134,7 @@ private:
     ModelRegistry *m_modelRegistry = nullptr;
     MetricService *m_metricService = nullptr;
     QStringList m_adapters = { QStringLiteral("ultralytics"), QStringLiteral("anomalib") };
+    QVariantMap m_latestEnvironment;
 };
 
 #endif // TRAININGSERVICE_H

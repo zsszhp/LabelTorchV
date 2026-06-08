@@ -27,6 +27,8 @@ Item {
 
     // 数据增强开关
     property bool augmentationEnabled: true
+    property var ultralyticsModelFamilies: ["yolov5", "yolov8", "yolov8_obb", "yolov8_cls", "yolov10", "yolov11"]
+    property var anomalibModelFamilies: ["patchcore", "padim", "efficient_ad", "stfpm"]
 
     onCurrentProjectIdChanged: {
         trainingModel.setProjectId(currentProjectId)
@@ -38,35 +40,59 @@ Item {
         metricModel.clear()
         recallModel.clear()
         precisionModel.clear()
+        if (currentProjectId !== "") {
+            root.applyTaskTypeToModelFamily(projectService.getTaskType(currentProjectId))
+        }
+    }
+
+    function applyModelFamilyOptions(options, preferredValue) {
+        modelFamilyCombo.model = options
+        var targetIndex = options.indexOf(preferredValue)
+        modelFamilyCombo.currentIndex = targetIndex >= 0 ? targetIndex : 0
+    }
+
+    function applyAdapterDefaults(adapterName) {
+        if (adapterName === "anomalib") {
+            applyModelFamilyOptions(anomalibModelFamilies, anomalibModelFamilies[0])
+            return
+        }
+        applyModelFamilyOptions(ultralyticsModelFamilies, "yolov8")
     }
 
     // 根据任务类型自动选择模型系列与适配器
     function applyTaskTypeToModelFamily(taskType) {
         switch (taskType) {
             case "detect":
-                modelFamilyCombo.currentIndex = modelFamilyCombo.indexOfValue("yolov8")
+                applyModelFamilyOptions(ultralyticsModelFamilies, "yolov8")
                 adapterCombo.currentIndex = adapterCombo.indexOfValue("ultralytics")
                 break
             case "obb":
-                modelFamilyCombo.currentIndex = modelFamilyCombo.indexOfValue("yolov8_obb")
+                applyModelFamilyOptions(ultralyticsModelFamilies, "yolov8_obb")
                 adapterCombo.currentIndex = adapterCombo.indexOfValue("ultralytics")
                 break
             case "classify":
-                modelFamilyCombo.currentIndex = modelFamilyCombo.indexOfValue("yolov8_cls")
+                applyModelFamilyOptions(ultralyticsModelFamilies, "yolov8_cls")
                 adapterCombo.currentIndex = adapterCombo.indexOfValue("ultralytics")
                 break
             case "anomaly":
-                modelFamilyCombo.currentIndex = modelFamilyCombo.indexOfValue("anomaly")
+                applyModelFamilyOptions(anomalibModelFamilies, "patchcore")
                 adapterCombo.currentIndex = adapterCombo.indexOfValue("anomalib")
+                break
+            default:
+                applyModelFamilyOptions(ultralyticsModelFamilies, "yolov8")
+                adapterCombo.currentIndex = adapterCombo.indexOfValue("ultralytics")
                 break
         }
     }
 
     // 收集全部训练配置并序列化为 JSON
     function getConfigJson() {
+        var trainingType = ["from_scratch", "pretrained", "incremental"][trainingTypeCombo.currentIndex]
+        var usePretrainedWeights = trainingType !== "from_scratch"
         var config = {
             "adapter": adapterCombo.currentText,
             "img_size": imgSizeStepper.value,
+            "imgsz": imgSizeStepper.value,
             "batch": batchStepper.value,
             "epochs": epochsStepper.value,
             "patience": patienceStepper.value,
@@ -75,7 +101,10 @@ Item {
             "resume": resumeSwitch.checked,
             "device": deviceCombo.currentText,
             "model_family": modelFamilyCombo.currentText,
-            "training_type": ["from_scratch", "pretrained", "incremental"][trainingTypeCombo.currentIndex],
+            "training_type": trainingType,
+            "pretrained": usePretrainedWeights,
+            "pretrained_profile": pretrainedCombo.currentText,
+            "input_channels": channelCombo.currentIndex === 0 ? 3 : 1,
             "save_period": savePeriodStepper.value,
             "iou": iouStepper.value / 100
         }
@@ -1407,13 +1436,7 @@ Item {
                                                 }
 
                                                 onActivated: {
-                                                    if (currentText === "anomalib") {
-                                                        modelFamilyCombo.model = ["anomaly"]
-                                                        modelFamilyCombo.currentIndex = 0
-                                                    } else {
-                                                        modelFamilyCombo.model = ["yolov5", "yolov8", "yolov8_obb", "yolov8_cls", "yolov10", "yolov11"]
-                                                        modelFamilyCombo.currentIndex = 1
-                                                    }
+                                                    root.applyAdapterDefaults(currentText)
                                                 }
                                             }
                                         }
@@ -1427,7 +1450,7 @@ Item {
                                             ComboBox {
                                                 id: modelFamilyCombo
                                                 anchors.fill: parent
-                                                model: ["yolov5", "yolov8", "yolov8_obb", "yolov8_cls", "yolov10", "yolov11"]
+                                                model: root.ultralyticsModelFamilies
                                                 currentIndex: 1
 
                                                 contentItem: Text {
@@ -2532,7 +2555,7 @@ Item {
                 ComboBox {
                     id: addModelTypeCombo
                     anchors.fill: parent
-                    model: ["yolov8", "yolov8_obb", "yolov8_cls", "yolov11", "anomaly"]
+                    model: ["yolov8", "yolov8_obb", "yolov8_cls", "yolov11", "patchcore"]
                     currentIndex: 0
 
                     contentItem: Text {
@@ -2643,14 +2666,12 @@ Item {
                     onClicked: {
                         // 设置模型类型到配置面板
                         var modelType = addModelTypeCombo.currentText
-                        if (modelType === "anomaly") {
+                        if (modelType === "patchcore") {
                             adapterCombo.currentIndex = adapterCombo.indexOfValue("anomalib")
-                            modelFamilyCombo.model = ["anomaly"]
-                            modelFamilyCombo.currentIndex = 0
+                            root.applyModelFamilyOptions(root.anomalibModelFamilies, "patchcore")
                         } else {
                             adapterCombo.currentIndex = adapterCombo.indexOfValue("ultralytics")
-                            modelFamilyCombo.model = ["yolov5", "yolov8", "yolov8_obb", "yolov8_cls", "yolov10", "yolov11"]
-                            modelFamilyCombo.currentIndex = modelFamilyCombo.indexOfValue(modelType)
+                            root.applyModelFamilyOptions(root.ultralyticsModelFamilies, modelType)
                         }
                         addModelDialog.accept()
                     }

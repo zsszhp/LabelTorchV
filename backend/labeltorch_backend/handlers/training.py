@@ -38,6 +38,24 @@ async def handle_start(payload: dict) -> dict:
             loss = epoch_data.get("loss", 0)
             map50 = epoch_data.get("mAP50(B)", epoch_data.get("mAP50", 0))
             map50_95 = epoch_data.get("mAP50-95(B)", epoch_data.get("mAP50-95", 0))
+            auroc = epoch_data.get("auroc", epoch_data.get("image_auroc", 0))
+            pixel_auroc = epoch_data.get("pixel_auroc", 0)
+            f1_score = epoch_data.get("f1", epoch_data.get("image_f1", 0))
+
+            metrics_payload = {
+                "mAP50": map50,
+                "mAP50-95": map50_95,
+                "precision": epoch_data.get("precision(B)", epoch_data.get("precision", 0)),
+                "recall": epoch_data.get("recall(B)", epoch_data.get("recall", 0)),
+                "map50": map50,
+            }
+            if auroc:
+                metrics_payload["auroc"] = auroc
+                metrics_payload["image_auroc"] = epoch_data.get("image_auroc", auroc)
+            if pixel_auroc:
+                metrics_payload["pixel_auroc"] = pixel_auroc
+            if f1_score:
+                metrics_payload["f1"] = f1_score
 
             server.send_event("task.progress", task_id, {
                 "task_id": task_id,
@@ -48,13 +66,10 @@ async def handle_start(payload: dict) -> dict:
                 "mAP50-95": map50_95,
                 "precision": epoch_data.get("precision(B)", epoch_data.get("precision", 0)),
                 "recall": epoch_data.get("recall(B)", epoch_data.get("recall", 0)),
-                "metrics": {
-                    "mAP50": map50,
-                    "mAP50-95": map50_95,
-                    "precision": epoch_data.get("precision(B)", epoch_data.get("precision", 0)),
-                    "recall": epoch_data.get("recall(B)", epoch_data.get("recall", 0)),
-                    "map50": map50,
-                }
+                "auroc": auroc,
+                "pixel_auroc": pixel_auroc,
+                "f1": f1_score,
+                "metrics": metrics_payload,
             })
 
             # 同时发送日志事件，让UI层实时显示训练进度
@@ -63,6 +78,8 @@ async def handle_start(payload: dict) -> dict:
                 log_msg += f", mAP50: {map50:.4f}"
             if map50_95:
                 log_msg += f", mAP50-95: {map50_95:.4f}"
+            if auroc:
+                log_msg += f", AUROC: {auroc:.4f}"
             server.send_event("task.log", task_id, {
                 "task_id": task_id,
                 "message": log_msg,
