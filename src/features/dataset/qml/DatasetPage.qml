@@ -19,6 +19,7 @@ Item {
     property int totalSamples: 0
     property int labeledSamples: 0
     property string selectedTag: "默认"
+    property string galleryFilterLabel: "全部图像"
 
     // === 页面初始化与可见性刷新 ===
     Component.onCompleted: {
@@ -670,6 +671,46 @@ Item {
             ColumnLayout {
                 anchors.fill: parent
                 spacing: 0
+
+                FilterBar {
+                    id: galleryFilterBar
+                    Layout.fillWidth: true
+                    visible: appController.projectOpen && currentDatasetId !== ""
+                }
+
+                Rectangle {
+                    visible: appController.projectOpen && currentDatasetId !== ""
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Theme.filterBarHeight
+                    color: Theme.bgSide
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: Theme.spacingLarge
+                        anchors.rightMargin: Theme.spacingLarge
+                        spacing: Theme.spacingNormal
+
+                        Text {
+                            text: currentDatasetName ? (currentDatasetName + " / " + galleryFilterLabel) : "样本画廊"
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Font.DemiBold
+                            font.family: Theme.fontFamily
+                            color: Theme.textMain
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+
+                        StatusTag {
+                            text: sampleListModel.count + " 张图像"
+                            tone: sampleListModel.count > 0 ? "info" : "neutral"
+                        }
+
+                        StatusTag {
+                            text: labeledSamples + "/" + totalSamples + " 已标注"
+                            tone: labeledSamples > 0 ? "success" : "warning"
+                        }
+                    }
+                }
 
                 // 空状态提示：未打开项目
                 Text {
