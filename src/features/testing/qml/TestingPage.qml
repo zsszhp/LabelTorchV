@@ -16,6 +16,8 @@ Item {
     property var testMetrics: ({})
     property var confusionMatrix: ({})
     property var prCurveData: ([])
+    property string testActionMessage: ""
+    property string testActionTone: "neutral"
     property string currentTaskType: currentProjectId !== "" ? projectService.getTaskType(currentProjectId) : "detect"
     property bool isAnomalyProject: currentTaskType === "anomaly"
     property var environmentInfo: ({})
@@ -205,6 +207,49 @@ Item {
         if (taskId !== "") {
             root.selectedTaskId = taskId
             testingModel.refresh()
+        }
+    }
+
+    function validateTestStart() {
+        if (!root.selectedModelVersionId)
+            return {"ok": false, "message": "请先选择一个模型版本"}
+        if (!snapshotCombo.currentValue)
+            return {"ok": false, "message": "请先选择用于测试的数据快照"}
+        if (Object.keys(environmentInfo).length === 0)
+            return {"ok": false, "message": "运行环境尚未检测完成，请稍后再启动测试"}
+        if (deviceCombo.currentText !== "auto" && deviceCombo.currentText !== "cpu" && environmentInfo.cuda_available !== true)
+            return {"ok": false, "message": "当前选择了 GPU 设备，但运行环境未检测到可用 CUDA"}
+
+        var memoryMb = environmentInfo.gpu_memory_total_mb || 0
+        if (environmentInfo.cuda_available === true && memoryMb > 0 && batchSizeStepper.value >= 32 && memoryMb < 8192)
+            return {"ok": false, "message": "当前显存较小，评估 batch 过高，建议降到 16 或更小"}
+
+        return {"ok": true, "message": ""}
+    }
+
+    function startOrCreateTestTask() {
+        var validation = validateTestStart()
+        if (!validation.ok) {
+            testActionMessage = validation.message
+            testActionTone = "warning"
+            return
+        }
+
+        if (root.testStatus === "running") {
+            testingService.stopTestTask(root.selectedTaskId)
+            testActionMessage = "已发送停止测试请求"
+            testActionTone = "warning"
+        } else if (root.selectedTaskId && root.testStatus === "draft") {
+            if (testingService.startTestTask(root.selectedTaskId)) {
+                testActionMessage = "测试任务已启动"
+                testActionTone = "info"
+            }
+        } else {
+            createNewTestTask()
+            if (root.selectedTaskId && testingService.startTestTask(root.selectedTaskId)) {
+                testActionMessage = "测试任务已创建并启动"
+                testActionTone = "info"
+            }
         }
     }
 
@@ -417,17 +462,7 @@ Item {
                         hoverEnabled: true
                         cursorShape: root.selectedModelVersionId ? Qt.PointingHandCursor : Qt.ForbiddenCursor
                         onClicked: {
-                            if (!root.selectedModelVersionId) return
-                            if (root.testStatus === "running") {
-                                testingService.stopTestTask(root.selectedTaskId)
-                            } else if (root.selectedTaskId && root.testStatus === "draft") {
-                                testingService.startTestTask(root.selectedTaskId)
-                            } else {
-                                createNewTestTask()
-                                if (root.selectedTaskId) {
-                                    testingService.startTestTask(root.selectedTaskId)
-                                }
-                            }
+                            root.startOrCreateTestTask()
                         }
                     }
                 }
@@ -547,6 +582,13 @@ Item {
                             visible: root.testStatus !== "idle"
                             text: root.testStatusText
                             tone: root.testStatusTone
+                            Layout.alignment: Qt.AlignVCenter
+                        }
+
+                        StatusTag {
+                            visible: root.testActionMessage !== ""
+                            text: root.testActionMessage
+                            tone: root.testActionTone
                             Layout.alignment: Qt.AlignVCenter
                         }
                     }
