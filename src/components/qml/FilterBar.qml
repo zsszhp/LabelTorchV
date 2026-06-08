@@ -13,6 +13,9 @@ Rectangle {
     property alias datasetFilter: datasetCombo.currentText
     property alias tagFilter: tagCombo.currentText
     property alias labelFilter: labelCombo.currentText
+    property alias datasetModel: datasetCombo.model
+    property alias tagModel: tagCombo.model
+    property alias labelModel: labelCombo.model
 
     Row {
         anchors.fill: parent
@@ -33,6 +36,7 @@ Rectangle {
                 id: datasetCombo
                 anchors.fill: parent
                 model: ["全部数据集"]
+                currentIndex: 0
                 font.pixelSize: Theme.fontSizeSmall
                 palette.button: Theme.bgSide
                 palette.text: Theme.textMain
@@ -52,6 +56,7 @@ Rectangle {
                 id: tagCombo
                 anchors.fill: parent
                 model: ["全部Tag"]
+                currentIndex: 0
                 font.pixelSize: Theme.fontSizeSmall
                 palette.button: Theme.bgSide
                 palette.text: Theme.textMain
@@ -71,6 +76,7 @@ Rectangle {
                 id: labelCombo
                 anchors.fill: parent
                 model: ["全部类别"]
+                currentIndex: 0
                 font.pixelSize: Theme.fontSizeSmall
                 palette.button: Theme.bgSide
                 palette.text: Theme.textMain

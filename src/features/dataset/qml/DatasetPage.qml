@@ -20,6 +20,7 @@ Item {
     property int labeledSamples: 0
     property string selectedTag: "默认"
     property string galleryFilterLabel: "全部图像"
+    property var rawSamples: []
 
     // === 页面初始化与可见性刷新 ===
     Component.onCompleted: {
@@ -40,6 +41,7 @@ Item {
         function onCurrentProjectIdChanged() {
             datasetModel.setProjectId(appController.currentProjectId)
             sampleListModel.clear()
+            rawSamples = []
             currentDatasetId = ""
             currentDatasetName = ""
             selectedSample = null
@@ -676,6 +678,9 @@ Item {
                     id: galleryFilterBar
                     Layout.fillWidth: true
                     visible: appController.projectOpen && currentDatasetId !== ""
+                    datasetModel: currentDatasetName ? [currentDatasetName] : ["全部数据集"]
+                    tagModel: ["全部状态", "已标注", "未标注", "有效", "异常"]
+                    labelModel: ["全部划分", "train", "val", "test", "unspecified"]
                 }
 
                 Rectangle {
@@ -860,6 +865,43 @@ Item {
         id: sampleListModel
     }
 
+    function applySampleFilters() {
+        sampleListModel.clear()
+
+        var statusFilter = galleryFilterBar.tagFilter || "全部状态"
+        var splitFilter = galleryFilterBar.labelFilter || "全部划分"
+        var filteredCount = 0
+
+        for (var index = 0; index < rawSamples.length; ++index) {
+            var sample = rawSamples[index]
+            var hasLabel = sample.labelPath !== ""
+            var validationStatus = sample.validationStatus || ""
+            var splitValue = sample.split || "unspecified"
+
+            var matchStatus = true
+            if (statusFilter === "已标注")
+                matchStatus = hasLabel
+            else if (statusFilter === "未标注")
+                matchStatus = !hasLabel
+            else if (statusFilter === "有效")
+                matchStatus = validationStatus === "valid" || validationStatus === "good" || validationStatus === "defective"
+            else if (statusFilter === "异常")
+                matchStatus = validationStatus !== "" && validationStatus !== "valid" && validationStatus !== "good" && validationStatus !== "defective"
+
+            var matchSplit = splitFilter === "全部划分" || splitValue === splitFilter
+
+            if (!matchStatus || !matchSplit)
+                continue
+
+            sampleListModel.append(sample)
+            filteredCount += 1
+        }
+
+        galleryFilterLabel = statusFilter === "全部状态" && splitFilter === "全部划分"
+            ? "全部图像"
+            : (statusFilter + " / " + splitFilter)
+    }
+
     // ================================================================
     // 选择数据集：加载样本列表与统计信息
     // ================================================================
@@ -867,6 +909,7 @@ Item {
         currentDatasetId = dsId
         selectedSample = null
         sampleListModel.clear()
+        rawSamples = []
 
         // 从listDatasets获取数据集名称
         var datasets = datasetService.listDatasets(appController.currentProjectId)
@@ -888,14 +931,29 @@ Item {
             var s = samples[j]
             var imgPath = s.image_path || s.imagePath || ""
             var fileName = imgPath.split("/").pop().split("\\").pop()
-            sampleListModel.append({
+            rawSamples.push({
                 "sampleId": s.id || "",
                 "fileName": fileName,
                 "imagePath": "file:///" + imgPath.replace(/\\/g, "/"),
                 "imgWidth": s.width || 0,
                 "imgHeight": s.height || 0,
-                "labelCount": s.label_count || 0
+                "labelCount": s.labelPath ? 1 : 0,
+                "labelPath": s.labelPath || "",
+                "validationStatus": s.validationStatus || "",
+                "split": s.split || "unspecified"
             })
+        }
+
+        applySampleFilters()
+    }
+
+    Connections {
+        target: galleryFilterBar
+        function onTagFilterChanged() {
+            pageRoot.applySampleFilters()
+        }
+        function onLabelFilterChanged() {
+            pageRoot.applySampleFilters()
         }
     }
 
