@@ -1724,15 +1724,323 @@
                     </div>
                 </div>
 
-                <div id="train-sub-results" class="train-sub-content">
-                    <div style="padding: 24px; height: 100%; display: flex; flex-direction: column; gap: 16px;">
-                        <div
-                            style="flex: 1; border: 1px dashed var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.2); display:flex; align-items:center; justify-content:center; color:var(--primary-glow); font-size:16px;">
-                            <i class="fa-solid fa-chart-area" style="margin-right:8px;"></i> [图表模块] 实时 Loss 曲线加载中...
+                <div id="train-sub-results" class="train-sub-content" style="height: 100%;">
+                    <div style="display: flex; height: 100%; overflow: hidden;">
+                        <!-- Left panel sidebar -->
+                        <div style="width: 240px; border-right: 1px solid var(--border-color); background-color: var(--bg-side); padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; flex-shrink: 0;">
+                            <!-- 训练状态 -->
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 12px;">训练状态</div>
+                                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--text-muted);">
+                                    <div style="display: flex; justify-content: space-between;"><span>Epoch:</span><span style="color: var(--text-main);">-</span></div>
+                                    <div style="display: flex; justify-content: space-between;"><span>迭代:</span><span style="color: var(--text-main);">-</span></div>
+                                    <div style="display: flex; justify-content: space-between;"><span>当前任务:</span><span style="color: var(--success); font-weight: 500;">空闲</span></div>
+                                    <div style="display: flex; justify-content: space-between;"><span>学习速率:</span><span style="color: var(--text-main);">-</span></div>
+                                    <div style="display: flex; justify-content: space-between;"><span>损失:</span><span style="color: var(--text-main);">-</span></div>
+                                </div>
+                                <div style="height: 1px; background-color: var(--border-color); margin: 12px 0;"></div>
+                                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--text-muted);">
+                                    <div style="display: flex; justify-content: space-between;"><span>已用时间:</span><span style="color: var(--text-main);">-</span></div>
+                                    <div style="display: flex; justify-content: space-between;"><span>剩余时间:</span><span style="color: var(--text-main);">-</span></div>
+                                    <div style="display: flex; justify-content: space-between;"><span>数据加载时间占比:</span><span style="color: var(--text-main);">-</span></div>
+                                    <div style="display: flex; justify-content: space-between;"><span>batch耗时:</span><span style="color: var(--text-main);">-</span></div>
+                                    <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+                                        <span>训练进度:</span>
+                                        <div style="width: 100%; height: 8px; background: var(--bg-main); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color);">
+                                            <div style="width: 30%; height: 100%; background: #e0e0e0; border-radius: 4px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 评估状态 -->
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 12px;">评估状态</div>
+                                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--text-muted);">
+                                    <div style="display: flex; justify-content: space-between;"><span>最佳Epoch:</span><span style="color: var(--text-main);">-</span></div>
+                                    <div style="display: flex; justify-content: space-between;"><span>mAP50:</span><span style="color: var(--text-main);">-</span></div>
+                                </div>
+                                <div style="height: 1px; background-color: var(--border-color); margin: 12px 0;"></div>
+                            </div>
+
+                            <!-- 指标展示类别 -->
+                            <div>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">指标展示类别</div>
+                                <div style="position: relative; display: flex; align-items: center; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 4px; padding: 6px 10px; cursor: pointer;">
+                                    <span style="display: inline-block; width: 12px; height: 12px; background-color: #FF1744; margin-right: 8px; border-radius: 2px;"></span>
+                                    <select style="background: transparent; border: none; padding: 0; color: var(--text-main); font-size: 12px; flex-grow: 1; outline: none; cursor: pointer; appearance: none;">
+                                        <option>划痕</option>
+                                    </select>
+                                    <i class="fa-solid fa-caret-down" style="color: var(--text-muted); font-size: 10px; pointer-events: none; margin-left: 4px;"></i>
+                                </div>
+                            </div>
                         </div>
-                        <div
-                            style="flex: 1; border: 1px dashed var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.2); display:flex; align-items:center; justify-content:center; color:var(--success); font-size:16px;">
-                            <i class="fa-solid fa-chart-line" style="margin-right:8px;"></i> [图表模块] mAP / 精确率波动监测...
+
+                        <!-- Right panel charts -->
+                        <div style="flex-grow: 1; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto;">
+                            <!-- Card 1: 损失 -->
+                            <div style="border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--bg-side); display: flex; flex-direction: column; overflow: hidden;">
+                                <div style="padding: 10px 14px; display: flex; align-items: center; gap: 6px; cursor: pointer; background-color: rgba(255,255,255,0.01); border-bottom: 1px solid var(--border-color);" onclick="const content = this.nextElementSibling; const icon = this.querySelector('i'); if(content.style.display==='none'){content.style.display='flex'; icon.className='fa-solid fa-caret-down';}else{content.style.display='none'; icon.className='fa-solid fa-caret-right';}">
+                                    <i class="fa-solid fa-caret-down" style="color: var(--text-muted); font-size: 12px;"></i>
+                                    <span style="font-size: 12px; font-weight: 600; color: var(--text-main);">损失</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; padding: 16px; gap: 12px; background-color: #07090D;">
+                                    <!-- Chart Legend -->
+                                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+                                        <span style="color: var(--text-main); font-weight: 500;">Loss</span>
+                                        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #0077FF; border-radius: 1px;"></span><span>box_loss</span></div>
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #00E676; border-radius: 1px;"></span><span>seg_loss</span></div>
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #00E5FF; border-radius: 1px;"></span><span>cls_loss</span></div>
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #FF9100; border-radius: 1px;"></span><span>dfl_loss</span></div>
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #D500F9; border-radius: 1px;"></span><span>severe_loss</span></div>
+                                        </div>
+                                        <i class="fa-solid fa-expand" style="cursor: pointer; color: var(--text-muted); transition: color 0.2s;" onmouseover="this.style.color='var(--text-main)'" onmouseout="this.style.color='var(--text-muted)'"></i>
+                                    </div>
+                                    <!-- Chart Graph SVG -->
+                                    <div style="position: relative; width: 100%; height: 260px; background-color: #05070A; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; padding: 10px;">
+                                        <svg style="width: 100%; height: 100%;" viewBox="0 0 800 240" preserveAspectRatio="none">
+                                            <!-- Dashed horizontal grid lines -->
+                                            <line x1="40" y1="30" x2="780" y2="30" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="40" y1="70" x2="780" y2="70" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="40" y1="110" x2="780" y2="110" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="40" y1="150" x2="780" y2="150" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="40" y1="190" x2="780" y2="190" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            
+                                            <!-- Solid bottom baseline -->
+                                            <line x1="40" y1="210" x2="780" y2="210" stroke="#FFD600" stroke-width="1.5"></line>
+                                            
+                                            <!-- Y Axis Labels -->
+                                            <text x="30" y="34" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.10</text>
+                                            <text x="30" y="74" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.08</text>
+                                            <text x="30" y="114" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.06</text>
+                                            <text x="30" y="154" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.04</text>
+                                            <text x="30" y="194" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.02</text>
+                                            <text x="30" y="214" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.00</text>
+                                            
+                                            <!-- X Axis Labels (0 to 20) -->
+                                            <text x="40" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">0</text>
+                                            <text x="77" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">1</text>
+                                            <text x="114" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">2</text>
+                                            <text x="151" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">3</text>
+                                            <text x="188" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">4</text>
+                                            <text x="225" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">5</text>
+                                            <text x="262" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">6</text>
+                                            <text x="299" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">7</text>
+                                            <text x="336" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">8</text>
+                                            <text x="373" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">9</text>
+                                            <text x="410" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">10</text>
+                                            <text x="447" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">11</text>
+                                            <text x="484" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">12</text>
+                                            <text x="521" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">13</text>
+                                            <text x="558" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">14</text>
+                                            <text x="595" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">15</text>
+                                            <text x="632" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">16</text>
+                                            <text x="669" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">17</text>
+                                            <text x="706" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">18</text>
+                                            <text x="743" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">19</text>
+                                            <text x="780" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">20</text>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 2: mAP -->
+                            <div style="border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--bg-side); display: flex; flex-direction: column; overflow: hidden;">
+                                <div style="padding: 10px 14px; display: flex; align-items: center; gap: 6px; cursor: pointer; background-color: rgba(255,255,255,0.01); border-bottom: 1px solid var(--border-color);" onclick="const content = this.nextElementSibling; const icon = this.querySelector('i'); if(content.style.display==='none'){content.style.display='flex'; icon.className='fa-solid fa-caret-down';}else{content.style.display='none'; icon.className='fa-solid fa-caret-right';}">
+                                    <i class="fa-solid fa-caret-down" style="color: var(--text-muted); font-size: 12px;"></i>
+                                    <span style="font-size: 12px; font-weight: 600; color: var(--text-main);">mAP</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; padding: 16px; gap: 12px; background-color: #07090D;">
+                                    <!-- Chart Legend -->
+                                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+                                        <span style="color: var(--text-main); font-weight: 500;">mAP</span>
+                                        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #00E676; border-radius: 1px;"></span><span>mAP50(B)</span></div>
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #FFFFFF; border-radius: 1px;"></span><span>mAP50:95(B)</span></div>
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #00E5FF; border-radius: 1px;"></span><span>mAP50(M)</span></div>
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #D500F9; border-radius: 1px;"></span><span>mAP50:95(M)</span></div>
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #FF1744; border-radius: 1px;"></span><span>划痕</span></div>
+                                        </div>
+                                        <i class="fa-solid fa-expand" style="cursor: pointer; color: var(--text-muted); transition: color 0.2s;" onmouseover="this.style.color='var(--text-main)'" onmouseout="this.style.color='var(--text-muted)'"></i>
+                                    </div>
+                                    <!-- Chart Graph SVG -->
+                                    <div style="position: relative; width: 100%; height: 260px; background-color: #05070A; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; padding: 10px;">
+                                        <svg style="width: 100%; height: 100%;" viewBox="0 0 800 240" preserveAspectRatio="none">
+                                            <!-- Dashed horizontal grid lines -->
+                                            <line x1="45" y1="30" x2="780" y2="30" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="45" y1="70" x2="780" y2="70" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="45" y1="110" x2="780" y2="110" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="45" y1="150" x2="780" y2="150" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="45" y1="190" x2="780" y2="190" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            
+                                            <!-- Solid bottom baseline -->
+                                            <line x1="45" y1="210" x2="780" y2="210" stroke="#FFD600" stroke-width="1.5"></line>
+                                            
+                                            <!-- Y Axis Labels -->
+                                            <text x="35" y="34" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">8.58</text>
+                                            <text x="35" y="74" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">4.71</text>
+                                            <text x="35" y="114" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.84</text>
+                                            <text x="35" y="154" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">-3.03</text>
+                                            <text x="35" y="194" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">-6.90</text>
+                                            <text x="35" y="214" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">-8.81</text>
+                                            
+                                            <!-- X Axis Labels (Custom large coordinate numbers) -->
+                                            <text x="45" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-3840</text>
+                                            <text x="81" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-3646</text>
+                                            <text x="118" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-3452</text>
+                                            <text x="155" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-3258</text>
+                                            <text x="192" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-3064</text>
+                                            <text x="229" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-2870</text>
+                                            <text x="266" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-2676</text>
+                                            <text x="303" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-2482</text>
+                                            <text x="340" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-2288</text>
+                                            <text x="377" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-2094</text>
+                                            <text x="414" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-1900</text>
+                                            <text x="451" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-1706</text>
+                                            <text x="488" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-1512</text>
+                                            <text x="525" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-1318</text>
+                                            <text x="562" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-1124</text>
+                                            <text x="599" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-930</text>
+                                            <text x="636" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-736</text>
+                                            <text x="673" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-542</text>
+                                            <text x="710" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-348</text>
+                                            <text x="747" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">-154</text>
+                                            <text x="780" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">39</text>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 3: 召回率 -->
+                            <div style="border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--bg-side); display: flex; flex-direction: column; overflow: hidden;">
+                                <div style="padding: 10px 14px; display: flex; align-items: center; gap: 6px; cursor: pointer; background-color: rgba(255,255,255,0.01); border-bottom: 1px solid var(--border-color);" onclick="const content = this.nextElementSibling; const icon = this.querySelector('i'); if(content.style.display==='none'){content.style.display='flex'; icon.className='fa-solid fa-caret-down';}else{content.style.display='none'; icon.className='fa-solid fa-caret-right';}">
+                                    <i class="fa-solid fa-caret-down" style="color: var(--text-muted); font-size: 12px;"></i>
+                                    <span style="font-size: 12px; font-weight: 600; color: var(--text-main);">召回率</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; padding: 16px; gap: 12px; background-color: #07090D;">
+                                    <!-- Chart Legend -->
+                                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+                                        <span style="color: var(--text-main); font-weight: 500;">召回率</span>
+                                        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #FFD600; border-radius: 1px;"></span><span>recall(B)</span></div>
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #00E676; border-radius: 1px;"></span><span>recall(M)</span></div>
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #FF1744; border-radius: 1px;"></span><span>划痕</span></div>
+                                        </div>
+                                        <i class="fa-solid fa-expand" style="cursor: pointer; color: var(--text-muted); transition: color 0.2s;" onmouseover="this.style.color='var(--text-main)'" onmouseout="this.style.color='var(--text-muted)'"></i>
+                                    </div>
+                                    <!-- Chart Graph SVG -->
+                                    <div style="position: relative; width: 100%; height: 260px; background-color: #05070A; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; padding: 10px;">
+                                        <svg style="width: 100%; height: 100%;" viewBox="0 0 800 240" preserveAspectRatio="none">
+                                            <!-- Dashed horizontal grid lines -->
+                                            <line x1="40" y1="30" x2="780" y2="30" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="40" y1="70" x2="780" y2="70" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="40" y1="110" x2="780" y2="110" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="40" y1="150" x2="780" y2="150" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="40" y1="190" x2="780" y2="190" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            
+                                            <!-- Solid bottom baseline -->
+                                            <line x1="40" y1="210" x2="780" y2="210" stroke="#FFD600" stroke-width="1.5"></line>
+                                            
+                                            <!-- Y Axis Labels -->
+                                            <text x="30" y="34" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.10</text>
+                                            <text x="30" y="74" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.08</text>
+                                            <text x="30" y="114" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.06</text>
+                                            <text x="30" y="154" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.04</text>
+                                            <text x="30" y="194" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.02</text>
+                                            <text x="30" y="214" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.00</text>
+                                            
+                                            <!-- X Axis Labels -->
+                                            <text x="40" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">0</text>
+                                            <text x="77" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">1</text>
+                                            <text x="114" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">2</text>
+                                            <text x="151" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">3</text>
+                                            <text x="188" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">4</text>
+                                            <text x="225" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">5</text>
+                                            <text x="262" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">6</text>
+                                            <text x="299" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">7</text>
+                                            <text x="336" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">8</text>
+                                            <text x="373" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">9</text>
+                                            <text x="410" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">10</text>
+                                            <text x="447" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">11</text>
+                                            <text x="484" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">12</text>
+                                            <text x="521" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">13</text>
+                                            <text x="558" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">14</text>
+                                            <text x="595" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">15</text>
+                                            <text x="632" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">16</text>
+                                            <text x="669" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">17</text>
+                                            <text x="706" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">18</text>
+                                            <text x="743" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">19</text>
+                                            <text x="780" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">20</text>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 4: 精确率 -->
+                            <div style="border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--bg-side); display: flex; flex-direction: column; overflow: hidden;">
+                                <div style="padding: 10px 14px; display: flex; align-items: center; gap: 6px; cursor: pointer; background-color: rgba(255,255,255,0.01); border-bottom: 1px solid var(--border-color);" onclick="const content = this.nextElementSibling; const icon = this.querySelector('i'); if(content.style.display==='none'){content.style.display='flex'; icon.className='fa-solid fa-caret-down';}else{content.style.display='none'; icon.className='fa-solid fa-caret-right';}">
+                                    <i class="fa-solid fa-caret-down" style="color: var(--text-muted); font-size: 12px;"></i>
+                                    <span style="font-size: 12px; font-weight: 600; color: var(--text-main);">精确率</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; padding: 16px; gap: 12px; background-color: #07090D;">
+                                    <!-- Chart Legend -->
+                                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+                                        <span style="color: var(--text-main); font-weight: 500;">精确率</span>
+                                        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #FFD600; border-radius: 1px;"></span><span>precision(B)</span></div>
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #00E676; border-radius: 1px;"></span><span>precision(M)</span></div>
+                                            <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #FF1744; border-radius: 1px;"></span><span>划痕</span></div>
+                                        </div>
+                                        <i class="fa-solid fa-expand" style="cursor: pointer; color: var(--text-muted); transition: color 0.2s;" onmouseover="this.style.color='var(--text-main)'" onmouseout="this.style.color='var(--text-muted)'"></i>
+                                    </div>
+                                    <!-- Chart Graph SVG -->
+                                    <div style="position: relative; width: 100%; height: 260px; background-color: #05070A; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; padding: 10px;">
+                                        <svg style="width: 100%; height: 100%;" viewBox="0 0 800 240" preserveAspectRatio="none">
+                                            <!-- Dashed horizontal grid lines -->
+                                            <line x1="40" y1="30" x2="780" y2="30" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="40" y1="70" x2="780" y2="70" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="40" y1="110" x2="780" y2="110" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="40" y1="150" x2="780" y2="150" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            <line x1="40" y1="190" x2="780" y2="190" stroke="rgba(255, 23, 68, 0.12)" stroke-dasharray="3,3" stroke-width="1"></line>
+                                            
+                                            <!-- Solid bottom baseline -->
+                                            <line x1="40" y1="210" x2="780" y2="210" stroke="#FFD600" stroke-width="1.5"></line>
+                                            
+                                            <!-- Y Axis Labels -->
+                                            <text x="30" y="34" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.10</text>
+                                            <text x="30" y="74" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.08</text>
+                                            <text x="30" y="114" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.06</text>
+                                            <text x="30" y="154" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.04</text>
+                                            <text x="30" y="194" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.02</text>
+                                            <text x="30" y="214" fill="var(--text-muted)" font-size="9" text-anchor="end" font-family="monospace">0.00</text>
+                                            
+                                            <!-- X Axis Labels -->
+                                            <text x="40" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">0</text>
+                                            <text x="77" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">1</text>
+                                            <text x="114" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">2</text>
+                                            <text x="151" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">3</text>
+                                            <text x="188" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">4</text>
+                                            <text x="225" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">5</text>
+                                            <text x="262" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">6</text>
+                                            <text x="299" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">7</text>
+                                            <text x="336" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">8</text>
+                                            <text x="373" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">9</text>
+                                            <text x="410" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">10</text>
+                                            <text x="447" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">11</text>
+                                            <text x="484" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">12</text>
+                                            <text x="521" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">13</text>
+                                            <text x="558" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">14</text>
+                                            <text x="595" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">15</text>
+                                            <text x="632" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">16</text>
+                                            <text x="669" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">17</text>
+                                            <text x="706" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">18</text>
+                                            <text x="743" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">19</text>
+                                            <text x="780" y="228" fill="var(--text-muted)" font-size="9" text-anchor="middle" font-family="monospace">20</text>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

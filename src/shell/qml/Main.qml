@@ -187,7 +187,7 @@ ApplicationWindow {
                             height: Theme.headerHeight
                             leftPadding: 22
                             rightPadding: 22
-                            enabled: true
+                            enabled: !model.needsProject || appController.projectOpen
 
                             contentItem: Row {
                                 id: navContentRow

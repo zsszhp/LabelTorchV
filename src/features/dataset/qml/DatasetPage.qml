@@ -64,7 +64,8 @@ Item {
         // ============================================================
         Rectangle {
             id: sidebarRect
-            Layout.preferredWidth: Theme.sidebarWidth
+            width: Theme.sidebarWidth
+            Layout.preferredWidth: width
             Layout.fillHeight: true
             color: Theme.bgSide
 

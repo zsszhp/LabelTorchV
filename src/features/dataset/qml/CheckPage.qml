@@ -100,14 +100,22 @@ Item {
         // === 左侧栏 ===
         Rectangle {
             id: sidebar
-            Layout.preferredWidth: root.sidebarWidth
+            width: Theme.sidebarWidth
+            Layout.preferredWidth: width
             Layout.fillHeight: true
             color: Theme.bgSide
 
-            ColumnLayout {
+            ScrollView {
                 anchors.fill: parent
-                anchors.margins: Theme.spacingLarge - Theme.spacingNormal  // 12px padding
-                spacing: Theme.spacingLarge  // 16px gap
+                anchors.rightMargin: 1
+                clip: true
+                contentWidth: availableWidth
+
+                ColumnLayout {
+                    width: parent.width - Theme.spacingNormal * 2
+                    x: Theme.spacingNormal
+                    y: Theme.spacingNormal
+                    spacing: Theme.spacingLarge
 
                 // 项目名标题
                 Text {
@@ -591,6 +599,7 @@ Item {
                 }
             }
         }
+    }
 
         // === 可拖拽垂直分割线 (4px) ===
         Splitter {

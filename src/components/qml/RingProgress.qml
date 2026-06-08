@@ -43,8 +43,9 @@ Item {
             ctx.stroke()
         }
 
-        onValueChanged: requestPaint()
     }
+
+    onValueChanged: canvas.requestPaint()
 
     Text {
         anchors.centerIn: parent

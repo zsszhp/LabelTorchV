@@ -29,7 +29,8 @@ Item {
         // === 左侧边栏 ===
         Rectangle {
             id: sidebar
-            Layout.preferredWidth: sidebarW
+            width: Theme.sidebarWidth
+            Layout.preferredWidth: width
             Layout.fillHeight: true
             color: Theme.bgSide
 
@@ -42,349 +43,331 @@ Item {
                 color: Theme.borderColor
             }
 
-            ColumnLayout {
+            ScrollView {
                 anchors.fill: parent
-                anchors.margins: Theme.spacingNormal
-                spacing: Theme.spacingNormal
+                anchors.rightMargin: 1
+                clip: true
+                contentWidth: availableWidth
 
-                // 区块标题：项目管理
-                SectionTitle {
-                    Layout.fillWidth: true
-                    text: "项目管理"
-                }
+                ColumnLayout {
+                    width: parent.width - Theme.spacingNormal * 2
+                    x: Theme.spacingNormal
+                    y: Theme.spacingNormal
+                    spacing: Theme.spacingNormal
 
-                // 新建项目按钮（渐变背景 primary→primaryDark）
-                Button {
-                    id: newProjectBtn
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 36
-                    Layout.bottomMargin: Theme.spacingNormal
-                    text: "新建项目"
-                    font.pixelSize: Theme.fontSizeNormal
-                    font.bold: true
-                    font.family: Theme.fontFamily
-
-                    background: Rectangle {
-                        gradient: Gradient {
-                            GradientStop { position: 0.0; color: Theme.primary }
-                            GradientStop { position: 1.0; color: Theme.primaryDark }
-                        }
-                        radius: Theme.radiusNormal
+                    // 区块标题：项目管理
+                    SectionTitle {
+                        Layout.fillWidth: true
+                        text: "项目管理"
                     }
 
-                    contentItem: Item {
-                        implicitWidth: newProjectRow.implicitWidth
-                        implicitHeight: newProjectRow.implicitHeight
-                        Row {
-                            id: newProjectRow
-                            spacing: 8
-                            anchors.centerIn: parent
-                            SvgIcon {
-                                icon: "plus"
-                                width: 14
-                                height: 14
-                                color: Theme.textMain
-                                anchors.verticalCenter: parent.verticalCenter
+                    // 新建项目按钮（渐变背景 primary→primaryDark）
+                    Button {
+                        id: newProjectBtn
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 36
+                        Layout.bottomMargin: Theme.spacingNormal
+                        text: "新建项目"
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.bold: true
+                        font.family: Theme.fontFamily
+
+                        background: Rectangle {
+                            gradient: Gradient {
+                                GradientStop { position: 0.0; color: Theme.primary }
+                                GradientStop { position: 1.0; color: Theme.primaryDark }
                             }
-                            Text {
-                                text: newProjectBtn.text
-                                color: Theme.textMain
-                                font: newProjectBtn.font
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-                        }
-                    }
-
-                    onClicked: newProjectDialog.open()
-                }
-
-                // 打开项目按钮（bgCard + border）
-                Button {
-                    id: openProjectBtn
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 36
-                    text: "打开项目"
-                    font.pixelSize: Theme.fontSizeNormal
-                    font.family: Theme.fontFamily
-
-                    background: Rectangle {
-                        color: openProjectBtn.hovered ? Theme.bgHover : Theme.bgCard
-                        border.color: Theme.borderColor
-                        border.width: 1
-                        radius: Theme.radiusNormal
-                    }
-
-                    contentItem: Item {
-                        implicitWidth: openProjectRow.implicitWidth
-                        implicitHeight: openProjectRow.implicitHeight
-                        Row {
-                            id: openProjectRow
-                            spacing: 8
-                            anchors.centerIn: parent
-                            SvgIcon {
-                                icon: "folder"
-                                width: 14
-                                height: 14
-                                color: Theme.textMain
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-                            Text {
-                                text: openProjectBtn.text
-                                color: Theme.textMain
-                                font: openProjectBtn.font
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-                        }
-                    }
-
-                    onClicked: importFolderDialog.open()
-                }
-
-                // 分割线
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 1
-                    color: Theme.dividerColor
-                }
-
-                // 类别体系管理（可折叠区块）
-                CollapsibleSection {
-                    id: taxonomySection
-                    Layout.fillWidth: true
-                    title: "类别体系"
-                    expanded: appController.projectOpen
-
-                    ColumnLayout {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        spacing: Theme.spacingSmall
-
-                        // 未打开项目提示
-                        Text {
-                            visible: !appController.projectOpen
-                            text: "请先打开项目"
-                            font.pixelSize: Theme.fontSizeSmall
-                            font.family: Theme.fontFamily
-                            color: Theme.textMuted
+                            radius: Theme.radiusNormal
                         }
 
-                        // 添加类别输入行
-                        RowLayout {
-                            visible: appController.projectOpen
-                            Layout.fillWidth: true
+                        contentItem: Item {
+                            implicitWidth: newProjectRow.implicitWidth
+                            implicitHeight: newProjectRow.implicitHeight
+                            Row {
+                                id: newProjectRow
+                                spacing: 8
+                                anchors.centerIn: parent
+                                SvgIcon {
+                                    icon: "plus"
+                                    width: 14
+                                    height: 14
+                                    color: Theme.textMain
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                Text {
+                                    text: newProjectBtn.text
+                                    color: Theme.textMain
+                                    font: newProjectBtn.font
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                            }
+                        }
+
+                        onClicked: newProjectDialog.open()
+                    }
+
+                    // 打开项目按钮（bgCard + border）
+                    Button {
+                        id: openProjectBtn
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 36
+                        text: "打开项目"
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.family: Theme.fontFamily
+
+                        background: Rectangle {
+                            color: openProjectBtn.hovered ? Theme.bgHover : Theme.bgCard
+                            border.color: Theme.borderColor
+                            border.width: 1
+                            radius: Theme.radiusNormal
+                        }
+
+                        contentItem: Item {
+                            implicitWidth: openProjectRow.implicitWidth
+                            implicitHeight: openProjectRow.implicitHeight
+                            Row {
+                                id: openProjectRow
+                                spacing: 8
+                                anchors.centerIn: parent
+                                SvgIcon {
+                                    icon: "folder"
+                                    width: 14
+                                    height: 14
+                                    color: Theme.textMain
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                Text {
+                                    text: openProjectBtn.text
+                                    color: Theme.textMain
+                                    font: openProjectBtn.font
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                            }
+                        }
+
+                        onClicked: importFolderDialog.open()
+                    }
+
+                    // 分割线
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 1
+                        color: Theme.dividerColor
+                    }
+
+                    // 类别体系管理（可折叠区块）
+                    CollapsibleSection {
+                        id: taxonomySection
+                        Layout.fillWidth: true
+                        title: "类别体系"
+                        expanded: appController.projectOpen
+
+                        ColumnLayout {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
                             spacing: Theme.spacingSmall
 
-                            TextField {
-                                id: newClassField
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 28
-                                placeholderText: "类别名称"
-                                placeholderTextColor: Theme.textDisabled
-                                color: Theme.textMain
+                            // 未打开项目提示
+                            Text {
+                                visible: !appController.projectOpen
+                                text: "请先打开项目"
                                 font.pixelSize: Theme.fontSizeSmall
                                 font.family: Theme.fontFamily
-
-                                background: Rectangle {
-                                    color: Theme.bgInput
-                                    radius: Theme.radiusSmall
-                                    border.color: newClassField.activeFocus ? Theme.primaryGlow : Theme.borderColor
-                                    border.width: 1
-                                }
-
-                                onAccepted: addClassBtn.clicked()
+                                color: Theme.textMuted
                             }
 
-                            Button {
-                                id: addClassBtn
-                                Layout.preferredWidth: 28
-                                Layout.preferredHeight: 28
-                                text: "+"
-                                font.pixelSize: Theme.fontSizeNormal
-                                font.bold: true
+                            // 添加类别输入行
+                            RowLayout {
+                                visible: appController.projectOpen
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingSmall
 
-                                background: Rectangle {
-                                    color: addClassBtn.hovered ? Theme.primary : Theme.bgCard
-                                    radius: Theme.radiusSmall
-                                    border.color: Theme.primary
-                                    border.width: 1
-                                }
+                                TextField {
+                                    id: newClassField
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 28
+                                    placeholderText: "类别名称"
+                                    placeholderTextColor: Theme.textDisabled
+                                    color: Theme.textMain
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    font.family: Theme.fontFamily
 
-                                contentItem: Text {
-                                    text: parent.text
-                                    color: addClassBtn.hovered ? Theme.textMain : Theme.primary
-                                    font: parent.font
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                onClicked: {
-                                    if (newClassField.text.trim()) {
-                                        taxonomyModel.addClass(newClassField.text.trim())
-                                        newClassField.clear()
-                                    }
-                                }
-                            }
-                        }
-
-                        // 类别列表
-                        ListView {
-                            visible: appController.projectOpen
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: Math.min(contentHeight, 300)
-                            clip: true
-                            model: taxonomyModel
-                            spacing: Theme.spacingTiny
-
-                            delegate: Rectangle {
-                                width: ListView.view.width
-                                height: 32
-                                color: classMouseArea.containsMouse ? Theme.bgHover : "transparent"
-                                radius: Theme.radiusSmall
-
-                                MouseArea {
-                                    id: classMouseArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                }
-
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: Theme.spacingSmall
-                                    anchors.rightMargin: Theme.spacingSmall
-                                    spacing: Theme.spacingSmall
-
-                                    // 类别色块
-                                    Rectangle {
-                                        width: 14
-                                        height: 14
-                                        radius: 2
-                                        color: Theme.classColors[model.classIndex % Theme.classColors.length]
+                                    background: Rectangle {
+                                        color: Theme.bgInput
+                                        radius: Theme.radiusSmall
+                                        border.color: newClassField.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                                        border.width: 1
                                     }
 
-                                    // 类别名称
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: model.className
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textMain
-                                        elide: Text.ElideRight
+                                    onAccepted: addClassBtn.clicked()
+                                }
+
+                                Button {
+                                    id: addClassBtn
+                                    Layout.preferredWidth: 28
+                                    Layout.preferredHeight: 28
+                                    text: "+"
+                                    font.pixelSize: Theme.fontSizeNormal
+                                    font.bold: true
+
+                                    background: Rectangle {
+                                        color: addClassBtn.hovered ? Theme.primary : Theme.bgCard
+                                        radius: Theme.radiusSmall
+                                        border.color: Theme.primary
+                                        border.width: 1
                                     }
 
-                                    // 重命名按钮
-                                    SvgIcon {
-                                        icon: "edit"
-                                        width: 12
-                                        height: 12
-                                        color: classEditBtn.containsMouse ? Theme.primaryGlow : Theme.textMuted
-                                        visible: classMouseArea.containsMouse
-                                        anchors.verticalCenter: parent.verticalCenter
-
-                                        MouseArea {
-                                            id: classEditBtn
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            hoverEnabled: true
-                                            onClicked: taxonomyModel.renameClass(model.classIndex, model.className + "_new")
-                                        }
+                                    contentItem: Text {
+                                        text: parent.text
+                                        color: addClassBtn.hovered ? Theme.textMain : Theme.primary
+                                        font: parent.font
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
                                     }
 
-                                    // 删除按钮
-                                    SvgIcon {
-                                        icon: "close"
-                                        width: 12
-                                        height: 12
-                                        color: classDelBtn.containsMouse ? Theme.danger : Theme.textMuted
-                                        visible: classMouseArea.containsMouse
-                                        anchors.verticalCenter: parent.verticalCenter
-
-                                        MouseArea {
-                                            id: classDelBtn
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            hoverEnabled: true
-                                            onClicked: taxonomyModel.removeClass(model.classIndex)
+                                    onClicked: {
+                                        if (newClassField.text.trim()) {
+                                            taxonomyModel.addClass(newClassField.text.trim())
+                                            newClassField.clear()
                                         }
                                     }
                                 }
                             }
+
+                            // 类别列表
+                            ListView {
+                                visible: appController.projectOpen
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: Math.min(contentHeight, 300)
+                                clip: true
+                                model: taxonomyModel
+                                spacing: Theme.spacingTiny
+
+                                delegate: Rectangle {
+                                    width: ListView.view.width
+                                    height: 32
+                                    color: classMouseArea.containsMouse ? Theme.bgHover : "transparent"
+                                    radius: Theme.radiusSmall
+
+                                    MouseArea {
+                                        id: classMouseArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                    }
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: Theme.spacingSmall
+                                        anchors.rightMargin: Theme.spacingSmall
+                                        spacing: Theme.spacingSmall
+
+                                        // 类别色块
+                                        Rectangle {
+                                            width: 14
+                                            height: 14
+                                            radius: 2
+                                            color: Theme.classColors[model.classIndex % Theme.classColors.length]
+                                        }
+
+                                        // 类别名称
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: model.className
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.family: Theme.fontFamily
+                                            color: Theme.textMain
+                                            elide: Text.ElideRight
+                                        }
+
+                                        // 重命名按钮
+                                        SvgIcon {
+                                            icon: "edit"
+                                            width: 12
+                                            height: 12
+                                            color: classEditBtn.containsMouse ? Theme.primaryGlow : Theme.textMuted
+                                            visible: classMouseArea.containsMouse
+                                            anchors.verticalCenter: parent.verticalCenter
+
+                                            MouseArea {
+                                                id: classEditBtn
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                hoverEnabled: true
+                                                onClicked: taxonomyModel.renameClass(model.classIndex, model.className + "_new")
+                                            }
+                                        }
+
+                                        // 删除按钮
+                                        SvgIcon {
+                                            icon: "close"
+                                            width: 12
+                                            height: 12
+                                            color: classDelBtn.containsMouse ? Theme.danger : Theme.textMuted
+                                            visible: classMouseArea.containsMouse
+                                            anchors.verticalCenter: parent.verticalCenter
+
+                                            MouseArea {
+                                                id: classDelBtn
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                hoverEnabled: true
+                                                onClicked: taxonomyModel.removeClass(model.classIndex)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 类别统计
+                            Text {
+                                visible: appController.projectOpen
+                                text: "共 " + taxonomyModel.rowCount() + " 个类别"
+                                font.pixelSize: Theme.fontSizeCaption
+                                font.family: Theme.fontFamily
+                                color: Theme.textMuted
+                            }
+                        }
+                    }
+
+                    // 刷新列表按钮
+                    Button {
+                        id: refreshBtn
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 32
+                        text: "刷新列表"
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.family: Theme.fontFamily
+
+                        background: Rectangle {
+                            color: refreshBtn.hovered ? Theme.bgHover : "transparent"
+                            border.color: Theme.borderColor
+                            border.width: 1
+                            radius: Theme.radiusSmall
                         }
 
-                        // 类别统计
-                        Text {
-                            visible: appController.projectOpen
-                            text: "共 " + taxonomyModel.rowCount() + " 个类别"
-                            font.pixelSize: Theme.fontSizeCaption
-                            font.family: Theme.fontFamily
+                        contentItem: Text {
+                            text: parent.text
                             color: Theme.textMuted
+                            font: parent.font
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
                         }
+
+                        onClicked: projectModel.refresh()
                     }
-                }
-
-                // 弹性占位
-                Item { Layout.fillHeight: true }
-
-                // 刷新列表按钮
-                Button {
-                    id: refreshBtn
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 32
-                    text: "刷新列表"
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.family: Theme.fontFamily
-
-                    background: Rectangle {
-                        color: refreshBtn.hovered ? Theme.bgHover : "transparent"
-                        border.color: Theme.borderColor
-                        border.width: 1
-                        radius: Theme.radiusSmall
-                    }
-
-                    contentItem: Text {
-                        text: parent.text
-                        color: Theme.textMuted
-                        font: parent.font
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-
-                    onClicked: projectModel.refresh()
                 }
             }
         }
 
         // === 可拖拽垂直分割线（4px宽） ===
-        Rectangle {
-            id: resizer
+        Splitter {
+            id: sidebarResizer
             Layout.preferredWidth: 4
             Layout.fillHeight: true
-            color: resizerMouseArea.containsMouse || resizerMouseArea.drag.active
-                   ? Theme.primaryGlow
-                   : Theme.dividerColor
-
-            Behavior on color { ColorAnimation { duration: Theme.animDuration } }
-
-            MouseArea {
-                id: resizerMouseArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.SplitHCursor
-
-                drag.target: resizer
-                drag.axis: Drag.XAxis
-                drag.minimumX: Theme.sidebarMinWidth
-                drag.maximumX: pageRoot.width * 0.4
-
-                // 拖拽时实时更新侧边栏宽度
-                onPositionChanged: {
-                    if (drag.active) {
-                        var newWidth = sidebarW + mouseX
-                        if (newWidth >= Theme.sidebarMinWidth && newWidth <= pageRoot.width * 0.4) {
-                            sidebarW = newWidth
-                        }
-                    }
-                }
-            }
+            vertical: true
+            targetItem: sidebar
+            minSize: Theme.sidebarMinWidth
+            maxSize: pageRoot.width * 0.4
         }
 
         // === 中心内容区 ===

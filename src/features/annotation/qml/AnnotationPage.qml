@@ -194,7 +194,9 @@ Item {
 
         // === 左侧栏 (240px, padding:12px, gap:16px) ===
         Rectangle {
-            Layout.preferredWidth: Theme.sidebarWidth
+            id: sidebar
+            width: Theme.sidebarWidth
+            Layout.preferredWidth: width
             Layout.fillHeight: true
             color: Theme.bgSide
 
@@ -212,7 +214,7 @@ Item {
                 clip: true
 
                 ColumnLayout {
-                    width: Theme.sidebarWidth
+                    width: parent.width
                     spacing: 0
 
                     // ====== 区域1：图库与数据集 ======
@@ -818,35 +820,15 @@ Item {
             }
         }
 
-        // === 可拖拽分割线 (4px, 对标参考UI resizer-v) ===
-        Rectangle {
+        // === 可拖拽分割线 (4px) ===
+        Splitter {
+            id: sidebarResizer
             Layout.preferredWidth: 4
             Layout.fillHeight: true
-            color: resizerMouseArea.drag.active || resizerMouseArea.containsMouse ? Theme.primaryGlow : Theme.borderColor
-
-            Behavior on color { ColorAnimation { duration: 200 } }
-
-            MouseArea {
-                id: resizerMouseArea
-                anchors.fill: parent
-                cursorShape: Qt.SplitHCursor
-                hoverEnabled: true
-
-                drag.target: parent
-                drag.axis: Drag.XAxis
-                drag.minimumX: Theme.sidebarMinWidth
-                drag.maximumX: 400
-
-                onPositionChanged: {
-                    if (drag.active) {
-                        // 调整左侧栏宽度
-                        var newWidth = parent.x + parent.width
-                        if (newWidth >= Theme.sidebarMinWidth && newWidth <= 400) {
-                            // 通过 parent.parent 调整左侧栏宽度
-                        }
-                    }
-                }
-            }
+            vertical: true
+            targetItem: sidebar
+            minSize: Theme.sidebarMinWidth
+            maxSize: 400
         }
 
         // === 中央画布区 ===
@@ -1658,11 +1640,24 @@ Item {
             }
         }
 
+        // === 右侧可拖拽分割线 ===
+        Splitter {
+            id: rightSidebarResizer
+            Layout.preferredWidth: 4
+            Layout.fillHeight: true
+            vertical: true
+            reverse: true
+            targetItem: rightSidebar
+            minSize: Theme.sidebarMinWidth
+            maxSize: 400
+        }
+
         // === 右侧面板 (240px) - 实例列表 + 文件列表 ===
         // 对标参考设计：右侧边栏包含当前图像的标注实例列表与文件目录
         Rectangle {
             id: rightSidebar
-            Layout.preferredWidth: Theme.sidebarWidth
+            width: Theme.sidebarWidth
+            Layout.preferredWidth: width
             Layout.fillHeight: true
             color: Theme.bgSide
 

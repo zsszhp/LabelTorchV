@@ -58,7 +58,9 @@ Item {
         // 左侧模型列表 Sidebar (240px, padding:0)
         // ============================================================
         Rectangle {
-            Layout.preferredWidth: 240
+            id: sidebar
+            width: 240
+            Layout.preferredWidth: width
             Layout.fillHeight: true
             color: Theme.bgSide
 
@@ -71,9 +73,15 @@ Item {
                 color: Theme.borderColor
             }
 
-            ColumnLayout {
+            ScrollView {
                 anchors.fill: parent
-                spacing: 0
+                anchors.rightMargin: 1
+                clip: true
+                contentWidth: availableWidth
+
+                ColumnLayout {
+                    width: parent.width - 1
+                    spacing: 0
 
                 // 区块标题 "模型列表"
                 Text {
@@ -165,15 +173,20 @@ Item {
                 }
             }
         }
+    }
 
-        // ============================================================
-        // 竖向 Resizer (4px)
-        // ============================================================
-        Rectangle {
-            Layout.preferredWidth: 4
-            Layout.fillHeight: true
-            color: Theme.dividerColor
-        }
+    // ============================================================
+    // 竖向 Resizer (4px)
+    // ============================================================
+    Splitter {
+        id: sidebarResizer
+        Layout.preferredWidth: 4
+        Layout.fillHeight: true
+        vertical: true
+        targetItem: sidebar
+        minSize: Theme.sidebarMinWidth
+        maxSize: 400
+    }
 
         // ============================================================
         // 中心内容区（左右分栏）
@@ -191,7 +204,9 @@ Item {
                 // 左侧参数面板 (280px, bgSide, border-right 1px borderColor)
                 // ========================================================
                 Rectangle {
-                    Layout.preferredWidth: 280
+                    id: paramPanel
+                    width: 280
+                    Layout.preferredWidth: width
                     Layout.fillHeight: true
                     color: Theme.bgSide
 
@@ -207,12 +222,12 @@ Item {
                     ScrollView {
                         anchors.fill: parent
                         clip: true
+                        padding: 16
                         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                         ColumnLayout {
-                            width: 280
+                            width: parent.width
                             spacing: Theme.spacingLarge
-                            padding: 16
 
                             // ---- Card 1: 导出模型 ----
                             ColumnLayout {
@@ -566,6 +581,17 @@ Item {
                             Item { Layout.fillHeight: true }
                         }
                     }
+                }
+
+                // 中间参数面板与右侧展示区的分割线
+                Splitter {
+                    id: paramPanelResizer
+                    Layout.preferredWidth: 4
+                    Layout.fillHeight: true
+                    vertical: true
+                    targetItem: paramPanel
+                    minSize: 200
+                    maxSize: 400
                 }
 
                 // ========================================================

@@ -428,14 +428,23 @@ Item {
 
         // === 左侧模型列表(240px) ===
         Rectangle {
-            Layout.preferredWidth: Theme.sidebarWidth
+            id: sidebar
+            width: Theme.sidebarWidth
+            Layout.preferredWidth: width
             Layout.fillHeight: true
             color: Theme.bgSide
 
-            ColumnLayout {
+            ScrollView {
                 anchors.fill: parent
-                anchors.margins: Theme.spacingNormal
-                spacing: Theme.spacingNormal
+                anchors.rightMargin: 1
+                clip: true
+                contentWidth: availableWidth
+
+                ColumnLayout {
+                    width: parent.width - Theme.spacingNormal * 2
+                    x: Theme.spacingNormal
+                    y: Theme.spacingNormal
+                    spacing: Theme.spacingNormal
 
                 // 区块标题 + 添加按钮
                 RowLayout {
@@ -658,13 +667,18 @@ Item {
                 }
             }
         }
+    }
 
-        // 左右分割线
-        Rectangle {
-            Layout.preferredWidth: 1
-            Layout.fillHeight: true
-            color: Theme.borderColor
-        }
+    // 左右分割线
+    Splitter {
+        id: sidebarResizer
+        Layout.preferredWidth: 4
+        Layout.fillHeight: true
+        vertical: true
+        targetItem: sidebar
+        minSize: Theme.sidebarMinWidth
+        maxSize: 400
+    }
 
         // === 右侧内容区 ===
         ColumnLayout {

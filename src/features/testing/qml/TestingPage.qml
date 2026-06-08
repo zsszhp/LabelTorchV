@@ -113,7 +113,8 @@ Item {
         // ========================================
         Rectangle {
             id: sidebarLeft
-            Layout.preferredWidth: 240
+            width: 240
+            Layout.preferredWidth: width
             Layout.fillHeight: true
             color: Theme.bgSide
 
@@ -126,9 +127,15 @@ Item {
                 color: Theme.borderColor
             }
 
-            ColumnLayout {
+            ScrollView {
                 anchors.fill: parent
-                spacing: 0
+                anchors.rightMargin: 1
+                clip: true
+                contentWidth: availableWidth
+
+                ColumnLayout {
+                    width: parent.width - 1
+                    spacing: 0
 
                 // 区块标题 "模型列表" + 右侧"+"图标
                 RowLayout {
@@ -318,6 +325,7 @@ Item {
                 }
             }
         }
+    }
 
         // 垂直分割线 (4px)
         Splitter {

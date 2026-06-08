@@ -10,6 +10,7 @@ MouseArea {
     cursorShape: vertical ? Qt.SplitHCursor : Qt.SplitVCursor
 
     property bool vertical: true
+    property bool reverse: false
     property real minSize: 120
     property real maxSize: 600
     property var targetItem: null
@@ -18,10 +19,10 @@ MouseArea {
     onPositionChanged: {
         if (pressed && targetItem) {
             if (vertical) {
-                var newWidth = targetItem.width + mouseX
+                var newWidth = targetItem.width + (reverse ? -mouseX : mouseX)
                 targetItem.width = Math.max(minSize, Math.min(maxSize, newWidth))
             } else {
-                var newHeight = targetItem.height + mouseY
+                var newHeight = targetItem.height + (reverse ? -mouseY : mouseY)
                 targetItem.height = Math.max(minSize, Math.min(maxSize, newHeight))
             }
         }
