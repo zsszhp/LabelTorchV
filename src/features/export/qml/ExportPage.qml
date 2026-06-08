@@ -14,6 +14,8 @@ Item {
     property string selectedVersionId: ""
     property var exportHistory: []
     property string exportStatus: "idle"
+    property string exportActionMessage: ""
+    property string exportActionTone: "neutral"
     property string currentTaskType: currentProjectId !== "" ? projectService.getTaskType(currentProjectId) : "detect"
     property bool isAnomalyProject: currentTaskType === "anomaly"
     property string selectedArtifactId: ""
@@ -87,6 +89,43 @@ Item {
             exportHistory = []
             selectedArtifactId = ""
             selectedArtifactDetails = ({})
+        }
+    }
+
+    function validateExportStart() {
+        if (!root.selectedVersionId)
+            return {"ok": false, "message": "请先选择一个模型版本"}
+        if (formatCombo.currentText === "onnx" && opsetStepper.value < 11)
+            return {"ok": false, "message": "ONNX opset 版本不能低于 11"}
+        if (formatCombo.currentText === "engine" && !(environmentInfo && environmentInfo.tensorrt_available))
+            return {"ok": false, "message": "导出 TensorRT 需要当前环境支持 TensorRT"}
+        if (formatCombo.currentText === "tflite" && currentTaskType !== "detect")
+            return {"ok": false, "message": "TFLite 导出仅支持检测任务"}
+        return {"ok": true, "message": ""}
+    }
+
+    function startExportWithValidation() {
+        var validation = validateExportStart()
+        if (!validation.ok) {
+            exportActionMessage = validation.message
+            exportActionTone = "warning"
+            return
+        }
+        var format = formatCombo.currentText
+        var optionsJson = "{}"
+        if (format === "onnx") {
+            optionsJson = JSON.stringify({
+                "opset": opsetStepper.value,
+                "simplify": simplifySwitch.checked,
+                "dynamic": dynamicSwitch.checked
+            })
+        }
+        var artifactId = exportService.exportModel(root.selectedVersionId, format, optionsJson)
+        if (artifactId !== "") {
+            exportStatus = "running"
+            exportActionMessage = "导出任务已启动"
+            exportActionTone = "info"
+            refreshExports()
         }
     }
 
@@ -543,22 +582,18 @@ Item {
                                         cursorShape: root.selectedVersionId ? Qt.PointingHandCursor : Qt.ForbiddenCursor
                                         onClicked: {
                                             if (!root.selectedVersionId || exportStatus === "running") return
-                                            var format = formatCombo.currentText
-                                            var optionsJson = "{}"
-                                            if (format === "onnx") {
-                                                optionsJson = JSON.stringify({
-                                                    "opset": opsetStepper.value,
-                                                    "simplify": simplifySwitch.checked,
-                                                    "dynamic": dynamicSwitch.checked
-                                                })
-                                            }
-                                            var artifactId = exportService.exportModel(root.selectedVersionId, format, optionsJson)
-                                            if (artifactId !== "") {
-                                                exportStatus = "running"
-                                                refreshExports()
-                                            }
+                                            root.startExportWithValidation()
                                         }
                                     }
+                                }
+
+                                // 导出状态反馈标签
+                                StatusTag {
+                                    visible: root.exportActionMessage !== ""
+                                    text: root.exportActionMessage
+                                    tone: root.exportActionTone
+                                    Layout.fillWidth: true
+                                    Layout.topMargin: Theme.spacingSmall
                                 }
                             }
 
