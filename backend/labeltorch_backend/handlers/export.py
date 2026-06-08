@@ -78,22 +78,25 @@ async def handle_verify(payload: dict) -> dict:
         artifact_path: 导出产物文件路径
         format: 导出格式
     """
-    _artifact_id = payload.get("artifact_id", "")
+    artifact_id = payload.get("artifact_id", "")
     artifact_path = payload.get("output_path", "") or payload.get("artifact_path", "")
     artifact_format = payload.get("format", "onnx")
 
     if not artifact_path:
-        return {"valid": False, "error": "Missing artifact_path"}
+        return {"artifact_id": artifact_id, "valid": False, "error": "Missing artifact_path"}
 
     if not os.path.isfile(artifact_path):
-        return {"valid": False, "error": f"File not found: {artifact_path}"}
+        return {"artifact_id": artifact_id, "valid": False, "error": f"File not found: {artifact_path}"}
 
     if artifact_format == "onnx":
-        return await _verify_onnx(artifact_path)
+        result = await _verify_onnx(artifact_path)
     elif artifact_format == "torchscript":
-        return await _verify_torchscript(artifact_path)
+        result = await _verify_torchscript(artifact_path)
     else:
-        return {"valid": True, "format": artifact_format, "note": "No verification available for this format"}
+        result = {"valid": True, "format": artifact_format, "note": "No verification available for this format"}
+
+    result["artifact_id"] = artifact_id
+    return result
 
 
 async def _verify_onnx(artifact_path: str) -> dict:
