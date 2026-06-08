@@ -18,6 +18,19 @@ Item {
     property var prCurveData: ([])
     property string currentTaskType: currentProjectId !== "" ? projectService.getTaskType(currentProjectId) : "detect"
     property bool isAnomalyProject: currentTaskType === "anomaly"
+    property string primaryMetricLabel: isAnomalyProject ? "AUROC" : "mAP50"
+    property real primaryMetricValue: isAnomalyProject ? (testMetrics.auroc || testMetrics.image_auroc || 0) : (testMetrics.mAP50 || 0)
+    property string secondaryMetricLabel: isAnomalyProject ? "像素AUROC" : "mAP50-95"
+    property real secondaryMetricValue: isAnomalyProject ? (testMetrics.pixel_auroc || 0) : (testMetrics["mAP50-95"] || 0)
+    property string recallLikeLabel: isAnomalyProject ? "图像AUROC" : "召回率"
+    property real recallLikeValue: isAnomalyProject ? (testMetrics.image_auroc || testMetrics.auroc || 0) : (testMetrics.recall || 0)
+    property string precisionLikeLabel: isAnomalyProject ? "像素AUROC" : "精确率"
+    property real precisionLikeValue: isAnomalyProject ? (testMetrics.pixel_auroc || 0) : (testMetrics.precision || 0)
+    property string deviceHintText: {
+        if (deviceCombo.currentText === "cpu") return "当前使用 CPU 评估，耗时会明显增加"
+        if (deviceCombo.currentText === "auto") return "设备自动选择，将根据环境自动切换 GPU 或 CPU"
+        return "当前优先使用 GPU " + deviceCombo.currentText + " 评估"
+    }
     // 测试状态：idle/draft/preparing/running/succeeded/failed/cancelled
     property string testStatus: "idle"
     // 测试详情子视图索引：0=混淆矩阵, 1=检查图像
@@ -642,6 +655,15 @@ Item {
                                         }
                                     }
 
+                                    Text {
+                                        text: root.deviceHintText
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: deviceCombo.currentText === "cpu" ? Theme.warning : Theme.textMuted
+                                        wrapMode: Text.WordWrap
+                                        Layout.fillWidth: true
+                                    }
+
                                     ParamRow {
                                         label: "测试权重"
                                         labelWidth: 80
@@ -754,18 +776,18 @@ Item {
 
                                         // 漏检率
                                         RingProgress {
-                                            value: (1 - (root.testMetrics.recall || 0)) * 100
+                                            value: root.isAnomalyProject ? root.primaryMetricValue * 100 : (1 - (root.testMetrics.recall || 0)) * 100
                                             ringColor: Theme.danger
-                                            centerText: ((1 - (root.testMetrics.recall || 0)) * 100).toFixed(1) + "%"
-                                            labelText: "漏检率"
+                                            centerText: (root.isAnomalyProject ? root.primaryMetricValue * 100 : (1 - (root.testMetrics.recall || 0)) * 100).toFixed(1) + "%"
+                                            labelText: root.isAnomalyProject ? root.primaryMetricLabel : "漏检率"
                                         }
 
                                         // 误检率
                                         RingProgress {
-                                            value: (1 - (root.testMetrics.precision || 0)) * 100
+                                            value: root.isAnomalyProject ? root.secondaryMetricValue * 100 : (1 - (root.testMetrics.precision || 0)) * 100
                                             ringColor: Theme.warning
-                                            centerText: ((1 - (root.testMetrics.precision || 0)) * 100).toFixed(1) + "%"
-                                            labelText: "误检率"
+                                            centerText: (root.isAnomalyProject ? root.secondaryMetricValue * 100 : (1 - (root.testMetrics.precision || 0)) * 100).toFixed(1) + "%"
+                                            labelText: root.isAnomalyProject ? root.secondaryMetricLabel : "误检率"
                                         }
                                     }
 
@@ -775,7 +797,7 @@ Item {
                                         spacing: Theme.spacingNormal
 
                                         Text {
-                                            text: "F1 分数"
+                                            text: root.isAnomalyProject ? "F1 分数" : "F1 分数"
                                             font.pixelSize: Theme.fontSizeSmall
                                             font.family: Theme.fontFamily
                                             color: Theme.textMuted
@@ -839,24 +861,24 @@ Item {
                                         Layout.fillWidth: true
 
                                         Text {
-                                            text: "超检率"
+                                            text: root.isAnomalyProject ? root.precisionLikeLabel : "超检率"
                                             font.pixelSize: Theme.fontSizeSmall
                                             color: Theme.textMuted
                                         }
                                         Text {
-                                            text: ((1 - (root.testMetrics.precision || 0)) * 100).toFixed(2) + "%"
+                                            text: (root.isAnomalyProject ? (root.precisionLikeValue * 100) : ((1 - (root.testMetrics.precision || 0)) * 100)).toFixed(2) + "%"
                                             font.pixelSize: Theme.fontSizeSmall
                                             font.family: Theme.fontFamilyMono
                                             color: Theme.textMain
                                         }
 
                                         Text {
-                                            text: "召回率"
+                                            text: root.recallLikeLabel
                                             font.pixelSize: Theme.fontSizeSmall
                                             color: Theme.textMuted
                                         }
                                         Text {
-                                            text: ((root.testMetrics.recall || 0) * 100).toFixed(2) + "%"
+                                            text: (root.recallLikeValue * 100).toFixed(2) + "%"
                                             font.pixelSize: Theme.fontSizeSmall
                                             font.family: Theme.fontFamilyMono
                                             color: Theme.textMain
@@ -921,7 +943,7 @@ Item {
                                     spacing: Theme.spacingSmall
 
                                     Text {
-                                        text: "PR曲线"
+                                        text: root.isAnomalyProject ? "评估曲线" : "PR曲线"
                                         font.pixelSize: Theme.fontSizeSmall
                                         font.weight: Font.DemiBold
                                         font.family: Theme.fontFamily
@@ -972,11 +994,11 @@ Item {
                                                 ctx.fillStyle = Theme.textMuted
                                                 ctx.font = Theme.fontSizeCaption + "px " + Theme.fontFamily
                                                 ctx.textAlign = "center"
-                                                ctx.fillText("Recall", w / 2, h - 4)
+                                                ctx.fillText(root.isAnomalyProject ? "Score" : "Recall", w / 2, h - 4)
                                                 ctx.save()
                                                 ctx.translate(10, h / 2)
                                                 ctx.rotate(-Math.PI / 2)
-                                                ctx.fillText("Precision", 0, 0)
+                                                ctx.fillText(root.isAnomalyProject ? "AUROC" : "Precision", 0, 0)
                                                 ctx.restore()
 
                                                 // 轴刻度
@@ -1009,6 +1031,12 @@ Item {
                                                     ctx.closePath()
                                                     ctx.fillStyle = Qt.alpha(Theme.primaryGlow, 0.1)
                                                     ctx.fill()
+                                                } else if (root.isAnomalyProject) {
+                                                    ctx.fillStyle = Theme.textMuted
+                                                    ctx.font = Theme.fontSizeNormal + "px " + Theme.fontFamily
+                                                    ctx.textAlign = "center"
+                                                    ctx.fillText("异常检测当前显示摘要指标", w / 2, h / 2 - 12)
+                                                    ctx.fillText(root.primaryMetricLabel + ": " + (root.primaryMetricValue * 100).toFixed(2) + "%", w / 2, h / 2 + 12)
                                                 } else {
                                                     // 无数据提示
                                                     ctx.fillStyle = Theme.textMuted
@@ -1316,12 +1344,12 @@ Item {
                     Layout.fillWidth: true
 
                     Text {
-                        text: root.isAnomalyProject ? "AUROC" : "mAP50"
+                        text: root.primaryMetricLabel
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.textMuted
                     }
                     Text {
-                        text: ((root.isAnomalyProject ? (root.testMetrics.auroc || root.testMetrics.image_auroc || 0) : (root.testMetrics.mAP50 || 0)) * 100).toFixed(2) + "%"
+                        text: (root.primaryMetricValue * 100).toFixed(2) + "%"
                         font.pixelSize: Theme.fontSizeSmall
                         font.family: Theme.fontFamilyMono
                         font.weight: Font.Bold
@@ -1329,12 +1357,12 @@ Item {
                     }
 
                     Text {
-                        text: root.isAnomalyProject ? "像素AUROC" : "mAP50-95"
+                        text: root.secondaryMetricLabel
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.textMuted
                     }
                     Text {
-                        text: ((root.isAnomalyProject ? (root.testMetrics.pixel_auroc || 0) : (root.testMetrics["mAP50-95"] || 0)) * 100).toFixed(2) + "%"
+                        text: (root.secondaryMetricValue * 100).toFixed(2) + "%"
                         font.pixelSize: Theme.fontSizeSmall
                         font.family: Theme.fontFamilyMono
                         font.weight: Font.Bold

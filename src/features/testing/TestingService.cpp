@@ -128,12 +128,12 @@ bool TestingService::startTestTask(const QString &taskId)
     updateTestTaskStatus(taskId, "preparing");
 
     // S1: 在后台线程准备快照物理目录（可能涉及文件拷贝，不能在UI线程执行）
-    QtConcurrent::run([this, taskId, snapshotId, weightPath, configObj]() {
+    QtConcurrent::run([this, taskId, snapshotId, weightPath, configObj, taskType]() {
         SnapshotService snapshotService;
         QString dataYamlPath = snapshotService.prepareSnapshotPhysicalDir(snapshotId);
 
         // 回到UI线程处理结果
-        QMetaObject::invokeMethod(this, [this, taskId, weightPath, dataYamlPath, configObj]() {
+        QMetaObject::invokeMethod(this, [this, taskId, weightPath, dataYamlPath, configObj, taskType]() {
             if (dataYamlPath.isEmpty()) {
                 ltError(LT_LOG_TESTING()) << "Failed to prepare snapshot directories for test:" << taskId;
                 updateTestTaskStatus(taskId, "failed");

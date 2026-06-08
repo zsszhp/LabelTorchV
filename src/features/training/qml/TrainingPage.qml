@@ -29,6 +29,11 @@ Item {
     property bool augmentationEnabled: true
     property var ultralyticsModelFamilies: ["yolov5", "yolov8", "yolov8_obb", "yolov8_cls", "yolov10", "yolov11"]
     property var anomalibModelFamilies: ["patchcore", "padim", "efficient_ad", "stfpm"]
+    property string deviceHintText: {
+        if (deviceCombo.currentText === "cpu") return "当前使用 CPU 训练，速度较慢但链路可继续执行"
+        if (deviceCombo.currentText === "auto") return "设备自动选择，将根据环境在 GPU 与 CPU 之间切换"
+        return "当前优先使用 GPU " + deviceCombo.currentText + " 训练"
+    }
 
     onCurrentProjectIdChanged: {
         trainingModel.setProjectId(currentProjectId)
@@ -1105,6 +1110,15 @@ Item {
                                                     background: Rectangle { color: highlighted ? Theme.bgHover : Theme.bgMain }
                                                 }
                                             }
+                                        }
+
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: root.deviceHintText
+                                            font.pixelSize: Theme.fontSizeCaption
+                                            font.family: Theme.fontFamily
+                                            color: deviceCombo.currentText === "cpu" ? Theme.warning : Theme.textMuted
+                                            wrapMode: Text.WordWrap
                                         }
 
                                         // 存储模型周期

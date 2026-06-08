@@ -16,6 +16,47 @@ Item {
     property string exportStatus: "idle"
     property string currentTaskType: currentProjectId !== "" ? projectService.getTaskType(currentProjectId) : "detect"
     property bool isAnomalyProject: currentTaskType === "anomaly"
+    property string selectedArtifactId: ""
+    property var selectedArtifactDetails: ({})
+    property var parsedValidationDetails: {
+        if (!selectedArtifactDetails.validationResult)
+            return ({})
+        try {
+            return JSON.parse(selectedArtifactDetails.validationResult)
+        } catch (error) {
+            return ({ "rawText": selectedArtifactDetails.validationResult })
+        }
+    }
+
+    function formatShape(shapeData) {
+        if (!shapeData || shapeData.length === 0)
+            return "未提供"
+        return "[" + shapeData.map(function(item) {
+            return item === null || item === undefined ? "?" : item
+        }).join(", ") + "]"
+    }
+
+    function validationStatusText(details) {
+        if (!details || Object.keys(details).length === 0)
+            return "待验证"
+        if (details.valid === true)
+            return "验证通过"
+        if (details.verified === false)
+            return "验证失败"
+        if (details.error)
+            return "验证失败"
+        return "已记录结果"
+    }
+
+    function validationStatusColor(details) {
+        if (!details || Object.keys(details).length === 0)
+            return Theme.textMuted
+        if (details.valid === true)
+            return Theme.success
+        if (details.verified === false || details.error)
+            return Theme.danger
+        return Theme.warning
+    }
 
     // 切换项目时重置状态
     onCurrentProjectIdChanged: {
@@ -39,8 +80,13 @@ Item {
     function refreshExports() {
         if (selectedVersionId !== "") {
             exportHistory = exportService.listExports(selectedVersionId)
+            if (selectedArtifactId !== "") {
+                selectedArtifactDetails = exportService.getExportStatus(selectedArtifactId)
+            }
         } else {
             exportHistory = []
+            selectedArtifactId = ""
+            selectedArtifactDetails = ({})
         }
     }
 
@@ -50,6 +96,9 @@ Item {
         function onExportStatusChanged(artifactId, status) {
             refreshExports()
             exportStatus = status
+            if (artifactId === root.selectedArtifactId) {
+                root.selectedArtifactDetails = exportService.getExportStatus(artifactId)
+            }
         }
     }
 
@@ -792,7 +841,9 @@ Item {
                                                     width: exportHistoryList.width
                                                     height: 36
                                                     radius: Theme.radiusSmall
-                                                    color: Theme.bgCard
+                                                    color: root.selectedArtifactId === modelData.id ? Qt.alpha(Theme.primaryGlow, 0.08) : Theme.bgCard
+                                                    border.color: root.selectedArtifactId === modelData.id ? Theme.primaryGlow : "transparent"
+                                                    border.width: 1
 
                                                     RowLayout {
                                                         anchors.fill: parent
@@ -889,10 +940,215 @@ Item {
                                                                 }
                                                             }
                                                         }
+
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            acceptedButtons: Qt.LeftButton
+                                                            onClicked: {
+                                                                root.selectedArtifactId = modelData.id || ""
+                                                                root.selectedArtifactDetails = root.selectedArtifactId ? exportService.getExportStatus(root.selectedArtifactId) : ({})
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
+                                    }
+                                }
+                            }
+
+                            CollapsibleSection {
+                                title: "验证详情"
+                                Layout.fillWidth: true
+                                expanded: true
+                                visible: root.selectedVersionId !== ""
+
+                                ColumnLayout {
+                                    width: parent.width
+                                    spacing: Theme.spacingSmall
+
+                                    Rectangle {
+                                        visible: root.selectedArtifactId !== ""
+                                        Layout.fillWidth: true
+                                        radius: Theme.radiusSmall
+                                        color: Theme.bgInput
+                                        border.color: Theme.borderColor
+                                        border.width: 1
+
+                                        ColumnLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: Theme.spacingSmall
+                                            spacing: 6
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+
+                                                Text {
+                                                    text: root.validationStatusText(root.parsedValidationDetails)
+                                                    font.pixelSize: Theme.fontSizeSmall
+                                                    font.weight: Font.DemiBold
+                                                    font.family: Theme.fontFamily
+                                                    color: root.validationStatusColor(root.parsedValidationDetails)
+                                                }
+
+                                                Item {
+                                                    Layout.fillWidth: true
+                                                }
+
+                                                Text {
+                                                    text: selectedArtifactDetails.format ? selectedArtifactDetails.format.toUpperCase() : "N/A"
+                                                    font.pixelSize: Theme.fontSizeCaption
+                                                    font.family: Theme.fontFamilyMono
+                                                    color: Theme.textMuted
+                                                }
+                                            }
+
+                                            Text {
+                                                visible: !!selectedArtifactDetails.outputPath
+                                                text: "产物路径：" + selectedArtifactDetails.outputPath
+                                                wrapMode: Text.WrapAnywhere
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamilyMono
+                                                color: Theme.textSecondary
+                                                Layout.fillWidth: true
+                                            }
+
+                                            Text {
+                                                visible: !!root.parsedValidationDetails.provider
+                                                text: "验证引擎：" + root.parsedValidationDetails.provider
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamily
+                                                color: Theme.textSecondary
+                                            }
+
+                                            Text {
+                                                visible: !!root.parsedValidationDetails.note
+                                                text: "说明：" + root.parsedValidationDetails.note
+                                                wrapMode: Text.WrapAnywhere
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamily
+                                                color: Theme.textSecondary
+                                                Layout.fillWidth: true
+                                            }
+
+                                            Text {
+                                                visible: !!root.parsedValidationDetails.error
+                                                text: "错误：" + root.parsedValidationDetails.error
+                                                wrapMode: Text.WrapAnywhere
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamilyMono
+                                                color: Theme.danger
+                                                Layout.fillWidth: true
+                                            }
+
+                                            Repeater {
+                                                model: root.parsedValidationDetails.inputs || []
+
+                                                delegate: Rectangle {
+                                                    required property var modelData
+                                                    Layout.fillWidth: true
+                                                    radius: Theme.radiusSmall
+                                                    color: Qt.alpha(Theme.primaryGlow, 0.04)
+                                                    border.color: Qt.alpha(Theme.primaryGlow, 0.18)
+                                                    border.width: 1
+                                                    implicitHeight: inputColumn.implicitHeight + Theme.spacingSmall * 2
+
+                                                    ColumnLayout {
+                                                        id: inputColumn
+                                                        anchors.fill: parent
+                                                        anchors.margins: Theme.spacingSmall
+                                                        spacing: 2
+
+                                                        Text {
+                                                            text: "输入：" + (modelData.name || "未命名")
+                                                            font.pixelSize: Theme.fontSizeCaption
+                                                            font.weight: Font.DemiBold
+                                                            font.family: Theme.fontFamily
+                                                            color: Theme.textMain
+                                                        }
+
+                                                        Text {
+                                                            text: "Shape: " + root.formatShape(modelData.shape)
+                                                            font.pixelSize: Theme.fontSizeCaption
+                                                            font.family: Theme.fontFamilyMono
+                                                            color: Theme.textSecondary
+                                                        }
+
+                                                        Text {
+                                                            visible: !!modelData.type
+                                                            text: "Type: " + modelData.type
+                                                            font.pixelSize: Theme.fontSizeCaption
+                                                            font.family: Theme.fontFamilyMono
+                                                            color: Theme.textMuted
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Repeater {
+                                                model: root.parsedValidationDetails.outputs || []
+
+                                                delegate: Rectangle {
+                                                    required property var modelData
+                                                    Layout.fillWidth: true
+                                                    radius: Theme.radiusSmall
+                                                    color: Qt.alpha(Theme.success, 0.05)
+                                                    border.color: Qt.alpha(Theme.success, 0.18)
+                                                    border.width: 1
+                                                    implicitHeight: outputColumn.implicitHeight + Theme.spacingSmall * 2
+
+                                                    ColumnLayout {
+                                                        id: outputColumn
+                                                        anchors.fill: parent
+                                                        anchors.margins: Theme.spacingSmall
+                                                        spacing: 2
+
+                                                        Text {
+                                                            text: "输出：" + (modelData.name || "未命名")
+                                                            font.pixelSize: Theme.fontSizeCaption
+                                                            font.weight: Font.DemiBold
+                                                            font.family: Theme.fontFamily
+                                                            color: Theme.textMain
+                                                        }
+
+                                                        Text {
+                                                            text: "Shape: " + root.formatShape(modelData.shape)
+                                                            font.pixelSize: Theme.fontSizeCaption
+                                                            font.family: Theme.fontFamilyMono
+                                                            color: Theme.textSecondary
+                                                        }
+
+                                                        Text {
+                                                            visible: !!modelData.type
+                                                            text: "Type: " + modelData.type
+                                                            font.pixelSize: Theme.fontSizeCaption
+                                                            font.family: Theme.fontFamilyMono
+                                                            color: Theme.textMuted
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        visible: root.selectedArtifactId === ""
+                                        text: "请选择一条导出记录查看验证详情"
+                                        wrapMode: Text.WrapAnywhere
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textSecondary
+                                        Layout.fillWidth: true
+                                    }
+
+                                    Text {
+                                        visible: root.selectedArtifactId !== "" && !!root.parsedValidationDetails.rawText
+                                        text: root.parsedValidationDetails.rawText
+                                        wrapMode: Text.WrapAnywhere
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamilyMono
+                                        color: Theme.textMuted
+                                        Layout.fillWidth: true
                                     }
                                 }
                             }
