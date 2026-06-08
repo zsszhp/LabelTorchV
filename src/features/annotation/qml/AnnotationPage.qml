@@ -185,19 +185,24 @@ Item {
     }
 
     // ================================================================
-    // 主布局：左侧栏(240px) + 可拖拽分割线(4px) + 中央画布区 + 右侧面板(240px)
+    // 主布局：左侧栏(240px) + 中央画布区 + 右侧面板(240px)
     // 对标参考设计：左面板4区域(hr分隔) + 可拖拽分割线 + 画布
     // ================================================================
-    RowLayout {
+    SplitView {
         anchors.fill: parent
-        spacing: 0
+        orientation: Qt.Horizontal
+
+        handle: Rectangle {
+            implicitWidth: 4
+            color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
+            Behavior on color { ColorAnimation { duration: 150 } }
+        }
 
         // === 左侧栏 (240px, padding:12px, gap:16px) ===
         Rectangle {
             id: sidebar
-            width: Theme.sidebarWidth
-            Layout.preferredWidth: width
-            Layout.fillHeight: true
+            SplitView.preferredWidth: Theme.sidebarWidth
+            SplitView.minimumWidth: Theme.sidebarMinWidth
             color: Theme.bgSide
 
             // 右侧边线
@@ -232,6 +237,7 @@ Item {
                             color: Theme.textMain
                             Layout.fillWidth: true
                             Layout.bottomMargin: 12
+                            Layout.topMargin: 12
                         }
 
                         // 图库选择器（对标参考UI select + icon）
@@ -258,14 +264,6 @@ Item {
                                 anchors.rightMargin: 10
                                 spacing: 8
 
-                                SvgIcon {
-                                    icon: "images"
-                                    width: 14
-                                    height: 14
-                                    color: Theme.primaryGlow
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-
                                 ComboBox {
                                     id: datasetCombo
                                     Layout.fillWidth: true
@@ -282,48 +280,33 @@ Item {
                                         color: Theme.textMain
                                         verticalAlignment: Text.AlignVCenter
                                     }
-                                    indicator: Item { width: 0; height: 0 }
+                                    indicator: SvgIcon { 
+                                        icon: "arrow-down"
+                                        width: 12
+                                        height: 12
+                                        color: Theme.textMuted
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
 
                                     onActivated: refreshSampleList()
-                                }
-
-                                Text {
-                                    text: "+"
-                                    font.pixelSize: 11
-                                    color: Theme.textMuted
-                                    font.family: Theme.fontFamily
                                 }
                             }
                         }
 
-                        // 数据集列表标题行（对标参考UI：折叠图标 + 计数 + 操作图标）
+                        // 数据集列表标题行（对标参考UI：无图标）
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.bottomMargin: 8
                             spacing: 4
 
-                            SvgIcon {
-                                icon: "arrow-down"
-                                width: 12
-                                height: 12
-                                color: Theme.textMain
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-
                             Text {
                                 text: "数据集(" + datasetService.listDatasets(appController.currentProjectId || "").length + ")"
                                 font.pixelSize: 12
-                                font.weight: Font.DemiBold
+                                font.weight: Font.Normal
                                 font.family: Theme.fontFamily
                                 color: Theme.textMain
                             }
-
-                            Item { Layout.fillWidth: true }
-
-                            // 操作图标
-                            SvgIcon { icon: "eye"; width: 12; height: 12; color: Theme.textMuted; opacity: 0.5; anchors.verticalCenter: parent.verticalCenter }
-                            SvgIcon { icon: "plus"; width: 11; height: 11; color: Theme.textMuted; opacity: 0.5; anchors.verticalCenter: parent.verticalCenter }
-                            SvgIcon { icon: "images"; width: 11; height: 11; color: Theme.textMuted; opacity: 0.5; anchors.verticalCenter: parent.verticalCenter }
                         }
 
                         // 数据集卡片（对标参考UI：名称+进度条+计数）
@@ -355,7 +338,7 @@ Item {
 
                                     // 进度条（对标参考UI 6px高，渐变填充）
                                     Rectangle {
-                                        Layout.preferredWidth: 50
+                                        Layout.preferredWidth: 60
                                         Layout.preferredHeight: 6
                                         radius: 3
                                         color: Theme.bgMain
@@ -406,53 +389,31 @@ Item {
                         Layout.margins: 12
                         spacing: 0
 
-                        // 当前文件（对标参考UI：图标+文件名+删除按钮）
+                        // 当前文件（对标参考UI：无图标，深色卡片居中文字）
                         Rectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 38
+                            Layout.preferredHeight: 30
                             Layout.bottomMargin: 10
                             color: Theme.bgCard
                             border.color: Theme.borderColor
                             border.width: 1
-                            radius: 6
+                            radius: 4
 
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                spacing: 10
-
-                                SvgIcon {
-                                    icon: "images"
-                                    width: 18
-                                    height: 18
-                                    color: Theme.primaryGlow
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-
-                                Text {
-                                    text: {
-                                        if (currentSampleIndex >= 0 && currentSampleIndex < sampleListData.length) {
-                                            var path = sampleListData[currentSampleIndex].imagePath || ""
-                                            return path.split('/').pop().split('\\').pop()
-                                        }
-                                        return "未选择图像"
+                            Text {
+                                anchors.centerIn: parent
+                                text: {
+                                    if (currentSampleIndex >= 0 && currentSampleIndex < sampleListData.length) {
+                                        var path = sampleListData[currentSampleIndex].imagePath || ""
+                                        return "Image " + path.split('/').pop().split('\\').pop()
                                     }
-                                    font.pixelSize: 12
-                                    font.family: Theme.fontFamily
-                                    color: Theme.textMain
-                                    Layout.fillWidth: true
-                                    elide: Text.ElideRight
+                                    return "未选择图像"
                                 }
-
-                                SvgIcon {
-                                    icon: "trash"
-                                    width: 12
-                                    height: 12
-                                    color: Theme.textMuted
-                                    opacity: 0.6
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
+                                font.pixelSize: 12
+                                font.family: Theme.fontFamily
+                                color: Theme.textMain
+                                elide: Text.ElideRight
+                                width: parent.width - 20
+                                horizontalAlignment: Text.AlignHCenter
                             }
                         }
 
@@ -464,10 +425,10 @@ Item {
                             Item { Layout.fillWidth: true }
 
                             Button {
-                                Layout.preferredWidth: 36
+                                Layout.preferredWidth: 26
                                 Layout.preferredHeight: 26
-                                text: "◀"
-                                font.pixelSize: 12
+                                text: "<"
+                                font.pixelSize: 14
                                 enabled: currentSampleIndex > 0
 
                                 background: Rectangle {
@@ -479,7 +440,7 @@ Item {
 
                                 contentItem: Text {
                                     text: parent.text
-                                    font.pixelSize: 12
+                                    font.pixelSize: 14
                                     color: parent.enabled ? Theme.textMain : Theme.textDisabled
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
@@ -493,15 +454,15 @@ Item {
                                 font.pixelSize: 12
                                 font.family: Theme.fontFamilyMono
                                 color: Theme.textMain
-                                Layout.leftMargin: 8
-                                Layout.rightMargin: 8
+                                Layout.leftMargin: 12
+                                Layout.rightMargin: 12
                             }
 
                             Button {
-                                Layout.preferredWidth: 36
+                                Layout.preferredWidth: 26
                                 Layout.preferredHeight: 26
-                                text: "▶"
-                                font.pixelSize: 12
+                                text: ">"
+                                font.pixelSize: 14
                                 enabled: currentSampleIndex < sampleListData.length - 1
 
                                 background: Rectangle {
@@ -513,7 +474,7 @@ Item {
 
                                 contentItem: Text {
                                     text: parent.text
-                                    font.pixelSize: 12
+                                    font.pixelSize: 14
                                     color: parent.enabled ? Theme.textMain : Theme.textDisabled
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
@@ -541,42 +502,18 @@ Item {
                         Layout.margins: 12
                         spacing: 0
 
-                        // 标题行（对标参考UI：折叠图标 + "标签类别" + 添加图标）
+                        // 标题行（对标参考UI：无图标）
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.bottomMargin: 8
                             spacing: 4
 
-                            SvgIcon {
-                                icon: "arrow-down"
-                                width: 12
-                                height: 12
-                                color: Theme.textMain
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-
                             Text {
                                 text: "标签类别"
                                 font.pixelSize: 12
-                                font.weight: Font.DemiBold
+                                font.weight: Font.Normal
                                 font.family: Theme.fontFamily
                                 color: Theme.textMain
-                            }
-
-                            Item { Layout.fillWidth: true }
-
-                            SvgIcon {
-                                icon: "plus"
-                                width: 12
-                                height: 12
-                                color: Theme.textMuted
-                                anchors.verticalCenter: parent.verticalCenter
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: addLabelDialog.open()
-                                }
                             }
                         }
 
@@ -631,24 +568,6 @@ Item {
                                             Layout.fillWidth: true
                                             elide: Text.ElideRight
                                         }
-
-                                        // 编辑/删除图标
-                                        SvgIcon {
-                                            icon: "edit"
-                                            width: 11
-                                            height: 11
-                                            color: (annotationMode === "detect" && selectedClassId === model.classIndex) ? Qt.alpha("#FFFFFF", 0.9) : Theme.textMuted
-                                            opacity: 0.8
-                                            anchors.verticalCenter: parent.verticalCenter
-                                        }
-                                        SvgIcon {
-                                            icon: "trash"
-                                            width: 11
-                                            height: 11
-                                            color: (annotationMode === "detect" && selectedClassId === model.classIndex) ? Qt.alpha("#FFFFFF", 0.9) : Theme.textMuted
-                                            opacity: 0.8
-                                            anchors.verticalCenter: parent.verticalCenter
-                                        }
                                     }
 
                                     MouseArea {
@@ -698,36 +617,12 @@ Item {
                             Layout.bottomMargin: 8
                             spacing: 4
 
-                            SvgIcon {
-                                icon: "arrow-down"
-                                width: 12
-                                height: 12
-                                color: Theme.textMain
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-
                             Text {
                                 text: "Tag"
                                 font.pixelSize: 12
-                                font.weight: Font.DemiBold
+                                font.weight: Font.Normal
                                 font.family: Theme.fontFamily
                                 color: Theme.textMain
-                            }
-
-                            Item { Layout.fillWidth: true }
-
-                            SvgIcon {
-                                icon: "plus"
-                                width: 12
-                                height: 12
-                                color: Theme.textMuted
-                                anchors.verticalCenter: parent.verticalCenter
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: addTagDialog.open()
-                                }
                             }
                         }
 
@@ -820,347 +715,163 @@ Item {
             }
         }
 
-        // === 可拖拽分割线 (4px) ===
-        Splitter {
-            id: sidebarResizer
-            Layout.preferredWidth: 4
-            Layout.fillHeight: true
-            vertical: true
-            targetItem: sidebar
-            minSize: Theme.sidebarMinWidth
-            maxSize: 400
-        }
-
         // === 中央画布区 ===
         Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
+            SplitView.fillWidth: true
             color: Theme.bgMain
 
             ColumnLayout {
                 anchors.fill: parent
                 spacing: 0
 
-                // 浮动工具栏 (36px)
+                // === 顶部筛选栏 (38px) ===
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Theme.toolbarHeight
-                    color: Theme.bgCard
-                    z: 10
+                    Layout.preferredHeight: 38
+                    color: Theme.bgMain
 
                     Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
                         anchors.bottom: parent.bottom
-                        width: parent.width
                         height: 1
-                        color: Theme.dividerColor
+                        color: Theme.borderColor
                     }
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: Theme.spacingNormal
-                        anchors.rightMargin: Theme.spacingNormal
-                        spacing: Theme.spacingSmall
+                        anchors.leftMargin: 20
+                        spacing: 15
 
-                        // 绘制工具组
-                        RowLayout {
-                            spacing: 1
-
-                            // 选择工具
-                            ToolButton {
-                                id: btnSelect
-                                text: "选择"
-                                font.pixelSize: Theme.fontSizeCaption
-                                highlighted: canvasController.drawMode === "select" && annotationMode === "detect"
-
-                                background: Rectangle {
-                                    color: parent.highlighted ? Theme.primary : (parent.hovered ? Theme.bgHover : "transparent")
-                                    radius: Theme.radiusSmall
-                                }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: parent.highlighted ? Theme.bgMain : Theme.textMain
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                onClicked: setDrawTool("select")
-                            }
-
-                            // 矩形工具
-                            ToolButton {
-                                id: btnRect
-                                text: "矩形(R)"
-                                font.pixelSize: Theme.fontSizeCaption
-                                visible: annotationMode === "detect"
-                                highlighted: canvasController.drawMode === "draw" && shapeMode === 0 && !canvasController.polygonDrawing
-
-                                background: Rectangle {
-                                    color: parent.highlighted ? Theme.primary : (parent.hovered ? Theme.bgHover : "transparent")
-                                    radius: Theme.radiusSmall
-                                }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: parent.highlighted ? Theme.bgMain : Theme.textMain
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                onClicked: setDrawTool("rect")
-                            }
-
-                            // 旋转矩形工具
-                            ToolButton {
-                                id: btnRotatedRect
-                                text: "旋转矩形(O)"
-                                font.pixelSize: Theme.fontSizeCaption
-                                visible: annotationMode === "detect"
-                                highlighted: canvasController.drawMode === "draw" && shapeMode === 1 && !canvasController.polygonDrawing
-
-                                background: Rectangle {
-                                    color: parent.highlighted ? Theme.primary : (parent.hovered ? Theme.bgHover : "transparent")
-                                    radius: Theme.radiusSmall
-                                }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: parent.highlighted ? Theme.bgMain : Theme.textMain
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                onClicked: setDrawTool("rotatedRect")
-                            }
-
-                            // 多边形工具
-                            ToolButton {
-                                id: btnPolygon
-                                text: "多边形(P)"
-                                font.pixelSize: Theme.fontSizeCaption
-                                visible: annotationMode === "detect"
-                                highlighted: canvasController.polygonDrawing
-
-                                background: Rectangle {
-                                    color: parent.highlighted ? Theme.primary : (parent.hovered ? Theme.bgHover : "transparent")
-                                    radius: Theme.radiusSmall
-                                }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: parent.highlighted ? Theme.bgMain : Theme.textMain
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                onClicked: setDrawTool("polygon")
-                            }
-                        }
-
-                        // 分隔线
+                        // 数据集筛选
                         Rectangle {
-                            Layout.preferredWidth: 1
-                            Layout.preferredHeight: 20
-                            color: Theme.dividerColor
-                            visible: annotationMode === "detect"
-                        }
+                            height: 26
+                            implicitWidth: dsLabel.implicitWidth + dsCombo.implicitWidth + 30
+                            color: Theme.bgSide
+                            border.color: Theme.borderColor
+                            radius: 6
 
-                        // 缩放工具组
-                        RowLayout {
-                            spacing: 1
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                spacing: 8
 
-                            ToolButton {
-                                text: "适应(F)"
-                                font.pixelSize: Theme.fontSizeCaption
-
-                                background: Rectangle {
-                                    color: parent.hovered ? Theme.bgHover : "transparent"
-                                    radius: Theme.radiusSmall
-                                }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: Theme.textMain
-                                    horizontalAlignment: Text.AlignHCenter
+                                Text {
+                                    id: dsLabel
+                                    text: "数据集"
+                                    font.pixelSize: 11
+                                    color: Theme.textMuted
                                     verticalAlignment: Text.AlignVCenter
                                 }
 
-                                onClicked: canvasItem.fitToView()
-                            }
+                                ComboBox {
+                                    id: dsCombo
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 20
+                                    model: appController.projectOpen ? datasetService.listDatasets(appController.currentProjectId || "") : []
+                                    textRole: "name"
+                                    valueRole: "id"
+                                    currentIndex: -1
 
-                            ToolButton {
-                                text: "+"
-                                font.pixelSize: Theme.fontSizeNormal
-                                font.bold: true
-
-                                background: Rectangle {
-                                    color: parent.hovered ? Theme.bgHover : "transparent"
-                                    radius: Theme.radiusSmall
+                                    background: Rectangle { color: "transparent" }
+                                    contentItem: Text {
+                                        text: dsCombo.displayText
+                                        font.pixelSize: 12
+                                        color: Theme.textMain
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                    indicator: Item { width: 0; height: 0 }
                                 }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.pixelSize: Theme.fontSizeNormal
-                                    font.bold: true
-                                    color: Theme.textMain
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                onClicked: canvasController.setZoom(canvasController.zoom * 1.2)
-                            }
-
-                            ToolButton {
-                                text: "−"
-                                font.pixelSize: Theme.fontSizeNormal
-                                font.bold: true
-
-                                background: Rectangle {
-                                    color: parent.hovered ? Theme.bgHover : "transparent"
-                                    radius: Theme.radiusSmall
-                                }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.pixelSize: Theme.fontSizeNormal
-                                    font.bold: true
-                                    color: Theme.textMain
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                onClicked: canvasController.setZoom(canvasController.zoom / 1.2)
                             }
                         }
 
-                        // 分隔线
+                        // Tag 过滤
                         Rectangle {
-                            Layout.preferredWidth: 1
-                            Layout.preferredHeight: 20
-                            color: Theme.dividerColor
-                            visible: annotationMode === "detect"
-                        }
+                            height: 26
+                            implicitWidth: tagLabel.implicitWidth + tagCombo.implicitWidth + 30
+                            color: Theme.bgSide
+                            border.color: Theme.borderColor
+                            radius: 6
 
-                        // 撤销/重做
-                        RowLayout {
-                            spacing: 1
-                            visible: annotationMode === "detect"
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                spacing: 8
 
-                            ToolButton {
-                                text: "撤销"
-                                font.pixelSize: Theme.fontSizeCaption
-                                enabled: canvasItem.canUndo()
-
-                                background: Rectangle {
-                                    color: parent.enabled ? (parent.hovered ? Theme.bgHover : "transparent") : "transparent"
-                                    radius: Theme.radiusSmall
-                                }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: parent.enabled ? Theme.textMain : Theme.textDisabled
-                                    horizontalAlignment: Text.AlignHCenter
+                                Text {
+                                    id: tagLabel
+                                    text: "TAG 过滤"
+                                    font.pixelSize: 11
+                                    color: Theme.textMuted
                                     verticalAlignment: Text.AlignVCenter
                                 }
 
-                                onClicked: canvasItem.undo()
-                            }
+                                ComboBox {
+                                    id: tagCombo
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 20
+                                    model: ["全选", "默认", "良品", "漏检", "误检", "待定", "重要"]
+                                    currentIndex: 0
 
-                            ToolButton {
-                                text: "重做"
-                                font.pixelSize: Theme.fontSizeCaption
-                                enabled: canvasItem.canRedo()
-
-                                background: Rectangle {
-                                    color: parent.enabled ? (parent.hovered ? Theme.bgHover : "transparent") : "transparent"
-                                    radius: Theme.radiusSmall
+                                    background: Rectangle { color: "transparent" }
+                                    contentItem: Text {
+                                        text: tagCombo.displayText
+                                        font.pixelSize: 12
+                                        color: Theme.textMain
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                    indicator: Item { width: 0; height: 0 }
                                 }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: parent.enabled ? Theme.textMain : Theme.textDisabled
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                onClicked: canvasItem.redo()
                             }
                         }
 
-                        // 分隔线
+                        // 标签类别筛选
                         Rectangle {
-                            Layout.preferredWidth: 1
-                            Layout.preferredHeight: 20
-                            color: Theme.dividerColor
-                            visible: annotationMode === "detect"
-                        }
+                            height: 26
+                            implicitWidth: classLabel.implicitWidth + classCombo.implicitWidth + 30
+                            color: Theme.bgSide
+                            border.color: Theme.borderColor
+                            radius: 6
 
-                        // 删除/保存
-                        RowLayout {
-                            spacing: 1
-                            visible: annotationMode === "detect"
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                spacing: 8
 
-                            ToolButton {
-                                text: "删除"
-                                font.pixelSize: Theme.fontSizeCaption
-
-                                background: Rectangle {
-                                    color: parent.hovered ? Theme.bgHover : "transparent"
-                                    radius: Theme.radiusSmall
-                                }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: Theme.danger
-                                    horizontalAlignment: Text.AlignHCenter
+                                Text {
+                                    id: classLabel
+                                    text: "标签类别"
+                                    font.pixelSize: 11
+                                    color: Theme.textMuted
                                     verticalAlignment: Text.AlignVCenter
                                 }
 
-                                onClicked: canvasItem.deleteSelected()
-                            }
+                                ComboBox {
+                                    id: classCombo
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 20
+                                    model: appController.projectOpen ? taxonomyModel : []
+                                    textRole: "className"
+                                    valueRole: "classIndex"
+                                    currentIndex: -1
 
-                            ToolButton {
-                                text: "保存"
-                                font.pixelSize: Theme.fontSizeCaption
-                                highlighted: canvasController.dirty
-
-                                background: Rectangle {
-                                    color: parent.highlighted ? Theme.primary : (parent.hovered ? Theme.bgHover : "transparent")
-                                    radius: Theme.radiusSmall
+                                    background: Rectangle { color: "transparent" }
+                                    contentItem: Text {
+                                        text: classCombo.displayText === "" ? "未指定过滤" : classCombo.displayText
+                                        font.pixelSize: 12
+                                        color: Theme.textMain
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                    indicator: Item { width: 0; height: 0 }
                                 }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: parent.highlighted ? Theme.bgMain : Theme.textMain
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                onClicked: saveCurrentAnnotations()
                             }
-                        }
-
-                        // 弹性空间
-                        Item { Layout.fillWidth: true }
-
-                        // 缩放百分比
-                        Text {
-                            text: Math.round(canvasController.zoom * 100) + "%"
-                            color: Theme.textMuted
-                            font.pixelSize: Theme.fontSizeCaption
-                            font.family: Theme.fontFamilyMono
                         }
                     }
                 }
+
 
                 // 画布区域
                 Item {
@@ -1217,6 +928,89 @@ Item {
                                 selectedClassId = newClassIdx
                                 canvasItem.currentClassIndex = newClassIdx
                                 canvasItem.currentClassName = newClassName
+                            }
+                        }
+                    }
+
+                    // === 右侧悬浮工具栏 ===
+                    Rectangle {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.rightMargin: 12
+                        width: 36
+                        height: toolColumn.implicitHeight + 16
+                        color: Theme.bgCard
+                        radius: Theme.radiusSmall
+                        border.color: Theme.borderColor
+                        border.width: 1
+                        visible: annotationMode === "detect"
+                        z: 10
+
+                        ColumnLayout {
+                            id: toolColumn
+                            anchors.centerIn: parent
+                            spacing: 8
+
+                            Repeater {
+                                model: [
+                                    { icon: "cursor", name: "select", isShape: false },
+                                    { icon: "rect", name: "rect", isShape: true, mode: 0 },
+                                    { icon: "rotate", name: "obb", isShape: true, mode: 1 },
+                                    { icon: "polygon", name: "polygon", isShape: true, mode: 2 },
+                                    { icon: "hand", name: "hand", isShape: false },
+                                    { icon: "zoom-in", name: "zoom_in", isShape: false },
+                                    { icon: "zoom-out", name: "zoom_out", isShape: false }
+                                ]
+
+                                Rectangle {
+                                    Layout.preferredWidth: 28
+                                    Layout.preferredHeight: 28
+                                    radius: Theme.radiusSmall
+                                    color: {
+                                        if (modelData.isShape) {
+                                            return (root.shapeMode === modelData.mode && canvasController.drawMode === "draw") ? Theme.bgSelected : (parent.hovered ? Theme.bgHover : "transparent")
+                                        } else {
+                                            if (modelData.name === "select") return canvasController.drawMode === "select" ? Theme.bgSelected : (parent.hovered ? Theme.bgHover : "transparent")
+                                            return parent.hovered ? Theme.bgHover : "transparent"
+                                        }
+                                    }
+
+                                    SvgIcon {
+                                        anchors.centerIn: parent
+                                        icon: modelData.icon
+                                        width: 16
+                                        height: 16
+                                        color: {
+                                            if (modelData.isShape) {
+                                                return (root.shapeMode === modelData.mode && canvasController.drawMode === "draw") ? Theme.primaryGlow : Theme.textMain
+                                            } else {
+                                                if (modelData.name === "select") return canvasController.drawMode === "select" ? Theme.primaryGlow : Theme.textMain
+                                                return Theme.textMain
+                                            }
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        hoverEnabled: true
+                                        onClicked: {
+                                            if (modelData.isShape) {
+                                                root.shapeMode = modelData.mode
+                                                canvasController.drawMode = "draw"
+                                            } else if (modelData.name === "select") {
+                                                canvasController.drawMode = "select"
+                                            } else if (modelData.name === "hand") {
+                                                // 拖拽模式
+                                                canvasController.drawMode = "select"
+                                            } else if (modelData.name === "zoom_in") {
+                                                canvasController.zoomIn()
+                                            } else if (modelData.name === "zoom_out") {
+                                                canvasController.zoomOut()
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1640,224 +1434,7 @@ Item {
             }
         }
 
-        // === 右侧可拖拽分割线 ===
-        Splitter {
-            id: rightSidebarResizer
-            Layout.preferredWidth: 4
-            Layout.fillHeight: true
-            vertical: true
-            reverse: true
-            targetItem: rightSidebar
-            minSize: Theme.sidebarMinWidth
-            maxSize: 400
-        }
 
-        // === 右侧面板 (240px) - 实例列表 + 文件列表 ===
-        // 对标参考设计：右侧边栏包含当前图像的标注实例列表与文件目录
-        Rectangle {
-            id: rightSidebar
-            width: Theme.sidebarWidth
-            Layout.preferredWidth: width
-            Layout.fillHeight: true
-            color: Theme.bgSide
-
-            Rectangle {
-                anchors.left: parent.left
-                width: 1
-                height: parent.height
-                color: Theme.borderColor
-            }
-
-            ColumnLayout {
-                anchors.fill: parent
-                spacing: 0
-
-                // 实例列表
-                CollapsibleSection {
-                    id: instanceSection
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    title: "实例列表 (" + annotationModel.rowCount() + ")"
-
-                    ListView {
-                        id: instanceList
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        clip: true
-                        model: annotationModel
-                        spacing: 1
-
-                        delegate: ItemDelegate {
-                            width: instanceList.width
-                            height: 36
-
-                            contentItem: RowLayout {
-                                spacing: Theme.spacingSmall
-
-                                // 类别颜色标记
-                                Rectangle {
-                                    width: 12
-                                    height: 12
-                                    radius: 2
-                                    color: Theme.classColor(model.classIndex)
-                                    Layout.leftMargin: Theme.spacingSmall
-                                }
-
-                                // 类别名
-                                Text {
-                                    text: model.className || ("class_" + model.classIndex)
-                                    font.pixelSize: Theme.fontSizeSmall
-                                    font.family: Theme.fontFamily
-                                    color: model.isSelected ? Theme.primaryGlow : Theme.textMain
-                                    Layout.fillWidth: true
-                                    elide: Text.ElideRight
-                                }
-
-                                // 坐标信息
-                                Text {
-                                    text: {
-                                        if (model.shapeType === 2) return model.points ? model.points.length + "点" : ""
-                                        return Math.round(model.cx * 100) / 100 + ", " + Math.round(model.cy * 100) / 100
-                                    }
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    font.family: Theme.fontFamilyMono
-                                    color: Theme.textMuted
-                                }
-                            }
-
-                            background: Rectangle {
-                                color: {
-                                    if (model.isSelected) return Qt.alpha(Theme.primaryGlow, 0.1)
-                                    if (parent.hovered) return Qt.alpha(Theme.textMain, 0.03)
-                                    return "transparent"
-                                }
-
-                                // 选中态左边框
-                                Rectangle {
-                                    visible: model.isSelected
-                                    width: 3
-                                    height: parent.height
-                                    color: Theme.primaryGlow
-                                }
-                            }
-
-                            onClicked: {
-                                // 点击实例：选中/取消选中
-                                for (var i = 0; i < annotationModel.rowCount(); i++) {
-                                    annotationModel.setSelected(i, false)
-                                }
-                                annotationModel.setSelected(model.index, true)
-                                canvasItem.update()
-                            }
-
-                            // 右键删除支持
-                            MouseArea {
-                                anchors.fill: parent
-                                acceptedButtons: Qt.RightButton
-                                onClicked: function(mouse) {
-                                    // 先选中该实例
-                                    for (var i = 0; i < annotationModel.rowCount(); i++) {
-                                        annotationModel.setSelected(i, false)
-                                    }
-                                    annotationModel.setSelected(model.index, true)
-                                    canvasItem.update()
-                                    // 右键删除
-                                    canvasItem.deleteSelected()
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 分割线
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 1
-                    color: Theme.borderColor
-                }
-
-                // 文件列表（缩略图网格）
-                CollapsibleSection {
-                    id: fileListSection
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: parent.height * 0.35
-                    title: "文件列表"
-
-                    GridView {
-                        id: fileGrid
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        clip: true
-                        cellWidth: 70
-                        cellHeight: 70
-                        model: sampleListData
-
-                        delegate: Item {
-                            width: fileGrid.cellWidth
-                            height: fileGrid.cellHeight
-
-                            Rectangle {
-                                anchors.fill: parent
-                                anchors.margins: 2
-                                color: currentSampleIndex === index ? Qt.alpha(Theme.primaryGlow, 0.15) : Theme.bgCard
-                                border.color: currentSampleIndex === index ? Theme.primaryGlow : Theme.borderColor
-                                border.width: currentSampleIndex === index ? 2 : 1
-                                radius: Theme.radiusSmall
-
-                                // 缩略图占位（后续接入 ThumbnailCache）
-                                Rectangle {
-                                    anchors.fill: parent
-                                    anchors.margins: 2
-                                    color: Theme.bgInput
-                                    radius: 2
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: {
-                                            var path = modelData.imagePath || ""
-                                            var parts = path.split("/")
-                                            return parts.length > 0 ? parts[parts.length - 1].substring(0, 4) : "?"
-                                        }
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        color: Theme.textMuted
-                                    }
-                                }
-
-                                // 选中指示
-                                Rectangle {
-                                    visible: currentSampleIndex === index
-                                    anchors.bottom: parent.bottom
-                                    width: parent.width
-                                    height: 2
-                                    color: Theme.primaryGlow
-                                }
-
-                                // 已标注指示（绿色勾号）
-                                Text {
-                                    visible: modelData.hasAnnotations === true
-                                    anchors.top: parent.top
-                                    anchors.left: parent.left
-                                    anchors.margins: 4
-                                    text: "✓"
-                                    color: Theme.success
-                                    font.pixelSize: 10
-                                    font.weight: Font.Bold
-                                    z: 1
-                                }
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    loadSample(modelData)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
     // ================================================================
