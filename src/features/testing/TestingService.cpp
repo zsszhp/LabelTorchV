@@ -83,7 +83,8 @@ bool TestingService::startTestTask(const QString &taskId)
 
     // S4: 状态前置检查，只有 draft 状态才能启动
     QSqlQuery checkQuery(db);
-    checkQuery.prepare("SELECT status, model_version_id, snapshot_id, config_json FROM testing_runs WHERE id = ?");
+    checkQuery.prepare("SELECT tr.status, tr.model_version_id, tr.snapshot_id, tr.config_json, p.task_type "
+                       "FROM testing_runs tr JOIN projects p ON tr.project_id = p.id WHERE tr.id = ?");
     checkQuery.addBindValue(taskId);
     if (!checkQuery.exec() || !checkQuery.next()) {
         ltWarning(LT_LOG_TESTING()) << "Test task not found:" << taskId;
@@ -99,6 +100,7 @@ bool TestingService::startTestTask(const QString &taskId)
     QString modelVersionId = checkQuery.value(1).toString();
     QString snapshotId = checkQuery.value(2).toString();
     QString configJson = checkQuery.value(3).toString();
+    QString taskType = checkQuery.value(4).toString();
 
     // S1: 查询模型权重路径
     QSqlQuery modelQuery(db);
@@ -145,6 +147,7 @@ bool TestingService::startTestTask(const QString &taskId)
             QJsonObject config = configObj;
             config["weight_path"] = weightPath;
             config["data_path"] = dataYamlPath;
+            config["task_type"] = taskType;
             payload["config"] = config;
 
             m_ipcClient->sendRequest(IpcProtocol::CMD_TESTING_START, payload);
@@ -350,5 +353,17 @@ void TestingService::onResponseReceived(const QJsonObject &response)
     if (!response["success"].toBool()) {
         QString error = response["error"].toObject()["message"].toString();
         ltWarning(LT_LOG_TESTING()) << "IPC response error for" << command << ":" << error;
+
+        if (command == IpcProtocol::CMD_TESTING_START) {
+            QSqlQuery query(Database::instance().database());
+            query.prepare(
+                "SELECT id FROM testing_runs WHERE status IN ('preparing', 'running') ORDER BY created_at DESC LIMIT 1"
+            );
+            if (query.exec() && query.next()) {
+                QString taskId = query.value(0).toString();
+                updateTestTaskStatus(taskId, "failed");
+                emit testLog(taskId, error.isEmpty() ? QStringLiteral("测试启动失败") : error);
+            }
+        }
     }
 }

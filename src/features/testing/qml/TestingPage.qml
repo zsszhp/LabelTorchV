@@ -16,6 +16,8 @@ Item {
     property var testMetrics: ({})
     property var confusionMatrix: ({})
     property var prCurveData: ([])
+    property string currentTaskType: currentProjectId !== "" ? projectService.getTaskType(currentProjectId) : "detect"
+    property bool isAnomalyProject: currentTaskType === "anomaly"
     // 测试状态：idle/draft/preparing/running/succeeded/failed/cancelled
     property string testStatus: "idle"
     // 测试详情子视图索引：0=混淆矩阵, 1=检查图像
@@ -31,6 +33,7 @@ Item {
     // 项目切换时刷新数据
     onCurrentProjectIdChanged: {
         if (currentProjectId !== "") {
+            currentTaskType = projectService.getTaskType(currentProjectId)
             testingModel.setProjectId(currentProjectId)
             modelVersionModel.setProjectId(currentProjectId)
             snapshotModel.setProjectId(currentProjectId)
@@ -61,6 +64,15 @@ Item {
         function onTestProgress(taskId, current, total, metrics) {
             if (taskId === root.selectedTaskId) {
                 root.testMetrics = metrics
+            }
+        }
+    }
+
+    Connections {
+        target: projectService
+        function onTaskTypeChanged(projectId, taskType) {
+            if (projectId === root.currentProjectId) {
+                root.currentTaskType = taskType
             }
         }
     }
@@ -244,7 +256,11 @@ Item {
                                 text: {
                                     try {
                                         var metrics = model.metricsJson ? JSON.parse(model.metricsJson) : {}
-                                        if (metrics.mAP50 !== undefined) return "mAP50: " + (metrics.mAP50 * 100).toFixed(1) + "%"
+                                        if (root.isAnomalyProject) {
+                                            if (metrics.auroc !== undefined) return "AUROC: " + (metrics.auroc * 100).toFixed(1) + "%"
+                                        } else if (metrics.mAP50 !== undefined) {
+                                            return "mAP50: " + (metrics.mAP50 * 100).toFixed(1) + "%"
+                                        }
                                     } catch(e) {}
                                     return "未评估"
                                 }
@@ -1300,12 +1316,12 @@ Item {
                     Layout.fillWidth: true
 
                     Text {
-                        text: "mAP50"
+                        text: root.isAnomalyProject ? "AUROC" : "mAP50"
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.textMuted
                     }
                     Text {
-                        text: ((root.testMetrics.mAP50 || 0) * 100).toFixed(2) + "%"
+                        text: ((root.isAnomalyProject ? (root.testMetrics.auroc || root.testMetrics.image_auroc || 0) : (root.testMetrics.mAP50 || 0)) * 100).toFixed(2) + "%"
                         font.pixelSize: Theme.fontSizeSmall
                         font.family: Theme.fontFamilyMono
                         font.weight: Font.Bold
@@ -1313,12 +1329,12 @@ Item {
                     }
 
                     Text {
-                        text: "mAP50-95"
+                        text: root.isAnomalyProject ? "像素AUROC" : "mAP50-95"
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.textMuted
                     }
                     Text {
-                        text: ((root.testMetrics["mAP50-95"] || 0) * 100).toFixed(2) + "%"
+                        text: ((root.isAnomalyProject ? (root.testMetrics.pixel_auroc || 0) : (root.testMetrics["mAP50-95"] || 0)) * 100).toFixed(2) + "%"
                         font.pixelSize: Theme.fontSizeSmall
                         font.family: Theme.fontFamilyMono
                         font.weight: Font.Bold

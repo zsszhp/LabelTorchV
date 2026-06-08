@@ -14,10 +14,13 @@ Item {
     property string selectedVersionId: ""
     property var exportHistory: []
     property string exportStatus: "idle"
+    property string currentTaskType: currentProjectId !== "" ? projectService.getTaskType(currentProjectId) : "detect"
+    property bool isAnomalyProject: currentTaskType === "anomaly"
 
     // 切换项目时重置状态
     onCurrentProjectIdChanged: {
         if (currentProjectId !== "") {
+            currentTaskType = projectService.getTaskType(currentProjectId)
             modelVersionModel.setProjectId(currentProjectId)
         }
         selectedVersionId = ""
@@ -47,6 +50,15 @@ Item {
         function onExportStatusChanged(artifactId, status) {
             refreshExports()
             exportStatus = status
+        }
+    }
+
+    Connections {
+        target: projectService
+        function onTaskTypeChanged(projectId, taskType) {
+            if (projectId === root.currentProjectId) {
+                root.currentTaskType = taskType
+            }
         }
     }
 
@@ -149,7 +161,11 @@ Item {
                             Text {
                                 text: {
                                     var metrics = model.metricsJson ? JSON.parse(model.metricsJson) : {}
-                                    if (metrics.mAP50 !== undefined) return "mAP50: " + (metrics.mAP50 * 100).toFixed(1) + "%"
+                                    if (root.isAnomalyProject) {
+                                        if (metrics.auroc !== undefined) return "AUROC: " + (metrics.auroc * 100).toFixed(1) + "%"
+                                    } else if (metrics.mAP50 !== undefined) {
+                                        return "mAP50: " + (metrics.mAP50 * 100).toFixed(1) + "%"
+                                    }
                                     return "未评估"
                                 }
                                 font.pixelSize: Theme.fontSizeCaption
@@ -313,7 +329,7 @@ Item {
                                     ComboBox {
                                         id: formatCombo
                                         Layout.fillWidth: true
-                                        model: ["pt", "onnx", "tflite", "engine"]
+                                        model: root.isAnomalyProject ? ["pt", "onnx"] : ["pt", "onnx"]
                                         currentIndex: 1
                                     }
                                 }
