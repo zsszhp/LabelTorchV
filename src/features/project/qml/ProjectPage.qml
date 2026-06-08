@@ -21,6 +21,8 @@ Item {
 
     // 侧边栏宽度（可拖拽调整）
     property real sidebarW: Theme.sidebarWidth
+    property string projectActionMessage: ""
+    property string projectActionTone: "neutral"
 
     RowLayout {
         anchors.fill: parent
@@ -386,6 +388,14 @@ Item {
                     Layout.fillWidth: true
                     Layout.bottomMargin: Theme.spacingLarge + Theme.spacingNormal
                     text: "最近使用项"
+                }
+
+                StatusTag {
+                    visible: pageRoot.projectActionMessage !== ""
+                    text: pageRoot.projectActionMessage
+                    tone: pageRoot.projectActionTone
+                    Layout.alignment: Qt.AlignLeft
+                    Layout.bottomMargin: Theme.spacingNormal
                 }
 
                 // 项目卡片列表
@@ -1180,6 +1190,8 @@ Item {
             if (taxonomies.length > 0) {
                 taxonomyModel.taxonomyId = taxonomies[0].id
             }
+            projectActionMessage = "已打开项目：" + projectName
+            projectActionTone = "success"
         }
     }
 
@@ -1219,8 +1231,12 @@ Item {
                 if (taxonomies.length > 0) {
                     taxonomyModel.taxonomyId = taxonomies[0].id
                 }
+                projectActionMessage = "已导入并打开项目：" + (projInfo.name || "导入项目")
+                projectActionTone = "success"
             } else {
                 projectModel.refresh()
+                projectActionMessage = "导入项目失败，请确认所选目录包含有效 project.json"
+                projectActionTone = "danger"
             }
         }
     }
