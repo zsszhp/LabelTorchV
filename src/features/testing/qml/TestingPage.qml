@@ -35,6 +35,28 @@ Item {
     property real recallLikeValue: isAnomalyProject ? (testMetrics.image_auroc || testMetrics.auroc || 0) : (testMetrics.recall || 0)
     property string precisionLikeLabel: isAnomalyProject ? "像素AUROC" : "精确率"
     property real precisionLikeValue: isAnomalyProject ? (testMetrics.pixel_auroc || 0) : (testMetrics.precision || 0)
+    property string testStatusText: {
+        switch (root.testStatus) {
+            case "draft": return "草稿"
+            case "preparing": return "准备中"
+            case "running": return "测试中"
+            case "succeeded": return "已完成"
+            case "failed": return "失败"
+            case "cancelled": return "已取消"
+            default: return ""
+        }
+    }
+    property string testStatusTone: {
+        switch (root.testStatus) {
+            case "running": return "info"
+            case "succeeded": return "success"
+            case "failed": return "danger"
+            case "cancelled": return "neutral"
+            case "draft": return "warning"
+            case "preparing": return "warning"
+            default: return "neutral"
+        }
+    }
     property string deviceHintText: {
         var hasCuda = environmentInfo.cuda_available === true
         var gpuName = environmentInfo.gpu_name || "GPU 信息未知"
@@ -521,43 +543,11 @@ Item {
                         Item { Layout.fillWidth: true }
 
                         // 状态指示
-                        Row {
-                            spacing: Theme.spacingSmall
+                        StatusTag {
                             visible: root.testStatus !== "idle"
+                            text: root.testStatusText
+                            tone: root.testStatusTone
                             Layout.alignment: Qt.AlignVCenter
-
-                            Rectangle {
-                                width: 8
-                                height: 8
-                                radius: 4
-                                anchors.verticalCenter: parent.verticalCenter
-                                color: {
-                                    switch (root.testStatus) {
-                                        case "running": return Theme.primaryGlow
-                                        case "succeeded": return Theme.success
-                                        case "failed": return Theme.danger
-                                        case "cancelled": return Theme.textMuted
-                                        default: return Theme.warning
-                                    }
-                                }
-                            }
-
-                            Text {
-                                text: {
-                                    switch (root.testStatus) {
-                                        case "draft": return "草稿"
-                                        case "preparing": return "准备中"
-                                        case "running": return "测试中"
-                                        case "succeeded": return "已完成"
-                                        case "failed": return "失败"
-                                        case "cancelled": return "已取消"
-                                        default: return ""
-                                    }
-                                }
-                                font.pixelSize: Theme.fontSizeCaption
-                                font.family: Theme.fontFamily
-                                color: Theme.textSecondary
-                            }
                         }
                     }
                 }

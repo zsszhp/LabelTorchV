@@ -13,6 +13,7 @@ Item {
     property string currentRunId: ""
     property string currentRunStatus: ""
     property int currentSubTab: 0  // 0=配置参数, 1=实时训练结果
+    property string statusBannerTone: "neutral"
 
     // 实时指标数据模型
     ListModel { id: lossModel }
@@ -292,23 +293,23 @@ Item {
             currentRunStatus = status
             if (status === "preparing") {
                 statusMainLabel.text = "正在准备训练数据..."
-                statusMainLabel.color = Theme.warning
+                statusBannerTone = "warning"
                 logView.appendLog("[LabelTorch] 正在准备训练数据目录...")
             } else if (status === "running") {
                 statusMainLabel.text = "训练运行中"
-                statusMainLabel.color = Theme.primary
+                statusBannerTone = "info"
                 logView.appendLog("[LabelTorch] 训练已启动，等待进度事件...")
             } else if (status === "succeeded") {
                 statusMainLabel.text = "训练完成"
-                statusMainLabel.color = Theme.success
+                statusBannerTone = "success"
                 logView.appendLog("[LabelTorch] 训练完成!")
             } else if (status === "failed") {
                 statusMainLabel.text = "训练失败"
-                statusMainLabel.color = Theme.danger
+                statusBannerTone = "danger"
                 logView.appendLog("[LabelTorch] 训练失败!")
             } else if (status === "cancelled" || status === "stopped") {
                 statusMainLabel.text = "训练已停止"
-                statusMainLabel.color = Theme.warning
+                statusBannerTone = "warning"
                 logView.appendLog("[LabelTorch] 训练已停止")
             }
             trainingModel.refresh()
@@ -718,7 +719,7 @@ Item {
                         var validationResult = validateTrainingStart()
                         if (!validationResult.ok) {
                             statusMainLabel.text = validationResult.message
-                            statusMainLabel.color = Theme.warning
+                            statusBannerTone = "warning"
                             logView.appendLog("[LabelTorch] WARNING: " + validationResult.message)
                             return
                         }
@@ -743,15 +744,15 @@ Item {
                                 currentRunStatus = "running"
                                 trainingModel.refresh()
                                 statusMainLabel.text = "训练已启动"
-                                statusMainLabel.color = Theme.primary
+                                statusBannerTone = "info"
                             } else {
                                 statusMainLabel.text = "训练启动失败"
-                                statusMainLabel.color = Theme.danger
+                                statusBannerTone = "danger"
                                 logView.appendLog("[LabelTorch] ERROR: Failed to start training")
                             }
                         } else {
                             statusMainLabel.text = "创建训练任务失败"
-                            statusMainLabel.color = Theme.danger
+                            statusBannerTone = "danger"
                         }
                     }
                 }
@@ -878,11 +879,10 @@ Item {
                     Item { Layout.fillWidth: true }
 
                     // 状态指示
-                    Text {
+                    StatusTag {
                         id: statusMainLabel
                         text: ""
-                        color: Theme.textMuted
-                        font.pixelSize: Theme.fontSizeSmall
+                        tone: root.statusBannerTone
                         visible: text !== ""
                         Layout.rightMargin: Theme.spacingLarge
                     }
