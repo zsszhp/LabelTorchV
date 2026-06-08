@@ -177,6 +177,28 @@ Item {
         return JSON.stringify(config)
     }
 
+    function validateTrainingStart() {
+        if (Object.keys(environmentInfo).length === 0) {
+            return {"ok": false, "message": "运行环境尚未检测完成，请稍后再启动训练"}
+        }
+
+        if (deviceCombo.currentText !== "auto" && deviceCombo.currentText !== "cpu" && environmentInfo.cuda_available !== true) {
+            return {"ok": false, "message": "当前选择了 GPU 设备，但运行环境未检测到可用 CUDA"}
+        }
+
+        var memoryMb = environmentInfo.gpu_memory_total_mb || 0
+        if (environmentInfo.cuda_available === true && memoryMb > 0) {
+            if (batchStepper.value >= 16 && memoryMb < 8192) {
+                return {"ok": false, "message": "当前显存较小，batch size 过高，建议降到 8 或更小后再启动"}
+            }
+            if (imgSizeStepper.value >= 1280 && memoryMb < 12288) {
+                return {"ok": false, "message": "当前显存条件下图像尺寸过大，建议降低 imgsz 或 batch size 后再启动"}
+            }
+        }
+
+        return {"ok": true, "message": ""}
+    }
+
     // 同步全局任务类型变更
     Connections {
         target: ApplicationWindow.window
@@ -693,6 +715,13 @@ Item {
                         if (currentProjectId === "") return
                         var snapshotId = snapshotCombo.currentValue
                         if (!snapshotId) return
+                        var validationResult = validateTrainingStart()
+                        if (!validationResult.ok) {
+                            statusMainLabel.text = validationResult.message
+                            statusMainLabel.color = Theme.warning
+                            logView.appendLog("[LabelTorch] WARNING: " + validationResult.message)
+                            return
+                        }
                         var configJson = getConfigJson()
                         var runId = trainingService.createRun(currentProjectId, snapshotId, configJson)
                         if (runId !== "") {
