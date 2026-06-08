@@ -56,20 +56,25 @@ Item {
     }
 
     // ================================================================
-    // 主布局：sidebar + resizer + center
+    // 主布局：SplitView (sidebar + center)
     // ================================================================
-    RowLayout {
+    SplitView {
         anchors.fill: parent
-        spacing: 0
+        orientation: Qt.Horizontal
+
+        handle: Rectangle {
+            implicitWidth: 4
+            color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
+            Behavior on color { ColorAnimation { duration: 150 } }
+        }
 
         // ============================================================
         // 左侧边栏 (240px, padding:12px, gap:16px)
         // ============================================================
         Rectangle {
             id: sidebarRect
-            width: Theme.sidebarWidth
-            Layout.preferredWidth: width
-            Layout.fillHeight: true
+            SplitView.preferredWidth: Theme.sidebarWidth
+            SplitView.minimumWidth: Theme.sidebarMinWidth
             color: Theme.bgSide
 
             // 右侧边线
@@ -87,7 +92,7 @@ Item {
                 contentWidth: availableWidth
 
                 ColumnLayout {
-                    width: Theme.sidebarWidth - 1
+                    width: parent.width - 24
                     anchors.leftMargin: Theme.spacingLarge - Theme.spacingNormal  // 12px
                     anchors.rightMargin: Theme.spacingLarge - Theme.spacingNormal
                     spacing: Theme.spacingLarge  // 16px gap
@@ -650,24 +655,10 @@ Item {
         }
 
         // ============================================================
-        // resizer-v (4px宽，hover变primaryGlow色，可拖拽)
-        // ============================================================
-        Splitter {
-            id: sidebarResizer
-            Layout.preferredWidth: 4
-            Layout.fillHeight: true
-            vertical: true
-            targetItem: sidebarRect
-            minSize: Theme.sidebarMinWidth  // 120
-            maxSize: 600
-        }
-
-        // ============================================================
         // 中心缩略图画廊网格
         // ============================================================
         Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
+            SplitView.fillWidth: true
             color: Theme.bgMain
 
             ColumnLayout {
