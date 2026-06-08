@@ -18,6 +18,15 @@ Item {
     property var prCurveData: ([])
     property string currentTaskType: currentProjectId !== "" ? projectService.getTaskType(currentProjectId) : "detect"
     property bool isAnomalyProject: currentTaskType === "anomaly"
+    property var environmentInfo: ({})
+    property var availableDeviceOptions: {
+        var options = ["auto", "cpu"]
+        var gpuCount = environmentInfo.gpu_count || 0
+        for (var index = 0; index < gpuCount; ++index) {
+            options.push(String(index))
+        }
+        return options
+    }
     property string primaryMetricLabel: isAnomalyProject ? "AUROC" : "mAP50"
     property real primaryMetricValue: isAnomalyProject ? (testMetrics.auroc || testMetrics.image_auroc || 0) : (testMetrics.mAP50 || 0)
     property string secondaryMetricLabel: isAnomalyProject ? "像素AUROC" : "mAP50-95"
@@ -27,9 +36,35 @@ Item {
     property string precisionLikeLabel: isAnomalyProject ? "像素AUROC" : "精确率"
     property real precisionLikeValue: isAnomalyProject ? (testMetrics.pixel_auroc || 0) : (testMetrics.precision || 0)
     property string deviceHintText: {
+        var hasCuda = environmentInfo.cuda_available === true
+        var gpuName = environmentInfo.gpu_name || "GPU 信息未知"
+        var gpuMemory = environmentInfo.gpu_memory_total_mb ? ("，显存约 " + environmentInfo.gpu_memory_total_mb + " MB") : ""
         if (deviceCombo.currentText === "cpu") return "当前使用 CPU 评估，耗时会明显增加"
-        if (deviceCombo.currentText === "auto") return "设备自动选择，将根据环境自动切换 GPU 或 CPU"
-        return "当前优先使用 GPU " + deviceCombo.currentText + " 评估"
+        if (deviceCombo.currentText === "auto") {
+            return hasCuda ? ("设备自动选择，当前环境可使用 " + gpuName + gpuMemory) : "设备自动选择，当前环境将回退到 CPU 评估"
+        }
+        return hasCuda ? ("当前优先使用 GPU " + deviceCombo.currentText + "，设备为 " + gpuName + gpuMemory) : ("当前指定 GPU " + deviceCombo.currentText + "，环境未检测到可用 CUDA，评估将回退到 CPU")
+    }
+    property string environmentSummaryText: {
+        if (Object.keys(environmentInfo).length === 0)
+            return "运行环境检测中..."
+        if (environmentInfo.cuda_available === true) {
+            var cudaVer = environmentInfo.torch_cuda || "?"
+            var providerText = environmentInfo.onnxruntime_providers && environmentInfo.onnxruntime_providers.length > 0
+                ? environmentInfo.onnxruntime_providers.join(", ") : "未检测到 ONNX Runtime Provider"
+            return "CUDA " + cudaVer + " | " + (environmentInfo.gpu_name || "GPU 信息未知") + " | ONNX Runtime: " + providerText
+        }
+        return "当前未检测到可用 CUDA，评估将使用 CPU 执行"
+    }
+    property string memorySuggestionText: {
+        if (environmentInfo.cuda_available !== true)
+            return "CPU 路径下建议优先降低批量大小，避免评估耗时过长"
+        var memoryMb = environmentInfo.gpu_memory_total_mb || 0
+        if (memoryMb > 0 && memoryMb < 8192)
+            return "当前显存偏小，建议先用较小 batch 进行评估"
+        if (memoryMb > 0 && memoryMb < 12288)
+            return "当前显存中等，评估时建议逐步增大 batch"
+        return "当前显存条件较好，可按默认 batch 评估"
     }
     // 测试状态：idle/draft/preparing/running/succeeded/failed/cancelled
     property string testStatus: "idle"
@@ -87,6 +122,28 @@ Item {
             if (projectId === root.currentProjectId) {
                 root.currentTaskType = taskType
             }
+        }
+    }
+
+    Connections {
+        target: ipcClient
+        function onConnectedChanged() {
+            if (ipcClient.connected) {
+                ipcClient.sendRequest("environment.check", {})
+            } else {
+                root.environmentInfo = ({})
+            }
+        }
+        function onResponseReceived(response) {
+            if ((response.command || "") === "environment.check" && response.success) {
+                root.environmentInfo = response.result || {}
+            }
+        }
+    }
+
+    Component.onCompleted: {
+        if (ipcClient && ipcClient.connected) {
+            ipcClient.sendRequest("environment.check", {})
         }
     }
 
@@ -650,7 +707,7 @@ Item {
                                         Layout.fillWidth: true
                                         ComboBox {
                                             id: deviceCombo
-                                            model: ["auto", "cpu", "0", "1"]
+                                            model: root.availableDeviceOptions
                                             Layout.fillWidth: true
                                         }
                                     }
@@ -660,6 +717,24 @@ Item {
                                         font.pixelSize: Theme.fontSizeCaption
                                         font.family: Theme.fontFamily
                                         color: deviceCombo.currentText === "cpu" ? Theme.warning : Theme.textMuted
+                                        wrapMode: Text.WordWrap
+                                        Layout.fillWidth: true
+                                    }
+
+                                    Text {
+                                        text: root.environmentSummaryText
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamilyMono
+                                        color: Theme.textMuted
+                                        wrapMode: Text.WordWrap
+                                        Layout.fillWidth: true
+                                    }
+
+                                    Text {
+                                        text: root.memorySuggestionText
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: Theme.warning
                                         wrapMode: Text.WordWrap
                                         Layout.fillWidth: true
                                     }
