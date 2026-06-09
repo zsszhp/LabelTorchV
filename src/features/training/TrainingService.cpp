@@ -95,13 +95,14 @@ void TrainingService::handleTrainingEvent(const QVariantMap &event)
                     QSqlQuery versionQuery(Database::instance().database());
                     versionQuery.prepare(
                         "INSERT INTO model_versions (id, run_id, best_weight_path, last_weight_path, "
-                        "metrics_snapshot_json) VALUES (?, ?, ?, ?, ?)"
+                        "metrics_snapshot_json, source, project_id, created_at) VALUES (?, ?, ?, ?, ?, 'trained', ?, datetime('now'))"
                     );
                     versionQuery.addBindValue(versionId);
                     versionQuery.addBindValue(taskId);
                     versionQuery.addBindValue(bestWeight);
                     versionQuery.addBindValue(lastWeight);
                     versionQuery.addBindValue(metricsJson);
+                    versionQuery.addBindValue(projectId);
                     if (!versionQuery.exec()) {
                         ltError(LT_LOG_TRAINING()) << "Failed to register model version:"
                                                    << versionQuery.lastError().text();

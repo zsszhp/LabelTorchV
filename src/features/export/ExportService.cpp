@@ -1,15 +1,18 @@
 #include "ExportService.h"
 #include "Database.h"
 #include "ipc/IpcClient.h"
+#include "filesystem/ProjectFs.h"
 #include "utils/Log.h"
+#include "utils/Id.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QUuid>
-#include <QDateTime>
+#include <QFile>
 #include <QDir>
+#include <QDateTime>
 
 ExportService::ExportService(QObject *parent) : QObject(parent)
 {
@@ -56,12 +59,17 @@ QString ExportService::exportModel(const QString &modelVersionId,
     auto db = Database::instance().database();
     if (!db.isOpen()) return {};
 
-    // 查询 model_version, 关联获取 task_type
+    // 查询 model_version，关联获取 task_type 和 project_root
+    // 支持训练模型（通过 training_runs → projects 关联）和导入模型（通过 project_id → projects 关联）
     QSqlQuery checkVersion(db);
     checkVersion.prepare(
-        "SELECT m.best_weight_path, p.task_type, p.root_path FROM model_versions m "
-        "JOIN training_runs r ON m.run_id = r.id "
-        "JOIN projects p ON r.project_id = p.id "
+        "SELECT m.best_weight_path, "
+        "COALESCE(p.task_type, p2.task_type, 'detect') AS task_type, "
+        "COALESCE(p.root_path, p2.root_path) AS root_path "
+        "FROM model_versions m "
+        "LEFT JOIN training_runs r ON m.run_id = r.id "
+        "LEFT JOIN projects p ON r.project_id = p.id "
+        "LEFT JOIN projects p2 ON m.project_id = p2.id "
         "WHERE m.id = ?"
     );
     checkVersion.addBindValue(modelVersionId);
@@ -413,4 +421,88 @@ int ExportService::reconcileStaleExports()
     }
 
     return fixed;
+}
+
+QString ExportService::exportReport(const QString &projectId,
+                                     const QString &modelVersionId,
+                                     const QString &reportType,
+                                     const QString &reportDataJson)
+{
+    ltInfo(LT_LOG_EXPORT()) << "Exporting report for project:" << projectId
+                            << "modelVersion:" << modelVersionId
+                            << "type:" << reportType;
+
+    // 获取项目根路径
+    auto db = Database::instance().database();
+    if (!db.isOpen()) {
+        ltWarning(LT_LOG_EXPORT()) << "Database not open, cannot export report";
+        return {};
+    }
+
+    QSqlQuery query(db);
+    query.prepare("SELECT root_path FROM projects WHERE id = ?");
+    query.addBindValue(projectId);
+    if (!query.exec() || !query.next()) {
+        ltWarning(LT_LOG_EXPORT()) << "Project not found:" << projectId;
+        return {};
+    }
+
+    QString rootPath = query.value(0).toString();
+    if (rootPath.isEmpty()) {
+        ltWarning(LT_LOG_EXPORT()) << "Project root path is empty";
+        return {};
+    }
+
+    // 确保exports目录存在
+    QString exportsDir = ProjectFs::exportsDir(rootPath);
+    QDir dir(exportsDir);
+    if (!dir.exists() && !dir.mkpath(".")) {
+        ltWarning(LT_LOG_EXPORT()) << "Failed to create exports directory:" << exportsDir;
+        return {};
+    }
+
+    // 构建报告文件名
+    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+    QString versionSuffix = modelVersionId.left(8);
+    QString typeSuffix;
+    if (reportType == "训练报告") typeSuffix = "training";
+    else if (reportType == "评估报告") typeSuffix = "evaluation";
+    else if (reportType == "对比报告") typeSuffix = "comparison";
+    else typeSuffix = "report";
+
+    QString fileName = QString("report_%1_%2_%3.json").arg(typeSuffix, versionSuffix, timestamp);
+    QString filePath = dir.filePath(fileName);
+
+    // 原子写入：先写临时文件，再重命名
+    QString tmpPath = filePath + ".tmp";
+    QFile tmpFile(tmpPath);
+    if (!tmpFile.open(QIODevice::WriteOnly)) {
+        ltWarning(LT_LOG_EXPORT()) << "Failed to create temp report file:" << tmpPath;
+        return {};
+    }
+
+    // 构建报告内容
+    QJsonObject reportObj = QJsonDocument::fromJson(reportDataJson.toUtf8()).object();
+    reportObj["reportType"] = reportType;
+    reportObj["projectId"] = projectId;
+    reportObj["modelVersionId"] = modelVersionId;
+    reportObj["generatedAt"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+
+    QJsonDocument doc(reportObj);
+    tmpFile.write(doc.toJson());
+    tmpFile.close();
+
+    // 重命名临时文件为最终文件
+    QFile finalFile(filePath);
+    if (finalFile.exists()) {
+        finalFile.remove();
+    }
+    if (!QFile::rename(tmpPath, filePath)) {
+        ltWarning(LT_LOG_EXPORT()) << "Failed to rename temp report file to:" << filePath;
+        QFile::remove(tmpPath);
+        return {};
+    }
+
+    ltInfo(LT_LOG_EXPORT()) << "Report exported to:" << filePath;
+    return filePath;
 }
