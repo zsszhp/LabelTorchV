@@ -6,7 +6,7 @@
 /**
  * @brief 数据库DDL常量定义
  *
- * 定义13张核心表的建表语句，对应 16-database-schema-full-v2.md
+ * 定义15张核心表的建表语句
  */
 class Schema
 {

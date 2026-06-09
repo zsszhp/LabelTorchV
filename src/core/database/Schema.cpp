@@ -109,15 +109,18 @@ QStringList Schema::createTableStatements()
         "  finished_at DATETIME"
         ")",
 
-        // 模型版本表
+        // 模型版本表（支持训练产出和外部导入两种来源）
         "CREATE TABLE IF NOT EXISTS model_versions ("
         "  id TEXT PRIMARY KEY,"
-        "  run_id TEXT NOT NULL REFERENCES training_runs(id),"
+        "  run_id TEXT REFERENCES training_runs(id),"
         "  parent_model_version_id TEXT REFERENCES model_versions(id),"
         "  best_weight_path TEXT,"
         "  last_weight_path TEXT,"
         "  metrics_snapshot_json TEXT,"
         "  export_registry_json TEXT,"
+        "  source TEXT NOT NULL DEFAULT 'trained',"
+        "  project_id TEXT REFERENCES projects(id),"
+        "  import_source_json TEXT,"
         "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
         ")",
 
