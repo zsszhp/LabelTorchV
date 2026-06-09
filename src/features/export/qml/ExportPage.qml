@@ -667,18 +667,33 @@ Item {
                                                 exportActionTone = "warning"
                                                 return
                                             }
-                                            exportActionMessage = "报告生成中..."
-                                            exportActionTone = "info"
-                                            // 生成导出摘要报告
-                                            var report = {
+                                            // 收集报告数据
+                                            var reportData = {
                                                 "modelVersion": root.selectedVersionId,
                                                 "exportFormat": formatCombo.currentText,
-                                                "exportTime": new Date().toISOString(),
                                                 "validationResult": root.selectedArtifactDetails.validationResult || "未验证"
                                             }
-                                            console.log("Export Report:", JSON.stringify(report, null, 2))
-                                            exportActionMessage = "报告已生成，查看控制台输出"
-                                            exportActionTone = "success"
+                                            // 如果有关联的测试结果，也包含进来
+                                            var versionData = modelVersionModel.getVersion(root.selectedVersionId)
+                                            if (versionData && versionData.metricsJson) {
+                                                try {
+                                                    reportData["metrics"] = JSON.parse(versionData.metricsJson)
+                                                } catch(e) {}
+                                            }
+                                            var reportJson = JSON.stringify(reportData)
+                                            var reportPath = exportService.exportReport(
+                                                root.currentProjectId,
+                                                root.selectedVersionId,
+                                                reportTypeCombo.currentText,
+                                                reportJson
+                                            )
+                                            if (reportPath !== "") {
+                                                exportActionMessage = "报告已保存到: " + reportPath
+                                                exportActionTone = "success"
+                                            } else {
+                                                exportActionMessage = "报告导出失败"
+                                                exportActionTone = "danger"
+                                            }
                                         }
                                     }
                                 }
@@ -1193,8 +1208,6 @@ Item {
                     }
                 }
             }
-        }
-    }
 
     // 初始化时加载数据
     Component.onCompleted: {

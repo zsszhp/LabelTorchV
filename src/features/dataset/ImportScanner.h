@@ -76,6 +76,11 @@ public:
     static bool isImageFile(const QString &fileName);
     static bool isLabelFile(const QString &fileName);
 
+    /**
+     * @brief 递归收集目录下所有图片文件（静态版本，供外部调用）
+     */
+    static QFileInfoList collectImageFilesStatic(const QDir &dir, bool recursive = true);
+
     bool isLabelMeJsonFile(const QString &filePath);
     QVariantMap parseLabelMeJsonFile(const QString &filePath);
     QVariantMap scanWithLabelMeJsonLabels(const QString &imageDir, const QString &labelDir);
@@ -120,6 +125,13 @@ private:
      * @return QVariantMap 探测结果
      */
     QVariantMap detectFlatLayout(const QString &folderPath);
+
+    /**
+     * @brief 探测 ImageNet 风格分类目录结构（每类一文件夹）
+     * @param folderPath 根目录
+     * @return QVariantMap 探测结果
+     */
+    QVariantMap detectClassifyLayout(const QString &folderPath);
 };
 
 #endif // IMPORTSCANNER_H
