@@ -18,7 +18,9 @@ public:
         LastWeightRole,
         MetricsRole,
         ParentVersionRole,
-        CreatedAtRole
+        CreatedAtRole,
+        SourceRole,
+        ImportSourceRole
     };
 
     explicit ModelVersionModel(QObject *parent = nullptr);

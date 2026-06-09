@@ -33,6 +33,8 @@ QVariant ModelVersionModel::data(const QModelIndex &index, int role) const
     case MetricsRole: return version["metricsJson"];
     case ParentVersionRole: return version["parentVersionId"];
     case CreatedAtRole: return version["createdAt"];
+    case SourceRole: return version["source"];
+    case ImportSourceRole: return version["importSourceJson"];
     default: return {};
     }
 }
@@ -46,7 +48,9 @@ QHash<int, QByteArray> ModelVersionModel::roleNames() const
         {LastWeightRole, "lastWeightPath"},
         {MetricsRole, "metricsJson"},
         {ParentVersionRole, "parentVersionId"},
-        {CreatedAtRole, "createdAt"}
+        {CreatedAtRole, "createdAt"},
+        {SourceRole, "source"},
+        {ImportSourceRole, "importSourceJson"}
     };
 }
 
@@ -72,13 +76,14 @@ void ModelVersionModel::refresh()
     }
 
     QSqlQuery query(db);
+    // 通过 project_id 字段直接查询（训练模型和导入模型都关联了 project_id）
     query.prepare(
         "SELECT mv.id, mv.run_id, mv.parent_model_version_id, "
         "mv.best_weight_path, mv.last_weight_path, "
-        "mv.metrics_snapshot_json, mv.export_registry_json, mv.created_at "
+        "mv.metrics_snapshot_json, mv.export_registry_json, mv.created_at, "
+        "mv.source, mv.import_source_json "
         "FROM model_versions mv "
-        "JOIN training_runs tr ON mv.run_id = tr.id "
-        "WHERE tr.project_id = ? "
+        "WHERE mv.project_id = ? "
         "ORDER BY mv.created_at DESC"
     );
     query.addBindValue(m_projectId);
@@ -94,6 +99,8 @@ void ModelVersionModel::refresh()
             version["metricsJson"] = query.value(5).toString();
             version["exportRegistryJson"] = query.value(6).toString();
             version["createdAt"] = query.value(7).toString();
+            version["source"] = query.value(8).toString();
+            version["importSourceJson"] = query.value(9).toString();
             m_versions.append(version);
         }
     }
