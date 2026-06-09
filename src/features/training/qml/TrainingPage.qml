@@ -21,10 +21,18 @@ Item {
     ListModel { id: recallModel }
     ListModel { id: precisionModel }
 
-    // 部署阈值：anomalib 用 AUROC > 0.95，ultralytics 用 mAP50 > 0.85
-    property real deploymentThreshold: adapterCombo.currentText === "anomalib" ? 0.95 : 0.85
-    // 当前精度指标名称，随适配器切换
-    property string metricName: adapterCombo.currentText === "anomalib" ? "AUROC" : "mAP50"
+    // 部署阈值：anomalib 用 AUROC > 0.95，ultralytics 用 mAP50 > 0.85，分类用 top1 > 0.85
+    property real deploymentThreshold: {
+        if (adapterCombo.currentText === "anomalib") return 0.95
+        if (modelFamilyCombo.currentText === "yolov8_cls") return 0.85
+        return 0.85
+    }
+    // 当前精度指标名称，随适配器和模型族切换
+    property string metricName: {
+        if (adapterCombo.currentText === "anomalib") return "AUROC"
+        if (modelFamilyCombo.currentText === "yolov8_cls") return "Top1 Acc"
+        return "mAP50"
+    }
 
     // 数据增强开关
     property bool augmentationEnabled: true
@@ -295,6 +303,11 @@ Item {
             var precisionValue = 0
             if (adapterCombo.currentText === "anomalib") {
                 metricValue = metrics["auroc"] || metrics["image_auroc"] || metrics["pixel_auroc"] || 0
+            } else if (modelFamilyCombo.currentText === "yolov8_cls") {
+                // 分类任务：top1 accuracy 为主指标
+                metricValue = metrics["top1"] || 0
+                recallValue = metrics["top5"] || 0
+                precisionValue = 0
             } else {
                 metricValue = metrics["mAP50"] || metrics["map50"] || metrics["metrics/mAP50(B)"] || 0
                 recallValue = metrics["recall"] || metrics["metrics/recall(B)"] || 0
@@ -832,6 +845,7 @@ Item {
                             logView.appendLog("[LabelTorch] Training stopped by user")
                         }
                     }
+                }
                 }
             }
         }
@@ -1680,8 +1694,8 @@ Item {
                                                 id: imgSizeStepper
                                                 anchors.right: parent.right
                                                 anchors.verticalCenter: parent.verticalCenter
-                                                value: 640
-                                                minValue: 320
+                                                value: modelFamilyCombo.currentText === "yolov8_cls" ? 224 : 640
+                                                minValue: 32
                                                 maxValue: 1280
                                                 stepSize: 32
                                             }

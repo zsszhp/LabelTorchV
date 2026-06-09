@@ -281,7 +281,7 @@ Item {
                 }
             }
         }
-        }
+        } // 关闭 sidebar Rectangle
 
         // ============================================================
         // 中心内容区（左右分栏）
@@ -672,13 +672,6 @@ Item {
                                                 "modelVersion": root.selectedVersionId,
                                                 "exportFormat": formatCombo.currentText,
                                                 "validationResult": root.selectedArtifactDetails.validationResult || "未验证"
-                                            }
-                                            // 如果有关联的测试结果，也包含进来
-                                            var versionData = modelVersionModel.getVersion(root.selectedVersionId)
-                                            if (versionData && versionData.metricsJson) {
-                                                try {
-                                                    reportData["metrics"] = JSON.parse(versionData.metricsJson)
-                                                } catch(e) {}
                                             }
                                             var reportJson = JSON.stringify(reportData)
                                             var reportPath = exportService.exportReport(
@@ -1208,6 +1201,7 @@ Item {
                     }
                 }
             }
+    }
 
     // 初始化时加载数据
     Component.onCompleted: {
