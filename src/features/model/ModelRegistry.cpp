@@ -1,6 +1,8 @@
 #include "ModelRegistry.h"
 #include "Database.h"
+#include "filesystem/ProjectFs.h"
 #include "utils/Log.h"
+#include "utils/Id.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -9,6 +11,9 @@
 #include <QJsonArray>
 #include <QUuid>
 #include <QDateTime>
+#include <QFile>
+#include <QFileInfo>
+#include <QDir>
 
 ModelRegistry::ModelRegistry(QObject *parent) : QObject(parent)
 {
@@ -37,16 +42,27 @@ QString ModelRegistry::registerModelVersion(const QString &runId,
 
     QString versionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
 
+    // 查询训练运行关联的 project_id
+    QString projectId;
+    QSqlQuery runQuery(db);
+    runQuery.prepare("SELECT project_id FROM training_runs WHERE id = ?");
+    runQuery.addBindValue(runId);
+    if (runQuery.exec() && runQuery.next()) {
+        projectId = runQuery.value(0).toString();
+    }
+
     QSqlQuery query(db);
     query.prepare(
-        "INSERT INTO model_versions (id, run_id, best_weight_path, last_weight_path, metrics_snapshot_json) "
-        "VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO model_versions (id, run_id, best_weight_path, last_weight_path, "
+        "metrics_snapshot_json, source, project_id, created_at) "
+        "VALUES (?, ?, ?, ?, ?, 'trained', ?, datetime('now'))"
     );
     query.addBindValue(versionId);
     query.addBindValue(runId);
     query.addBindValue(bestWeightPath);
     query.addBindValue(lastWeightPath);
     query.addBindValue(metricsJson.isEmpty() ? "{}" : metricsJson);
+    query.addBindValue(projectId);
 
     if (!query.exec()) {
         ltError(LT_LOG_MODEL()) << "Failed to register model version:" << query.lastError().text();
@@ -68,10 +84,10 @@ QVariantList ModelRegistry::listModelVersions(const QString &projectId)
     query.prepare(
         "SELECT mv.id, mv.run_id, mv.parent_model_version_id, "
         "mv.best_weight_path, mv.last_weight_path, "
-        "mv.metrics_snapshot_json, mv.export_registry_json, mv.created_at "
+        "mv.metrics_snapshot_json, mv.export_registry_json, mv.created_at, "
+        "mv.source, mv.import_source_json "
         "FROM model_versions mv "
-        "JOIN training_runs tr ON mv.run_id = tr.id "
-        "WHERE tr.project_id = ? "
+        "WHERE mv.project_id = ? "
         "ORDER BY mv.created_at DESC"
     );
     query.addBindValue(projectId);
@@ -91,6 +107,8 @@ QVariantList ModelRegistry::listModelVersions(const QString &projectId)
         version["metricsJson"] = query.value(5).toString();
         version["exportRegistryJson"] = query.value(6).toString();
         version["createdAt"] = query.value(7).toString();
+        version["source"] = query.value(8).toString();
+        version["importSourceJson"] = query.value(9).toString();
         result.append(version);
     }
 
@@ -318,4 +336,113 @@ bool ModelRegistry::removeTag(const QString &versionId, const QString &tag)
 
     ltInfo(LT_LOG_MODEL()) << "Removed tag:" << tag << "from version:" << versionId;
     return true;
+}
+
+QString ModelRegistry::importExternalModel(const QString &projectId,
+                                             const QString &weightPath,
+                                             const QString &modelFormat,
+                                             const QString &taskType,
+                                             const QString &modelName,
+                                             const QString &importNotes)
+{
+    ltInfo(LT_LOG_MODEL()) << "Importing external model:" << weightPath
+                           << "format=" << modelFormat << "taskType=" << taskType;
+
+    // 验证源文件存在
+    QFileInfo sourceInfo(weightPath);
+    if (!sourceInfo.exists() || !sourceInfo.isFile()) {
+        ltWarning(LT_LOG_MODEL()) << "External model file not found:" << weightPath;
+        return {};
+    }
+
+    // 验证格式合法
+    QStringList validFormats = {"pt", "onnx", "engine"};
+    if (!validFormats.contains(modelFormat)) {
+        ltWarning(LT_LOG_MODEL()) << "Invalid model format:" << modelFormat;
+        return {};
+    }
+
+    // 验证任务类型合法
+    QStringList validTaskTypes = {"detect", "obb", "classify", "anomaly"};
+    if (!validTaskTypes.contains(taskType)) {
+        ltWarning(LT_LOG_MODEL()) << "Invalid task type:" << taskType;
+        return {};
+    }
+
+    // 查询项目根路径
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return {};
+
+    QSqlQuery projectQuery(db);
+    projectQuery.prepare("SELECT root_path FROM projects WHERE id = ?");
+    projectQuery.addBindValue(projectId);
+    if (!projectQuery.exec() || !projectQuery.next()) {
+        ltWarning(LT_LOG_MODEL()) << "Project not found:" << projectId;
+        return {};
+    }
+
+    QString projectRoot = projectQuery.value(0).toString();
+
+    // 创建导入目录 {projectRoot}/models/imports/
+    QString importsDir = ProjectFs::modelsDir(projectRoot) + "/imports";
+    QDir().mkpath(importsDir);
+
+    // 生成目标文件路径
+    QString versionId = Id::generate();
+    QString destFileName = QString("%1_%2.%3").arg(modelName.isEmpty() ? "imported" : modelName,
+                                                     versionId.left(8), modelFormat);
+    QString destPath = importsDir + "/" + destFileName;
+
+    // 原子写入：先复制到 .tmp 再 rename
+    QString tmpPath = destPath + ".tmp";
+    if (!QFile::copy(weightPath, tmpPath)) {
+        ltWarning(LT_LOG_MODEL()) << "Failed to copy model file to:" << tmpPath;
+        return {};
+    }
+
+    QFile tmpFile(tmpPath);
+    if (!tmpFile.rename(destPath)) {
+        ltWarning(LT_LOG_MODEL()) << "Failed to rename temp file to:" << destPath;
+        tmpFile.remove();
+        return {};
+    }
+
+    // 构建 import_source_json
+    QJsonObject importSource;
+    importSource["original_path"] = QFileInfo(weightPath).canonicalFilePath();
+    importSource["format"] = modelFormat;
+    importSource["task_type"] = taskType;
+    importSource["model_name"] = modelName;
+    importSource["import_notes"] = importNotes;
+    importSource["imported_at"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+
+    // 构建 metrics_snapshot_json（初始带 imported 标签）
+    QJsonObject metricsObj;
+    QJsonArray tagsArray;
+    tagsArray.append("imported");
+    metricsObj["tags"] = tagsArray;
+
+    // 插入 model_versions 表
+    QSqlQuery query(db);
+    query.prepare(
+        "INSERT INTO model_versions (id, run_id, best_weight_path, metrics_snapshot_json, "
+        "source, project_id, import_source_json, created_at) "
+        "VALUES (?, '', ?, ?, 'imported', ?, ?, datetime('now'))"
+    );
+    query.addBindValue(versionId);
+    query.addBindValue(destPath);
+    query.addBindValue(QString::fromUtf8(QJsonDocument(metricsObj).toJson(QJsonDocument::Compact)));
+    query.addBindValue(projectId);
+    query.addBindValue(QString::fromUtf8(QJsonDocument(importSource).toJson(QJsonDocument::Compact)));
+
+    if (!query.exec()) {
+        ltError(LT_LOG_MODEL()) << "Failed to import external model:" << query.lastError().text();
+        // 清理已复制的文件
+        QFile::remove(destPath);
+        return {};
+    }
+
+    ltInfo(LT_LOG_MODEL()) << "External model imported successfully:" << versionId
+                           << "path=" << destPath;
+    return versionId;
 }

@@ -52,6 +52,27 @@ public:
      * @brief Remove a tag from the version.
      */
     Q_INVOKABLE bool removeTag(const QString &versionId, const QString &tag);
+
+    /**
+     * @brief 导入外部模型文件，注册为模型版本。
+     *
+     * 将外部模型文件复制到项目目录，注册到 model_versions 表，
+     * source='imported'，run_id 为空。
+     *
+     * @param projectId   关联项目 ID
+     * @param weightPath  外部模型文件路径（pt/onnx/engine）
+     * @param modelFormat 模型格式（pt/onnx/engine）
+     * @param taskType    任务类型（detect/obb/classify/anomaly）
+     * @param modelName   用户自定义模型名称
+     * @param importNotes 导入备注（可选）
+     * @return 注册成功的版本 ID，失败返回空字符串
+     */
+    Q_INVOKABLE QString importExternalModel(const QString &projectId,
+                                              const QString &weightPath,
+                                              const QString &modelFormat,
+                                              const QString &taskType,
+                                              const QString &modelName,
+                                              const QString &importNotes);
 };
 
 #endif // MODELREGISTRY_H
