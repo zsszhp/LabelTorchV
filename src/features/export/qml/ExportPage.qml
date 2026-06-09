@@ -662,7 +662,23 @@ Item {
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
-                                            // 导出报告功能预留
+                                            if (!root.selectedVersionId) {
+                                                exportActionMessage = "请先选择模型版本"
+                                                exportActionTone = "warning"
+                                                return
+                                            }
+                                            exportActionMessage = "报告生成中..."
+                                            exportActionTone = "info"
+                                            // 生成导出摘要报告
+                                            var report = {
+                                                "modelVersion": root.selectedVersionId,
+                                                "exportFormat": formatCombo.currentText,
+                                                "exportTime": new Date().toISOString(),
+                                                "validationResult": root.selectedArtifactDetails.validationResult || "未验证"
+                                            }
+                                            console.log("Export Report:", JSON.stringify(report, null, 2))
+                                            exportActionMessage = "报告已生成，查看控制台输出"
+                                            exportActionTone = "success"
                                         }
                                     }
                                 }
@@ -681,6 +697,8 @@ Item {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     color: Theme.bgMain
+
+                    ScrollView {
                         anchors.fill: parent
                         clip: true
                         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
