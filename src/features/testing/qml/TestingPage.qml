@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import LabelTorch.Theme
 import LabelTorch.Components
 
@@ -94,6 +95,10 @@ Item {
     property string testStatus: "idle"
     // 测试详情子视图索引：0=混淆矩阵, 1=检查图像
     property int detailViewIndex: 0
+    // 检查图像相关属性
+    property var checkImageList: []
+    property string selectedCheckImagePath: ""
+    property string selectedCheckImageName: ""
 
     // 测试参数别名
     property alias batchSize: batchSizeStepper.value
@@ -190,7 +195,39 @@ Item {
                 root.prCurveData = JSON.parse(results.prCurveJson || "[]")
             } catch(e) { root.prCurveData = [] }
             root.testStatus = results.status
+
+            // 加载检查图像列表：从快照关联的数据集中获取测试集样本
+            loadCheckImages(results.snapshotId)
         }
+    }
+
+    // 加载检查图像（从快照关联的数据集获取测试集样本）
+    function loadCheckImages(snapshotId) {
+        root.checkImageList = []
+        if (!snapshotId) return
+
+        // 从快照获取数据集ID
+        var snapshotData = snapshotService.getSnapshot(snapshotId)
+        if (!snapshotData || !snapshotData.datasetId) return
+
+        // 从数据集获取测试集样本
+        var samples = annotationService.listSamples(snapshotData.datasetId)
+        var testSamples = []
+        for (var i = 0; i < samples.length; i++) {
+            var sample = samples[i]
+            // 只取测试集样本
+            if (sample.split === "val" || sample.split === "test") {
+                testSamples.push({
+                    "imagePath": sample.imagePath || "",
+                    "labelPath": sample.labelPath || "",
+                    "sampleId": sample.id || sample.sampleId || "",
+                    "width": sample.width || 0,
+                    "height": sample.height || 0,
+                    "validationStatus": sample.validationStatus || ""
+                })
+            }
+        }
+        root.checkImageList = testSamples
     }
 
     // 创建新测试任务
@@ -337,6 +374,7 @@ Item {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
+                            onClicked: importFileDialog.open()
                         }
                     }
                 }
@@ -391,7 +429,11 @@ Item {
                             spacing: 2
 
                             Text {
-                                text: model.bestWeightPath ? model.bestWeightPath.split("/").pop().split("\\").pop() : "模型 " + model.versionId.substring(0, 8)
+                                text: {
+                                    var name = model.bestWeightPath ? model.bestWeightPath.split("/").pop().split("\\").pop() : "模型 " + model.versionId.substring(0, 8)
+                                    if (model.source === "imported") name = "[导入] " + name
+                                    return name
+                                }
                                 font.pixelSize: Theme.fontSizeSmall
                                 font.weight: Font.DemiBold
                                 font.family: Theme.fontFamily
@@ -476,6 +518,7 @@ Item {
                             root.startOrCreateTestTask()
                         }
                     }
+                }
                 }
             }
         }
@@ -943,6 +986,7 @@ Item {
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
+                                            onClicked: classConfigDialog.open()
                                         }
                                     }
                                 }
@@ -1185,6 +1229,13 @@ Item {
                                                 anchors.fill: parent
                                                 hoverEnabled: true
                                                 cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    // 复制PR曲线数据到剪贴板
+                                                    var dataStr = JSON.stringify(root.prCurveData, null, 2)
+                                                    clipboardHelper.setText(dataStr)
+                                                    root.testActionMessage = "PR曲线数据已复制到剪贴板"
+                                                    root.testActionTone = "success"
+                                                }
                                             }
                                         }
                                     }
@@ -1269,6 +1320,37 @@ Item {
                                                     anchors.fill: parent
                                                     hoverEnabled: true
                                                     cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        // 导出测试结果为JSON文件
+                                                        if (!root.selectedTaskId) {
+                                                            root.testActionMessage = "请先选择测试任务"
+                                                            root.testActionTone = "warning"
+                                                            return
+                                                        }
+                                                        var results = testingService.getTestResults(root.selectedTaskId)
+                                                        if (!results.taskId) {
+                                                            root.testActionMessage = "无测试结果可导出"
+                                                            root.testActionTone = "warning"
+                                                            return
+                                                        }
+                                                        var exportData = {
+                                                            "taskId": results.taskId,
+                                                            "projectId": results.projectId,
+                                                            "modelVersionId": results.modelVersionId,
+                                                            "snapshotId": results.snapshotId,
+                                                            "status": results.status,
+                                                            "metrics": root.testMetrics,
+                                                            "confusionMatrix": root.confusionMatrix,
+                                                            "prCurve": root.prCurveData,
+                                                            "createdAt": results.createdAt,
+                                                            "startedAt": results.startedAt,
+                                                            "finishedAt": results.finishedAt
+                                                        }
+                                                        var jsonStr = JSON.stringify(exportData, null, 2)
+                                                        clipboardHelper.setText(jsonStr)
+                                                        root.testActionMessage = "测试结果已复制到剪贴板（JSON格式）"
+                                                        root.testActionTone = "success"
+                                                    }
                                                 }
                                             }
                                         }
@@ -1393,13 +1475,89 @@ Item {
                                                 ColumnLayout {
                                                     spacing: 0
 
-                                                    Text {
-                                                        text: "检查图像功能将在后续版本中实现"
-                                                        font.pixelSize: Theme.fontSizeSmall
-                                                        font.family: Theme.fontFamily
-                                                        color: Theme.textMuted
-                                                        Layout.alignment: Qt.AlignHCenter
-                                                        Layout.topMargin: Theme.spacingXLarge
+                                                    // 标题栏
+                                                    Rectangle {
+                                                        Layout.fillWidth: true
+                                                        Layout.preferredHeight: 28
+                                                        color: Theme.bgSide
+
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: "检查图像 (" + root.checkImageList.length + ")"
+                                                            font.pixelSize: Theme.fontSizeCaption
+                                                            font.font.weight: Font.DemiBold
+                                                            font.family: Theme.fontFamily
+                                                            color: Theme.textSecondary
+                                                        }
+                                                    }
+
+                                                    // 图像列表
+                                                    ListView {
+                                                        id: checkImageListView
+                                                        Layout.fillWidth: true
+                                                        Layout.fillHeight: true
+                                                        clip: true
+                                                        spacing: 2
+
+                                                        model: root.checkImageList
+                                                        delegate: Rectangle {
+                                                            width: checkImageListView.width
+                                                            height: 32
+                                                            color: {
+                                                                if (root.selectedCheckImagePath === modelData.imagePath)
+                                                                    return Qt.alpha(Theme.primaryGlow, 0.1)
+                                                                if (checkItemMouse.containsMouse)
+                                                                    return Theme.bgHover
+                                                                return "transparent"
+                                                            }
+
+                                                            // 选中指示条
+                                                            Rectangle {
+                                                                visible: root.selectedCheckImagePath === modelData.imagePath
+                                                                anchors.left: parent.left
+                                                                anchors.top: parent.top
+                                                                anchors.bottom: parent.bottom
+                                                                width: 2
+                                                                color: Theme.primaryGlow
+                                                            }
+
+                                                            Text {
+                                                                anchors.fill: parent
+                                                                anchors.leftMargin: 8
+                                                                anchors.rightMargin: 8
+                                                                text: {
+                                                                    // 从路径提取文件名
+                                                                    var path = modelData.imagePath || ""
+                                                                    return path.split("/").pop().split("\\").pop()
+                                                                }
+                                                                font.pixelSize: Theme.fontSizeCaption
+                                                                font.family: Theme.fontFamily
+                                                                color: root.selectedCheckImagePath === modelData.imagePath ? Theme.primaryGlow : Theme.textMain
+                                                                elide: Text.ElideRight
+                                                                verticalAlignment: Text.AlignVCenter
+                                                            }
+
+                                                            MouseArea {
+                                                                id: checkItemMouse
+                                                                anchors.fill: parent
+                                                                hoverEnabled: true
+                                                                cursorShape: Qt.PointingHandCursor
+                                                                onClicked: {
+                                                                    root.selectedCheckImagePath = modelData.imagePath
+                                                                    root.selectedCheckImageName = (modelData.imagePath || "").split("/").pop().split("\\").pop()
+                                                                }
+                                                            }
+                                                        }
+
+                                                        // 空状态提示
+                                                        Text {
+                                                            visible: root.checkImageList.length === 0
+                                                            anchors.centerIn: parent
+                                                            text: root.testStatus === "succeeded" ? "无测试集样本" : "请先完成测试"
+                                                            font.pixelSize: Theme.fontSizeSmall
+                                                            font.family: Theme.fontFamily
+                                                            color: Theme.textMuted
+                                                        }
                                                     }
                                                 }
                                             }
@@ -1413,12 +1571,74 @@ Item {
                                             border.color: Theme.borderColor
                                             border.width: 1
 
+                                            // 有选中图像时显示图像
+                                            Image {
+                                                id: previewImage
+                                                anchors.fill: parent
+                                                anchors.margins: 4
+                                                visible: root.selectedCheckImagePath !== ""
+                                                fillMode: Image.PreserveAspectFit
+                                                smooth: true
+                                                // 将本地路径转为file URL
+                                                source: {
+                                                    if (!root.selectedCheckImagePath) return ""
+                                                    var path = root.selectedCheckImagePath
+                                                    // Windows路径需要正斜杠
+                                                    path = path.replace(/\\/g, "/")
+                                                    if (!path.startsWith("file:///")) {
+                                                        path = "file:///" + path
+                                                    }
+                                                    return path
+                                                }
+
+                                                // 加载中指示
+                                                BusyIndicator {
+                                                    anchors.centerIn: parent
+                                                    running: previewImage.status === Image.Loading
+                                                    visible: running
+                                                }
+
+                                                // 加载失败提示
+                                                Text {
+                                                    visible: previewImage.status === Image.Error
+                                                    anchors.centerIn: parent
+                                                    text: "图像加载失败"
+                                                    font.pixelSize: Theme.fontSizeSmall
+                                                    font.family: Theme.fontFamily
+                                                    color: Theme.danger
+                                                }
+                                            }
+
+                                            // 无选中图像时的占位提示
                                             Text {
+                                                visible: root.selectedCheckImagePath === ""
                                                 anchors.centerIn: parent
-                                                text: "图像预览区"
+                                                text: root.checkImageList.length > 0 ? "请从左侧选择图像" : "图像预览区"
                                                 font.pixelSize: Theme.fontSizeNormal
                                                 font.family: Theme.fontFamily
                                                 color: Theme.textDisabled
+                                            }
+
+                                            // 图像名称标签（底部叠加）
+                                            Rectangle {
+                                                visible: root.selectedCheckImagePath !== ""
+                                                anchors.bottom: parent.bottom
+                                                anchors.left: parent.left
+                                                anchors.right: parent.right
+                                                height: 24
+                                                color: Qt.alpha(Theme.bgMain, 0.85)
+
+                                                Text {
+                                                    anchors.fill: parent
+                                                    anchors.leftMargin: 8
+                                                    anchors.rightMargin: 8
+                                                    text: root.selectedCheckImageName
+                                                    font.pixelSize: Theme.fontSizeCaption
+                                                    font.family: Theme.fontFamilyMono
+                                                    color: Theme.textMuted
+                                                    elide: Text.ElideMiddle
+                                                    verticalAlignment: Text.AlignVCenter
+                                                }
                                             }
                                         }
 
@@ -1508,6 +1728,517 @@ Item {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // 剪贴板辅助（隐藏TextEdit用于复制文本到剪贴板）
+    TextEdit {
+        id: clipboardHelper
+        visible: false
+        function setText(text) {
+            clipboardHelper.text = text
+            clipboardHelper.selectAll()
+            clipboardHelper.copy()
+            clipboardHelper.text = ""
+        }
+    }
+
+    // ========================================
+    // 导入外部模型 - 文件选择对话框
+    // ========================================
+    FileDialog {
+        id: importFileDialog
+        title: "选择外部模型文件"
+        nameFilters: ["模型文件 (*.pt *.onnx *.engine)", "PyTorch 模型 (*.pt)", "ONNX 模型 (*.onnx)", "TensorRT 引擎 (*.engine)", "所有文件 (*)"]
+        onAccepted: {
+            var path = selectedFile.toString()
+            // 移除 file:/// 前缀
+            if (Qt.platform.os === "windows") {
+                path = path.replace(/^file:\/\/\//, "")
+            } else {
+                path = path.replace(/^file:\/\//, "")
+            }
+            importModelDialog.selectedFilePath = path
+            // 自动检测格式
+            var ext = path.split(".").pop().toLowerCase()
+            if (ext === "pt") importModelDialog.selectedFormat = "pt"
+            else if (ext === "onnx") importModelDialog.selectedFormat = "onnx"
+            else if (ext === "engine") importModelDialog.selectedFormat = "engine"
+            // 自动填充模型名称为文件名（不含扩展名）
+            var fileName = path.split("/").pop().split("\\").pop()
+            importModelDialog.modelName = fileName.replace(/\.[^.]+$/, "")
+            importModelDialog.open()
+        }
+    }
+
+    // ========================================
+    // 导入外部模型 - 配置对话框
+    // ========================================
+    Dialog {
+        id: importModelDialog
+        title: "导入外部模型"
+        modal: true
+        anchors.centerIn: parent
+        width: 420
+        padding: 24
+        closePolicy: Popup.CloseOnEscape
+
+        property string selectedFilePath: ""
+        property string selectedFormat: "pt"
+        property alias modelName: modelNameField.text
+
+        background: Rectangle {
+            color: Theme.bgCard
+            radius: Theme.radiusNormal
+            border.color: Theme.borderColor
+            border.width: 1
+        }
+
+        header: Rectangle {
+            color: "transparent"
+            height: childrenRect.height + 16
+            Text {
+                text: "导入外部模型"
+                font.pixelSize: Theme.fontSizeLarge
+                font.weight: Font.Bold
+                font.family: Theme.fontFamily
+                color: Theme.textMain
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.topMargin: 8
+            }
+        }
+
+        contentItem: ColumnLayout {
+            spacing: Theme.spacingNormal
+
+            // 选择的文件路径
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingSmall
+
+                Text {
+                    text: "文件路径："
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    color: Theme.textMuted
+                }
+
+                Text {
+                    text: importModelDialog.selectedFilePath.split("/").pop().split("\\").pop()
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    color: Theme.textMain
+                    elide: Text.ElideMiddle
+                    Layout.fillWidth: true
+                }
+
+                Text {
+                    text: "更换"
+                    font.pixelSize: Theme.fontSizeCaption
+                    font.family: Theme.fontFamily
+                    color: Theme.primaryGlow
+                    Layout.alignment: Qt.AlignRight
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: importFileDialog.open()
+                    }
+                }
+            }
+
+            // 模型名称
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 4
+
+                Text {
+                    text: "模型名称"
+                    font.pixelSize: Theme.fontSizeCaption
+                    font.family: Theme.fontFamily
+                    color: Theme.textMuted
+                }
+
+                TextField {
+                    id: modelNameField
+                    Layout.fillWidth: true
+                    placeholderText: "输入模型名称"
+                    color: Theme.textMain
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    background: Rectangle {
+                        radius: Theme.radiusSmall
+                        color: Theme.bgInput
+                        border.color: modelNameField.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                        border.width: 1
+                    }
+                }
+            }
+
+            // 模型格式
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 4
+
+                Text {
+                    text: "模型格式"
+                    font.pixelSize: Theme.fontSizeCaption
+                    font.family: Theme.fontFamily
+                    color: Theme.textMuted
+                }
+
+                ComboBox {
+                    id: importFormatCombo
+                    Layout.fillWidth: true
+                    model: [
+                        { text: "PyTorch (.pt)", value: "pt" },
+                        { text: "ONNX (.onnx)", value: "onnx" },
+                        { text: "TensorRT (.engine)", value: "engine" }
+                    ]
+                    textRole: "text"
+                    valueRole: "value"
+                    currentIndex: {
+                        switch (importModelDialog.selectedFormat) {
+                            case "pt": return 0
+                            case "onnx": return 1
+                            case "engine": return 2
+                            default: return 0
+                        }
+                    }
+                    contentItem: Text {
+                        text: importFormatCombo.displayText
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.family: Theme.fontFamily
+                        color: Theme.textMain
+                        verticalAlignment: Text.AlignVCenter
+                        leftPadding: 10
+                    }
+                    background: Rectangle {
+                        radius: Theme.radiusSmall
+                        color: Theme.bgInput
+                        border.color: importFormatCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                        border.width: 1
+                    }
+                }
+            }
+
+            // 任务类型
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 4
+
+                Text {
+                    text: "任务类型"
+                    font.pixelSize: Theme.fontSizeCaption
+                    font.family: Theme.fontFamily
+                    color: Theme.textMuted
+                }
+
+                ComboBox {
+                    id: importTaskTypeCombo
+                    Layout.fillWidth: true
+                    model: [
+                        { text: "目标检测 (detect)", value: "detect" },
+                        { text: "旋转框检测 (obb)", value: "obb" },
+                        { text: "分类 (classify)", value: "classify" },
+                        { text: "异常检测 (anomaly)", value: "anomaly" }
+                    ]
+                    textRole: "text"
+                    valueRole: "value"
+                    currentIndex: {
+                        switch (root.currentTaskType) {
+                            case "detect": return 0
+                            case "obb": return 1
+                            case "classify": return 2
+                            case "anomaly": return 3
+                            default: return 0
+                        }
+                    }
+                    contentItem: Text {
+                        text: importTaskTypeCombo.displayText
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.family: Theme.fontFamily
+                        color: Theme.textMain
+                        verticalAlignment: Text.AlignVCenter
+                        leftPadding: 10
+                    }
+                    background: Rectangle {
+                        radius: Theme.radiusSmall
+                        color: Theme.bgInput
+                        border.color: importTaskTypeCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                        border.width: 1
+                    }
+                }
+            }
+
+            // 导入备注
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 4
+
+                Text {
+                    text: "导入备注（可选）"
+                    font.pixelSize: Theme.fontSizeCaption
+                    font.family: Theme.fontFamily
+                    color: Theme.textMuted
+                }
+
+                TextField {
+                    id: importNotesField
+                    Layout.fillWidth: true
+                    placeholderText: "例如：供应商提供的预训练模型 v2.1"
+                    color: Theme.textMain
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    background: Rectangle {
+                        radius: Theme.radiusSmall
+                        color: Theme.bgInput
+                        border.color: importNotesField.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                        border.width: 1
+                    }
+                }
+            }
+
+            // 错误提示
+            Text {
+                id: importErrorText
+                Layout.fillWidth: true
+                visible: text !== ""
+                font.pixelSize: Theme.fontSizeCaption
+                font.family: Theme.fontFamily
+                color: Theme.accentDanger
+                wrapMode: Text.WordWrap
+            }
+        }
+
+        footer: RowLayout {
+            spacing: Theme.spacingNormal
+
+            Item { Layout.fillWidth: true }
+
+            Button {
+                text: "取消"
+                onClicked: importModelDialog.reject()
+                background: Rectangle {
+                    radius: Theme.radiusSmall
+                    color: parent.hovered ? Theme.bgHover : Theme.bgInput
+                    border.color: Theme.borderColor
+                    border.width: 1
+                    implicitWidth: 80
+                    implicitHeight: 32
+                }
+                contentItem: Text {
+                    text: parent.text
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    color: Theme.textMain
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+
+            Button {
+                text: "导入"
+                onClicked: {
+                    importErrorText.text = ""
+                    if (!importModelDialog.selectedFilePath) {
+                        importErrorText.text = "请先选择模型文件"
+                        return
+                    }
+                    if (!modelNameField.text.trim()) {
+                        importErrorText.text = "请输入模型名称"
+                        return
+                    }
+
+                    var versionId = modelRegistry.importExternalModel(
+                        root.currentProjectId,
+                        importModelDialog.selectedFilePath,
+                        importFormatCombo.currentValue,
+                        importTaskTypeCombo.currentValue,
+                        modelNameField.text.trim(),
+                        importNotesField.text.trim()
+                    )
+
+                    if (versionId && versionId !== "") {
+                        importModelDialog.close()
+                        modelVersionModel.setProjectId(root.currentProjectId)
+                        root.selectedModelVersionId = versionId
+                        root.testActionMessage = "模型导入成功"
+                        root.testActionTone = "success"
+                    } else {
+                        importErrorText.text = "模型导入失败，请检查文件格式和路径"
+                    }
+                }
+                background: Rectangle {
+                    radius: Theme.radiusSmall
+                    color: parent.pressed ? Qt.darker(Theme.primary, 1.3) : (parent.hovered ? Qt.lighter(Theme.primary, 1.1) : Theme.primary)
+                    implicitWidth: 80
+                    implicitHeight: 32
+                }
+                contentItem: Text {
+                    text: parent.text
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Font.DemiBold
+                    font.family: Theme.fontFamily
+                    color: "#FFFFFF"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+        }
+    }
+
+    // ========================================
+    // 类别配置对话框
+    // ========================================
+    Dialog {
+        id: classConfigDialog
+        title: "类别配置"
+        modal: true
+        anchors.centerIn: parent
+        width: 360
+        padding: 24
+        closePolicy: Popup.CloseOnEscape
+
+        property var selectedClassIds: []
+
+        background: Rectangle {
+            color: Theme.bgCard
+            radius: Theme.radiusNormal
+            border.color: Theme.borderColor
+            border.width: 1
+        }
+
+        header: Rectangle {
+            color: "transparent"
+            height: childrenRect.height + 16
+            Text {
+                text: "类别配置"
+                font.pixelSize: Theme.fontSizeLarge
+                font.weight: Font.Bold
+                font.family: Theme.fontFamily
+                color: Theme.textMain
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.topMargin: 8
+            }
+        }
+
+        contentItem: ColumnLayout {
+            spacing: Theme.spacingNormal
+
+            Text {
+                text: "选择要在评估中包含的类别："
+                font.pixelSize: Theme.fontSizeSmall
+                font.family: Theme.fontFamily
+                color: Theme.textMuted
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+            }
+
+            // 类别列表
+            ListView {
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(contentHeight, 300)
+                clip: true
+                spacing: 4
+
+                model: {
+                    // 从混淆矩阵获取类别名
+                    var names = root.confusionMatrix.names || []
+                    if (names.length > 0) return names
+                    // 从taxonomy获取类别
+                    if (root.currentProjectId) {
+                        var classes = taxonomyService.listClasses(root.currentProjectId)
+                        return classes || []
+                    }
+                    return []
+                }
+
+                delegate: Rectangle {
+                    width: ListView.view.width
+                    height: 32
+                    radius: Theme.radiusSmall
+                    color: classCheckMouse.containsMouse ? Theme.bgHover : "transparent"
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: Theme.spacingSmall
+
+                        Rectangle {
+                            width: 12
+                            height: 12
+                            radius: 2
+                            color: classConfigDialog.selectedClassIds.indexOf(modelData) >= 0 ? Theme.primaryGlow : "transparent"
+                            border.color: classConfigDialog.selectedClassIds.indexOf(modelData) >= 0 ? Theme.primaryGlow : Theme.borderColor
+                            border.width: 1
+                        }
+
+                        Text {
+                            text: typeof modelData === 'object' ? (modelData.name || JSON.stringify(modelData)) : modelData
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.family: Theme.fontFamily
+                            color: Theme.textMain
+                            Layout.fillWidth: true
+                        }
+                    }
+
+                    MouseArea {
+                        id: classCheckMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            var idx = classConfigDialog.selectedClassIds.indexOf(modelData)
+                            var newIds = classConfigDialog.selectedClassIds.slice()
+                            if (idx >= 0) {
+                                newIds.splice(idx, 1)
+                            } else {
+                                newIds.push(modelData)
+                            }
+                            classConfigDialog.selectedClassIds = newIds
+                        }
+                    }
+                }
+            }
+
+            Text {
+                text: "不选择任何类别表示包含所有类别"
+                font.pixelSize: Theme.fontSizeCaption
+                font.family: Theme.fontFamily
+                color: Theme.textMuted
+                Layout.fillWidth: true
+            }
+        }
+
+        footer: RowLayout {
+            spacing: Theme.spacingNormal
+
+            Item { Layout.fillWidth: true }
+
+            Button {
+                text: "关闭"
+                onClicked: classConfigDialog.close()
+                background: Rectangle {
+                    radius: Theme.radiusSmall
+                    color: parent.hovered ? Theme.bgHover : Theme.bgInput
+                    border.color: Theme.borderColor
+                    border.width: 1
+                    implicitWidth: 80
+                    implicitHeight: 32
+                }
+                contentItem: Text {
+                    text: parent.text
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    color: Theme.textMain
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
             }
         }
