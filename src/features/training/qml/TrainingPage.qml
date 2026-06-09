@@ -200,6 +200,51 @@ Item {
         return {"ok": true, "message": ""}
     }
 
+    // 保存配置模板
+    function saveTrainingTemplate(templateName) {
+        var config = {
+            "name": templateName,
+            "adapter": adapterCombo.currentText,
+            "modelFamily": modelFamilyCombo.currentText,
+            "epochs": epochsStepper.value,
+            "batch": batchStepper.value,
+            "imgSize": imgSizeStepper.value,
+            "device": deviceCombo.currentText,
+            "optimizer": optimizerCombo.currentText,
+            "lr0": lrStepper.value / 10000,
+            "weightDecay": wdStepper.value / 10000,
+            "augmentation": augmentationEnabled,
+            "createdAt": new Date().toISOString()
+        }
+        if (adapterCombo.currentText === "anomalib") {
+            config["backbone"] = backboneCombo.currentText
+            config["anomalyScoreThreshold"] = thresholdStepper.value / 100
+        }
+        return JSON.stringify(config)
+    }
+
+    // 加载配置模板
+    function loadTrainingTemplate(configJson) {
+        try {
+            var config = JSON.parse(configJson)
+            if (config.adapter) adapterCombo.currentIndex = adapterCombo.model.indexOf(config.adapter)
+            if (config.modelFamily) modelFamilyCombo.currentIndex = modelFamilyCombo.model.indexOf(config.modelFamily)
+            if (config.epochs) epochsStepper.value = config.epochs
+            if (config.batch) batchStepper.value = config.batch
+            if (config.imgSize) imgSizeStepper.value = config.imgSize
+            if (config.device) deviceCombo.currentIndex = deviceCombo.model.indexOf(config.device)
+            if (config.optimizer) optimizerCombo.currentIndex = optimizerCombo.model.indexOf(config.optimizer)
+            if (config.lr0) lrStepper.value = (config.lr0 * 10000)
+            if (config.weightDecay) wdStepper.value = (config.weightDecay * 10000)
+            if (config.augmentation !== undefined) augmentationEnabled = config.augmentation
+            if (config.backbone && adapterCombo.currentText === "anomalib") backboneCombo.currentIndex = backboneCombo.model.indexOf(config.backbone)
+            if (config.anomalyScoreThreshold && adapterCombo.currentText === "anomalib") thresholdStepper.value = (config.anomalyScoreThreshold * 100)
+            return true
+        } catch(e) {
+            return false
+        }
+    }
+
     // 同步全局任务类型变更
     Connections {
         target: ApplicationWindow.window
