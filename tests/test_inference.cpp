@@ -26,6 +26,15 @@ private slots:
     void testRejectAllBelowThreshold();
     void testGetBatchStats();
 
+    // 异常场景测试
+    void testRunInferenceInvalidModelVersion();
+    void testRunInferenceInvalidDataset();
+    void testCancelCompletedBatch();
+    void testCancelNonexistentBatch();
+    void testListBatchesNonexistentDataset();
+    void testConfirmCandidateNonexistentBatch();
+    void testRejectCandidateNonexistentBatch();
+
 private:
     QString m_projectId;
     QString m_datasetId;
@@ -449,6 +458,70 @@ void TestInference::testGetBatchStats()
     // Non-existent batch returns zero stats
     QVariantMap emptyStats = labelService.getBatchStats("nonexistent-id");
     QCOMPARE(emptyStats["total"].toInt(), 0);
+}
+
+// === 异常场景测试 ===
+
+void TestInference::testRunInferenceInvalidModelVersion()
+{
+    // 不存在的模型版本应返回空字符串
+    InferenceService service;
+    QString batchId = service.runInference("nonexistent-model-version", m_datasetId, "all", 0.25, 0.45);
+    QVERIFY(batchId.isEmpty());
+}
+
+void TestInference::testRunInferenceInvalidDataset()
+{
+    // 不存在的数据集应返回空字符串
+    InferenceService service;
+    QString batchId = service.runInference(m_modelVersionId, "nonexistent-dataset-id", "all", 0.25, 0.45);
+    QVERIFY(batchId.isEmpty());
+}
+
+void TestInference::testCancelCompletedBatch()
+{
+    InferenceService infService;
+    AssistedLabelService labelService;
+
+    // 创建批次并注入已完成的候选
+    QString batchId = infService.runInference(m_modelVersionId, m_datasetId, "all", 0.25, 0.45);
+    QVERIFY(!batchId.isEmpty());
+
+    QJsonArray candidates;
+    QJsonObject c1;
+    c1["className"] = "scratch"; c1["classIndex"] = 0;
+    c1["cx"] = 0.5; c1["cy"] = 0.5; c1["w"] = 0.2; c1["h"] = 0.1;
+    c1["confidence"] = 0.92; c1["state"] = "confirmed";
+    candidates.append(c1);
+    injectCandidates(batchId, candidates, "completed");
+
+    // 已完成的批次不能取消
+    QVERIFY(!infService.cancelBatch(batchId));
+}
+
+void TestInference::testCancelNonexistentBatch()
+{
+    InferenceService service;
+    QVERIFY(!service.cancelBatch("nonexistent-batch-id"));
+}
+
+void TestInference::testListBatchesNonexistentDataset()
+{
+    InferenceService service;
+    QVariantList batches = service.listBatches("nonexistent-dataset-id");
+    QVERIFY(batches.isEmpty());
+}
+
+void TestInference::testConfirmCandidateNonexistentBatch()
+{
+    AssistedLabelService labelService;
+    QVERIFY(!labelService.confirmCandidate("nonexistent-batch-id", 0));
+}
+
+void TestInference::testRejectCandidateNonexistentBatch()
+{
+    AssistedLabelService labelService;
+    QVERIFY(!labelService.rejectCandidate("nonexistent-batch-id", 0));
 }
 
 QTEST_MAIN(TestInference)

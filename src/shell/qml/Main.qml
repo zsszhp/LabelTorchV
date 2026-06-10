@@ -28,6 +28,24 @@ ApplicationWindow {
     property string selectedFileName: ""
     property real annotationProgress: 0
 
+    // 计算标注进度：已标注样本数 / 总样本数 * 100
+    function updateAnnotationProgress() {
+        if (!appController.projectOpen) {
+            root.annotationProgress = 0
+            return
+        }
+        var datasets = datasetService.listDatasets(appController.currentProjectId)
+        var totalSamples = 0
+        var labeledSamples = 0
+        for (var i = 0; i < datasets.length; i++) {
+            var ds = datasets[i]
+            var stats = datasetService.getSampleStats(ds.id)
+            totalSamples += (stats.totalSamples || 0)
+            labeledSamples += (stats.labeledSamples || 0)
+        }
+        root.annotationProgress = totalSamples > 0 ? (labeledSamples / totalSamples * 100) : 0
+    }
+
     ListModel {
         id: navModel
         ListElement { pageId: "project"; title: "项目"; icon: "folder"; needsProject: false }
@@ -44,8 +62,10 @@ ApplicationWindow {
         function onCurrentProjectIdChanged() {
             if (appController.projectOpen) {
                 root.currentTaskType = projectService.getTaskType(appController.currentProjectId)
+                updateAnnotationProgress()
             } else {
                 root.currentTaskType = "detect"
+                root.annotationProgress = 0
             }
         }
     }

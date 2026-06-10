@@ -2009,7 +2009,7 @@ Item {
                 visible: text !== ""
                 font.pixelSize: Theme.fontSizeCaption
                 font.family: Theme.fontFamily
-                color: Theme.accentDanger
+                color: Theme.danger
                 wrapMode: Text.WordWrap
             }
         }

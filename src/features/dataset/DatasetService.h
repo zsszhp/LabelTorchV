@@ -213,6 +213,18 @@ private:
      */
     bool importLabelMeDataset(const QString &datasetId, const QString &imageDir, const QString &labelDir);
 
+    /**
+     * @brief 导入 ImageNet 风格分类数据集
+     *
+     * 分类数据集目录结构：每个子文件夹为一个类别，文件夹内的图片为该类别样本。
+     * 样本的 label_path 字段存储类别名（而非标签文件路径）。
+     *
+     * @param datasetId 已创建的数据集 ID
+     * @param folderPath 数据集根目录（包含类别子文件夹）
+     * @return true 导入成功
+     */
+    bool importClassifyFolderDataset(const QString &datasetId, const QString &folderPath);
+
     ImportScanner *m_scanner;
 };
 

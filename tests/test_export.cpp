@@ -21,6 +21,13 @@ private slots:
     void testUpdateExportStatus();
     void testExportInvalidModelVersion();
 
+    // 异常场景测试
+    void testExportModelInvalidOptionsJson();
+    void testReconcileStaleExports();
+    void testListExportsNonexistentVersion();
+    void testVerifyExportFailed();
+    void testUpdateExportStatusNonexistent();
+
 private:
     QString m_projectId;
     QString m_datasetId;
@@ -247,6 +254,86 @@ void TestExport::testExportInvalidModelVersion()
     ExportService service;
     QString artifactId = service.exportModel("nonexistent-version-id", "onnx", "{}");
     QVERIFY(artifactId.isEmpty());
+}
+
+// === 异常场景测试 ===
+
+void TestExport::testExportModelInvalidOptionsJson()
+{
+    // 无效的 options JSON 应返回空字符串
+    ExportService service;
+    QString artifactId = service.exportModel(m_modelVersionId, "onnx", "not a json");
+    QVERIFY(artifactId.isEmpty());
+
+    // 不完整的 JSON
+    artifactId = service.exportModel(m_modelVersionId, "onnx", "{invalid");
+    QVERIFY(artifactId.isEmpty());
+}
+
+void TestExport::testReconcileStaleExports()
+{
+    ExportService service;
+
+    // 先清理之前测试可能遗留的 running/verifying 记录
+    auto db = Database::instance().database();
+    QSqlQuery cleanup(db);
+    cleanup.exec("UPDATE export_artifacts SET status = 'failed' WHERE status IN ('running', 'verifying')");
+
+    // 创建一个导出，手动将其状态设为 running（模拟异常退出残留）
+    QString artifactId = service.exportModel(m_modelVersionId, "onnx", "{}");
+    QVERIFY(!artifactId.isEmpty());
+
+    QSqlQuery q(db);
+    q.prepare("UPDATE export_artifacts SET status = 'running' WHERE id = ?");
+    q.addBindValue(artifactId);
+    QVERIFY(q.exec());
+
+    // 再创建一个 verifying 状态的残留
+    QString artifactId2 = service.exportModel(m_modelVersionId, "pt", "{}");
+    QVERIFY(!artifactId2.isEmpty());
+    q.prepare("UPDATE export_artifacts SET status = 'verifying' WHERE id = ?");
+    q.addBindValue(artifactId2);
+    QVERIFY(q.exec());
+
+    // 执行冷启动自检
+    int fixed = service.reconcileStaleExports();
+    QCOMPARE(fixed, 2);
+
+    // 验证状态已修正为 failed
+    QVariantMap status1 = service.getExportStatus(artifactId);
+    QCOMPARE(status1["status"].toString(), QString("failed"));
+
+    QVariantMap status2 = service.getExportStatus(artifactId2);
+    QCOMPARE(status2["status"].toString(), QString("failed"));
+
+    // 没有残留时返回 0
+    int fixedAgain = service.reconcileStaleExports();
+    QCOMPARE(fixedAgain, 0);
+}
+
+void TestExport::testListExportsNonexistentVersion()
+{
+    ExportService service;
+    QVariantList exports = service.listExports("nonexistent-version-id");
+    QVERIFY(exports.isEmpty());
+}
+
+void TestExport::testVerifyExportFailed()
+{
+    ExportService service;
+    QString artifactId = service.exportModel(m_modelVersionId, "onnx", "{}");
+    QVERIFY(!artifactId.isEmpty());
+
+    // 设为 failed 状态后不能验证
+    QVERIFY(service.updateExportStatus(artifactId, "failed"));
+    QVERIFY(!service.verifyExport(artifactId));
+}
+
+void TestExport::testUpdateExportStatusNonexistent()
+{
+    ExportService service;
+    // 不存在的 artifact 应返回 false
+    QVERIFY(!service.updateExportStatus("nonexistent-artifact-id", "succeeded"));
 }
 
 QTEST_MAIN(TestExport)

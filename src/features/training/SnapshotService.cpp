@@ -440,6 +440,7 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
     // 2b. 获取项目任务类型
     QString taskType = projectQuery.value(1).toString();
     bool isAnomaly = (taskType == QStringLiteral("anomaly"));
+    bool isClassify = (taskType == QStringLiteral("classify"));
 
     // 3. Define target snapshot directory
     QString cacheDir = projectRoot + QStringLiteral("/cache/snapshots");
@@ -452,6 +453,13 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
             !dir.mkpath(snapshotDir + QStringLiteral("/test/good")) ||
             !dir.mkpath(snapshotDir + QStringLiteral("/test/defective"))) {
             ltError(LT_LOG_TRAINING()) << "Failed to create anomaly physical folders for snapshot:" << snapshotDir;
+            return {};
+        }
+    } else if (isClassify) {
+        // 分类目录结构: train/ + val/（子目录在拷贝样本时按类别创建）
+        if (!dir.mkpath(snapshotDir + QStringLiteral("/train")) ||
+            !dir.mkpath(snapshotDir + QStringLiteral("/val"))) {
+            ltError(LT_LOG_TRAINING()) << "Failed to create classify physical folders for snapshot:" << snapshotDir;
             return {};
         }
     } else {
@@ -507,6 +515,16 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
                         dstImg = snapshotDir + QStringLiteral("/test/good/") + imgInfo.fileName();
                     }
                 }
+            } else if (isClassify) {
+                // 分类格式：train/类名/ 或 val/类名/（label_path 存储类别名）
+                QString className = srcLbl; // 分类数据集的 label_path 存储类别名
+                if (className.isEmpty()) {
+                    className = QStringLiteral("unknown");
+                }
+                // 创建类别子目录
+                QString classDir = snapshotDir + QStringLiteral("/") + splitName + QStringLiteral("/") + className;
+                dir.mkpath(classDir);
+                dstImg = classDir + QStringLiteral("/") + imgInfo.fileName();
             } else {
                 dstImg = snapshotDir + QStringLiteral("/images/") + splitName + QStringLiteral("/") + imgInfo.fileName();
             }
@@ -519,7 +537,7 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
                 return false;
             }
 
-            if (!isAnomaly) {
+            if (!isAnomaly && !isClassify) {
                 // YOLO 格式需要标签文件
                 if (!srcLbl.isEmpty()) {
                     QFileInfo lblInfo(srcLbl);
@@ -593,6 +611,23 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
         yamlFile.close();
 
         ltInfo(LT_LOG_TRAINING()) << "Anomaly snapshot prepared at:" << snapshotDir;
+        return yamlPath;
+    } else if (isClassify) {
+        // 分类类型：生成简洁的 data.yaml（Ultralytics 从目录结构自动推断类别）
+        QString yamlPath = snapshotDir + QStringLiteral("/data.yaml");
+        QFile yamlFile(yamlPath);
+        if (!yamlFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            ltError(LT_LOG_TRAINING()) << "Failed to create data.yaml file at" << yamlPath;
+            return {};
+        }
+
+        QTextStream out(&yamlFile);
+        out << "path: " << QDir(snapshotDir).absolutePath() << "\n";
+        out << "train: train\n";
+        out << "val: val\n";
+        yamlFile.close();
+
+        ltInfo(LT_LOG_TRAINING()) << "Classify snapshot prepared at:" << snapshotDir;
         return yamlPath;
     } else {
         // YOLO 类型：生成标准 data.yaml

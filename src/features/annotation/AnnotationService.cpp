@@ -568,7 +568,7 @@ QVariantList AnnotationService::listSamples(const QString &datasetId)
 
     QSqlQuery query(Database::instance().database());
     query.prepare("SELECT id, dataset_id, image_path, label_path, width, height, "
-                  "hash, validation_status, error_code "
+                  "hash, validation_status, error_code, split "
                   "FROM dataset_samples WHERE dataset_id = ? ORDER BY image_path");
     query.addBindValue(datasetId);
 
@@ -588,6 +588,7 @@ QVariantList AnnotationService::listSamples(const QString &datasetId)
         s[QStringLiteral("hash")]              = query.value(6);
         s[QStringLiteral("validationStatus")]  = query.value(7);
         s[QStringLiteral("errorCode")]         = query.value(8);
+        s[QStringLiteral("split")]             = query.value(9);
         result.append(s);
     }
 

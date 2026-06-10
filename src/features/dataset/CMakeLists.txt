@@ -15,6 +15,8 @@ qt_add_qml_module(labeltorch_dataset
         DatasetService.cpp
         ImportScanner.h
         ImportScanner.cpp
+        handlers/ClassifyFolderHandler.h
+        handlers/ClassifyFolderHandler.cpp
         ClassMappingService.h
         ClassMappingService.cpp
         DatasetModel.h

@@ -23,6 +23,16 @@ private slots:
     void testDeleteRun();
     void testDeleteRunningRunFails();
     void testUpdateRunStatus();
+    void testCreateRunInvalidJson();
+    void testCreateRunNonexistentProject();
+    void testStartNonDraftRun();
+    void testStopNonRunningRun();
+    void testStartNonexistentRun();
+    void testStopNonexistentRun();
+    void testDeleteNonexistentRun();
+    void testReconcileStaleRuns();
+    void testGetNonexistentRun();
+    void testListRunsEmptyProject();
 
 private:
     QString m_projectId;
@@ -230,6 +240,154 @@ void TestTraining::testUpdateRunStatus()
     QVariantMap details = service.getRun(runId);
     QCOMPARE(details["status"].toString(), QString("succeeded"));
     QVERIFY(!details["finishedAt"].toString().isEmpty());
+}
+
+// === 异常场景测试 ===
+
+void TestTraining::testCreateRunInvalidJson()
+{
+    // 无效的 JSON 配置应返回空字符串
+    TrainingService service;
+    service.setModelRegistry(nullptr);
+    QString runId = service.createRun(m_projectId, m_snapshotId, "not a json");
+    QVERIFY(runId.isEmpty());
+
+    // 空字符串也不是有效 JSON
+    runId = service.createRun(m_projectId, m_snapshotId, "");
+    QVERIFY(runId.isEmpty());
+
+    // 不完整的 JSON
+    runId = service.createRun(m_projectId, m_snapshotId, "{invalid");
+    QVERIFY(runId.isEmpty());
+}
+
+void TestTraining::testCreateRunNonexistentProject()
+{
+    // 不存在的项目 ID，SQLite 外键约束会阻止插入
+    TrainingService service;
+    service.setModelRegistry(nullptr);
+    QString config = R"({"model_family":"yolov8","epochs":10})";
+    QString runId = service.createRun("nonexistent-project-id", m_snapshotId, config);
+    // 外键约束失败应返回空字符串
+    QVERIFY(runId.isEmpty());
+}
+
+void TestTraining::testStartNonDraftRun()
+{
+    // 非 draft 状态的 run 不能启动
+    TrainingService service;
+    QString config = R"({"model_family":"yolov8","epochs":5})";
+    QString runId = service.createRun(m_projectId, m_snapshotId, config);
+    QVERIFY(!runId.isEmpty());
+
+    // 先启动一次，状态变为 running
+    QVERIFY(service.startTraining(runId));
+    QThreadPool::globalInstance()->waitForDone();
+    QCoreApplication::processEvents();
+
+    // 再次启动应失败
+    QVERIFY(!service.startTraining(runId));
+
+    // 停止后状态为 stopped，也不能启动
+    QVERIFY(service.stopTraining(runId));
+    QVERIFY(!service.startTraining(runId));
+}
+
+void TestTraining::testStopNonRunningRun()
+{
+    // 非 running 状态的 run 不能停止
+    TrainingService service;
+    QString config = R"({"model_family":"yolov8","epochs":5})";
+    QString runId = service.createRun(m_projectId, m_snapshotId, config);
+
+    // draft 状态不能停止
+    QVERIFY(!service.stopTraining(runId));
+}
+
+void TestTraining::testStartNonexistentRun()
+{
+    // 不存在的 run ID 应返回 false
+    TrainingService service;
+    QVERIFY(!service.startTraining("nonexistent-run-id"));
+}
+
+void TestTraining::testStopNonexistentRun()
+{
+    // 不存在的 run ID 应返回 false
+    TrainingService service;
+    QVERIFY(!service.stopTraining("nonexistent-run-id"));
+}
+
+void TestTraining::testDeleteNonexistentRun()
+{
+    // 不存在的 run ID 应返回 false
+    TrainingService service;
+    QVERIFY(!service.deleteRun("nonexistent-run-id"));
+}
+
+void TestTraining::testReconcileStaleRuns()
+{
+    // 测试冷启动自检：将残留的 running/preparing 状态修正为 stopped
+    TrainingService service;
+    service.setModelRegistry(nullptr);
+
+    // 先清理之前测试可能遗留的 running/preparing 记录
+    auto db = Database::instance().database();
+    QSqlQuery cleanup(db);
+    cleanup.exec("UPDATE training_runs SET status = 'stopped', finished_at = datetime('now') WHERE status IN ('running', 'preparing')");
+
+    // 创建一个 run 并启动
+    QString config = R"({"model_family":"yolov8","epochs":5})";
+    QString runId = service.createRun(m_projectId, m_snapshotId, config);
+    QVERIFY(!runId.isEmpty());
+    QVERIFY(service.startTraining(runId));
+    QThreadPool::globalInstance()->waitForDone();
+    QCoreApplication::processEvents();
+
+    // 手动将状态设为 running（模拟异常退出残留）
+    QSqlQuery q(db);
+    q.prepare("UPDATE training_runs SET status = 'running' WHERE id = ?");
+    q.addBindValue(runId);
+    QVERIFY(q.exec());
+
+    // 再创建一个 preparing 状态的残留
+    QString config2 = R"({"model_family":"yolov8","epochs":3})";
+    QString runId2 = service.createRun(m_projectId, m_snapshotId, config2);
+    QVERIFY(!runId2.isEmpty());
+    q.prepare("UPDATE training_runs SET status = 'preparing' WHERE id = ?");
+    q.addBindValue(runId2);
+    QVERIFY(q.exec());
+
+    // 执行冷启动自检
+    int fixed = service.reconcileStaleRuns();
+    QCOMPARE(fixed, 2);
+
+    // 验证状态已修正为 stopped
+    QVariantMap details1 = service.getRun(runId);
+    QCOMPARE(details1["status"].toString(), QString("stopped"));
+
+    QVariantMap details2 = service.getRun(runId2);
+    QCOMPARE(details2["status"].toString(), QString("stopped"));
+
+    // 没有残留时返回 0
+    int fixedAgain = service.reconcileStaleRuns();
+    QCOMPARE(fixedAgain, 0);
+}
+
+void TestTraining::testGetNonexistentRun()
+{
+    // 不存在的 run 应返回空 Map
+    TrainingService service;
+    QVariantMap details = service.getRun("nonexistent-run-id");
+    QVERIFY(details.isEmpty());
+}
+
+void TestTraining::testListRunsEmptyProject()
+{
+    // 不存在的项目应返回空列表
+    TrainingService service;
+    QVariantList runs = service.listRuns("nonexistent-project-id");
+    QVERIFY(runs.isEmpty());
 }
 
 QTEST_MAIN(TestTraining)

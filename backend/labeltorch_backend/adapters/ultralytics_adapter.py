@@ -175,8 +175,16 @@ class UltralyticsAdapter(TrainingAdapter):
                     epoch_data["loss"] = float(loss)
             if hasattr(trainer, 'metrics') and trainer.metrics:
                 metrics = trainer.metrics
+                # 检测/分割/姿态任务的指标
                 for key in ['metrics/mAP50(B)', 'metrics/mAP50-95(B)',
                             'metrics/precision(B)', 'metrics/recall(B)']:
+                    if key in metrics:
+                        short_key = key.replace('metrics/', '').replace('(B)', '')
+                        epoch_data[short_key] = float(metrics[key])
+                # 分类任务的指标（top1/top5 accuracy）
+                for key in ['metrics/top1(B)', 'metrics/top5(B)',
+                            'metrics/top1', 'metrics/top5',
+                            'top1', 'top5']:
                     if key in metrics:
                         short_key = key.replace('metrics/', '').replace('(B)', '')
                         epoch_data[short_key] = float(metrics[key])
@@ -337,6 +345,12 @@ class UltralyticsAdapter(TrainingAdapter):
                 if hasattr(box, 'mr'):
                     self._metrics["recall"] = float(box.mr)
 
+            # 分类任务指标
+            if hasattr(results, 'top1'):
+                self._metrics["top1"] = float(results.top1)
+            if hasattr(results, 'top5'):
+                self._metrics["top5"] = float(results.top5)
+
             # 记录训练保存目录
             if hasattr(results, 'save_dir'):
                 self._run_dir = str(results.save_dir)
@@ -361,9 +375,13 @@ class UltralyticsAdapter(TrainingAdapter):
 
         try:
             model = YOLO(weight_path)
+            # 根据模型类型调整默认 imgsz
+            default_imgsz = 640
+            if hasattr(model, 'task') and model.task == 'classify':
+                default_imgsz = 224
             export_path = model.export(
                 format=format,
-                imgsz=options.get("imgsz", 640),
+                imgsz=options.get("imgsz", default_imgsz),
                 opset=options.get("opset", 13),
                 dynamic=options.get("dynamic", True),
                 simplify=options.get("simplify", True),

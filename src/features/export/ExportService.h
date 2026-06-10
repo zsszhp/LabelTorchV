@@ -87,6 +87,23 @@ public:
      */
     int reconcileStaleExports();
 
+    /**
+     * @brief 导出测试报告为JSON文件
+     *
+     * 将模型版本的测试指标、混淆矩阵等数据导出为JSON报告文件，
+     * 保存到项目的exports目录下。
+     *
+     * @param projectId 项目ID
+     * @param modelVersionId 模型版本ID
+     * @param reportType 报告类型（训练报告/评估报告/对比报告）
+     * @param reportDataJson 报告数据JSON字符串
+     * @return 报告文件路径，失败返回空字符串
+     */
+    Q_INVOKABLE QString exportReport(const QString &projectId,
+                                      const QString &modelVersionId,
+                                      const QString &reportType,
+                                      const QString &reportDataJson);
+
 signals:
     /**
      * @brief Emitted when an export artifact's status changes.

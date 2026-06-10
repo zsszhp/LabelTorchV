@@ -51,8 +51,15 @@ Item {
                 var sample = samples[s]
                 sample.datasetName = ds.name
                 sample.datasetId = ds.id
+                // 从标签文件提取第一个类别索引（用于类别过滤）
+                if (sample.labelPath) {
+                    var annotations = annotationService.loadAnnotations(sample.labelPath)
+                    if (annotations && annotations.length > 0) {
+                        sample.classIndex = annotations[0].classIndex
+                    }
+                    annotated++
+                }
                 allSamples.push(sample)
-                if (sample.validationStatus === "annotated" || sample.labelPath) annotated++
             }
         }
         sampleListData = allSamples
@@ -69,10 +76,9 @@ Item {
             var filtered = []
             for (var i = 0; i < sampleListData.length; i++) {
                 var sample = sampleListData[i]
+                // 只保留包含选中类别的样本
                 if (sample.classIndex !== undefined && selectedClassIds.indexOf(sample.classIndex) >= 0) {
                     filtered.push(sample)
-                } else {
-                    filtered.push(sample)  // 暂时全部显示，后续可按标签文件内容过滤
                 }
             }
             filteredSamples = filtered

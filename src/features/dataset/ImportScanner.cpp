@@ -1,4 +1,7 @@
 #include "ImportScanner.h"
+#include "handlers/AnomalibHandler.h"
+#include "handlers/LabelMeJsonHandler.h"
+#include "handlers/ClassifyFolderHandler.h"
 #include "utils/Log.h"
 
 #include <QDir>
@@ -757,11 +760,17 @@ QVariantMap ImportScanner::scanFolder(const QString &folderPath)
         return result;
     }
 
-    // 按优先级依次探测：Anomalib → 嵌套 YOLO → 扁平结构
+    // 按优先级依次探测：Anomalib → 分类文件夹 → 嵌套 YOLO → 扁平结构
     QVariantMap anomalibResult = detectAnomalibLayout(folderPath);
     if (anomalibResult["isValid"].toBool()) {
         ltInfo(LT_LOG_DATASET()) << "scanFolder: detected Anomalib layout";
         return anomalibResult;
+    }
+
+    QVariantMap classifyResult = detectClassifyLayout(folderPath);
+    if (classifyResult["isValid"].toBool()) {
+        ltInfo(LT_LOG_DATASET()) << "scanFolder: detected classify folder layout";
+        return classifyResult;
     }
 
     QVariantMap nestedResult = detectNestedYoloLayout(folderPath);
@@ -1827,6 +1836,115 @@ QVariantMap ImportScanner::scanWithLabelMeJsonLabels(const QString &imageDir, co
                              << "unmatched images:" << unmatchedImages
                              << "unmatched labels:" << unmatchedLabels
                              << "categories:" << globalLabelToClassId.size();
+
+    return result;
+}
+
+QVariantMap ImportScanner::detectClassifyLayout(const QString &folderPath)
+{
+    ltTrace(LT_LOG_DATASET()) << "detectClassifyLayout folderPath=" << folderPath;
+
+    QVariantMap result;
+    result["isValid"] = false;
+
+    QDir rootDir(folderPath);
+    if (!rootDir.exists()) {
+        return result;
+    }
+
+    // 排除已知的数据集结构目录（这些不是类别目录）
+    static const QStringList excludeDirNames = {
+        QStringLiteral("images"),
+        QStringLiteral("labels"),
+        QStringLiteral("train"),
+        QStringLiteral("val"),
+        QStringLiteral("test"),
+        QStringLiteral("valid"),
+        QStringLiteral("annotations"),
+        QStringLiteral("cache"),
+        QStringLiteral("__pycache__"),
+        QStringLiteral(".git"),
+        QStringLiteral(".svn")
+    };
+
+    // 获取所有子目录
+    QFileInfoList subDirs = rootDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    QStringList classDirs;
+    int totalImages = 0;
+    QVariantMap classCounts;
+
+    for (const auto &subDir : subDirs) {
+        QString dirName = subDir.fileName();
+
+        // 跳过已知的数据集结构目录
+        if (excludeDirNames.contains(dirName.toLower())) {
+            continue;
+        }
+
+        // 检查子目录内是否有图片文件
+        QDir classDir(subDir.absoluteFilePath());
+        QFileInfoList images = collectImageFiles(classDir, false);
+
+        if (!images.isEmpty()) {
+            classDirs.append(dirName);
+            totalImages += images.size();
+            classCounts[dirName] = images.size();
+        }
+    }
+
+    // 至少需要2个类别目录才认为是分类布局
+    if (classDirs.size() < 2 || totalImages < 2) {
+        return result;
+    }
+
+    // 按名称排序，确保类别索引稳定
+    classDirs.sort();
+
+    // 构建 classIds 列表
+    QVariantList classIdList;
+    for (int i = 0; i < classDirs.size(); ++i) {
+        classIdList.append(i);
+    }
+
+    // 分类数据集特有的布局统计信息
+    QVariantMap layoutStats;
+    layoutStats["numClasses"] = classDirs.size();
+    layoutStats["classNames"] = classDirs;
+
+    result["isValid"] = true;
+    result["detectedFormat"] = QStringLiteral("classify_folder");
+    result["imageDir"] = folderPath;
+    result["labelDirOrPath"] = QString();
+    result["imageCount"] = totalImages;
+    result["labelCount"] = 0;
+    result["unmatchedImagesCount"] = 0;
+    result["classIds"] = classIdList;
+    result["classes"] = classCounts;
+    result["layoutStats"] = layoutStats;
+
+    ltInfo(LT_LOG_DATASET()) << "Classify folder layout detected: classes=" << classDirs.size()
+                             << "totalImages=" << totalImages;
+    return result;
+}
+
+QFileInfoList ImportScanner::collectImageFilesStatic(const QDir &dir, bool recursive)
+{
+    QFileInfoList result;
+    if (!dir.exists()) return result;
+
+    QFileInfoList entries = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    for (const auto &fi : entries) {
+        if (isImageFile(fi.fileName())) {
+            result.append(fi);
+        }
+    }
+
+    if (recursive) {
+        QFileInfoList subDirs = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const auto &subDir : subDirs) {
+            result.append(collectImageFilesStatic(QDir(subDir.absoluteFilePath()), true));
+        }
+    }
 
     return result;
 }

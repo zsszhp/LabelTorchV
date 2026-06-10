@@ -1,4 +1,5 @@
-// ImportPage.qml - V3 数据导入页面
+// ImportPage.qml - V4 数据导入页面
+// 布局：左侧数据集列表 Sidebar + 右侧导入操作区
 // 支持分别指定图片/标签路径、自动格式探测、步骤卡片式交互
 import QtQuick
 import QtQuick.Controls
@@ -109,1105 +110,1202 @@ Item {
         }
     }
 
-    ScrollView {
+    // === 主布局：左侧数据集列表 Sidebar + 右侧导入操作区 ===
+    SplitView {
         anchors.fill: parent
-        clip: true
-        contentWidth: availableWidth
+        orientation: Qt.Horizontal
         visible: appController.currentProjectId !== ""
 
-        ColumnLayout {
-            width: Math.max(root.width, 600)
-            anchors.margins: Theme.spacingXLarge
-            spacing: Theme.spacingLarge
+        handle: Rectangle {
+            implicitWidth: 4
+            color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
+            Behavior on color { ColorAnimation { duration: 150 } }
+        }
 
-            // 标题栏
-            RowLayout {
-                Layout.fillWidth: true
+        // 左侧数据集列表 Sidebar (240px)
+        Rectangle {
+            id: sidebar
+            SplitView.preferredWidth: Theme.sidebarWidth
+            SplitView.minimumWidth: Theme.sidebarMinWidth
+            SplitView.maximumWidth: 400
+            Layout.fillHeight: true
+            color: Theme.bgSide
 
-                Label {
-                    text: "数据导入"
-                    font.pixelSize: Theme.fontSizeDisplay
-                    font.bold: true
-                    color: Theme.textPrimary
-                    font.family: Theme.fontFamily
-                }
-
-                Item { Layout.fillWidth: true }
-
-                Button {
-                    text: "刷新"
-                    font.family: Theme.fontFamily
-                    onClicked: datasetModel.refresh()
-                }
-            }
-
-            // 未打开项目提示
-            Label {
-                visible: !appController.projectOpen
-                text: "请先打开一个项目再导入数据"
-                font.pixelSize: Theme.fontSizeNormal
-                font.family: Theme.fontFamily
-                color: Theme.accentError
-                Layout.fillWidth: true
-            }
-
-            // === 导入模式切换 ===
+            // 右侧分割线
             Rectangle {
-                visible: appController.projectOpen
-                Layout.fillWidth: true
-                implicitHeight: modeRow.implicitHeight + 24
-                color: Theme.bgCard
-                radius: Theme.radiusLarge
-
-                RowLayout {
-                    id: modeRow
-                    anchors.fill: parent
-                    anchors.margins: Theme.spacingNormal
-                    spacing: Theme.spacingNormal
-
-                    Label {
-                        text: "导入模式："
-                        font.pixelSize: Theme.fontSizeNormal
-                        font.bold: true
-                        font.family: Theme.fontFamily
-                        color: Theme.textPrimary
-                    }
-
-                    Button {
-                        id: autoBtn
-                        text: "单目录自动探测"
-                        font.family: Theme.fontFamily
-                        font.bold: root.importMode === "auto"
-                        background: Rectangle {
-                            color: {
-                                if (root.importMode === "auto") return Theme.primary
-                                return autoBtn.hovered ? Theme.bgHover : Theme.bgInput
-                            }
-                            radius: Theme.radiusSmall
-                            border.color: root.importMode === "auto" ? Theme.primaryGlow : (autoBtn.hovered ? Theme.primary : Theme.borderColor)
-                            border.width: 1
-                            
-                            layer.enabled: root.importMode === "auto" || autoBtn.hovered
-                            layer.effect: MultiEffect {
-                                shadowEnabled: true
-                                shadowColor: root.importMode === "auto" ? Theme.primaryGlow : Theme.primary
-                                shadowBlur: 0.15
-                            }
-                            
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                            Behavior on border.color { ColorAnimation { duration: 150 } }
-                        }
-                        contentItem: Label {
-                            text: autoBtn.text
-                            color: root.importMode === "auto" ? "#ffffff" : (autoBtn.hovered ? Theme.primaryGlow : Theme.textSecondary)
-                            font: autoBtn.font
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                        }
-                        onClicked: {
-                            root.importMode = "auto"
-                            root.scanResult = null
-                        }
-                    }
-
-                    Button {
-                        id: sepBtn
-                        text: "分别指定图片和标签路径"
-                        font.family: Theme.fontFamily
-                        font.bold: root.importMode === "separate"
-                        background: Rectangle {
-                            color: {
-                                if (root.importMode === "separate") return Theme.primary
-                                return sepBtn.hovered ? Theme.bgHover : Theme.bgInput
-                            }
-                            radius: Theme.radiusSmall
-                            border.color: root.importMode === "separate" ? Theme.primaryGlow : (sepBtn.hovered ? Theme.primary : Theme.borderColor)
-                            border.width: 1
-
-                            layer.enabled: root.importMode === "separate" || sepBtn.hovered
-                            layer.effect: MultiEffect {
-                                shadowEnabled: true
-                                shadowColor: root.importMode === "separate" ? Theme.primaryGlow : Theme.primary
-                                shadowBlur: 0.15
-                            }
-
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                            Behavior on border.color { ColorAnimation { duration: 150 } }
-                        }
-                        contentItem: Label {
-                            text: sepBtn.text
-                            color: root.importMode === "separate" ? "#ffffff" : (sepBtn.hovered ? Theme.primaryGlow : Theme.textSecondary)
-                            font: sepBtn.font
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                        }
-                        onClicked: {
-                            root.importMode = "separate"
-                            root.scanResult = null
-                        }
-                    }
-                }
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: 1
+                color: Theme.borderColor
             }
 
-            // === 步骤卡片区域 ===
-            Rectangle {
-                visible: appController.projectOpen
-                Layout.fillWidth: true
-                Layout.preferredHeight: stepContent.implicitHeight + 32
-                color: Theme.bgCard
-                radius: Theme.radiusLarge
+            ScrollView {
+                anchors.fill: parent
+                anchors.rightMargin: 1
+                clip: true
+                contentWidth: availableWidth
 
                 ColumnLayout {
-                    id: stepContent
-                    anchors.fill: parent
-                    anchors.margins: Theme.spacingLarge
-                    spacing: Theme.spacingLarge
+                    width: parent.width - 1
+                    spacing: 0
 
-                    // ====== 模式1: 单目录自动探测 ======
-                    ColumnLayout {
-                        visible: root.importMode === "auto"
+                    // 区块标题 "数据集列表" + 数量 + 刷新按钮
+                    RowLayout {
                         Layout.fillWidth: true
-                        spacing: Theme.spacingNormal
+                        Layout.topMargin: Theme.spacingNormal
+                        Layout.leftMargin: Theme.spacingNormal
+                        Layout.rightMargin: Theme.spacingNormal
+                        Layout.bottomMargin: Theme.spacingSmall
 
-                        Label {
-                            text: "步骤1：选择数据集根目录"
-                            font.pixelSize: Theme.fontSizeSubheading
-                            font.bold: true
+                        Text {
+                            text: "数据集列表"
+                            font.pixelSize: Theme.fontSizeNormal
+                            font.weight: Font.DemiBold
                             font.family: Theme.fontFamily
-                            color: Theme.textPrimary
+                            color: Theme.textMain
                         }
 
-                        // 拖拽区域
-                        Rectangle {
-                            id: dropArea
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 120
-                            color: dropAreaDrag.containsDrag ? Theme.bgSelected : (dropAreaMouse.containsMouse ? Theme.bgHover : Theme.bgInput)
-                            radius: Theme.radiusNormal
-                            border.color: dropAreaDrag.containsDrag ? Theme.primaryGlow : (dropAreaMouse.containsMouse ? Theme.primary : Theme.borderColor)
-                            border.width: 1
-
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                            Behavior on border.color { ColorAnimation { duration: 150 } }
-
-                            layer.enabled: dropAreaDrag.containsDrag || dropAreaMouse.containsMouse
-                            layer.effect: MultiEffect {
-                                shadowEnabled: true
-                                shadowColor: dropAreaDrag.containsDrag ? Theme.primaryGlow : Theme.primary
-                                shadowBlur: 0.2
-                            }
-
-                            DropArea {
-                                id: dropAreaDrag
-                                anchors.fill: parent
-                                onEntered: function(drag) {
-                                    if (drag.hasUrls) drag.accepted = true
-                                }
-                                onDropped: function(drop) {
-                                    if (drop.hasUrls) {
-                                        folderPathField.text = urlToPath(drop.urls[0])
-                                        root.selectedImagePath = folderPathField.text
-                                        startScanAuto()
-                                    }
-                                }
-                            }
-
-                            ColumnLayout {
-                                anchors.centerIn: parent
-                                spacing: Theme.spacingSmall
-
-                                Label {
-                                    text: "📁"
-                                    font.pixelSize: 32
-                                    Layout.alignment: Qt.AlignHCenter
-                                    scale: dropAreaMouse.containsMouse || dropAreaDrag.containsDrag ? 1.15 : 1.0
-                                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
-                                }
-
-                                Label {
-                                    text: "点击或拖拽文件夹到此处"
-                                    font.pixelSize: Theme.fontSizeNormal
-                                    font.family: Theme.fontFamily
-                                    color: dropAreaMouse.containsMouse || dropAreaDrag.containsDrag ? Theme.primaryGlow : Theme.textSecondary
-                                    Layout.alignment: Qt.AlignHCenter
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                }
-
-                                Label {
-                                    text: "支持 YOLO TXT / COCO JSON / LabelMe JSON / Anomalib 异常检测格式"
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    font.family: Theme.fontFamily
-                                    color: Theme.textMuted
-                                    Layout.alignment: Qt.AlignHCenter
-                                }
-                            }
-
-                            MouseArea {
-                                id: dropAreaMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                onClicked: folderDialog.open()
-                            }
-                        }
-
-                        // 路径输入行
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: Theme.spacingNormal
-
-                            TextField {
-                                id: folderPathField
-                                Layout.fillWidth: true
-                                placeholderText: "选择数据集根目录..."
-                                color: Theme.textPrimary
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeNormal
-                                background: Rectangle {
-                                    color: Theme.bgInput
-                                    radius: Theme.radiusSmall
-                                    border.color: folderPathField.activeFocus ? Theme.primaryGlow : (folderPathField.hovered ? Theme.primary : Theme.borderColor)
-                                    border.width: 1
-
-                                    layer.enabled: folderPathField.activeFocus || folderPathField.hovered
-                                    layer.effect: MultiEffect {
-                                        shadowEnabled: true
-                                        shadowColor: folderPathField.activeFocus ? Theme.primaryGlow : Theme.primary
-                                        shadowBlur: 0.15
-                                    }
-                                }
-                                onTextChanged: root.selectedImagePath = text
-                            }
-
-                            Button {
-                                id: browseAutoBtn
-                                text: "浏览"
-                                font.family: Theme.fontFamily
-                                background: Rectangle {
-                                    color: browseAutoBtn.hovered ? Theme.bgHover : Theme.bgInput
-                                    radius: Theme.radiusSmall
-                                    border.color: browseAutoBtn.hovered ? Theme.primaryGlow : Theme.borderColor
-                                    border.width: 1
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                    Behavior on border.color { ColorAnimation { duration: 150 } }
-                                }
-                                contentItem: Label {
-                                    text: browseAutoBtn.text
-                                    color: browseAutoBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
-                                    font: browseAutoBtn.font
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                }
-                                onClicked: folderDialog.open()
-                            }
-
-                            Button {
-                                id: analyzeAutoBtn
-                                text: "分析"
-                                enabled: folderPathField.text.trim().length > 0 && !root.isScanning
-                                font.family: Theme.fontFamily
-                                font.bold: true
-                                background: Rectangle {
-                                    color: analyzeAutoBtn.enabled ? (analyzeAutoBtn.hovered ? Theme.primaryGlow : Theme.primary) : Theme.bgCard
-                                    radius: Theme.radiusSmall
-                                    border.color: analyzeAutoBtn.enabled ? Theme.primaryGlow : Theme.borderColor
-                                    border.width: 1
-                                    
-                                    layer.enabled: analyzeAutoBtn.enabled && analyzeAutoBtn.hovered
-                                    layer.effect: MultiEffect {
-                                        shadowEnabled: true
-                                        shadowColor: Theme.primaryGlow
-                                        shadowBlur: 0.15
-                                    }
-                                    
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                    Behavior on border.color { ColorAnimation { duration: 150 } }
-                                }
-                                contentItem: Label {
-                                    text: analyzeAutoBtn.text
-                                    color: analyzeAutoBtn.enabled ? (analyzeAutoBtn.hovered ? Theme.bgMain : "#ffffff") : Theme.textDisabled
-                                    font: analyzeAutoBtn.font
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                }
-                                onClicked: startScanAuto()
-                            }
-                        }
-                    }
-
-                    // ====== 模式2: 分别指定图片和标签路径 ======
-                    ColumnLayout {
-                        visible: root.importMode === "separate"
-                        Layout.fillWidth: true
-                        spacing: Theme.spacingNormal
-
-                        Label {
-                            text: "步骤1：分别指定图片和标签路径"
-                            font.pixelSize: Theme.fontSizeSubheading
-                            font.bold: true
-                            font.family: Theme.fontFamily
-                            color: Theme.textPrimary
-                        }
-
-                        Label {
-                            text: "图片和标签可以在不同目录，系统会按文件名自动匹配。标签路径可留空（用于异常检测或待标注数据）。"
+                        Text {
+                            text: "(" + datasetModel.rowCount() + ")"
                             font.pixelSize: Theme.fontSizeCaption
                             font.family: Theme.fontFamily
                             color: Theme.textMuted
-                            Layout.fillWidth: true
-                            wrapMode: Text.WordWrap
                         }
 
-                        // 图片路径
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: Theme.spacingNormal
+                        Item { Layout.fillWidth: true }
 
-                            Label {
-                                text: "图片目录："
-                                font.pixelSize: Theme.fontSizeNormal
-                                font.family: Theme.fontFamily
-                                color: Theme.textPrimary
-                                Layout.preferredWidth: 80
+                        Button {
+                            implicitWidth: 24
+                            implicitHeight: 24
+                            background: Rectangle {
+                                color: parent.hovered ? Theme.bgHover : "transparent"
+                                radius: Theme.radiusSmall
                             }
-
-                            TextField {
-                                id: imagePathField
-                                Layout.fillWidth: true
-                                placeholderText: "选择图片目录（jpg/png/bmp/pbm等）..."
-                                color: Theme.textPrimary
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeNormal
-                                background: Rectangle {
-                                    color: Theme.bgInput
-                                    radius: Theme.radiusSmall
-                                    border.color: imagePathField.activeFocus ? Theme.primaryGlow : (imagePathField.hovered ? Theme.primary : Theme.borderColor)
-                                    border.width: 1
-
-                                    layer.enabled: imagePathField.activeFocus || imagePathField.hovered
-                                    layer.effect: MultiEffect {
-                                        shadowEnabled: true
-                                        shadowColor: imagePathField.activeFocus ? Theme.primaryGlow : Theme.primary
-                                        shadowBlur: 0.15
-                                    }
-                                }
-                                onTextChanged: root.selectedImagePath = text
-                            }
-
-                            Button {
-                                id: browseImgBtn
-                                text: "浏览"
-                                font.family: Theme.fontFamily
-                                background: Rectangle {
-                                    color: browseImgBtn.hovered ? Theme.bgHover : Theme.bgInput
-                                    radius: Theme.radiusSmall
-                                    border.color: browseImgBtn.hovered ? Theme.primaryGlow : Theme.borderColor
-                                    border.width: 1
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                    Behavior on border.color { ColorAnimation { duration: 150 } }
-                                }
-                                contentItem: Label {
-                                    text: browseImgBtn.text
-                                    color: browseImgBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
-                                    font: browseImgBtn.font
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                }
-                                onClicked: imageFolderDialog.open()
-                            }
-                        }
-
-                        // 标签路径
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: Theme.spacingNormal
-
-                            Label {
-                                text: "标签目录："
-                                font.pixelSize: Theme.fontSizeNormal
-                                font.family: Theme.fontFamily
-                                color: Theme.textSecondary
-                                Layout.preferredWidth: 80
-                            }
-
-                            TextField {
-                                id: labelPathField
-                                Layout.fillWidth: true
-                                placeholderText: "选择标签目录（txt/json），可留空..."
-                                color: Theme.textPrimary
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeNormal
-                                background: Rectangle {
-                                    color: Theme.bgInput
-                                    radius: Theme.radiusSmall
-                                    border.color: labelPathField.activeFocus ? Theme.primaryGlow : (labelPathField.hovered ? Theme.primary : Theme.borderColor)
-                                    border.width: 1
-
-                                    layer.enabled: labelPathField.activeFocus || labelPathField.hovered
-                                    layer.effect: MultiEffect {
-                                        shadowEnabled: true
-                                        shadowColor: labelPathField.activeFocus ? Theme.primaryGlow : Theme.primary
-                                        shadowBlur: 0.15
-                                    }
-                                }
-                                onTextChanged: root.selectedLabelPath = text
-                            }
-
-                            Button {
-                                id: browseLabelBtn
-                                text: "浏览"
-                                font.family: Theme.fontFamily
-                                background: Rectangle {
-                                    color: browseLabelBtn.hovered ? Theme.bgHover : Theme.bgInput
-                                    radius: Theme.radiusSmall
-                                    border.color: browseLabelBtn.hovered ? Theme.primaryGlow : Theme.borderColor
-                                    border.width: 1
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                    Behavior on border.color { ColorAnimation { duration: 150 } }
-                                }
-                                contentItem: Label {
-                                    text: browseLabelBtn.text
-                                    color: browseLabelBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
-                                    font: browseLabelBtn.font
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                }
-                                onClicked: labelFolderDialog.open()
-                            }
-
-                            Button {
-                                id: clearLabelBtn
-                                text: "清空"
-                                font.family: Theme.fontFamily
-                                background: Rectangle {
-                                    color: clearLabelBtn.hovered ? Theme.bgHover : Theme.bgInput
-                                    radius: Theme.radiusSmall
-                                    border.color: clearLabelBtn.hovered ? Theme.primaryGlow : Theme.borderColor
-                                    border.width: 1
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                    Behavior on border.color { ColorAnimation { duration: 150 } }
-                                }
-                                contentItem: Label {
-                                    text: clearLabelBtn.text
-                                    color: clearLabelBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
-                                    font: clearLabelBtn.font
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                }
-                                onClicked: {
-                                    labelPathField.clear()
-                                    root.selectedLabelPath = ""
-                                }
-                            }
-                        }
-
-                        // 分析按钮
-                        RowLayout {
-                            Layout.fillWidth: true
-
-                            Item { Layout.fillWidth: true }
-
-                            Button {
-                                id: analyzeBtn
-                                text: "分析匹配"
-                                enabled: imagePathField.text.trim().length > 0 && !root.isScanning
-                                font.family: Theme.fontFamily
+                            contentItem: Text {
+                                text: "↻"
+                                color: Theme.primaryGlow
+                                font.pixelSize: Theme.fontSizeSubheading
                                 font.bold: true
-                                background: Rectangle {
-                                    color: analyzeBtn.enabled ? (analyzeBtn.hovered ? Theme.primaryGlow : Theme.primary) : Theme.bgCard
-                                    radius: Theme.radiusSmall
-                                    border.color: analyzeBtn.enabled ? Theme.primaryGlow : Theme.borderColor
-                                    border.width: 1
-                                    
-                                    layer.enabled: analyzeBtn.enabled && analyzeBtn.hovered
-                                    layer.effect: MultiEffect {
-                                        shadowEnabled: true
-                                        shadowColor: Theme.primaryGlow
-                                        shadowBlur: 0.15
-                                    }
-                                    
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                    Behavior on border.color { ColorAnimation { duration: 150 } }
-                                }
-                                contentItem: Label {
-                                    text: analyzeBtn.text
-                                    color: analyzeBtn.enabled ? (analyzeBtn.hovered ? Theme.bgMain : "#ffffff") : Theme.textDisabled
-                                    font: analyzeBtn.font
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                }
-                                onClicked: startScanSeparate()
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
                             }
+                            onClicked: datasetModel.refresh()
                         }
                     }
 
-                    // 加载动画
-                    BusyIndicator {
-                        visible: root.isScanning
-                        running: root.isScanning
-                        Layout.alignment: Qt.AlignHCenter
-                        Layout.preferredHeight: 40
-                        Layout.preferredWidth: 40
-                    }
-
-                    Label {
-                        visible: root.isScanning
-                        text: "正在分析目录文件..."
-                        font.pixelSize: Theme.fontSizeNormal
-                        font.family: Theme.fontFamily
-                        color: Theme.textSecondary
-                        Layout.alignment: Qt.AlignHCenter
-                    }
-
-                    // === 步骤2：扫描结果预览 ===
-                    ColumnLayout {
-                        visible: root.scanResult !== null && !root.isScanning
+                    // 数据集列表
+                    ListView {
+                        id: datasetListView
                         Layout.fillWidth: true
-                        spacing: Theme.spacingNormal
+                        Layout.fillHeight: true
+                        clip: true
+                        spacing: 0
 
-                        Label {
-                            text: "步骤2：扫描结果预览"
-                            font.pixelSize: Theme.fontSizeSubheading
-                            font.bold: true
-                            font.family: Theme.fontFamily
-                            color: Theme.textPrimary
-                        }
+                        model: datasetModel
 
-                        // 格式徽章 + 匹配统计卡片
-                        Rectangle {
-                            Layout.fillWidth: true
-                            color: Theme.bgInput
-                            radius: Theme.radiusNormal
-                            border.color: Theme.borderColor
-                            border.width: 1
-                            implicitHeight: statsRow.implicitHeight + 24
-
-                            RowLayout {
-                                id: statsRow
-                                anchors.fill: parent
-                                anchors.margins: Theme.spacingNormal
-                                spacing: Theme.spacingXLarge
-
-                                // 格式徽章
-                                Rectangle {
-                                    Layout.alignment: Qt.AlignVCenter
-                                    Layout.preferredWidth: formatBadgeText.implicitWidth + 16
-                                    Layout.preferredHeight: 28
-                                    implicitWidth: formatBadgeText.implicitWidth + 16
-                                    implicitHeight: 28
-                                    radius: Theme.radiusSmall
-                                    color: {
-                                        var fmt = root.scanResult ? root.scanResult.detectedFormat : ""
-                                        if (fmt === "yolo_txt") return Theme.accentPrimary
-                                        if (fmt === "coco_json") return Theme.accentSecondary
-                                        if (fmt === "labelme_json") return Theme.accentWarning
-                                        if (fmt === "anomaly_unsupervised") return Theme.accentWarning
-                                        if (fmt === "image_only") return Theme.textMuted
-                                        return Theme.textMuted
-                                    }
-
-                                    Label {
-                                        id: formatBadgeText
-                                        anchors.centerIn: parent
-                                        text: {
-                                            var fmt = root.scanResult ? root.scanResult.detectedFormat : ""
-                                            if (fmt === "yolo_txt") return "YOLO 目标检测 (TXT)"
-                                            if (fmt === "coco_json") return "COCO 目标检测 (JSON)"
-                                            if (fmt === "labelme_json") return "LabelMe 标注 (JSON)"
-                                            if (fmt === "anomaly_unsupervised") return "Anomalib 异常检测"
-                                            if (fmt === "image_only") return "纯图片（无标签）"
-                                            return "未知格式"
-                                        }
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        font.bold: true
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textPrimary
-                                    }
-                                }
-
-                                // 图片总数
-                                ColumnLayout {
-                                    spacing: 2
-                                    Label {
-                                        text: "图片总数"
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textMuted
-                                    }
-                                    Label {
-                                        text: root.scanResult ? root.scanResult.imageCount : "0"
-                                        font.pixelSize: Theme.fontSizeLarge
-                                        font.bold: true
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textPrimary
-                                    }
-                                }
-
-                                // 已标注
-                                ColumnLayout {
-                                    visible: root.scanResult && root.scanResult.detectedFormat !== "anomaly_unsupervised" && root.scanResult.detectedFormat !== "image_only"
-                                    spacing: 2
-                                    Label {
-                                        text: "已标注"
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textMuted
-                                    }
-                                    Label {
-                                        text: root.scanResult ? (root.scanResult.labelCount || 0) : "0"
-                                        font.pixelSize: Theme.fontSizeLarge
-                                        font.bold: true
-                                        font.family: Theme.fontFamily
-                                        color: Theme.accentSuccess
-                                    }
-                                }
-
-                                // 未标注
-                                ColumnLayout {
-                                    visible: root.scanResult && root.scanResult.detectedFormat !== "anomaly_unsupervised" && root.scanResult.detectedFormat !== "image_only"
-                                    spacing: 2
-                                    Label {
-                                        text: "未标注"
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textMuted
-                                    }
-                                    Label {
-                                        text: root.scanResult ? (root.scanResult.unmatchedImagesCount || 0) : "0"
-                                        font.pixelSize: Theme.fontSizeLarge
-                                        font.bold: true
-                                        font.family: Theme.fontFamily
-                                        color: root.scanResult && root.scanResult.unmatchedImagesCount > 0 ? Theme.accentWarning : Theme.textPrimary
-                                    }
-                                }
-
-                                // 异常检测统计
-                                ColumnLayout {
-                                    visible: root.scanResult && root.scanResult.detectedFormat === "anomaly_unsupervised"
-                                    spacing: 2
-                                    Label {
-                                        text: "正常训练集"
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textMuted
-                                    }
-                                    Label {
-                                        text: root.scanResult && root.scanResult.layoutStats ? root.scanResult.layoutStats.trainGood : "0"
-                                        font.pixelSize: Theme.fontSizeLarge
-                                        font.bold: true
-                                        font.family: Theme.fontFamily
-                                        color: Theme.accentSuccess
-                                    }
-                                }
-
-                                ColumnLayout {
-                                    visible: root.scanResult && root.scanResult.detectedFormat === "anomaly_unsupervised" && root.scanResult.layoutStats && root.scanResult.layoutStats.testDefective > 0
-                                    spacing: 2
-                                    Label {
-                                        text: "异常测试集"
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textMuted
-                                    }
-                                    Label {
-                                        text: root.scanResult && root.scanResult.layoutStats ? root.scanResult.layoutStats.testDefective : "0"
-                                        font.pixelSize: Theme.fontSizeLarge
-                                        font.bold: true
-                                        font.family: Theme.fontFamily
-                                        color: Theme.accentError
-                                    }
-                                }
+                        delegate: Rectangle {
+                            id: listDelegate
+                            width: datasetListView.width
+                            height: 64
+                            color: {
+                                if (delegateMouse.containsMouse) return Theme.bgHover
+                                return "transparent"
                             }
-                        }
 
-                        // 类别列表（目标检测格式）
-                        Rectangle {
-                            visible: root.scanResult && root.scanResult.detectedFormat !== "anomaly_unsupervised" && root.scanResult.detectedFormat !== "image_only" && root.scanResult.classIds && root.scanResult.classIds.length > 0
-                            Layout.fillWidth: true
-                            implicitHeight: classFlow.implicitHeight + 24
-                            color: Theme.bgInput
-                            radius: Theme.radiusNormal
-                            border.color: Theme.borderColor
-                            border.width: 1
+                            // 左侧选中指示条
+                            Rectangle {
+                                visible: delegateMouse.containsMouse
+                                width: 3
+                                height: parent.height - 8
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                radius: 1.5
+                                color: Theme.primaryGlow
+                            }
 
+                            // 内容：名称 + 路径 + 格式徽章 + 状态 + 样本数 + 删除
                             ColumnLayout {
-                                id: classFlow
                                 anchors.fill: parent
-                                anchors.margins: Theme.spacingNormal
-                                spacing: Theme.spacingSmall
+                                anchors.leftMargin: 16
+                                anchors.rightMargin: 12
+                                anchors.topMargin: 8
+                                anchors.bottomMargin: 8
+                                spacing: 2
 
-                                Label {
-                                    text: "类别探测 (" + (root.scanResult && root.scanResult.classIds ? root.scanResult.classIds.length : 0) + "类)"
-                                    font.pixelSize: Theme.fontSizeNormal
-                                    font.bold: true
-                                    font.family: Theme.fontFamily
-                                    color: Theme.textPrimary
-                                }
-
-                                Flow {
+                                // 第一行：名称 + 格式徽章 + 状态灯
+                                RowLayout {
                                     Layout.fillWidth: true
                                     spacing: Theme.spacingSmall
 
-                                    Repeater {
-                                        model: root.scanResult && root.scanResult.classIds ? root.scanResult.classIds : []
+                                    Text {
+                                        text: model.name
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        font.weight: Font.DemiBold
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMain
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
 
-                                        Rectangle {
-                                            width: classTagText.implicitWidth + 16
-                                            height: 24
-                                            radius: Theme.radiusSmall
-                                            color: Theme.classColor(index)
+                                    // 格式徽章
+                                    Rectangle {
+                                        visible: model.format && model.format.length > 0
+                                        width: formatBadgeText.implicitWidth + 10
+                                        height: 18
+                                        radius: Theme.radiusSmall
+                                        color: {
+                                            if (model.format === "yolo_txt") return Theme.primary
+                                            if (model.format === "coco_json") return Theme.primaryGlow
+                                            if (model.format === "labelme_json") return Theme.warning
+                                            if (model.format === "anomaly_unsupervised") return Theme.warning
+                                            if (model.format === "classify_folder") return Theme.primaryGlow
+                                            if (model.format === "image_only") return Theme.textMuted
+                                            return Theme.textMuted
+                                        }
 
-                                            Label {
-                                                id: classTagText
-                                                anchors.centerIn: parent
-                                                text: {
-                                                    var classes = root.scanResult ? root.scanResult.classes : {}
-                                                    var name = classes[modelData] || ("class_" + modelData)
-                                                    return modelData + ": " + name
-                                                }
-                                                font.pixelSize: Theme.fontSizeCaption
-                                                font.family: Theme.fontFamily
-                                                color: Theme.textPrimary
+                                        Text {
+                                            id: formatBadgeText
+                                            anchors.centerIn: parent
+                                            text: {
+                                                if (model.format === "yolo_txt") return "YOLO"
+                                                if (model.format === "coco_json") return "COCO"
+                                                if (model.format === "labelme_json") return "LabelMe"
+                                                if (model.format === "anomaly_unsupervised") return "异常"
+                                                if (model.format === "classify_folder") return "分类"
+                                                if (model.format === "image_only") return "图片"
+                                                return model.format || ""
+                                            }
+                                            font.pixelSize: 10
+                                            font.family: Theme.fontFamily
+                                            color: (model.format === "coco_json") ? Theme.bgMain : Theme.textPrimary
+                                            font.bold: true
+                                        }
+                                    }
+
+                                    // 状态指示灯
+                                    Rectangle {
+                                        width: 8
+                                        height: 8
+                                        radius: 4
+                                        Layout.alignment: Qt.AlignVCenter
+                                        color: model.importStatus === "completed" ? Theme.success :
+                                               model.importStatus === "failed" ? Theme.danger : Theme.warning
+                                    }
+                                }
+
+                                // 第二行：样本数 + 状态文字 + 删除按钮
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.spacingSmall
+
+                                    Text {
+                                        text: model.sampleCount + " 张"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMuted
+                                    }
+
+                                    Text {
+                                        text: {
+                                            if (model.importStatus === "completed") return "已完成"
+                                            if (model.importStatus === "failed") return "失败"
+                                            if (model.importStatus === "scanning") return "扫描中"
+                                            if (model.importStatus === "importing") return "导入中"
+                                            return model.importStatus
+                                        }
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textMuted
+                                    }
+
+                                    Item { Layout.fillWidth: true }
+
+                                    // 删除按钮
+                                    Rectangle {
+                                        width: 20
+                                        height: 20
+                                        radius: Theme.radiusSmall
+                                        color: deleteBtnMouse.containsMouse ? Theme.danger : "transparent"
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "×"
+                                            font.pixelSize: Theme.fontSizeCaption
+                                            font.family: Theme.fontFamily
+                                            color: deleteBtnMouse.containsMouse ? "#ffffff" : Theme.textMuted
+                                        }
+
+                                        MouseArea {
+                                            id: deleteBtnMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                datasetService.deleteDataset(model.datasetId)
+                                                datasetModel.refresh()
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
 
-                        // 错误提示
-                        Rectangle {
-                            visible: root.scanResult && root.scanResult.error && root.scanResult.error.length > 0
-                            Layout.fillWidth: true
-                            height: 48
-                            color: Theme.bgInput
-                            radius: Theme.radiusSmall
-                            border.color: Theme.accentError
-                            border.width: 1
-
-                            Label {
+                            MouseArea {
+                                id: delegateMouse
                                 anchors.fill: parent
-                                anchors.margins: Theme.spacingNormal
-                                text: root.scanResult ? root.scanResult.error : ""
-                                font.pixelSize: Theme.fontSizeNormal
-                                font.family: Theme.fontFamily
-                                color: Theme.accentError
-                                wrapMode: Text.WordWrap
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                        }
-
-                        // 数据集名称 + 确认导入
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: Theme.spacingNormal
-
-                            Label {
-                                text: "数据集名称"
-                                font.pixelSize: Theme.fontSizeNormal
-                                font.family: Theme.fontFamily
-                                color: Theme.textPrimary
-                            }
-
-                            TextField {
-                                id: datasetNameField
-                                Layout.fillWidth: true
-                                placeholderText: "输入数据集名称"
-                                color: Theme.textPrimary
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeNormal
-                                text: root.scanResult ? extractFolderName(root.selectedImagePath) : ""
-                                background: Rectangle {
-                                    color: Theme.bgInput
-                                    radius: Theme.radiusSmall
-                                    border.color: datasetNameField.activeFocus ? Theme.primaryGlow : (datasetNameField.hovered ? Theme.primary : Theme.borderColor)
-                                    border.width: 1
-
-                                    layer.enabled: datasetNameField.activeFocus || datasetNameField.hovered
-                                    layer.effect: MultiEffect {
-                                        shadowEnabled: true
-                                        shadowColor: datasetNameField.activeFocus ? Theme.primaryGlow : Theme.primary
-                                        shadowBlur: 0.15
-                                    }
-                                }
-                            }
-
-                            Button {
-                                id: confirmImportBtn
-                                text: "确认导入"
-                                enabled: root.scanResult
-                                         && root.scanResult.isValid
-                                         && datasetNameField.text.trim().length > 0
-                                         && !root.isScanning
-                                font.family: Theme.fontFamily
-                                font.bold: true
-                                background: Rectangle {
-                                    color: confirmImportBtn.enabled ? (confirmImportBtn.hovered ? Theme.primaryGlow : Theme.primary) : Theme.bgCard
-                                    radius: Theme.radiusSmall
-                                    border.color: confirmImportBtn.enabled ? Theme.primaryGlow : Theme.borderColor
-                                    border.width: 1
-
-                                    layer.enabled: confirmImportBtn.enabled && confirmImportBtn.hovered
-                                    layer.effect: MultiEffect {
-                                        shadowEnabled: true
-                                        shadowColor: Theme.primaryGlow
-                                        shadowBlur: 0.15
-                                    }
-
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                    Behavior on border.color { ColorAnimation { duration: 150 } }
-                                }
-                                contentItem: Label {
-                                    text: confirmImportBtn.text
-                                    color: confirmImportBtn.enabled ? (confirmImportBtn.hovered ? Theme.bgMain : "#ffffff") : Theme.textDisabled
-                                    font: confirmImportBtn.font
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                }
-                                onClicked: {
-                                    var dsId = ""
-                                    var format = root.scanResult ? root.scanResult.detectedFormat : ""
-                                    var count = root.scanResult ? (root.scanResult.imageCount || 0) : 0
-                                    var name = datasetNameField.text.trim()
-
-                                    if (root.importMode === "separate") {
-                                        dsId = datasetService.importDatasetSeparate(
-                                            appController.currentProjectId,
-                                            name,
-                                            root.selectedImagePath,
-                                            root.selectedLabelPath
-                                        )
-                                    } else {
-                                        dsId = datasetService.importDatasetV2(
-                                            appController.currentProjectId,
-                                            name,
-                                            root.selectedImagePath,
-                                            format,
-                                            root.scanResult.labelDirOrPath ? root.scanResult.labelDirOrPath : "",
-                                            true
-                                        )
-                                    }
-                                    if (dsId && dsId.length > 0) {
-                                        root.lastImportedDatasetId = dsId
-                                        datasetModel.refresh()
-                                        
-                                        var formatStr = "未知格式"
-                                        if (format === "yolo_txt") formatStr = "YOLO TXT"
-                                        else if (format === "coco_json") formatStr = "COCO JSON"
-                                        else if (format === "labelme_json") formatStr = "LabelMe JSON"
-                                        else if (format === "anomaly_unsupervised") formatStr = "无监督异常检测"
-                                        else if (format === "image_only") formatStr = "纯图片"
-
-                                        importSuccessMsg.text = "数据集: " + name + "\n格式: " + formatStr + "\n样本数量: " + count + " 张图片"
-                                        importSuccessDialog.open()
-
-                                        root.scanResult = null
-                                        folderPathField.clear()
-                                        imagePathField.clear()
-                                        labelPathField.clear()
-                                        datasetNameField.clear()
-                                        root.selectedImagePath = ""
-                                        root.selectedLabelPath = ""
-                                    } else {
-                                        // 导入失败，显示错误提示
-                                        importErrorLabel.visible = true
-                                        importErrorLabel.text = "导入失败，请检查路径和格式是否正确"
-                                    }
-                                }
-                            }
-
-                            Label {
-                                id: importErrorLabel
-                                visible: false
-                                color: Theme.accentError
-                                font.pixelSize: Theme.fontSizeCaption
-                                font.family: Theme.fontFamily
+                                hoverEnabled: true
+                                acceptedButtons: Qt.NoButton
                             }
                         }
                     }
                 }
             }
+        }
 
-            // 已导入数据集列表
-            Label {
-                visible: appController.projectOpen
-                text: "已导入数据集"
-                font.pixelSize: Theme.fontSizeLarge
-                font.bold: true
-                font.family: Theme.fontFamily
-                color: Theme.textPrimary
-            }
+        // 右侧导入操作区
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            color: Theme.bgMain
 
-            ColumnLayout {
-                visible: appController.projectOpen
-                Layout.fillWidth: true
-                spacing: Theme.spacingSmall
+            ScrollView {
+                anchors.fill: parent
+                clip: true
+                contentWidth: availableWidth
 
-                Repeater {
-                    model: datasetModel
-                    delegate: Rectangle {
-                        id: listDelegateRect
+                ColumnLayout {
+                    width: Math.max(parent.width - Theme.spacingXLarge * 2, 500)
+                    x: Theme.spacingXLarge
+                    y: Theme.spacingXLarge
+                    spacing: Theme.spacingLarge
+
+                    // 标题栏
+                    RowLayout {
                         Layout.fillWidth: true
-                        height: 72
-                        color: hovered ? Theme.bgHover : (index % 2 === 0 ? Theme.bgCard : Theme.bgInput)
-                        radius: Theme.radiusNormal
-                        border.color: hovered ? Theme.primaryGlow : Theme.borderColor
-                        border.width: 1
 
-                        property bool hovered: mouseArea.containsMouse
-
-                        Behavior on color { ColorAnimation { duration: 150 } }
-                        Behavior on border.color { ColorAnimation { duration: 150 } }
-
-                        layer.enabled: hovered
-                        layer.effect: MultiEffect {
-                            shadowEnabled: true
-                            shadowColor: Theme.primaryGlow
-                            shadowBlur: 0.15
+                        Label {
+                            text: "数据导入"
+                            font.pixelSize: Theme.fontSizeDisplay
+                            font.bold: true
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
                         }
 
-                        MouseArea {
-                            id: mouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            acceptedButtons: Qt.NoButton
-                        }
+                        Item { Layout.fillWidth: true }
+                    }
+
+                    // 未打开项目提示
+                    Label {
+                        visible: !appController.projectOpen
+                        text: "请先打开一个项目再导入数据"
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.family: Theme.fontFamily
+                        color: Theme.accentError
+                        Layout.fillWidth: true
+                    }
+
+                    // === 导入模式切换 ===
+                    Rectangle {
+                        visible: appController.projectOpen
+                        Layout.fillWidth: true
+                        implicitHeight: modeRow.implicitHeight + 24
+                        color: Theme.bgCard
+                        radius: Theme.radiusLarge
 
                         RowLayout {
+                            id: modeRow
                             anchors.fill: parent
                             anchors.margins: Theme.spacingNormal
                             spacing: Theme.spacingNormal
 
-                            Column {
-                                Layout.fillWidth: true
-                                Label {
-                                    text: model.name
-                                    font.bold: true
-                                    font.pixelSize: Theme.fontSizeNormal
-                                    font.family: Theme.fontFamily
-                                    color: Theme.textPrimary
-                                }
-                                Label {
-                                    text: model.imageRoot
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    font.family: Theme.fontFamily
-                                    color: Theme.textMuted
-                                    elide: Text.ElideMiddle
-                                    width: parent.width
-                                }
-                            }
-
-                            // 格式徽章
-                            Rectangle {
-                                visible: model.format && model.format.length > 0
-                                width: formatText.implicitWidth + 12
-                                height: 20
-                                radius: Theme.radiusSmall
-                                color: {
-                                    if (model.format === "yolo_txt") return Theme.primary
-                                    if (model.format === "coco_json") return Theme.primaryGlow
-                                    if (model.format === "labelme_json") return Theme.warning
-                                    if (model.format === "anomaly_unsupervised") return Theme.warning
-                                    if (model.format === "image_only") return Theme.textMuted
-                                    return Theme.textMuted
-                                }
-
-                                Label {
-                                    id: formatText
-                                    anchors.centerIn: parent
-                                    text: {
-                                        if (model.format === "yolo_txt") return "YOLO TXT"
-                                        if (model.format === "coco_json") return "COCO JSON"
-                                        if (model.format === "labelme_json") return "LabelMe"
-                                        if (model.format === "anomaly_unsupervised") return "异常检测"
-                                        if (model.format === "image_only") return "纯图片"
-                                        return model.format || ""
-                                    }
-                                    font.pixelSize: 10
-                                    font.family: Theme.fontFamily
-                                    color: (model.format === "coco_json") ? Theme.bgMain : Theme.textPrimary
-                                    font.bold: true
-                                }
-                            }
-
-                            // 状态指示灯
-                            Item {
-                                width: 16
-                                height: 16
-                                Layout.alignment: Qt.AlignVCenter
-
-                                Rectangle {
-                                    id: statusLed
-                                    anchors.centerIn: parent
-                                    width: 10
-                                    height: 10
-                                    radius: 5
-                                    color: model.importStatus === "completed" ? Theme.success :
-                                           model.importStatus === "failed" ? Theme.danger : Theme.warning
-                                    
-                                    Rectangle {
-                                        anchors.centerIn: parent
-                                        width: parent.width + 4
-                                        height: parent.height + 4
-                                        radius: width / 2
-                                        color: parent.color
-                                        opacity: 0.3
-                                    }
-                                }
-                            }
-
                             Label {
-                                text: model.sampleCount + " 张"
-                                font.pixelSize: Theme.fontSizeCaption
+                                text: "导入模式："
+                                font.pixelSize: Theme.fontSizeNormal
+                                font.bold: true
                                 font.family: Theme.fontFamily
-                                color: Theme.textSecondary
-                            }
-
-                            Label {
-                                text: {
-                                    if (model.importStatus === "completed") return "已完成"
-                                    if (model.importStatus === "failed") return "失败"
-                                    if (model.importStatus === "scanning") return "扫描中"
-                                    if (model.importStatus === "importing") return "导入中"
-                                    return model.importStatus
-                                }
-                                font.pixelSize: Theme.fontSizeCaption
-                                font.family: Theme.fontFamily
-                                color: Theme.textMuted
+                                color: Theme.textPrimary
                             }
 
                             Button {
-                                id: deleteBtn
-                                text: "删除"
+                                id: autoBtn
+                                text: "单目录自动探测"
                                 font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSmall
+                                font.bold: root.importMode === "auto"
                                 background: Rectangle {
-                                    color: deleteBtn.hovered ? Theme.danger : "transparent"
+                                    color: {
+                                        if (root.importMode === "auto") return Theme.primary
+                                        return autoBtn.hovered ? Theme.bgHover : Theme.bgInput
+                                    }
                                     radius: Theme.radiusSmall
-                                    border.color: deleteBtn.hovered ? Theme.danger : Theme.borderColor
+                                    border.color: root.importMode === "auto" ? Theme.primaryGlow : (autoBtn.hovered ? Theme.primary : Theme.borderColor)
                                     border.width: 1
+
+                                    layer.enabled: root.importMode === "auto" || autoBtn.hovered
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: root.importMode === "auto" ? Theme.primaryGlow : Theme.primary
+                                        shadowBlur: 0.15
+                                    }
+
                                     Behavior on color { ColorAnimation { duration: 150 } }
                                     Behavior on border.color { ColorAnimation { duration: 150 } }
                                 }
                                 contentItem: Label {
-                                    text: deleteBtn.text
-                                    color: deleteBtn.hovered ? "#ffffff" : Theme.textSecondary
-                                    font: deleteBtn.font
+                                    text: autoBtn.text
+                                    color: root.importMode === "auto" ? "#ffffff" : (autoBtn.hovered ? Theme.primaryGlow : Theme.textSecondary)
+                                    font: autoBtn.font
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                     Behavior on color { ColorAnimation { duration: 150 } }
                                 }
                                 onClicked: {
-                                    datasetService.deleteDataset(model.datasetId)
-                                    datasetModel.refresh()
+                                    root.importMode = "auto"
+                                    root.scanResult = null
+                                }
+                            }
+
+                            Button {
+                                id: sepBtn
+                                text: "分别指定图片和标签路径"
+                                font.family: Theme.fontFamily
+                                font.bold: root.importMode === "separate"
+                                background: Rectangle {
+                                    color: {
+                                        if (root.importMode === "separate") return Theme.primary
+                                        return sepBtn.hovered ? Theme.bgHover : Theme.bgInput
+                                    }
+                                    radius: Theme.radiusSmall
+                                    border.color: root.importMode === "separate" ? Theme.primaryGlow : (sepBtn.hovered ? Theme.primary : Theme.borderColor)
+                                    border.width: 1
+
+                                    layer.enabled: root.importMode === "separate" || sepBtn.hovered
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: root.importMode === "separate" ? Theme.primaryGlow : Theme.primary
+                                        shadowBlur: 0.15
+                                    }
+
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Behavior on border.color { ColorAnimation { duration: 150 } }
+                                }
+                                contentItem: Label {
+                                    text: sepBtn.text
+                                    color: root.importMode === "separate" ? "#ffffff" : (sepBtn.hovered ? Theme.primaryGlow : Theme.textSecondary)
+                                    font: sepBtn.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
+                                onClicked: {
+                                    root.importMode = "separate"
+                                    root.scanResult = null
+                                }
+                            }
+                        }
+                    }
+
+                    // === 步骤卡片区域 ===
+                    Rectangle {
+                        visible: appController.projectOpen
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: stepContent.implicitHeight + 32
+                        color: Theme.bgCard
+                        radius: Theme.radiusLarge
+
+                        ColumnLayout {
+                            id: stepContent
+                            anchors.fill: parent
+                            anchors.margins: Theme.spacingLarge
+                            spacing: Theme.spacingLarge
+
+                            // ====== 模式1: 单目录自动探测 ======
+                            ColumnLayout {
+                                visible: root.importMode === "auto"
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingNormal
+
+                                Label {
+                                    text: "步骤1：选择数据集根目录"
+                                    font.pixelSize: Theme.fontSizeSubheading
+                                    font.bold: true
+                                    font.family: Theme.fontFamily
+                                    color: Theme.textPrimary
+                                }
+
+                                // 拖拽区域
+                                Rectangle {
+                                    id: dropArea
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 120
+                                    color: dropAreaDrag.containsDrag ? Theme.bgSelected : (dropAreaMouse.containsMouse ? Theme.bgHover : Theme.bgInput)
+                                    radius: Theme.radiusNormal
+                                    border.color: dropAreaDrag.containsDrag ? Theme.primaryGlow : (dropAreaMouse.containsMouse ? Theme.primary : Theme.borderColor)
+                                    border.width: 1
+
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                                    layer.enabled: dropAreaDrag.containsDrag || dropAreaMouse.containsMouse
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: dropAreaDrag.containsDrag ? Theme.primaryGlow : Theme.primary
+                                        shadowBlur: 0.2
+                                    }
+
+                                    DropArea {
+                                        id: dropAreaDrag
+                                        anchors.fill: parent
+                                        onEntered: function(drag) {
+                                            if (drag.hasUrls) drag.accepted = true
+                                        }
+                                        onDropped: function(drop) {
+                                            if (drop.hasUrls) {
+                                                folderPathField.text = urlToPath(drop.urls[0])
+                                                root.selectedImagePath = folderPathField.text
+                                                startScanAuto()
+                                            }
+                                        }
+                                    }
+
+                                    ColumnLayout {
+                                        anchors.centerIn: parent
+                                        spacing: Theme.spacingSmall
+
+                                        Label {
+                                            text: "📁"
+                                            font.pixelSize: 32
+                                            Layout.alignment: Qt.AlignHCenter
+                                            scale: dropAreaMouse.containsMouse || dropAreaDrag.containsDrag ? 1.15 : 1.0
+                                            Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
+                                        }
+
+                                        Label {
+                                            text: "点击或拖拽文件夹到此处"
+                                            font.pixelSize: Theme.fontSizeNormal
+                                            font.family: Theme.fontFamily
+                                            color: dropAreaMouse.containsMouse || dropAreaDrag.containsDrag ? Theme.primaryGlow : Theme.textSecondary
+                                            Layout.alignment: Qt.AlignHCenter
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                        }
+
+                                        Label {
+                                            text: "支持 YOLO TXT / COCO JSON / LabelMe JSON / Anomalib 异常检测格式"
+                                            font.pixelSize: Theme.fontSizeCaption
+                                            font.family: Theme.fontFamily
+                                            color: Theme.textMuted
+                                            Layout.alignment: Qt.AlignHCenter
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: dropAreaMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        onClicked: folderDialog.open()
+                                    }
+                                }
+
+                                // 路径输入行
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.spacingNormal
+
+                                    TextField {
+                                        id: folderPathField
+                                        Layout.fillWidth: true
+                                        placeholderText: "选择数据集根目录..."
+                                        color: Theme.textPrimary
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeNormal
+                                        background: Rectangle {
+                                            color: Theme.bgInput
+                                            radius: Theme.radiusSmall
+                                            border.color: folderPathField.activeFocus ? Theme.primaryGlow : (folderPathField.hovered ? Theme.primary : Theme.borderColor)
+                                            border.width: 1
+
+                                            layer.enabled: folderPathField.activeFocus || folderPathField.hovered
+                                            layer.effect: MultiEffect {
+                                                shadowEnabled: true
+                                                shadowColor: folderPathField.activeFocus ? Theme.primaryGlow : Theme.primary
+                                                shadowBlur: 0.15
+                                            }
+                                        }
+                                        onTextChanged: root.selectedImagePath = text
+                                    }
+
+                                    Button {
+                                        id: browseAutoBtn
+                                        text: "浏览"
+                                        font.family: Theme.fontFamily
+                                        background: Rectangle {
+                                            color: browseAutoBtn.hovered ? Theme.bgHover : Theme.bgInput
+                                            radius: Theme.radiusSmall
+                                            border.color: browseAutoBtn.hovered ? Theme.primaryGlow : Theme.borderColor
+                                            border.width: 1
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                        }
+                                        contentItem: Label {
+                                            text: browseAutoBtn.text
+                                            color: browseAutoBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
+                                            font: browseAutoBtn.font
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                        }
+                                        onClicked: folderDialog.open()
+                                    }
+
+                                    Button {
+                                        id: analyzeAutoBtn
+                                        text: "分析"
+                                        enabled: folderPathField.text.trim().length > 0 && !root.isScanning
+                                        font.family: Theme.fontFamily
+                                        font.bold: true
+                                        background: Rectangle {
+                                            color: analyzeAutoBtn.enabled ? (analyzeAutoBtn.hovered ? Theme.primaryGlow : Theme.primary) : Theme.bgCard
+                                            radius: Theme.radiusSmall
+                                            border.color: analyzeAutoBtn.enabled ? Theme.primaryGlow : Theme.borderColor
+                                            border.width: 1
+
+                                            layer.enabled: analyzeAutoBtn.enabled && analyzeAutoBtn.hovered
+                                            layer.effect: MultiEffect {
+                                                shadowEnabled: true
+                                                shadowColor: Theme.primaryGlow
+                                                shadowBlur: 0.15
+                                            }
+
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                        }
+                                        contentItem: Label {
+                                            text: analyzeAutoBtn.text
+                                            color: analyzeAutoBtn.enabled ? (analyzeAutoBtn.hovered ? Theme.bgMain : "#ffffff") : Theme.textDisabled
+                                            font: analyzeAutoBtn.font
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                        }
+                                        onClicked: startScanAuto()
+                                    }
+                                }
+                            }
+
+                            // ====== 模式2: 分别指定图片和标签路径 ======
+                            ColumnLayout {
+                                visible: root.importMode === "separate"
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingNormal
+
+                                Label {
+                                    text: "步骤1：分别指定图片和标签路径"
+                                    font.pixelSize: Theme.fontSizeSubheading
+                                    font.bold: true
+                                    font.family: Theme.fontFamily
+                                    color: Theme.textPrimary
+                                }
+
+                                Label {
+                                    text: "图片和标签可以在不同目录，系统会按文件名自动匹配。标签路径可留空（用于异常检测或待标注数据）。"
+                                    font.pixelSize: Theme.fontSizeCaption
+                                    font.family: Theme.fontFamily
+                                    color: Theme.textMuted
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                // 图片路径
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.spacingNormal
+
+                                    Label {
+                                        text: "图片目录："
+                                        font.pixelSize: Theme.fontSizeNormal
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textPrimary
+                                        Layout.preferredWidth: 80
+                                    }
+
+                                    TextField {
+                                        id: imagePathField
+                                        Layout.fillWidth: true
+                                        placeholderText: "选择图片目录（jpg/png/bmp/pbm等）..."
+                                        color: Theme.textPrimary
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeNormal
+                                        background: Rectangle {
+                                            color: Theme.bgInput
+                                            radius: Theme.radiusSmall
+                                            border.color: imagePathField.activeFocus ? Theme.primaryGlow : (imagePathField.hovered ? Theme.primary : Theme.borderColor)
+                                            border.width: 1
+
+                                            layer.enabled: imagePathField.activeFocus || imagePathField.hovered
+                                            layer.effect: MultiEffect {
+                                                shadowEnabled: true
+                                                shadowColor: imagePathField.activeFocus ? Theme.primaryGlow : Theme.primary
+                                                shadowBlur: 0.15
+                                            }
+                                        }
+                                        onTextChanged: root.selectedImagePath = text
+                                    }
+
+                                    Button {
+                                        id: browseImgBtn
+                                        text: "浏览"
+                                        font.family: Theme.fontFamily
+                                        background: Rectangle {
+                                            color: browseImgBtn.hovered ? Theme.bgHover : Theme.bgInput
+                                            radius: Theme.radiusSmall
+                                            border.color: browseImgBtn.hovered ? Theme.primaryGlow : Theme.borderColor
+                                            border.width: 1
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                        }
+                                        contentItem: Label {
+                                            text: browseImgBtn.text
+                                            color: browseImgBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
+                                            font: browseImgBtn.font
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                        }
+                                        onClicked: imageFolderDialog.open()
+                                    }
+                                }
+
+                                // 标签路径
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.spacingNormal
+
+                                    Label {
+                                        text: "标签目录："
+                                        font.pixelSize: Theme.fontSizeNormal
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textSecondary
+                                        Layout.preferredWidth: 80
+                                    }
+
+                                    TextField {
+                                        id: labelPathField
+                                        Layout.fillWidth: true
+                                        placeholderText: "选择标签目录（txt/json），可留空..."
+                                        color: Theme.textPrimary
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeNormal
+                                        background: Rectangle {
+                                            color: Theme.bgInput
+                                            radius: Theme.radiusSmall
+                                            border.color: labelPathField.activeFocus ? Theme.primaryGlow : (labelPathField.hovered ? Theme.primary : Theme.borderColor)
+                                            border.width: 1
+
+                                            layer.enabled: labelPathField.activeFocus || labelPathField.hovered
+                                            layer.effect: MultiEffect {
+                                                shadowEnabled: true
+                                                shadowColor: labelPathField.activeFocus ? Theme.primaryGlow : Theme.primary
+                                                shadowBlur: 0.15
+                                            }
+                                        }
+                                        onTextChanged: root.selectedLabelPath = text
+                                    }
+
+                                    Button {
+                                        id: browseLabelBtn
+                                        text: "浏览"
+                                        font.family: Theme.fontFamily
+                                        background: Rectangle {
+                                            color: browseLabelBtn.hovered ? Theme.bgHover : Theme.bgInput
+                                            radius: Theme.radiusSmall
+                                            border.color: browseLabelBtn.hovered ? Theme.primaryGlow : Theme.borderColor
+                                            border.width: 1
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                        }
+                                        contentItem: Label {
+                                            text: browseLabelBtn.text
+                                            color: browseLabelBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
+                                            font: browseLabelBtn.font
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                        }
+                                        onClicked: labelFolderDialog.open()
+                                    }
+
+                                    Button {
+                                        id: clearLabelBtn
+                                        text: "清空"
+                                        font.family: Theme.fontFamily
+                                        background: Rectangle {
+                                            color: clearLabelBtn.hovered ? Theme.bgHover : Theme.bgInput
+                                            radius: Theme.radiusSmall
+                                            border.color: clearLabelBtn.hovered ? Theme.primaryGlow : Theme.borderColor
+                                            border.width: 1
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                        }
+                                        contentItem: Label {
+                                            text: clearLabelBtn.text
+                                            color: clearLabelBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
+                                            font: clearLabelBtn.font
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                        }
+                                        onClicked: {
+                                            labelPathField.clear()
+                                            root.selectedLabelPath = ""
+                                        }
+                                    }
+                                }
+
+                                // 分析按钮
+                                RowLayout {
+                                    Layout.fillWidth: true
+
+                                    Item { Layout.fillWidth: true }
+
+                                    Button {
+                                        id: analyzeBtn
+                                        text: "分析匹配"
+                                        enabled: imagePathField.text.trim().length > 0 && !root.isScanning
+                                        font.family: Theme.fontFamily
+                                        font.bold: true
+                                        background: Rectangle {
+                                            color: analyzeBtn.enabled ? (analyzeBtn.hovered ? Theme.primaryGlow : Theme.primary) : Theme.bgCard
+                                            radius: Theme.radiusSmall
+                                            border.color: analyzeBtn.enabled ? Theme.primaryGlow : Theme.borderColor
+                                            border.width: 1
+
+                                            layer.enabled: analyzeBtn.enabled && analyzeBtn.hovered
+                                            layer.effect: MultiEffect {
+                                                shadowEnabled: true
+                                                shadowColor: Theme.primaryGlow
+                                                shadowBlur: 0.15
+                                            }
+
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                        }
+                                        contentItem: Label {
+                                            text: analyzeBtn.text
+                                            color: analyzeBtn.enabled ? (analyzeBtn.hovered ? Theme.bgMain : "#ffffff") : Theme.textDisabled
+                                            font: analyzeBtn.font
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                        }
+                                        onClicked: startScanSeparate()
+                                    }
+                                }
+                            }
+
+                            // 加载动画
+                            BusyIndicator {
+                                visible: root.isScanning
+                                running: root.isScanning
+                                Layout.alignment: Qt.AlignHCenter
+                                Layout.preferredHeight: 40
+                                Layout.preferredWidth: 40
+                            }
+
+                            Label {
+                                visible: root.isScanning
+                                text: "正在分析目录文件..."
+                                font.pixelSize: Theme.fontSizeNormal
+                                font.family: Theme.fontFamily
+                                color: Theme.textSecondary
+                                Layout.alignment: Qt.AlignHCenter
+                            }
+
+                            // === 步骤2：扫描结果预览 ===
+                            ColumnLayout {
+                                visible: root.scanResult !== null && !root.isScanning
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingNormal
+
+                                Label {
+                                    text: "步骤2：扫描结果预览"
+                                    font.pixelSize: Theme.fontSizeSubheading
+                                    font.bold: true
+                                    font.family: Theme.fontFamily
+                                    color: Theme.textPrimary
+                                }
+
+                                // 格式徽章 + 匹配统计卡片
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    color: Theme.bgInput
+                                    radius: Theme.radiusNormal
+                                    border.color: Theme.borderColor
+                                    border.width: 1
+                                    implicitHeight: statsRow.implicitHeight + 24
+
+                                    RowLayout {
+                                        id: statsRow
+                                        anchors.fill: parent
+                                        anchors.margins: Theme.spacingNormal
+                                        spacing: Theme.spacingXLarge
+
+                                        // 格式徽章
+                                        Rectangle {
+                                            Layout.alignment: Qt.AlignVCenter
+                                            Layout.preferredWidth: formatBadgeText.implicitWidth + 16
+                                            Layout.preferredHeight: 28
+                                            implicitWidth: formatBadgeText.implicitWidth + 16
+                                            implicitHeight: 28
+                                            radius: Theme.radiusSmall
+                                            color: {
+                                                var fmt = root.scanResult ? root.scanResult.detectedFormat : ""
+                                                if (fmt === "yolo_txt") return Theme.accentPrimary
+                                                if (fmt === "coco_json") return Theme.accentSecondary
+                                                if (fmt === "labelme_json") return Theme.accentWarning
+                                                if (fmt === "anomaly_unsupervised") return Theme.accentWarning
+                                                if (fmt === "classify_folder") return Theme.accentSecondary
+                                                if (fmt === "image_only") return Theme.textMuted
+                                                return Theme.textMuted
+                                            }
+
+                                            Label {
+                                                id: formatBadgeText
+                                                anchors.centerIn: parent
+                                                text: {
+                                                    var fmt = root.scanResult ? root.scanResult.detectedFormat : ""
+                                                    if (fmt === "yolo_txt") return "YOLO 目标检测 (TXT)"
+                                                    if (fmt === "coco_json") return "COCO 目标检测 (JSON)"
+                                                    if (fmt === "labelme_json") return "LabelMe 标注 (JSON)"
+                                                    if (fmt === "anomaly_unsupervised") return "Anomalib 异常检测"
+                                                    if (fmt === "classify_folder") return "ImageNet 分类（每类一文件夹）"
+                                                    if (fmt === "image_only") return "纯图片（无标签）"
+                                                    return "未知格式"
+                                                }
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.bold: true
+                                                font.family: Theme.fontFamily
+                                                color: Theme.textPrimary
+                                            }
+                                        }
+
+                                        // 图片总数
+                                        ColumnLayout {
+                                            spacing: 2
+                                            Label {
+                                                text: "图片总数"
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamily
+                                                color: Theme.textMuted
+                                            }
+                                            Label {
+                                                text: root.scanResult ? root.scanResult.imageCount : "0"
+                                                font.pixelSize: Theme.fontSizeLarge
+                                                font.bold: true
+                                                font.family: Theme.fontFamily
+                                                color: Theme.textPrimary
+                                            }
+                                        }
+
+                                        // 已标注
+                                        ColumnLayout {
+                                            visible: root.scanResult && root.scanResult.detectedFormat !== "anomaly_unsupervised" && root.scanResult.detectedFormat !== "image_only" && root.scanResult.detectedFormat !== "classify_folder"
+                                            spacing: 2
+                                            Label {
+                                                text: "已标注"
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamily
+                                                color: Theme.textMuted
+                                            }
+                                            Label {
+                                                text: root.scanResult ? (root.scanResult.labelCount || 0) : "0"
+                                                font.pixelSize: Theme.fontSizeLarge
+                                                font.bold: true
+                                                font.family: Theme.fontFamily
+                                                color: Theme.accentSuccess
+                                            }
+                                        }
+
+                                        // 未标注
+                                        ColumnLayout {
+                                            visible: root.scanResult && root.scanResult.detectedFormat !== "anomaly_unsupervised" && root.scanResult.detectedFormat !== "image_only" && root.scanResult.detectedFormat !== "classify_folder"
+                                            spacing: 2
+                                            Label {
+                                                text: "未标注"
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamily
+                                                color: Theme.textMuted
+                                            }
+                                            Label {
+                                                text: root.scanResult ? (root.scanResult.unmatchedImagesCount || 0) : "0"
+                                                font.pixelSize: Theme.fontSizeLarge
+                                                font.bold: true
+                                                font.family: Theme.fontFamily
+                                                color: root.scanResult && root.scanResult.unmatchedImagesCount > 0 ? Theme.accentWarning : Theme.textPrimary
+                                            }
+                                        }
+
+                                        // 异常检测统计
+                                        ColumnLayout {
+                                            visible: root.scanResult && root.scanResult.detectedFormat === "anomaly_unsupervised"
+                                            spacing: 2
+                                            Label {
+                                                text: "正常训练集"
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamily
+                                                color: Theme.textMuted
+                                            }
+                                            Label {
+                                                text: root.scanResult && root.scanResult.layoutStats ? root.scanResult.layoutStats.trainGood : "0"
+                                                font.pixelSize: Theme.fontSizeLarge
+                                                font.bold: true
+                                                font.family: Theme.fontFamily
+                                                color: Theme.accentSuccess
+                                            }
+                                        }
+
+                                        ColumnLayout {
+                                            visible: root.scanResult && root.scanResult.detectedFormat === "anomaly_unsupervised" && root.scanResult.layoutStats && root.scanResult.layoutStats.testDefective > 0
+                                            spacing: 2
+                                            Label {
+                                                text: "异常测试集"
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamily
+                                                color: Theme.textMuted
+                                            }
+                                            Label {
+                                                text: root.scanResult && root.scanResult.layoutStats ? root.scanResult.layoutStats.testDefective : "0"
+                                                font.pixelSize: Theme.fontSizeLarge
+                                                font.bold: true
+                                                font.family: Theme.fontFamily
+                                                color: Theme.accentError
+                                            }
+                                        }
+
+                                        // 分类数据集统计
+                                        ColumnLayout {
+                                            visible: root.scanResult && root.scanResult.detectedFormat === "classify_folder"
+                                            spacing: 2
+                                            Label {
+                                                text: "类别数"
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamily
+                                                color: Theme.textMuted
+                                            }
+                                            Label {
+                                                text: root.scanResult && root.scanResult.layoutStats ? root.scanResult.layoutStats.numClasses : "0"
+                                                font.pixelSize: Theme.fontSizeLarge
+                                                font.bold: true
+                                                font.family: Theme.fontFamily
+                                                color: Theme.accentSecondary
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 类别列表（目标检测格式）
+                                Rectangle {
+                                    visible: root.scanResult && root.scanResult.detectedFormat !== "anomaly_unsupervised" && root.scanResult.detectedFormat !== "image_only" && root.scanResult.classIds && root.scanResult.classIds.length > 0
+                                    Layout.fillWidth: true
+                                    implicitHeight: classFlow.implicitHeight + 24
+                                    color: Theme.bgInput
+                                    radius: Theme.radiusNormal
+                                    border.color: Theme.borderColor
+                                    border.width: 1
+
+                                    ColumnLayout {
+                                        id: classFlow
+                                        anchors.fill: parent
+                                        anchors.margins: Theme.spacingNormal
+                                        spacing: Theme.spacingSmall
+
+                                        Label {
+                                            text: "类别探测 (" + (root.scanResult && root.scanResult.classIds ? root.scanResult.classIds.length : 0) + "类)"
+                                            font.pixelSize: Theme.fontSizeNormal
+                                            font.bold: true
+                                            font.family: Theme.fontFamily
+                                            color: Theme.textPrimary
+                                        }
+
+                                        Flow {
+                                            Layout.fillWidth: true
+                                            spacing: Theme.spacingSmall
+
+                                            Repeater {
+                                                model: root.scanResult && root.scanResult.classIds ? root.scanResult.classIds : []
+
+                                                Rectangle {
+                                                    width: classTagText.implicitWidth + 16
+                                                    height: 24
+                                                    radius: Theme.radiusSmall
+                                                    color: Theme.classColor(index)
+
+                                                    Label {
+                                                        id: classTagText
+                                                        anchors.centerIn: parent
+                                                        text: {
+                                                            var classes = root.scanResult ? root.scanResult.classes : {}
+                                                            var name = classes[modelData] || ("class_" + modelData)
+                                                            return modelData + ": " + name
+                                                        }
+                                                        font.pixelSize: Theme.fontSizeCaption
+                                                        font.family: Theme.fontFamily
+                                                        color: Theme.textPrimary
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 错误提示
+                                Rectangle {
+                                    visible: root.scanResult && root.scanResult.error && root.scanResult.error.length > 0
+                                    Layout.fillWidth: true
+                                    height: 48
+                                    color: Theme.bgInput
+                                    radius: Theme.radiusSmall
+                                    border.color: Theme.accentError
+                                    border.width: 1
+
+                                    Label {
+                                        anchors.fill: parent
+                                        anchors.margins: Theme.spacingNormal
+                                        text: root.scanResult ? root.scanResult.error : ""
+                                        font.pixelSize: Theme.fontSizeNormal
+                                        font.family: Theme.fontFamily
+                                        color: Theme.accentError
+                                        wrapMode: Text.WordWrap
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                }
+
+                                // 数据集名称 + 确认导入
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.spacingNormal
+
+                                    Label {
+                                        text: "数据集名称"
+                                        font.pixelSize: Theme.fontSizeNormal
+                                        font.family: Theme.fontFamily
+                                        color: Theme.textPrimary
+                                    }
+
+                                    TextField {
+                                        id: datasetNameField
+                                        Layout.fillWidth: true
+                                        placeholderText: "输入数据集名称"
+                                        color: Theme.textPrimary
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeNormal
+                                        text: root.scanResult ? extractFolderName(root.selectedImagePath) : ""
+                                        background: Rectangle {
+                                            color: Theme.bgInput
+                                            radius: Theme.radiusSmall
+                                            border.color: datasetNameField.activeFocus ? Theme.primaryGlow : (datasetNameField.hovered ? Theme.primary : Theme.borderColor)
+                                            border.width: 1
+
+                                            layer.enabled: datasetNameField.activeFocus || datasetNameField.hovered
+                                            layer.effect: MultiEffect {
+                                                shadowEnabled: true
+                                                shadowColor: datasetNameField.activeFocus ? Theme.primaryGlow : Theme.primary
+                                                shadowBlur: 0.15
+                                            }
+                                        }
+                                    }
+
+                                    Button {
+                                        id: confirmImportBtn
+                                        text: "确认导入"
+                                        enabled: root.scanResult
+                                                 && root.scanResult.isValid
+                                                 && datasetNameField.text.trim().length > 0
+                                                 && !root.isScanning
+                                        font.family: Theme.fontFamily
+                                        font.bold: true
+                                        background: Rectangle {
+                                            color: confirmImportBtn.enabled ? (confirmImportBtn.hovered ? Theme.primaryGlow : Theme.primary) : Theme.bgCard
+                                            radius: Theme.radiusSmall
+                                            border.color: confirmImportBtn.enabled ? Theme.primaryGlow : Theme.borderColor
+                                            border.width: 1
+
+                                            layer.enabled: confirmImportBtn.enabled && confirmImportBtn.hovered
+                                            layer.effect: MultiEffect {
+                                                shadowEnabled: true
+                                                shadowColor: Theme.primaryGlow
+                                                shadowBlur: 0.15
+                                            }
+
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                        }
+                                        contentItem: Label {
+                                            text: confirmImportBtn.text
+                                            color: confirmImportBtn.enabled ? (confirmImportBtn.hovered ? Theme.bgMain : "#ffffff") : Theme.textDisabled
+                                            font: confirmImportBtn.font
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                        }
+                                        onClicked: {
+                                            var dsId = ""
+                                            var format = root.scanResult ? root.scanResult.detectedFormat : ""
+                                            var count = root.scanResult ? (root.scanResult.imageCount || 0) : 0
+                                            var name = datasetNameField.text.trim()
+
+                                            if (root.importMode === "separate") {
+                                                dsId = datasetService.importDatasetSeparate(
+                                                    appController.currentProjectId,
+                                                    name,
+                                                    root.selectedImagePath,
+                                                    root.selectedLabelPath
+                                                )
+                                            } else {
+                                                dsId = datasetService.importDatasetV2(
+                                                    appController.currentProjectId,
+                                                    name,
+                                                    root.selectedImagePath,
+                                                    format,
+                                                    root.scanResult.labelDirOrPath ? root.scanResult.labelDirOrPath : "",
+                                                    true
+                                                )
+                                            }
+                                            if (dsId && dsId.length > 0) {
+                                                root.lastImportedDatasetId = dsId
+                                                datasetModel.refresh()
+
+                                                var formatStr = "未知格式"
+                                                if (format === "yolo_txt") formatStr = "YOLO TXT"
+                                                else if (format === "coco_json") formatStr = "COCO JSON"
+                                                else if (format === "labelme_json") formatStr = "LabelMe JSON"
+                                                else if (format === "anomaly_unsupervised") formatStr = "无监督异常检测"
+                                                else if (format === "classify_folder") formatStr = "ImageNet 分类"
+                                                else if (format === "image_only") formatStr = "纯图片"
+
+                                                importSuccessMsg.text = "数据集: " + name + "\n格式: " + formatStr + "\n样本数量: " + count + " 张图片"
+                                                importSuccessDialog.open()
+
+                                                root.scanResult = null
+                                                folderPathField.clear()
+                                                imagePathField.clear()
+                                                labelPathField.clear()
+                                                datasetNameField.clear()
+                                                root.selectedImagePath = ""
+                                                root.selectedLabelPath = ""
+                                            } else {
+                                                // 导入失败，显示错误提示
+                                                importErrorLabel.visible = true
+                                                importErrorLabel.text = "导入失败，请检查路径和格式是否正确"
+                                            }
+                                        }
+                                    }
+
+                                    Label {
+                                        id: importErrorLabel
+                                        visible: false
+                                        color: Theme.accentError
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
+                                    }
                                 }
                             }
                         }

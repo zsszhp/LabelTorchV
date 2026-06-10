@@ -1734,6 +1734,36 @@ QString DatasetService::importDatasetV2(const QString &projectId,
         return datasetId;
     }
 
+    if (detectedFormat == QStringLiteral("classify_folder")) {
+        // ImageNet 风格分类数据集：每类一文件夹
+        ltDebug(LT_LOG_DATASET()) << "importDatasetV2: classify_folder 分发 folderPath=" << folderPath;
+
+        // 创建数据集记录
+        QString datasetId = Id::generate();
+        QSqlQuery query(Database::instance().database());
+        query.prepare("INSERT INTO datasets (id, project_id, name, image_root, label_root, format, sample_count, import_status) "
+                      "VALUES (?, ?, ?, ?, ?, 'classify_folder', 0, 'scanning')");
+        query.addBindValue(datasetId);
+        query.addBindValue(projectId);
+        query.addBindValue(datasetName);
+        query.addBindValue(folderPath);
+        query.addBindValue(folderPath);
+
+        if (!query.exec()) {
+            ltError(LT_LOG_DATASET()) << "importDatasetV2: 创建分类数据集记录失败:" << query.lastError().text();
+            return {};
+        }
+
+        if (!importClassifyFolderDataset(datasetId, folderPath)) {
+            ltError(LT_LOG_DATASET()) << "importDatasetV2: 分类数据集导入失败";
+            updateImportStatus(datasetId, QStringLiteral("failed"));
+            return {};
+        }
+
+        syncClassesToTaxonomy(datasetId);
+        return datasetId;
+    }
+
     if (detectedFormat == QStringLiteral("anomaly_unsupervised") || detectedFormat == QStringLiteral("image_only")) {
         // 获取项目的 task_type
         QString taskType = QStringLiteral("detect");
@@ -1897,6 +1927,128 @@ bool DatasetService::importAnomalyDataset(const QString &datasetId, const QStrin
 
     ltInfo(LT_LOG_DATASET()) << "异常检测导入完成:" << datasetId
                              << "共" << totalSamples << "个样本";
+    return true;
+}
+
+bool DatasetService::importClassifyFolderDataset(const QString &datasetId, const QString &folderPath)
+{
+    ltTrace(LT_LOG_DATASET()) << "importClassifyFolderDataset datasetId=" << datasetId
+                              << "folderPath=" << folderPath;
+
+    QDir baseDir(folderPath);
+    if (!baseDir.exists()) {
+        ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 目录不存在:" << folderPath;
+        return false;
+    }
+
+    // 排除已知的数据集结构目录
+    static const QStringList excludeDirNames = {
+        QStringLiteral("images"),
+        QStringLiteral("labels"),
+        QStringLiteral("train"),
+        QStringLiteral("val"),
+        QStringLiteral("test"),
+        QStringLiteral("valid"),
+        QStringLiteral("annotations"),
+        QStringLiteral("cache"),
+        QStringLiteral("__pycache__"),
+        QStringLiteral(".git"),
+        QStringLiteral(".svn")
+    };
+
+    // 获取所有类别子目录
+    QFileInfoList subDirs = baseDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    QStringList classDirs;
+    for (const auto &subDir : subDirs) {
+        QString dirName = subDir.fileName();
+        if (excludeDirNames.contains(dirName.toLower())) {
+            continue;
+        }
+        // 检查子目录内是否有图片
+        QDir classDir(subDir.absoluteFilePath());
+        QFileInfoList images = ImportScanner::collectImageFilesStatic(classDir, false);
+        if (!images.isEmpty()) {
+            classDirs.append(dirName);
+        }
+    }
+
+    if (classDirs.isEmpty()) {
+        ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 未找到类别子目录:" << folderPath;
+        return false;
+    }
+
+    classDirs.sort(); // 按名称排序，确保类别索引稳定
+
+    QSqlDatabase db = Database::instance().database();
+    int totalSamples = 0;
+
+    // 遍历每个类别目录，插入样本记录
+    for (int classIdx = 0; classIdx < classDirs.size(); ++classIdx) {
+        const QString &className = classDirs[classIdx];
+        QDir classDir(baseDir.filePath(className));
+        QFileInfoList images = ImportScanner::collectImageFilesStatic(classDir, true);
+
+        for (const auto &imgInfo : images) {
+            QString imagePath = imgInfo.absoluteFilePath();
+            QString sampleId = Id::generate();
+
+            QSqlQuery query(db);
+            // label_path 字段存储类别名（分类数据集的类别由目录结构隐含）
+            query.prepare("INSERT INTO dataset_samples "
+                          "(id, dataset_id, image_path, label_path, validation_status, split) "
+                          "VALUES (?, ?, ?, ?, 'valid', ?)");
+            query.addBindValue(sampleId);
+            query.addBindValue(datasetId);
+            query.addBindValue(imagePath);
+            query.addBindValue(className); // 复用 label_path 存类别名
+            query.addBindValue(QString()); // split 由后续 resplitDataset 设置
+
+            if (!query.exec()) {
+                ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 插入样本失败:"
+                                          << query.lastError().text();
+                return false;
+            }
+            totalSamples++;
+        }
+
+        ltDebug(LT_LOG_DATASET()) << "importClassifyFolderDataset: 类别" << className
+                                  << "-" << images.size() << "张图片";
+    }
+
+    if (totalSamples == 0) {
+        ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 在" << folderPath << "中未找到任何样本";
+        return false;
+    }
+
+    // 更新状态为导入中
+    if (!updateImportStatus(datasetId, QStringLiteral("importing"))) {
+        ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 更新状态为 importing 失败";
+        return false;
+    }
+
+    // 存储类别 schema
+    QVariantMap categories;
+    for (int i = 0; i < classDirs.size(); ++i) {
+        categories[QString::number(i)] = classDirs[i];
+    }
+    extractAndStoreSchemaFromCategories(datasetId, categories);
+
+    // 更新样本数和最终状态
+    QSqlQuery updateQuery(db);
+    updateQuery.prepare("UPDATE datasets SET sample_count = ?, import_status = 'completed' WHERE id = ?");
+    updateQuery.addBindValue(totalSamples);
+    updateQuery.addBindValue(datasetId);
+
+    if (!updateQuery.exec()) {
+        ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 完成数据集更新失败:"
+                                  << updateQuery.lastError().text();
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return false;
+    }
+
+    ltInfo(LT_LOG_DATASET()) << "分类数据集导入完成:" << datasetId
+                             << "共" << totalSamples << "个样本"
+                             << classDirs.size() << "个类别";
     return true;
 }
 

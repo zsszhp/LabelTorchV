@@ -123,3 +123,16 @@ target_link_libraries(test_export PRIVATE
     Qt6::Sql
 )
 add_test(NAME ExportTest COMMAND test_export)
+
+# 分类功能端到端测试
+add_executable(test_classify
+    test_classify.cpp
+)
+target_link_libraries(test_classify PRIVATE
+    labeltorch_core
+    labeltorch_dataset
+    labeltorch_training
+    Qt6::Test
+    Qt6::Sql
+)
+add_test(NAME ClassifyTest COMMAND test_classify)

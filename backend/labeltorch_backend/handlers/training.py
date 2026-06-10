@@ -41,6 +41,9 @@ async def handle_start(payload: dict) -> dict:
             auroc = epoch_data.get("auroc", epoch_data.get("image_auroc", 0))
             pixel_auroc = epoch_data.get("pixel_auroc", 0)
             f1_score = epoch_data.get("f1", epoch_data.get("image_f1", 0))
+            # 分类指标
+            top1 = epoch_data.get("top1", 0)
+            top5 = epoch_data.get("top5", 0)
 
             metrics_payload = {
                 "mAP50": map50,
@@ -56,6 +59,11 @@ async def handle_start(payload: dict) -> dict:
                 metrics_payload["pixel_auroc"] = pixel_auroc
             if f1_score:
                 metrics_payload["f1"] = f1_score
+            # 分类指标
+            if top1:
+                metrics_payload["top1"] = top1
+            if top5:
+                metrics_payload["top5"] = top5
 
             server.send_event("task.progress", task_id, {
                 "task_id": task_id,
@@ -69,6 +77,8 @@ async def handle_start(payload: dict) -> dict:
                 "auroc": auroc,
                 "pixel_auroc": pixel_auroc,
                 "f1": f1_score,
+                "top1": top1,
+                "top5": top5,
                 "metrics": metrics_payload,
             })
 
@@ -80,6 +90,10 @@ async def handle_start(payload: dict) -> dict:
                 log_msg += f", mAP50-95: {map50_95:.4f}"
             if auroc:
                 log_msg += f", AUROC: {auroc:.4f}"
+            if top1:
+                log_msg += f", top1: {top1:.4f}"
+            if top5:
+                log_msg += f", top5: {top5:.4f}"
             server.send_event("task.log", task_id, {
                 "task_id": task_id,
                 "message": log_msg,

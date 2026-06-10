@@ -19,6 +19,16 @@ private slots:
     void testDeleteSnapshotInUse();
     void testImmutable();
 
+    // 异常场景测试
+    void testCreateSnapshotEmptyDataset();
+    void testCreateSnapshotNonexistentDataset();
+    void testCreateSnapshotEdgeRatios();
+    void testGetSnapshotNonexistent();
+    void testListSnapshotsNonexistentDataset();
+    void testDeleteSnapshotNonexistent();
+    void testGetSampleManifestNonexistent();
+    void testGetSplitManifestNonexistent();
+
 private:
     QString m_projectId;
     QString m_datasetId;
@@ -175,6 +185,94 @@ void TestSnapshot::testImmutable()
 
     QVERIFY(service.isImmutable(snapId));
     QVERIFY(!service.isImmutable("nonexistent-id"));
+}
+
+// === 异常场景测试 ===
+
+void TestSnapshot::testCreateSnapshotEmptyDataset()
+{
+    // 创建一个没有有效样本的数据集
+    auto db = Database::instance().database();
+    QString emptyDsId = "ds-empty-snap-test";
+    QSqlQuery q(db);
+    q.prepare("INSERT INTO datasets (id, project_id, name, image_root, label_root, format, sample_count, import_status) "
+              "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    q.addBindValue(emptyDsId);
+    q.addBindValue(m_projectId);
+    q.addBindValue("EmptyDataset");
+    q.addBindValue("/tmp/empty/img");
+    q.addBindValue("/tmp/empty/lbl");
+    q.addBindValue("yolo_txt");
+    q.addBindValue(0);
+    q.addBindValue("completed");
+    QVERIFY(q.exec());
+
+    // 空数据集应返回空字符串
+    SnapshotService service;
+    QString snapId = service.createSnapshot(emptyDsId, 0.8, "random");
+    QVERIFY(snapId.isEmpty());
+}
+
+void TestSnapshot::testCreateSnapshotNonexistentDataset()
+{
+    // 不存在的数据集应返回空字符串
+    SnapshotService service;
+    QString snapId = service.createSnapshot("nonexistent-dataset-id", 0.8, "random");
+    QVERIFY(snapId.isEmpty());
+}
+
+void TestSnapshot::testCreateSnapshotEdgeRatios()
+{
+    SnapshotService service;
+
+    // trainRatio = 1.0：所有样本在训练集，验证集为空
+    QString snapId1 = service.createSnapshot(m_datasetId, 1.0, "sequential");
+    QVERIFY(!snapId1.isEmpty());
+    QVariantMap details1 = service.getSnapshot(snapId1);
+    QCOMPARE(details1["trainCount"].toInt(), 10);
+    QCOMPARE(details1["valCount"].toInt(), 0);
+
+    // trainRatio = 0.0：至少1个样本在训练集（qMax(1, ...)）
+    QString snapId2 = service.createSnapshot(m_datasetId, 0.0, "sequential");
+    QVERIFY(!snapId2.isEmpty());
+    QVariantMap details2 = service.getSnapshot(snapId2);
+    QCOMPARE(details2["trainCount"].toInt(), 1); // qMax(1, 0) = 1
+    QCOMPARE(details2["valCount"].toInt(), 9);
+}
+
+void TestSnapshot::testGetSnapshotNonexistent()
+{
+    SnapshotService service;
+    QVariantMap details = service.getSnapshot("nonexistent-snapshot-id");
+    QVERIFY(details.isEmpty());
+}
+
+void TestSnapshot::testListSnapshotsNonexistentDataset()
+{
+    SnapshotService service;
+    QVariantList snapshots = service.listSnapshots("nonexistent-dataset-id");
+    QVERIFY(snapshots.isEmpty());
+}
+
+void TestSnapshot::testDeleteSnapshotNonexistent()
+{
+    SnapshotService service;
+    // 不存在的快照应返回 false
+    QVERIFY(!service.deleteSnapshot("nonexistent-snapshot-id"));
+}
+
+void TestSnapshot::testGetSampleManifestNonexistent()
+{
+    SnapshotService service;
+    QVariantList manifest = service.getSampleManifest("nonexistent-snapshot-id");
+    QVERIFY(manifest.isEmpty());
+}
+
+void TestSnapshot::testGetSplitManifestNonexistent()
+{
+    SnapshotService service;
+    QVariantMap split = service.getSplitManifest("nonexistent-snapshot-id");
+    QVERIFY(split.isEmpty());
 }
 
 QTEST_MAIN(TestSnapshot)
