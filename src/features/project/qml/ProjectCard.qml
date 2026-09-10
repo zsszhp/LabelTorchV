@@ -12,7 +12,7 @@ Item {
         anchors.fill: parent
         color: Theme.bgCard
         radius: Theme.radiusNormal
-        border.color: Theme.border
+        border.color: Theme.borderColor
         border.width: 1
 
         Column {
@@ -20,7 +20,7 @@ Item {
             anchors.margins: 12
             spacing: 4
 
-            Label { text: projectName; font.bold: true; color: Theme.textPrimary; font.pixelSize: Theme.fontSizeNormal; font.family: Theme.fontFamily }
+            Label { text: projectName; font.bold: true; color: Theme.textMain; font.pixelSize: Theme.fontSizeNormal; font.family: Theme.fontFamily }
             Label { text: projectPath; color: Theme.textMuted; font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamilyMono }
             Label { text: lastModified; color: Theme.textMuted; font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamilyMono }
         }

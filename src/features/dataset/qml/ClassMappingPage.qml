@@ -14,7 +14,7 @@ Item {
     property string mappingActionTone: "neutral"
     property var sourceClasses: []
     property var targetClasses: []
-    property var mappingRules: ({})
+    property var mappingRules: null
 
     function loadSourceClasses() {
         if (!currentDatasetId) {
@@ -153,7 +153,7 @@ Item {
                             text: "源数据集"
                             font.pixelSize: Theme.fontSizeSmall
                             font.weight: Font.DemiBold
-                            color: Theme.textSecondary
+                            color: Theme.textMuted
                         }
 
                         ComboBox {
@@ -198,7 +198,7 @@ Item {
                             text: "源类别 (" + root.sourceClasses.length + ")"
                             font.pixelSize: Theme.fontSizeSmall
                             font.weight: Font.DemiBold
-                            color: Theme.textSecondary
+                            color: Theme.textMuted
                         }
 
                         Rectangle {
@@ -272,7 +272,7 @@ Item {
                                 text: "映射建议"
                                 font.pixelSize: Theme.fontSizeSmall
                                 font.weight: Font.DemiBold
-                                color: Theme.textSecondary
+                                color: Theme.textMuted
                             }
 
                             Item { Layout.fillWidth: true }
@@ -321,7 +321,7 @@ Item {
                                 text: "映射规则"
                                 font.pixelSize: Theme.fontSizeSmall
                                 font.weight: Font.DemiBold
-                                color: Theme.textSecondary
+                                color: Theme.textMuted
                             }
 
                             Rectangle {
@@ -415,7 +415,7 @@ Item {
                             text: "预览与执行"
                             font.pixelSize: Theme.fontSizeSmall
                             font.weight: Font.DemiBold
-                            color: Theme.textSecondary
+                            color: Theme.textMuted
                         }
 
                         Rectangle {
@@ -434,7 +434,7 @@ Item {
                                 wrapMode: TextArea.Wrap
                                 font.pixelSize: Theme.fontSizeCaption
                                 font.family: Theme.fontFamilyMono
-                                color: Theme.textSecondary
+                                color: Theme.textMuted
                                 placeholderText: "点击预览按钮查看映射结果"
                                 background: Rectangle { color: "transparent" }
                             }

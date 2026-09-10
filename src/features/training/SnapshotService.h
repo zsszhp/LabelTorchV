@@ -5,6 +5,9 @@
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QMap>
+
+class IpcClient;
 
 class SnapshotService : public QObject
 {
@@ -12,6 +15,12 @@ class SnapshotService : public QObject
 
 public:
     explicit SnapshotService(QObject *parent = nullptr);
+
+    /**
+     * @brief 注入 IPC 客户端依赖（用于调用 snapshot.preview 等命令）。
+     * @param client IpcClient 实例。
+     */
+    void setIpcClient(IpcClient *client);
 
     /**
      * @brief Create an immutable snapshot of a dataset.
@@ -90,15 +99,47 @@ public:
     Q_INVOKABLE QString prepareSnapshotPhysicalDir(const QString &snapshotId);
 
     /**
-     * @brief 为异常检测数据集准备快照物理目录
+     * @brief 生成数据快照的预览网格图（P0-2）。
      *
-     * 将数据集按 train/good、test/good、test/defective 结构复制到快照目录，
-     * 符合 Anomalib Folder Datamodule 的目录规范。
+     * 异步调用 Python 后端 snapshot.preview 命令，使用 supervision 库
+     * 加载快照数据集，对采样图片渲染 GT 框并合成网格图，输出到
+     * {snapshotDir}/preview.jpg。完成后发射 previewGenerated 信号。
      *
-     * @param snapshotId 快照 ID
-     * @return 快照根目录路径，失败返回空字符串
+     * @param snapshotId 快照 ID。
+     * @return 请求 ID（非空表示已成功派发），空串表示失败（IPC 未连接或快照不存在）。
      */
-    Q_INVOKABLE QString prepareAnomalySnapshotDir(const QString &snapshotId);
+    Q_INVOKABLE QString generatePreview(const QString &snapshotId);
+
+    /**
+     * @brief 查询快照预览图路径（同步、纯本地）。
+     *
+     * 不发起 IPC 请求，仅返回快照目录下已存在的 preview.jpg 路径；
+     * 若文件不存在则返回空串。QML 可在 previewGenerated 信号触发后调用此方法刷新显示。
+     *
+     * @param snapshotId 快照 ID。
+     * @return preview.jpg 绝对路径，或空串。
+     */
+    Q_INVOKABLE QString getPreviewPath(const QString &snapshotId) const;
+
+signals:
+    /**
+     * @brief 预览图生成完成信号。
+     * @param snapshotId 快照 ID。
+     * @param previewPath 预览图路径（成功时为绝对路径，失败时为空串）。
+     * @param success 是否成功。
+     * @param error 错误信息（失败时）。
+     */
+    void previewGenerated(const QString &snapshotId, const QString &previewPath,
+                          bool success, const QString &error);
+
+private slots:
+    /// 处理 IPC 响应（snapshot.preview 结果回传）
+    void onPreviewResponseReceived(const QJsonObject &response);
+
+private:
+    IpcClient *m_ipcClient = nullptr;
+    /// 待响应预览请求映射：requestId → snapshotId
+    QMap<QString, QString> m_pendingPreviews;
 };
 
 #endif // SNAPSHOTSERVICE_H

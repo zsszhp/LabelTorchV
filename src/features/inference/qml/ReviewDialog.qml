@@ -16,17 +16,17 @@ Dialog {
     property int candidateIndex: -1
     property var candidate: null
 
-    palette.window: Theme.bgPrimary
-    palette.windowText: Theme.textPrimary
+    palette.window: Theme.bgMain
+    palette.windowText: Theme.textMain
     palette.base: Theme.bgInput
-    palette.text: Theme.textPrimary
-    palette.button: Theme.bgTertiary
-    palette.buttonText: Theme.textPrimary
-    palette.highlight: Theme.accentPrimary
-    palette.highlightedText: Theme.textPrimary
+    palette.text: Theme.textMain
+    palette.button: Theme.bgCard
+    palette.buttonText: Theme.textMain
+    palette.highlight: Theme.primary
+    palette.highlightedText: Theme.textMain
 
     background: Rectangle {
-        color: Theme.bgPrimary
+        color: Theme.bgMain
         radius: 8
         border.color: Theme.bgHover
         border.width: 1
@@ -40,14 +40,14 @@ Dialog {
         Label {
             anchors.centerIn: parent
             text: "审核候选结果"
-            color: Theme.accentPrimary
+            color: Theme.primary
             font.pixelSize: 15
             font.bold: true
         }
     }
 
     contentItem: Rectangle {
-        color: Theme.bgPrimary
+        color: Theme.bgMain
 
         ColumnLayout {
             anchors.fill: parent
@@ -94,7 +94,7 @@ Dialog {
 
                         Label {
                             text: root.candidate ? (root.candidate.className || ("Class " + root.candidate.classIndex)) : "N/A"
-                            color: Theme.textPrimary
+                            color: Theme.textMain
                             font.pixelSize: 13
                             font.bold: true
                         }
@@ -109,7 +109,7 @@ Dialog {
 
                         Label {
                             text: root.candidate ? (parseFloat(root.candidate.confidence) || 0).toFixed(3) : "N/A"
-                            color: root.candidate && (parseFloat(root.candidate.confidence) || 0) >= 0.5 ? Theme.accentSuccess : Theme.accentWarning
+                            color: root.candidate && (parseFloat(root.candidate.confidence) || 0) >= 0.5 ? Theme.success : Theme.warning
                             font.pixelSize: 13
                             font.bold: true
                             font.family: "monospace"
@@ -152,18 +152,18 @@ Dialog {
                             radius: 3
                             color: {
                                 switch (root.candidate ? root.candidate.state : "") {
-                                case "confirmed": return Theme.accentSuccess
-                                case "rejected": return Theme.accentError
-                                case "edited": return Theme.accentWarning
-                                default: return Theme.accentPrimary
+                                case "confirmed": return Theme.success
+                                case "rejected": return Theme.danger
+                                case "edited": return Theme.warning
+                                default: return Theme.primary
                                 }
                             }
                             border.color: {
                                 switch (root.candidate ? root.candidate.state : "") {
-                                case "confirmed": return Theme.accentSuccess
-                                case "rejected": return Theme.accentError
-                                case "edited": return Theme.accentWarning
-                                default: return Theme.accentPrimary
+                                case "confirmed": return Theme.success
+                                case "rejected": return Theme.danger
+                                case "edited": return Theme.warning
+                                default: return Theme.primary
                                 }
                             }
                             border.width: 1
@@ -174,10 +174,10 @@ Dialog {
                                 text: root.candidate ? root.candidate.state : "pending"
                                 color: {
                                     switch (root.candidate ? root.candidate.state : "") {
-                                    case "confirmed": return Theme.accentSuccess
-                                    case "rejected": return Theme.accentError
-                                    case "edited": return Theme.accentWarning
-                                    default: return Theme.accentPrimary
+                                    case "confirmed": return Theme.success
+                                    case "rejected": return Theme.danger
+                                    case "edited": return Theme.warning
+                                    default: return Theme.primary
                                     }
                                 }
                                 font.pixelSize: 11
@@ -208,13 +208,13 @@ Dialog {
                 Layout.preferredHeight: 34
 
                 background: Rectangle {
-                    color: parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess
+                    color: parent.pressed ? Qt.darker(Theme.success, 1.2) : Theme.success
                     radius: 6
                 }
 
                 contentItem: Label {
                     text: parent.text
-                    color: Theme.bgPrimary
+                    color: Theme.bgMain
                     font.pixelSize: 13
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
@@ -237,13 +237,13 @@ Dialog {
                 Layout.preferredHeight: 34
 
                 background: Rectangle {
-                    color: parent.pressed ? Qt.darker(Theme.accentError, 1.2) : Theme.accentError
+                    color: parent.pressed ? Qt.darker(Theme.danger, 1.2) : Theme.danger
                     radius: 6
                 }
 
                 contentItem: Label {
                     text: parent.text
-                    color: Theme.bgPrimary
+                    color: Theme.bgMain
                     font.pixelSize: 13
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
@@ -266,13 +266,13 @@ Dialog {
                 Layout.preferredHeight: 34
 
                 background: Rectangle {
-                    color: parent.pressed ? Qt.darker(Theme.accentWarning, 1.2) : Theme.accentWarning
+                    color: parent.pressed ? Qt.darker(Theme.warning, 1.2) : Theme.warning
                     radius: 6
                 }
 
                 contentItem: Label {
                     text: parent.text
-                    color: Theme.bgPrimary
+                    color: Theme.bgMain
                     font.pixelSize: 13
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter

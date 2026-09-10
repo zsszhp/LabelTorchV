@@ -5,7 +5,7 @@ import LabelTorch.Theme
 
 Rectangle {
     id: root
-    color: Theme.bgPrimary
+    color: Theme.bgMain
 
     property string datasetId: ""
     property string taxonomyId: ""
@@ -27,7 +27,7 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 44
-            color: Theme.bgSecondary
+            color: Theme.bgSide
 
             RowLayout {
                 anchors.fill: parent
@@ -38,7 +38,7 @@ Rectangle {
                     text: "类别管理"
                     font.pixelSize: Theme.fontSizeNormal
                     font.bold: true
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.family: Theme.fontFamily
                 }
 
@@ -48,7 +48,7 @@ Rectangle {
                     text: "刷新"
                     flat: true
                     font.pixelSize: Theme.fontSizeSmall
-                    palette.buttonText: Theme.accentPrimary
+                    palette.buttonText: Theme.primary
                     onClicked: refresh()
                 }
             }
@@ -67,7 +67,7 @@ Rectangle {
                 id: delegateRoot
                 width: classListView.width
                 height: 48
-                color: index % 2 === 0 ? Theme.bgPrimary : Theme.bgSecondary
+                color: index % 2 === 0 ? Theme.bgMain : Theme.bgSide
 
                 property bool editing: false
 
@@ -87,7 +87,7 @@ Rectangle {
                         visible: !delegateRoot.editing
                         text: model.className || ("class_" + model.classId)
                         font.pixelSize: Theme.fontSizeNormal
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.family: Theme.fontFamily
                     }
 
@@ -97,9 +97,9 @@ Rectangle {
                         Layout.fillWidth: true
                         text: model.className || ("class_" + model.classId)
                         font.pixelSize: Theme.fontSizeNormal
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.family: Theme.fontFamily
-                        background: Rectangle { color: Theme.bgInput; radius: Theme.radiusSmall; border.color: Theme.accentPrimary; border.width: 1 }
+                        background: Rectangle { color: Theme.bgInput; radius: Theme.radiusSmall; border.color: Theme.primary; border.width: 1 }
                         onAccepted: {
                             if (taxonomyId) {
                                 datasetService.updateClassName(taxonomyId, model.classId, text)
@@ -129,7 +129,7 @@ Rectangle {
                     Label {
                         text: model.count + " 个标注"
                         font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.textSecondary
+                        color: Theme.textMuted
                         font.family: Theme.fontFamily
                     }
 
@@ -164,7 +164,7 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 36
-            color: Theme.bgSecondary
+            color: Theme.bgSide
 
             Label {
                 anchors.centerIn: parent

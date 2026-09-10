@@ -25,7 +25,7 @@ Item {
 
         Label {
             text: "🏷️ 请先打开一个项目"
-            color: Theme.textSecondary
+            color: Theme.textMuted
             font.pixelSize: Theme.fontSizeTitle
             font.bold: true
             Layout.alignment: Qt.AlignHCenter
@@ -43,16 +43,16 @@ Item {
             font.family: Theme.fontFamily
             Layout.alignment: Qt.AlignHCenter
             background: Rectangle {
-                color: parent.hovered ? Theme.accentPrimary : Theme.bgTertiary
+                color: parent.hovered ? Theme.primary : Theme.bgCard
                 radius: Theme.radiusSmall
-                border.color: Theme.accentPrimary
+                border.color: Theme.primary
                 border.width: 1
                 implicitWidth: 140
                 implicitHeight: 36
             }
             contentItem: Label {
                 text: parent.text
-                color: Theme.accentPrimary
+                color: Theme.primary
                 font.pixelSize: Theme.fontSizeNormal
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
@@ -85,7 +85,7 @@ Item {
 
                 contentItem: Label {
                     text: parent.text
-                    color: modelTabBar.currentIndex === 0 ? Theme.accentPrimary : Theme.textMuted
+                    color: modelTabBar.currentIndex === 0 ? Theme.primary : Theme.textMuted
                     font.pixelSize: 13
                     font.bold: modelTabBar.currentIndex === 0
                     horizontalAlignment: Text.AlignHCenter
@@ -105,7 +105,7 @@ Item {
 
                 contentItem: Label {
                     text: parent.text
-                    color: modelTabBar.currentIndex === 1 ? Theme.accentPrimary : Theme.textMuted
+                    color: modelTabBar.currentIndex === 1 ? Theme.primary : Theme.textMuted
                     font.pixelSize: 13
                     font.bold: modelTabBar.currentIndex === 1
                     horizontalAlignment: Text.AlignHCenter
@@ -142,7 +142,7 @@ Item {
 
                             Label {
                                 text: "模型版本"
-                                color: Theme.accentPrimary
+                                color: Theme.primary
                                 font.pixelSize: 16
                                 font.bold: true
                             }
@@ -158,7 +158,7 @@ Item {
                             Button {
                                 text: "刷新"
                                 flat: true
-                                palette.buttonText: Theme.accentPrimary
+                                palette.buttonText: Theme.primary
                                 font.pixelSize: 12
                                 onClicked: modelVersionModel.refresh()
                             }
@@ -186,8 +186,8 @@ Item {
                                 width: versionList.width
                                 height: 72
                                 radius: 6
-                                color: selectedVersionId === model.versionId ? Theme.bgInput : (mouseArea.containsMouse ? Theme.bgSecondary : Theme.bgPrimary)
-                                border.color: selectedVersionId === model.versionId ? Theme.accentPrimary : "transparent"
+                                color: selectedVersionId === model.versionId ? Theme.bgInput : (mouseArea.containsMouse ? Theme.bgSide : Theme.bgMain)
+                                border.color: selectedVersionId === model.versionId ? Theme.primary : "transparent"
                                 border.width: selectedVersionId === model.versionId ? 1 : 0
 
                                 ColumnLayout {
@@ -204,7 +204,7 @@ Item {
 
                                         Label {
                                             text: model.versionId.substring(0, 8) + "..."
-                                            color: Theme.accentPrimary
+                                            color: Theme.primary
                                             font.pixelSize: 13
                                             font.family: "monospace"
                                         }
@@ -231,18 +231,18 @@ Item {
                                                     radius: 4
                                                     color: {
                                                         switch(modelData) {
-                                                        case "baseline": return Theme.accentPrimary
-                                                        case "best-so-far": return Theme.accentSuccess
-                                                        case "production-candidate": return Theme.accentWarning
+                                                        case "baseline": return Theme.primary
+                                                        case "best-so-far": return Theme.success
+                                                        case "production-candidate": return Theme.warning
                                                         default: return Theme.textDisabled
                                                         }
                                                     }
                                                     border.color: {
                                                         switch(modelData) {
-                                                        case "baseline": return Theme.accentPrimary
-                                                        case "best-so-far": return Theme.accentSuccess
-                                                        case "production-candidate": return Theme.accentWarning
-                                                        default: return Theme.borderNormal
+                                                        case "baseline": return Theme.primary
+                                                        case "best-so-far": return Theme.success
+                                                        case "production-candidate": return Theme.warning
+                                                        default: return Theme.borderColor
                                                         }
                                                     }
                                                     border.width: 1
@@ -253,10 +253,10 @@ Item {
                                                         text: modelData
                                                         color: {
                                                             switch(modelData) {
-                                                            case "baseline": return Theme.accentPrimary
-                                                            case "best-so-far": return Theme.accentSuccess
-                                                            case "production-candidate": return Theme.accentWarning
-                                                            default: return Theme.textSecondary
+                                                            case "baseline": return Theme.primary
+                                                            case "best-so-far": return Theme.success
+                                                            case "production-candidate": return Theme.warning
+                                                            default: return Theme.textMuted
                                                             }
                                                         }
                                                         font.pixelSize: 10
@@ -283,7 +283,7 @@ Item {
 
                                         Label {
                                             text: "运行：" + model.runId.substring(0, 8) + "..."
-                                            color: Theme.textSecondary
+                                            color: Theme.textMuted
                                             font.pixelSize: 11
                                             font.family: "monospace"
                                         }
@@ -344,7 +344,7 @@ Item {
 
                             Label {
                                 text: "版本详情"
-                                color: Theme.accentPrimary
+                                color: Theme.primary
                                 font.pixelSize: 16
                                 font.bold: true
                             }
@@ -355,7 +355,7 @@ Item {
                                 visible: selectedVersionId !== ""
                                 text: "删除"
                                 flat: true
-                                palette.buttonText: Theme.accentError
+                                palette.buttonText: Theme.danger
                                 font.pixelSize: 12
 
                                 onClicked: {
@@ -373,7 +373,7 @@ Item {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 120
                             visible: selectedVersionId !== ""
-                            color: Theme.bgPrimary
+                            color: Theme.bgMain
                             radius: 6
 
                             ColumnLayout {
@@ -386,7 +386,7 @@ Item {
                                     Label { text: "ID："; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: selectedVersionId
-                                        color: Theme.textPrimary
+                                        color: Theme.textMain
                                         font.pixelSize: 12
                                         font.family: "monospace"
                                         Layout.fillWidth: true
@@ -398,7 +398,7 @@ Item {
                                     Label { text: "运行ID:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: selectedVersion ? selectedVersion.runId || "N/A" : "N/A"
-                                        color: Theme.textPrimary
+                                        color: Theme.textMain
                                         font.pixelSize: 12
                                         font.family: "monospace"
                                         Layout.fillWidth: true
@@ -410,7 +410,7 @@ Item {
                                     Label { text: "最佳权重:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: selectedVersion ? selectedVersion.bestWeightPath || "N/A" : "N/A"
-                                        color: Theme.accentSuccess
+                                        color: Theme.success
                                         font.pixelSize: 12
                                         font.family: "monospace"
                                         Layout.fillWidth: true
@@ -422,7 +422,7 @@ Item {
                                     Label { text: "最新权重:"; color: Theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 100 }
                                     Label {
                                         text: selectedVersion ? selectedVersion.lastWeightPath || "N/A" : "N/A"
-                                        color: Theme.textSecondary
+                                        color: Theme.textMuted
                                         font.pixelSize: 12
                                         font.family: "monospace"
                                         Layout.fillWidth: true
@@ -439,7 +439,7 @@ Item {
                                             if (!pv || pv === "") return "无"
                                             return pv.substring(0, 8) + "..."
                                         }
-                                        color: Theme.accentPrimary
+                                        color: Theme.primary
                                         font.pixelSize: 12
                                         font.family: "monospace"
                                     }
@@ -455,14 +455,14 @@ Item {
 
                             Label {
                                 text: "标签:"
-                                color: Theme.textPrimary
+                                color: Theme.textMain
                                 font.pixelSize: 13
                             }
 
                             Button {
                                 text: "基线"
                                 flat: true
-                                palette.buttonText: Theme.accentPrimary
+                                palette.buttonText: Theme.primary
                                 font.pixelSize: 11
                                 onClicked: {
                                     modelRegistry.setTag(selectedVersionId, "baseline")
@@ -475,7 +475,7 @@ Item {
                             Button {
                                 text: "最佳"
                                 flat: true
-                                palette.buttonText: Theme.accentSuccess
+                                palette.buttonText: Theme.success
                                 font.pixelSize: 11
                                 onClicked: {
                                     modelRegistry.setTag(selectedVersionId, "best-so-far")
@@ -488,7 +488,7 @@ Item {
                             Button {
                                 text: "生产"
                                 flat: true
-                                palette.buttonText: Theme.accentWarning
+                                palette.buttonText: Theme.warning
                                 font.pixelSize: 11
                                 onClicked: {
                                     modelRegistry.setTag(selectedVersionId, "production-candidate")
@@ -503,7 +503,7 @@ Item {
                             Button {
                                 text: "清除标签"
                                 flat: true
-                                palette.buttonText: Theme.accentError
+                                palette.buttonText: Theme.danger
                                 font.pixelSize: 11
                                 onClicked: {
                                     modelRegistry.removeTag(selectedVersionId, "baseline")
@@ -534,14 +534,14 @@ Item {
 
                                 Label {
                                     text: "版本谱系"
-                                    color: Theme.accentPrimary
+                                    color: Theme.primary
                                     font.pixelSize: 12
                                     font.bold: true
                                 }
 
                                 Label {
                                     id: lineageLabel
-                                    color: Theme.textSecondary
+                                    color: Theme.textMuted
                                     font.pixelSize: 11
                                     font.family: "monospace"
                                     wrapMode: Text.WordWrap

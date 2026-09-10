@@ -30,7 +30,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: Theme.bgPrimary
+        color: Theme.bgMain
         radius: 8
 
         ColumnLayout {
@@ -45,7 +45,7 @@ Item {
 
                 Label {
                     text: "低置信度队列"
-                    color: Theme.accentWarning
+                    color: Theme.warning
                     font.pixelSize: 16
                     font.bold: true
                 }
@@ -54,7 +54,7 @@ Item {
 
                 Label {
                     text: "阈值："
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 12
                 }
 
@@ -81,7 +81,7 @@ Item {
                         Rectangle {
                             width: thresholdSlider.visualPosition * parent.width
                             height: parent.height
-                            color: Theme.accentWarning
+                            color: Theme.warning
                             radius: 2
                         }
                     }
@@ -92,7 +92,7 @@ Item {
                         width: 14
                         height: 14
                         radius: 7
-                        color: thresholdSlider.pressed ? Qt.darker(Theme.accentWarning, 1.15) : Theme.accentWarning
+                        color: thresholdSlider.pressed ? Qt.darker(Theme.warning, 1.15) : Theme.warning
                     }
                 }
 
@@ -111,13 +111,13 @@ Item {
                     background: Rectangle {
                         color: parent.pressed ? Theme.textDisabled : Theme.bgHover
                         radius: 4
-                        border.color: Theme.accentWarning
+                        border.color: Theme.warning
                         border.width: 1
                     }
 
                     contentItem: Label {
                         text: parent.text
-                        color: Theme.accentWarning
+                        color: Theme.warning
                         font.pixelSize: 11
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
@@ -132,7 +132,7 @@ Item {
             Label {
                 Layout.fillWidth: true
                 text: qsTr("找到 %1 个低置信度候选").arg(queueListModel.count)
-                color: queueListModel.count > 0 ? Theme.accentWarning : Theme.textDisabled
+                color: queueListModel.count > 0 ? Theme.warning : Theme.textDisabled
                 font.pixelSize: 12
             }
 
@@ -164,7 +164,7 @@ Item {
                     width: queueList.width
                     height: 52
                     radius: 6
-                    color: delegateMouseArea.containsMouse ? Theme.bgHover : Theme.bgSecondary
+                    color: delegateMouseArea.containsMouse ? Theme.bgHover : Theme.bgSide
                     border.color: Theme.bgHover
                     border.width: 1
 
@@ -181,15 +181,15 @@ Item {
                             radius: 5
                             color: {
                                 var conf = parseFloat(model.confidence) || 0
-                                if (conf < 0.2) return Theme.accentError
-                                return Theme.accentWarning
+                                if (conf < 0.2) return Theme.danger
+                                return Theme.warning
                             }
                         }
 
                         // Candidate index (truncated ID)
                         Label {
                             text: "#" + model.candidateIndex
-                            color: Theme.accentPrimary
+                            color: Theme.primary
                             font.pixelSize: 12
                             font.family: "monospace"
                             font.bold: true
@@ -199,7 +199,7 @@ Item {
                         // Class name
                         Label {
                             text: model.className || ("类别 " + model.classIndex)
-                            color: Theme.textPrimary
+                            color: Theme.textMain
                             font.pixelSize: 12
                             Layout.preferredWidth: 100
                         }
@@ -207,7 +207,7 @@ Item {
                         // Confidence score
                         Label {
                             text: "置信度: " + (parseFloat(model.confidence) || 0).toFixed(3)
-                            color: (parseFloat(model.confidence) || 0) < 0.2 ? Theme.accentError : Theme.accentWarning
+                            color: (parseFloat(model.confidence) || 0) < 0.2 ? Theme.danger : Theme.warning
                             font.pixelSize: 11
                             font.family: "monospace"
                         }
@@ -232,13 +232,13 @@ Item {
                             Layout.preferredWidth: 70
 
                             background: Rectangle {
-                                color: parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess
+                                color: parent.pressed ? Qt.darker(Theme.success, 1.2) : Theme.success
                                 radius: 4
                             }
 
                             contentItem: Label {
                                 text: parent.text
-                                color: Theme.bgPrimary
+                                color: Theme.bgMain
                                 font.pixelSize: 10
                                 font.bold: true
                                 horizontalAlignment: Text.AlignHCenter
@@ -262,13 +262,13 @@ Item {
                             background: Rectangle {
                                 color: parent.pressed ? Theme.textDisabled : Theme.bgHover
                                 radius: 4
-                                border.color: Theme.accentError
+                                border.color: Theme.danger
                                 border.width: 1
                             }
 
                             contentItem: Label {
                                 text: parent.text
-                                color: Theme.accentError
+                                color: Theme.danger
                                 font.pixelSize: 10
                                 font.bold: true
                                 horizontalAlignment: Text.AlignHCenter

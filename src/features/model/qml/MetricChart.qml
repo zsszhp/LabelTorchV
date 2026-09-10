@@ -12,7 +12,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: Theme.bgPrimary
+        color: Theme.bgMain
         radius: 6
 
         ColumnLayout {
@@ -26,7 +26,7 @@ Item {
 
                 Label {
                     text: "指标"
-                    color: Theme.accentPrimary
+                    color: Theme.primary
                     font.pixelSize: 14
                     font.bold: true
                 }
@@ -90,7 +90,7 @@ Item {
                                     }
                                     return String(val)
                                 }
-                                color: Theme.accentSuccess
+                                color: Theme.success
                                 font.pixelSize: 16
                                 font.bold: true
                                 font.family: "monospace"
@@ -139,7 +139,7 @@ Item {
                             return root.metricsJson
                         }
                     }
-                    color: Theme.textSecondary
+                    color: Theme.textMuted
                     font.pixelSize: 12
                     font.family: "monospace"
                     selectByMouse: true

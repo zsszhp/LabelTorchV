@@ -29,6 +29,7 @@ public:
     static constexpr const char *TASK_EVENTS = "task_events";
     static constexpr const char *RUN_METRICS = "run_metrics";
     static constexpr const char *TESTING_RUNS = "testing_runs";
+    static constexpr const char *DATASET_TAGS = "dataset_tags";  ///< 数据集标签表（A6）
 };
 
 #endif // SCHEMA_H

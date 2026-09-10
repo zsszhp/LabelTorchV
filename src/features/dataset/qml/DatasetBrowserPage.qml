@@ -5,7 +5,7 @@ import LabelTorch.Theme
 
 Rectangle {
     id: root
-    color: Theme.bgPrimary
+    color: Theme.bgMain
 
     property string currentDatasetId: ""
     property string currentDatasetName: ""
@@ -38,7 +38,7 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 44
-            color: Theme.bgSecondary
+            color: Theme.bgSide
 
             RowLayout {
                 anchors.fill: parent
@@ -49,7 +49,7 @@ Rectangle {
                     text: currentDatasetId ? "数据集: " + currentDatasetName : "选择一个数据集浏览"
                     font.pixelSize: Theme.fontSizeNormal
                     font.bold: true
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.family: Theme.fontFamily
                 }
 
@@ -59,7 +59,7 @@ Rectangle {
                     visible: currentDatasetId
                     text: "共 " + totalSamples + " 个样本"
                     font.pixelSize: Theme.fontSizeSmall
-                    color: Theme.textSecondary
+                    color: Theme.textMuted
                     font.family: Theme.fontFamily
                 }
 
@@ -68,7 +68,7 @@ Rectangle {
                     text: "刷新"
                     flat: true
                     font.pixelSize: Theme.fontSizeSmall
-                    palette.buttonText: Theme.accentPrimary
+                    palette.buttonText: Theme.primary
                     onClicked: refreshSamples()
                 }
             }
@@ -82,7 +82,7 @@ Rectangle {
             Rectangle {
                 Layout.preferredWidth: 220
                 Layout.fillHeight: true
-                color: Theme.bgSecondary
+                color: Theme.bgSide
                 visible: appController.projectOpen
 
                 ColumnLayout {
@@ -94,7 +94,7 @@ Rectangle {
                         text: "数据集列表"
                         font.pixelSize: Theme.fontSizeSmall
                         font.bold: true
-                        color: Theme.textSecondary
+                        color: Theme.textMuted
                         font.family: Theme.fontFamily
                         leftPadding: Theme.spacingNormal
                         topPadding: Theme.spacingNormal
@@ -117,7 +117,7 @@ Rectangle {
                                 Label {
                                     text: model.name
                                     font.pixelSize: Theme.fontSizeNormal
-                                    color: highlighted ? Theme.accentPrimary : Theme.textPrimary
+                                    color: highlighted ? Theme.primary : Theme.textMain
                                     font.family: Theme.fontFamily
                                 }
                                 Label {
@@ -129,7 +129,7 @@ Rectangle {
                             }
 
                             background: Rectangle {
-                                color: highlighted ? Theme.bgSelected : (parent.hovered ? Theme.bgPrimary : "transparent")
+                                color: highlighted ? Theme.bgSelected : (parent.hovered ? Theme.bgMain : "transparent")
                             }
 
                             onClicked: root.loadDataset(model.datasetId, model.name)
@@ -158,7 +158,7 @@ Rectangle {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                color: Theme.bgPrimary
+                color: Theme.bgMain
 
                 GridView {
                     id: sampleGrid
@@ -178,7 +178,7 @@ Rectangle {
                         height: sampleGrid.cellHeight - 4
                         color: Theme.bgCard
                         radius: Theme.radiusSmall
-                        border.color: Theme.borderNormal
+                        border.color: Theme.borderColor
                         border.width: 1
 
                         Column {
@@ -197,7 +197,7 @@ Rectangle {
                                 Rectangle {
                                     anchors.fill: parent
                                     visible: parent.status === Image.Error || parent.status === Image.Null
-                                    color: Theme.bgTertiary
+                                    color: Theme.bgCard
 
                                     Label {
                                         anchors.centerIn: parent
@@ -217,7 +217,7 @@ Rectangle {
                                     return parts.length > 0 ? parts[parts.length - 1] : ""
                                 }
                                 font.pixelSize: Theme.fontSizeSmall
-                                color: Theme.textSecondary
+                                color: Theme.textMuted
                                 font.family: Theme.fontFamily
                                 elide: Text.ElideRight
                             }
@@ -226,7 +226,7 @@ Rectangle {
                                 width: parent.width - 8
                                 text: model.validationStatus === "valid" ? "有效" : "异常"
                                 font.pixelSize: Theme.fontSizeSmall
-                                color: model.validationStatus === "valid" ? Theme.accentSuccess : Theme.accentError
+                                color: model.validationStatus === "valid" ? Theme.success : Theme.danger
                                 font.family: Theme.fontFamily
                             }
                         }
@@ -234,7 +234,10 @@ Rectangle {
                         MouseArea {
                             anchors.fill: parent
                             onDoubleClicked: {
-                                console.log("Open sample:", model.id)
+                                // 双击跳转标注页
+                                if (model && model.id) {
+                                    appController.currentPage = "annotation"
+                                }
                             }
                         }
                     }
@@ -256,7 +259,7 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 36
-            color: Theme.bgSecondary
+            color: Theme.bgSide
             visible: currentDatasetId
 
             RowLayout {
@@ -267,7 +270,7 @@ Rectangle {
                 Label {
                     text: "第 " + (currentPage + 1) + " 页"
                     font.pixelSize: Theme.fontSizeSmall
-                    color: Theme.textSecondary
+                    color: Theme.textMuted
                     font.family: Theme.fontFamily
                 }
 
@@ -278,7 +281,7 @@ Rectangle {
                     flat: true
                     enabled: currentPage > 0
                     font.pixelSize: Theme.fontSizeSmall
-                    palette.buttonText: Theme.accentPrimary
+                    palette.buttonText: Theme.primary
                     onClicked: {
                         currentPage--
                         refreshSamples()
@@ -290,7 +293,7 @@ Rectangle {
                     flat: true
                     enabled: (currentPage + 1) * pageSize < totalSamples
                     font.pixelSize: Theme.fontSizeSmall
-                    palette.buttonText: Theme.accentPrimary
+                    palette.buttonText: Theme.primary
                     onClicked: {
                         currentPage++
                         refreshSamples()

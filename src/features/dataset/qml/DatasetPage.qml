@@ -45,7 +45,13 @@ Item {
             currentDatasetId = ""
             currentDatasetName = ""
             selectedSample = null
+            tagModel.setDatasetId("")  // A6：清空标签列表
         }
+    }
+
+    // A6：当前数据集变化时刷新标签列表
+    onCurrentDatasetIdChanged: {
+        tagModel.setDatasetId(currentDatasetId)
     }
 
     // === 监听扫描完成信号 ===
@@ -1104,7 +1110,16 @@ Item {
             }
         }
 
-        onAccepted: { tagNameField.clear(); tagShortcutField.clear() }
+        onAccepted: {
+            // A6：调用 TagService 持久化标签
+            var name = tagNameField.text.trim()
+            var shortcut = tagShortcutField.text.trim()
+            if (name && currentDatasetId) {
+                tagService.addTag(currentDatasetId, name, shortcut)
+            }
+            tagNameField.clear()
+            tagShortcutField.clear()
+        }
         onRejected: { tagNameField.clear(); tagShortcutField.clear() }
     }
 

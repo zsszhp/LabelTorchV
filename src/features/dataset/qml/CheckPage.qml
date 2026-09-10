@@ -20,6 +20,7 @@ Item {
     property string selectedDatasetId: "" // 当前选中的数据集ID
     property bool severityMode: false     // 程度图像模式开关
     property real sidebarWidth: Theme.sidebarWidth  // 侧边栏宽度（可拖拽调整）
+    property var classCounts: ({})        // 按类别样本数统计 {classIndex: count}
 
     // === 生命周期 ===
     Component.onCompleted: {
@@ -51,10 +52,21 @@ Item {
                 var sample = samples[s]
                 sample.datasetName = ds.name
                 sample.datasetId = ds.id
-                // 从标签文件提取第一个类别索引（用于类别过滤）
+                // 从标签文件提取所有类别索引（用于类别过滤和统计）
+                sample.classIndices = []
                 if (sample.labelPath) {
                     var annotations = annotationService.loadAnnotations(sample.labelPath)
                     if (annotations && annotations.length > 0) {
+                        // 收集所有类别索引（去重）
+                        var seen = {}
+                        for (var a = 0; a < annotations.length; a++) {
+                            var cid = annotations[a].classIndex
+                            if (seen[cid] === undefined) {
+                                seen[cid] = true
+                                sample.classIndices.push(cid)
+                            }
+                        }
+                        // 兼容字段：保留第一个类别索引用于旧逻辑
                         sample.classIndex = annotations[0].classIndex
                     }
                     annotated++
@@ -65,7 +77,23 @@ Item {
         sampleListData = allSamples
         totalSamples = allSamples.length
         annotatedSamples = annotated
+        computeClassCounts()
         applyClassFilter()
+    }
+
+    // === 计算每个类别的样本数 ===
+    function computeClassCounts() {
+        var counts = {}
+        for (var i = 0; i < sampleListData.length; i++) {
+            var sample = sampleListData[i]
+            if (sample.classIndices && sample.classIndices.length > 0) {
+                for (var j = 0; j < sample.classIndices.length; j++) {
+                    var cid = sample.classIndices[j]
+                    counts[cid] = (counts[cid] || 0) + 1
+                }
+            }
+        }
+        classCounts = counts
     }
 
     // === 按类别过滤 ===
@@ -76,9 +104,14 @@ Item {
             var filtered = []
             for (var i = 0; i < sampleListData.length; i++) {
                 var sample = sampleListData[i]
-                // 只保留包含选中类别的样本
-                if (sample.classIndex !== undefined && selectedClassIds.indexOf(sample.classIndex) >= 0) {
-                    filtered.push(sample)
+                // 保留包含任意选中类别的样本
+                if (sample.classIndices && sample.classIndices.length > 0) {
+                    for (var j = 0; j < sample.classIndices.length; j++) {
+                        if (selectedClassIds.indexOf(sample.classIndices[j]) >= 0) {
+                            filtered.push(sample)
+                            break
+                        }
+                    }
                 }
             }
             filteredSamples = filtered
@@ -411,7 +444,11 @@ Item {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    // TODO: 打开程度模型标注界面
+                                    // 切换程度模式并跳转标注页
+                                    root.severityMode = !root.severityMode
+                                    if (root.severityMode) {
+                                        appController.currentPage = "annotation"
+                                    }
                                 }
                             }
                         }
@@ -530,9 +567,9 @@ Item {
                                         elide: Text.ElideRight
                                     }
 
-                                    // 数量（monospace）
+                                    // 数量（monospace）- 按类别样本数统计
                                     Text {
-                                        text: "0"  // 样本数，后续可从服务获取
+                                        text: classCounts[model.classIndex] || 0
                                         font.pixelSize: Theme.fontSizeCaption
                                         font.family: Theme.fontFamilyMono
                                         color: Theme.textMuted

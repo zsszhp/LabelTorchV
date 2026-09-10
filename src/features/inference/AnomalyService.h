@@ -25,10 +25,18 @@ public:
     void setIpcClient(IpcClient *client);
 
     /**
-     * @brief 列出支持的异常检测模型
+     * @brief 列出支持的异常检测模型（A9：优先从缓存返回，IPC 不可用时返回完整 fallback 列表）
      * @return 模型名称列表
      */
     Q_INVOKABLE QStringList listModels() const;
+
+    /**
+     * @brief 异步从后端获取模型列表并缓存（A9）
+     *
+     * 在 IPC 连接后调用，获取后端实际支持的模型列表。
+     * 失败时使用本地 fallback（完整 12 个模型）。
+     */
+    Q_INVOKABLE void refreshModels();
 
     /**
      * @brief 执行异常检测推理
@@ -58,12 +66,21 @@ signals:
      */
     void inferenceFailed(const QString &error);
 
+    /**
+     * @brief 模型列表刷新完成信号（A9）
+     */
+    void modelsRefreshed();
+
 private slots:
     void onResponseReceived(const QJsonObject &response);
 
 private:
     IpcClient *m_ipcClient = nullptr;
     int m_pendingInferenceId = 0;
+    /// A9：缓存的模型列表（从后端获取，失败时使用 fallback）
+    mutable QStringList m_cachedModels;
+    /// A9：本地 fallback 完整 12 个模型列表
+    static QStringList fallbackModels();
 };
 
 #endif // ANOMALYSERVICE_H

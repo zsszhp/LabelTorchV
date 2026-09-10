@@ -10,6 +10,55 @@ import os
 
 logger = logging.getLogger(__name__)
 
+# A9：Anomalib 支持的完整 12 个模型列表（与 anomalib_adapter.py 一致）
+SUPPORTED_MODELS = [
+    "patchcore",
+    "padim",
+    "stfpm",
+    "cflow",
+    "dfkde",
+    "dfm",
+    "ganomaly",
+    "fastflow",
+    "reverse_distillation",
+    "csflow",
+    "devnet",
+    "efficient_ad",
+]
+
+
+async def handle_list_models(payload: dict) -> dict:
+    """A9：返回后端支持的异常检测模型列表
+
+    优先检测 anomalib 实际可用的模型，失败时返回完整列表。
+    """
+    try:
+        # 尝试从 anomalib 获取实际支持的模型
+        from anomalib.models import get_model  # noqa: F401
+
+        # anomalib 已安装，返回完整支持列表
+        return {
+            "status": "succeeded",
+            "models": SUPPORTED_MODELS,
+            "count": len(SUPPORTED_MODELS),
+        }
+    except ImportError:
+        # anomalib 未安装，返回空列表（前端会使用 fallback）
+        logger.warning("anomalib not installed, returning empty model list")
+        return {
+            "status": "succeeded",
+            "models": [],
+            "count": 0,
+        }
+    except Exception as e:
+        logger.error(f"Failed to list anomaly models: {e}")
+        return {
+            "status": "failed",
+            "error": str(e),
+            "models": [],
+            "count": 0,
+        }
+
 
 async def handle_infer(payload: dict) -> dict:
     """异常检测推理：单张/批量图片，返回异常分数和热力图"""

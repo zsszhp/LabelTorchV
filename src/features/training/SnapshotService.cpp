@@ -1,5 +1,7 @@
 #include "SnapshotService.h"
 #include "Database.h"
+#include "ipc/IpcClient.h"
+#include "ipc/IpcProtocol.h"
 #include "utils/Log.h"
 
 #include <QSqlQuery>
@@ -23,6 +25,30 @@ struct ThreadDbGuard {
         QSqlDatabase::removeDatabase(connectionName);
     }
 };
+
+/// 原子性写入文件（先写 .tmp 再 rename，防止崩溃半写损坏）
+static bool writeFileAtomically(const QString &targetPath, const QString &content)
+{
+    QString tmpPath = targetPath + QStringLiteral(".tmp");
+    QFile tmpFile(tmpPath);
+    if (!tmpFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        ltError(LT_LOG_TRAINING()) << "Failed to create temp file:" << tmpPath;
+        return false;
+    }
+    QTextStream out(&tmpFile);
+    out << content;
+    out.flush();
+    tmpFile.close();
+
+    // 移除已存在的目标文件（rename 不会覆盖已存在文件）
+    QFile::remove(targetPath);
+    if (!tmpFile.rename(targetPath)) {
+        ltError(LT_LOG_TRAINING()) << "Failed to rename temp file to:" << targetPath;
+        QFile::remove(tmpPath);
+        return false;
+    }
+    return true;
+}
 
 SnapshotService::SnapshotService(QObject *parent) : QObject(parent)
 {
@@ -251,6 +277,10 @@ bool SnapshotService::deleteSnapshot(const QString &snapshotId)
     deleteQuery.addBindValue(snapshotId);
 
     if (deleteQuery.exec()) {
+        if (deleteQuery.numRowsAffected() == 0) {
+            ltWarning(LT_LOG_TRAINING()) << "Snapshot not found for deletion:" << snapshotId;
+            return false;
+        }
         ltInfo(LT_LOG_TRAINING()) << "Deleted snapshot:" << snapshotId;
         return true;
     }
@@ -596,166 +626,209 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
     if (isAnomaly) {
         // Anomaly 类型：生成 data.yaml 指向目录结构，Anomalib 适配器会自动识别
         QString yamlPath = snapshotDir + QStringLiteral("/data.yaml");
-        QFile yamlFile(yamlPath);
-        if (!yamlFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            ltError(LT_LOG_TRAINING()) << "Failed to create data.yaml file at" << yamlPath;
+        QString content;
+        QTextStream stream(&content);
+        stream << "path: " << QDir(snapshotDir).absolutePath() << "\n";
+        stream << "task: anomaly\n";
+        stream << "normal_dir: train/good\n";
+        stream << "abnormal_dir: test/defective\n";
+        stream << "normal_test_dir: test/good\n";
+
+        if (!writeFileAtomically(yamlPath, content)) {
             return {};
         }
-
-        QTextStream out(&yamlFile);
-        out << "path: " << QDir(snapshotDir).absolutePath() << "\n";
-        out << "task: anomaly\n";
-        out << "normal_dir: train/good\n";
-        out << "abnormal_dir: test/defective\n";
-        out << "normal_test_dir: test/good\n";
-        yamlFile.close();
 
         ltInfo(LT_LOG_TRAINING()) << "Anomaly snapshot prepared at:" << snapshotDir;
         return yamlPath;
     } else if (isClassify) {
         // 分类类型：生成简洁的 data.yaml（Ultralytics 从目录结构自动推断类别）
         QString yamlPath = snapshotDir + QStringLiteral("/data.yaml");
-        QFile yamlFile(yamlPath);
-        if (!yamlFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            ltError(LT_LOG_TRAINING()) << "Failed to create data.yaml file at" << yamlPath;
+        QString content;
+        QTextStream stream(&content);
+        stream << "path: " << QDir(snapshotDir).absolutePath() << "\n";
+        stream << "train: train\n";
+        stream << "val: val\n";
+
+        if (!writeFileAtomically(yamlPath, content)) {
             return {};
         }
-
-        QTextStream out(&yamlFile);
-        out << "path: " << QDir(snapshotDir).absolutePath() << "\n";
-        out << "train: train\n";
-        out << "val: val\n";
-        yamlFile.close();
 
         ltInfo(LT_LOG_TRAINING()) << "Classify snapshot prepared at:" << snapshotDir;
         return yamlPath;
     } else {
         // YOLO 类型：生成标准 data.yaml
         QString yamlPath = snapshotDir + QStringLiteral("/data.yaml");
-        QFile yamlFile(yamlPath);
-        if (!yamlFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            ltError(LT_LOG_TRAINING()) << "Failed to create data.yaml file at" << yamlPath;
-            return {};
+        QString content;
+        QTextStream stream(&content);
+        stream << "path: " << QDir(snapshotDir).absolutePath() << "\n";
+        stream << "train: images/train\n";
+        stream << "val: images/val\n";
+        stream << "nc: " << classes.size() << "\n";
+        stream << "names:\n";
+        for (int i = 0; i < classes.size(); ++i) {
+            stream << "  " << i << ": " << classes[i] << "\n";
         }
 
-        QTextStream out(&yamlFile);
-        out << "path: " << QDir(snapshotDir).absolutePath() << "\n";
-        out << "train: images/train\n";
-        out << "val: images/val\n";
-        out << "nc: " << classes.size() << "\n";
-        out << "names:\n";
-        for (int i = 0; i < classes.size(); ++i) {
-            out << "  " << i << ": " << classes[i] << "\n";
+        if (!writeFileAtomically(yamlPath, content)) {
+            return {};
         }
-        yamlFile.close();
 
         ltInfo(LT_LOG_TRAINING()) << "YOLO snapshot prepared at:" << snapshotDir;
         return yamlPath;
     }
 }
 
-QString SnapshotService::prepareAnomalySnapshotDir(const QString &snapshotId)
-{
-    ltInfo(LT_LOG_TRAINING()) << "Preparing anomaly detection snapshot directory for" << snapshotId;
-    QString dbPath = Database::instance().dbPath();
-    QString connectionName = QStringLiteral("thread_anomaly_snap_") + QUuid::createUuid().toString(QUuid::WithoutBraces);
-    ThreadDbGuard guard{connectionName};
+// ============================================================================
+// P0-2: 数据快照预览图（supervision 集成）
+// ============================================================================
 
-    QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
-    db.setDatabaseName(dbPath);
-    if (!db.open()) {
-        ltError(LT_LOG_TRAINING()) << "Failed to open thread database:" << db.lastError().text();
+void SnapshotService::setIpcClient(IpcClient *client)
+{
+    ltTrace(LT_LOG_TRAINING()) << "client=" << client;
+    if (m_ipcClient) {
+        disconnect(m_ipcClient, &IpcClient::responseReceived,
+                   this, &SnapshotService::onPreviewResponseReceived);
+    }
+    m_ipcClient = client;
+    if (m_ipcClient) {
+        // 仅过滤处理 snapshot.preview 响应，其他命令忽略
+        connect(m_ipcClient, &IpcClient::responseReceived,
+                this, &SnapshotService::onPreviewResponseReceived);
+    }
+}
+
+QString SnapshotService::generatePreview(const QString &snapshotId)
+{
+    ltTrace(LT_LOG_TRAINING()) << "snapshotId=" << snapshotId;
+
+    if (!m_ipcClient) {
+        ltError(LT_LOG_TRAINING()) << "IpcClient not injected for snapshot preview";
+        emit previewGenerated(snapshotId, QString(), false, QStringLiteral("IPC 客户端未注入"));
         return {};
     }
 
-    // 1. 获取快照信息
+    auto db = Database::instance().database();
+    if (!db.isOpen()) {
+        emit previewGenerated(snapshotId, QString(), false, QStringLiteral("数据库未打开"));
+        return {};
+    }
+
+    // 1. 校验快照存在并解析所属项目根目录 + dataset_id
     QSqlQuery snapQuery(db);
-    snapQuery.prepare("SELECT dataset_id, sample_manifest_json FROM dataset_snapshots WHERE id = ?");
+    snapQuery.prepare("SELECT dataset_id FROM dataset_snapshots WHERE id = ?");
     snapQuery.addBindValue(snapshotId);
     if (!snapQuery.exec() || !snapQuery.next()) {
         ltError(LT_LOG_TRAINING()) << "Snapshot not found:" << snapshotId;
+        emit previewGenerated(snapshotId, QString(), false, QStringLiteral("快照不存在"));
         return {};
     }
-
     QString datasetId = snapQuery.value(0).toString();
-    QString manifestJson = snapQuery.value(1).toString();
 
-    // 2. 获取项目根路径
-    QSqlQuery datasetQuery(db);
-    datasetQuery.prepare("SELECT project_id FROM datasets WHERE id = ?");
-    datasetQuery.addBindValue(datasetId);
-    if (!datasetQuery.exec() || !datasetQuery.next()) {
-        ltError(LT_LOG_TRAINING()) << "Dataset not found:" << datasetId;
+    QSqlQuery projQuery(db);
+    projQuery.prepare(
+        "SELECT p.root_path FROM projects p "
+        "JOIN datasets d ON d.project_id = p.id WHERE d.id = ?");
+    projQuery.addBindValue(datasetId);
+    if (!projQuery.exec() || !projQuery.next()) {
+        ltError(LT_LOG_TRAINING()) << "Project root not resolvable for dataset:" << datasetId;
+        emit previewGenerated(snapshotId, QString(), false, QStringLiteral("无法解析项目根目录"));
         return {};
     }
-    QString projectId = datasetQuery.value(0).toString();
+    QString projectRoot = projQuery.value(0).toString();
+    QString snapshotDir = projectRoot + QStringLiteral("/cache/snapshots/") + snapshotId;
+    QString dataYamlPath = snapshotDir + QStringLiteral("/data.yaml");
 
-    QSqlQuery projectQuery(db);
-    projectQuery.prepare("SELECT root_path FROM projects WHERE id = ?");
-    projectQuery.addBindValue(projectId);
-    if (!projectQuery.exec() || !projectQuery.next()) {
-        ltError(LT_LOG_TRAINING()) << "Project not found:" << projectId;
-        return {};
-    }
-    QString projectRoot = projectQuery.value(0).toString();
-
-    // 3. 创建快照目录结构（Anomalib 规范）
-    QString cacheDir = projectRoot + QStringLiteral("/cache/snapshots");
-    QString snapshotDir = cacheDir + QStringLiteral("/") + snapshotId;
-
-    QDir dir;
-    if (!dir.mkpath(snapshotDir + QStringLiteral("/train/good")) ||
-        !dir.mkpath(snapshotDir + QStringLiteral("/test/good")) ||
-        !dir.mkpath(snapshotDir + QStringLiteral("/test/defective"))) {
-        ltError(LT_LOG_TRAINING()) << "Failed to create anomaly snapshot directories:" << snapshotDir;
-        return {};
-    }
-
-    // 4. 查询样本并按 validation_status 和 split 分类复制
-    QSqlQuery sampleQuery(db);
-    sampleQuery.prepare("SELECT image_path, validation_status, split FROM dataset_samples "
-                        "WHERE dataset_id = ? AND validation_status IN ('good', 'defective')");
-    sampleQuery.addBindValue(datasetId);
-
-    if (!sampleQuery.exec()) {
-        ltError(LT_LOG_TRAINING()) << "Failed to query samples for anomaly snapshot:" << sampleQuery.lastError().text();
-        return {};
-    }
-
-    int copiedCount = 0;
-    while (sampleQuery.next()) {
-        QString srcImg = sampleQuery.value(0).toString();
-        QString validationStatus = sampleQuery.value(1).toString();
-        QString split = sampleQuery.value(2).toString();
-
-        if (srcImg.isEmpty()) continue;
-
-        QFileInfo imgInfo(srcImg);
-        QString destSubDir;
-
-        if (split == QStringLiteral("train") && validationStatus == QStringLiteral("good")) {
-            destSubDir = QStringLiteral("/train/good/");
-        } else if (split == QStringLiteral("test") && validationStatus == QStringLiteral("good")) {
-            destSubDir = QStringLiteral("/test/good/");
-        } else if (split == QStringLiteral("test") && validationStatus == QStringLiteral("defective")) {
-            destSubDir = QStringLiteral("/test/defective/");
-        } else {
-            // 默认：正常样本放 train/good
-            destSubDir = QStringLiteral("/train/good/");
+    // 2. 若物理目录尚未准备，先调用 prepareSnapshotPhysicalDir
+    if (!QFileInfo::exists(dataYamlPath)) {
+        ltInfo(LT_LOG_TRAINING()) << "Physical dir not ready, preparing:" << snapshotId;
+        QString prepared = prepareSnapshotPhysicalDir(snapshotId);
+        if (prepared.isEmpty()) {
+            emit previewGenerated(snapshotId, QString(), false,
+                                  QStringLiteral("快照物理目录准备失败"));
+            return {};
         }
-
-        QString dstImg = snapshotDir + destSubDir + imgInfo.fileName();
-        if (QFile::exists(dstImg)) {
-            QFile::remove(dstImg);
-        }
-        if (QFile::copy(srcImg, dstImg)) {
-            copiedCount++;
-        } else {
-            ltWarning(LT_LOG_TRAINING()) << "Failed to copy image:" << srcImg << "to" << dstImg;
-        }
+        dataYamlPath = prepared;
     }
 
-    ltInfo(LT_LOG_TRAINING()) << "Anomaly snapshot prepared at:" << snapshotDir
-                              << "copied" << copiedCount << "images";
-    return snapshotDir;
+    // 3. 发起 IPC 请求 snapshot.preview
+    QJsonObject payload;
+    payload["snapshot_dir"] = snapshotDir;
+    payload["data_yaml_path"] = dataYamlPath;
+    payload["max_samples"] = 9;
+    payload["grid_cols"] = 3;
+    payload["thumb_size"] = 320;
+
+    QString requestId = m_ipcClient->sendRequest(IpcProtocol::CMD_SNAPSHOT_PREVIEW, payload);
+    if (requestId.isEmpty()) {
+        ltError(LT_LOG_TRAINING()) << "Failed to send snapshot.preview request";
+        emit previewGenerated(snapshotId, QString(), false, QStringLiteral("IPC 请求发送失败"));
+        return {};
+    }
+
+    m_pendingPreviews[requestId] = snapshotId;
+    ltInfo(LT_LOG_TRAINING()) << "Snapshot preview requested:" << snapshotId
+                              << "requestId=" << requestId;
+    return requestId;
+}
+
+QString SnapshotService::getPreviewPath(const QString &snapshotId) const
+{
+    if (snapshotId.isEmpty()) return {};
+
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return {};
+
+    QSqlQuery snapQuery(db);
+    snapQuery.prepare(
+        "SELECT d.project_id FROM dataset_snapshots s "
+        "JOIN datasets d ON d.id = s.dataset_id WHERE s.id = ?");
+    snapQuery.addBindValue(snapshotId);
+    if (!snapQuery.exec() || !snapQuery.next()) return {};
+
+    QString projectId = snapQuery.value(0).toString();
+    QSqlQuery projQuery(db);
+    projQuery.prepare("SELECT root_path FROM projects WHERE id = ?");
+    projQuery.addBindValue(projectId);
+    if (!projQuery.exec() || !projQuery.next()) return {};
+
+    QString previewPath = projQuery.value(0).toString()
+                          + QStringLiteral("/cache/snapshots/")
+                          + snapshotId
+                          + QStringLiteral("/preview.jpg");
+    return QFileInfo::exists(previewPath) ? previewPath : QString();
+}
+
+void SnapshotService::onPreviewResponseReceived(const QJsonObject &response)
+{
+    // 仅处理 snapshot.preview 响应，其他命令直接返回
+    QString command = response.value("command").toString();
+    if (command != IpcProtocol::CMD_SNAPSHOT_PREVIEW) {
+        return;
+    }
+
+    QString requestId = response.value("request_id").toString();
+    if (!m_pendingPreviews.contains(requestId)) {
+        return; // 不是本服务发起的请求
+    }
+
+    QString snapshotId = m_pendingPreviews.take(requestId);
+    bool success = response.value("success").toBool(false);
+    QJsonObject result = response.value("result").toObject();
+    QString error = response.value("error").toObject().value("message").toString();
+
+    if (success) {
+        QString previewPath = result.value("preview_path").toString();
+        if (previewPath.isEmpty()) {
+            // 后端未返回路径，回退到本地推断
+            previewPath = getPreviewPath(snapshotId);
+        }
+        ltInfo(LT_LOG_TRAINING()) << "Snapshot preview generated:" << snapshotId
+                                  << "path=" << previewPath;
+        emit previewGenerated(snapshotId, previewPath, true, QString());
+    } else {
+        ltError(LT_LOG_TRAINING()) << "Snapshot preview failed:" << snapshotId
+                                   << "error=" << error;
+        emit previewGenerated(snapshotId, QString(), false,
+                              error.isEmpty() ? QStringLiteral("后端生成预览失败") : error);
+    }
 }

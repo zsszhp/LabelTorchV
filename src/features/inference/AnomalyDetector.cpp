@@ -76,11 +76,26 @@ bool AnomalyDetector::loadModel(const QString &modelPath)
         return false;
     }
 #else
-    // 无 ONNX Runtime 时，仅读取元数据（不实际推理）
-    m_impl->loaded = true;
-    loadMetadataFromModel();
-    ltWarning(LT_LOG_INFERENCE()) << "ONNX Runtime not available, model loaded in metadata-only mode";
-    return true;
+    // A8：无 ONNX Runtime 时返回 false，避免状态不一致（infer 会失败）
+    // 元数据仍可通过 getModelMetadata() 读取（如果未来实现纯 JSON 元数据解析）
+    m_impl->loaded = false;
+    ltWarning(LT_LOG_INFERENCE()) << "ONNX Runtime not available, cannot load model for inference:" << modelPath;
+    return false;
+#endif
+}
+
+bool AnomalyDetector::isLoaded() const
+{
+    return m_impl->loaded;
+}
+
+bool AnomalyDetector::isInferable() const
+{
+    // A8：可推理 = 已加载 + ONNX Runtime 可用 + session 已创建
+#ifdef WITH_ONNXRUNTIME
+    return m_impl->loaded && m_impl->session != nullptr;
+#else
+    return false;
 #endif
 }
 
@@ -272,18 +287,11 @@ QVariantMap AnomalyDetector::infer(const QString &imagePath)
         return result;
     }
 #else
-    // 无 ONNX Runtime 时的占位实现
-    ltWarning(LT_LOG_INFERENCE()) << "ONNX Runtime not available, returning placeholder result";
-    result["anomalyScore"] = 0.0;
-    result["isAnomalous"] = 0;
-    emit inferenceCompleted(result);
+    // 无 ONNX Runtime 时，发出失败信号（不返回假数据，避免上层误认为推理成功）
+    ltError(LT_LOG_INFERENCE()) << "ONNX Runtime not available, cannot perform inference";
+    emit inferenceFailed(QStringLiteral("ONNX Runtime 不可用，无法执行异常检测推理"));
     return result;
 #endif
-}
-
-bool AnomalyDetector::isLoaded() const
-{
-    return m_impl->loaded;
 }
 
 QVariantMap AnomalyDetector::getModelMetadata() const

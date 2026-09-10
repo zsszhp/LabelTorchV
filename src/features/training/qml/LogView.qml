@@ -45,7 +45,7 @@ Rectangle {
 
                 Label {
                     text: "训练日志"
-                    color: Theme.textSecondary
+                    color: Theme.textMuted
                     font.pixelSize: 12
                     font.bold: true
                 }
@@ -54,7 +54,7 @@ Rectangle {
 
                 Label {
                     text: autoScroll ? "自动滚动：开" : "自动滚动：关"
-                    color: autoScroll ? Theme.accentSuccess : Theme.textMuted
+                    color: autoScroll ? Theme.success : Theme.textMuted
                     font.pixelSize: 11
                 }
 
@@ -86,7 +86,7 @@ Rectangle {
                 id: logArea
                 readOnly: true
                 selectByMouse: true
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 12
                 font.family: "Consolas, Courier New, monospace"
                 wrapMode: TextEdit.NoWrap

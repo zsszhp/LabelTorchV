@@ -6,7 +6,7 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
-    color: Theme.bgPrimary
+    color: Theme.bgMain
     radius: 6
     implicitHeight: layout.implicitHeight + 24
 
@@ -22,7 +22,7 @@ Rectangle {
 
         Label {
             text: "ONNX 导出选项"
-            color: Theme.accentPrimary
+            color: Theme.primary
             font.pixelSize: 14
             font.bold: true
         }
@@ -34,7 +34,7 @@ Rectangle {
 
             Label {
                 text: "Opset 版本："
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 120
             }
@@ -49,7 +49,7 @@ Rectangle {
 
                 contentItem: Label {
                     text: opsetSpin.textFromValue(opsetSpin.value, opsetSpin.locale)
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 13
                     font.family: "monospace"
                     horizontalAlignment: Text.AlignHCenter
@@ -60,14 +60,14 @@ Rectangle {
                     x: opsetSpin.mirrored ? 0 : parent.width - width
                     height: parent.height / 2
                     width: 32
-                    color: opsetSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
+                    color: opsetSpin.up.pressed ? Theme.borderColor : Theme.bgInput
+                    border.color: Theme.borderColor
                     radius: 2
 
                     Label {
                         anchors.centerIn: parent
                         text: "+"
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.pixelSize: 14
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -79,14 +79,14 @@ Rectangle {
                     y: parent.height / 2
                     height: parent.height / 2
                     width: 32
-                    color: opsetSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
+                    color: opsetSpin.down.pressed ? Theme.borderColor : Theme.bgInput
+                    border.color: Theme.borderColor
                     radius: 2
 
                     Label {
                         anchors.centerIn: parent
                         text: "-"
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.pixelSize: 14
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -95,7 +95,7 @@ Rectangle {
 
                 background: Rectangle {
                     color: Theme.bgInput
-                    border.color: opsetSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                    border.color: opsetSpin.activeFocus ? Theme.primary : Theme.borderColor
                     radius: 4
                 }
             }
@@ -114,7 +114,7 @@ Rectangle {
 
             Label {
                 text: "动态批次："
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 120
             }
@@ -129,8 +129,8 @@ Rectangle {
                     width: 40
                     height: 22
                     radius: 11
-                    color: dynamicBatchSwitch.checked ? Theme.accentPrimary : Theme.borderNormal
-                    border.color: dynamicBatchSwitch.checked ? Theme.accentPrimary : Theme.textDisabled
+                    color: dynamicBatchSwitch.checked ? Theme.primary : Theme.borderColor
+                    border.color: dynamicBatchSwitch.checked ? Theme.primary : Theme.textDisabled
 
                     Rectangle {
                         x: dynamicBatchSwitch.checked ? parent.width - width - 3 : 3
@@ -138,7 +138,7 @@ Rectangle {
                         width: 16
                         height: 16
                         radius: 8
-                        color: Theme.textPrimary
+                        color: Theme.textMain
 
                         Behavior on x {
                             NumberAnimation { duration: 150 }
@@ -153,7 +153,7 @@ Rectangle {
 
             Label {
                 text: dynamicBatchSwitch.checked ? "已启用" : "已禁用"
-                color: dynamicBatchSwitch.checked ? Theme.accentSuccess : Theme.textMuted
+                color: dynamicBatchSwitch.checked ? Theme.success : Theme.textMuted
                 font.pixelSize: 12
             }
         }
@@ -165,7 +165,7 @@ Rectangle {
 
             Label {
                 text: "简化："
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 120
             }
@@ -180,8 +180,8 @@ Rectangle {
                     width: 40
                     height: 22
                     radius: 11
-                    color: simplifySwitch.checked ? Theme.accentPrimary : Theme.borderNormal
-                    border.color: simplifySwitch.checked ? Theme.accentPrimary : Theme.textDisabled
+                    color: simplifySwitch.checked ? Theme.primary : Theme.borderColor
+                    border.color: simplifySwitch.checked ? Theme.primary : Theme.textDisabled
 
                     Rectangle {
                         x: simplifySwitch.checked ? parent.width - width - 3 : 3
@@ -189,7 +189,7 @@ Rectangle {
                         width: 16
                         height: 16
                         radius: 8
-                        color: Theme.textPrimary
+                        color: Theme.textMain
 
                         Behavior on x {
                             NumberAnimation { duration: 150 }
@@ -204,7 +204,7 @@ Rectangle {
 
             Label {
                 text: simplifySwitch.checked ? "已启用" : "已禁用"
-                color: simplifySwitch.checked ? Theme.accentSuccess : Theme.textMuted
+                color: simplifySwitch.checked ? Theme.success : Theme.textMuted
                 font.pixelSize: 12
             }
         }

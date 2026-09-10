@@ -40,7 +40,7 @@ Rectangle {
                 font.pixelSize: Theme.fontSizeSmall
                 palette.button: Theme.bgSide
                 palette.text: Theme.textMain
-                palette.buttonText: Theme.textSecondary
+                palette.buttonText: Theme.textMuted
             }
         }
 
@@ -60,7 +60,7 @@ Rectangle {
                 font.pixelSize: Theme.fontSizeSmall
                 palette.button: Theme.bgSide
                 palette.text: Theme.textMain
-                palette.buttonText: Theme.textSecondary
+                palette.buttonText: Theme.textMuted
             }
         }
 
@@ -80,7 +80,7 @@ Rectangle {
                 font.pixelSize: Theme.fontSizeSmall
                 palette.button: Theme.bgSide
                 palette.text: Theme.textMain
-                palette.buttonText: Theme.textSecondary
+                palette.buttonText: Theme.textMuted
             }
         }
     }

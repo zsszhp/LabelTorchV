@@ -20,7 +20,7 @@ Item {
 
             Label {
                 text: "数据集:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
             }
 
@@ -44,7 +44,7 @@ Item {
 
             Label {
                 text: "训练比例:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
             }
 
@@ -68,7 +68,7 @@ Item {
 
                 contentItem: TextInput {
                     text: trainRatioSpin.displayText
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
@@ -83,38 +83,38 @@ Item {
                     x: trainRatioSpin.mirrored ? 0 : parent.width - width
                     height: parent.height
                     implicitWidth: 32
-                    color: trainRatioSpin.up.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
+                    color: trainRatioSpin.up.pressed ? Theme.borderColor : Theme.bgInput
+                    border.color: Theme.borderColor
                     radius: 2
-                    Label { anchors.centerIn: parent; text: "+"; color: Theme.textPrimary; font.pixelSize: 14 }
+                    Label { anchors.centerIn: parent; text: "+"; color: Theme.textMain; font.pixelSize: 14 }
                 }
 
                 down.indicator: Rectangle {
                     x: trainRatioSpin.mirrored ? parent.width - width : 0
                     height: parent.height
                     implicitWidth: 32
-                    color: trainRatioSpin.down.pressed ? Theme.borderNormal : Theme.bgInput
-                    border.color: Theme.borderNormal
+                    color: trainRatioSpin.down.pressed ? Theme.borderColor : Theme.bgInput
+                    border.color: Theme.borderColor
                     radius: 2
-                    Label { anchors.centerIn: parent; text: "-"; color: Theme.textPrimary; font.pixelSize: 14 }
+                    Label { anchors.centerIn: parent; text: "-"; color: Theme.textMain; font.pixelSize: 14 }
                 }
 
                 background: Rectangle {
                     color: Theme.bgInput
-                    border.color: trainRatioSpin.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                    border.color: trainRatioSpin.activeFocus ? Theme.primary : Theme.borderColor
                     radius: 4
                 }
             }
 
             Label {
                 text: "%"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
             }
 
             Label {
                 text: "划分策略:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
             }
 
@@ -137,10 +137,10 @@ Item {
                     if (snapId !== "") {
                         snapshotModel.refresh()
                         statusLabel.text = "快照创建成功: " + snapId.substring(0, 8) + "..."
-                        statusLabel.color = Theme.accentSuccess
+                        statusLabel.color = Theme.success
                     } else {
                         statusLabel.text = "快照创建失败"
-                        statusLabel.color = Theme.accentError
+                        statusLabel.color = Theme.danger
                     }
                 }
             }
@@ -148,7 +148,7 @@ Item {
             Label {
                 id: statusLabel
                 text: ""
-                color: Theme.accentSuccess
+                color: Theme.success
                 font.pixelSize: 12
             }
 
@@ -168,7 +168,7 @@ Item {
                 width: snapshotList.width
                 height: 64
                 radius: 6
-                color: mouseArea.containsMouse ? Theme.bgInput : Theme.bgSecondary
+                color: mouseArea.containsMouse ? Theme.bgInput : Theme.bgSide
 
                 RowLayout {
                     anchors.fill: parent
@@ -179,7 +179,7 @@ Item {
                     // 快照ID (缩写)
                     Label {
                         text: model.snapshotId.substring(0, 8) + "..."
-                        color: Theme.accentPrimary
+                        color: Theme.primary
                         font.pixelSize: 13
                         font.family: "monospace"
                         Layout.preferredWidth: 100
@@ -188,28 +188,28 @@ Item {
                     // 样本数
                     Label {
                         text: model.sampleCount + " 样本"
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.pixelSize: 13
                     }
 
                     // 划分信息
                     Label {
                         text: "训练: " + model.trainCount + " / 验证: " + model.valCount
-                        color: Theme.textSecondary
+                        color: Theme.textMuted
                         font.pixelSize: 12
                     }
 
                     // 类别版本
                     Label {
                         text: "类别: " + (model.taxonomyVersion || "未知")
-                        color: Theme.textSecondary
+                        color: Theme.textMuted
                         font.pixelSize: 12
                     }
 
                     // 修订边界
                     Label {
                         text: "修订: " + (model.revisionBoundary || "无")
-                        color: Theme.textSecondary
+                        color: Theme.textMuted
                         font.pixelSize: 12
                     }
 
@@ -226,7 +226,7 @@ Item {
                     Button {
                         text: "删除"
                         flat: true
-                        palette.buttonText: Theme.accentError
+                        palette.buttonText: Theme.danger
                         onClicked: {
                             if (snapshotService.deleteSnapshot(model.snapshotId)) {
                                 snapshotModel.refresh()
@@ -271,7 +271,7 @@ Item {
                 spacing: 6
 
                 RowLayout {
-                    Label { text: "快照详情"; color: Theme.accentPrimary; font.pixelSize: 14; font.bold: true }
+                    Label { text: "快照详情"; color: Theme.primary; font.pixelSize: 14; font.bold: true }
                     Item { Layout.fillWidth: true }
                     Button {
                         text: "关闭"
@@ -283,7 +283,7 @@ Item {
 
                 Label {
                     id: detailLabel
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 12
                     font.family: "monospace"
                     wrapMode: Text.WrapAnywhere
@@ -292,7 +292,7 @@ Item {
 
                 Label {
                     id: splitDetailLabel
-                    color: Theme.textSecondary
+                    color: Theme.textMuted
                     font.pixelSize: 12
                     wrapMode: Text.WrapAnywhere
                     Layout.fillWidth: true

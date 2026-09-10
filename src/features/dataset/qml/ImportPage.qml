@@ -27,8 +27,8 @@ Item {
         spacing: 16
 
         Label {
-            text: "📁 请先打开一个项目"
-            color: Theme.textSecondary
+            text: "请先打开一个项目"
+            color: Theme.textMuted
             font.pixelSize: Theme.fontSizeTitle
             font.bold: true
             Layout.alignment: Qt.AlignHCenter
@@ -46,16 +46,16 @@ Item {
             font.family: Theme.fontFamily
             Layout.alignment: Qt.AlignHCenter
             background: Rectangle {
-                color: parent.hovered ? Theme.accentPrimary : Theme.bgTertiary
+                color: parent.hovered ? Theme.primary : Theme.bgCard
                 radius: Theme.radiusSmall
-                border.color: Theme.accentPrimary
+                border.color: Theme.primary
                 border.width: 1
                 implicitWidth: 140
                 implicitHeight: 36
             }
             contentItem: Label {
                 text: parent.text
-                color: Theme.accentPrimary
+                color: Theme.primary
                 font.pixelSize: Theme.fontSizeNormal
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
@@ -278,7 +278,7 @@ Item {
                                             }
                                             font.pixelSize: 10
                                             font.family: Theme.fontFamily
-                                            color: (model.format === "coco_json") ? Theme.bgMain : Theme.textPrimary
+                                            color: (model.format === "coco_json") ? Theme.bgMain : Theme.textMain
                                             font.bold: true
                                         }
                                     }
@@ -387,7 +387,7 @@ Item {
                             text: "数据导入"
                             font.pixelSize: Theme.fontSizeDisplay
                             font.bold: true
-                            color: Theme.textPrimary
+                            color: Theme.textMain
                             font.family: Theme.fontFamily
                         }
 
@@ -400,7 +400,7 @@ Item {
                         text: "请先打开一个项目再导入数据"
                         font.pixelSize: Theme.fontSizeNormal
                         font.family: Theme.fontFamily
-                        color: Theme.accentError
+                        color: Theme.danger
                         Layout.fillWidth: true
                     }
 
@@ -423,7 +423,7 @@ Item {
                                 font.pixelSize: Theme.fontSizeNormal
                                 font.bold: true
                                 font.family: Theme.fontFamily
-                                color: Theme.textPrimary
+                                color: Theme.textMain
                             }
 
                             Button {
@@ -452,7 +452,7 @@ Item {
                                 }
                                 contentItem: Label {
                                     text: autoBtn.text
-                                    color: root.importMode === "auto" ? "#ffffff" : (autoBtn.hovered ? Theme.primaryGlow : Theme.textSecondary)
+                                    color: root.importMode === "auto" ? "#ffffff" : (autoBtn.hovered ? Theme.primaryGlow : Theme.textMuted)
                                     font: autoBtn.font
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
@@ -490,7 +490,7 @@ Item {
                                 }
                                 contentItem: Label {
                                     text: sepBtn.text
-                                    color: root.importMode === "separate" ? "#ffffff" : (sepBtn.hovered ? Theme.primaryGlow : Theme.textSecondary)
+                                    color: root.importMode === "separate" ? "#ffffff" : (sepBtn.hovered ? Theme.primaryGlow : Theme.textMuted)
                                     font: sepBtn.font
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
@@ -529,7 +529,7 @@ Item {
                                     font.pixelSize: Theme.fontSizeSubheading
                                     font.bold: true
                                     font.family: Theme.fontFamily
-                                    color: Theme.textPrimary
+                                    color: Theme.textMain
                                 }
 
                                 // 拖拽区域
@@ -572,8 +572,9 @@ Item {
                                         spacing: Theme.spacingSmall
 
                                         Label {
-                                            text: "📁"
+                                            text: "[+]"
                                             font.pixelSize: 32
+                                            color: Theme.textMuted
                                             Layout.alignment: Qt.AlignHCenter
                                             scale: dropAreaMouse.containsMouse || dropAreaDrag.containsDrag ? 1.15 : 1.0
                                             Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
@@ -583,7 +584,7 @@ Item {
                                             text: "点击或拖拽文件夹到此处"
                                             font.pixelSize: Theme.fontSizeNormal
                                             font.family: Theme.fontFamily
-                                            color: dropAreaMouse.containsMouse || dropAreaDrag.containsDrag ? Theme.primaryGlow : Theme.textSecondary
+                                            color: dropAreaMouse.containsMouse || dropAreaDrag.containsDrag ? Theme.primaryGlow : Theme.textMuted
                                             Layout.alignment: Qt.AlignHCenter
                                             Behavior on color { ColorAnimation { duration: 150 } }
                                         }
@@ -614,7 +615,7 @@ Item {
                                         id: folderPathField
                                         Layout.fillWidth: true
                                         placeholderText: "选择数据集根目录..."
-                                        color: Theme.textPrimary
+                                        color: Theme.textMain
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeNormal
                                         background: Rectangle {
@@ -647,7 +648,7 @@ Item {
                                         }
                                         contentItem: Label {
                                             text: browseAutoBtn.text
-                                            color: browseAutoBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
+                                            color: browseAutoBtn.hovered ? Theme.primaryGlow : Theme.textMain
                                             font: browseAutoBtn.font
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
@@ -702,7 +703,7 @@ Item {
                                     font.pixelSize: Theme.fontSizeSubheading
                                     font.bold: true
                                     font.family: Theme.fontFamily
-                                    color: Theme.textPrimary
+                                    color: Theme.textMain
                                 }
 
                                 Label {
@@ -723,7 +724,7 @@ Item {
                                         text: "图片目录："
                                         font.pixelSize: Theme.fontSizeNormal
                                         font.family: Theme.fontFamily
-                                        color: Theme.textPrimary
+                                        color: Theme.textMain
                                         Layout.preferredWidth: 80
                                     }
 
@@ -731,7 +732,7 @@ Item {
                                         id: imagePathField
                                         Layout.fillWidth: true
                                         placeholderText: "选择图片目录（jpg/png/bmp/pbm等）..."
-                                        color: Theme.textPrimary
+                                        color: Theme.textMain
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeNormal
                                         background: Rectangle {
@@ -764,7 +765,7 @@ Item {
                                         }
                                         contentItem: Label {
                                             text: browseImgBtn.text
-                                            color: browseImgBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
+                                            color: browseImgBtn.hovered ? Theme.primaryGlow : Theme.textMain
                                             font: browseImgBtn.font
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
@@ -783,7 +784,7 @@ Item {
                                         text: "标签目录："
                                         font.pixelSize: Theme.fontSizeNormal
                                         font.family: Theme.fontFamily
-                                        color: Theme.textSecondary
+                                        color: Theme.textMuted
                                         Layout.preferredWidth: 80
                                     }
 
@@ -791,7 +792,7 @@ Item {
                                         id: labelPathField
                                         Layout.fillWidth: true
                                         placeholderText: "选择标签目录（txt/json），可留空..."
-                                        color: Theme.textPrimary
+                                        color: Theme.textMain
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeNormal
                                         background: Rectangle {
@@ -824,7 +825,7 @@ Item {
                                         }
                                         contentItem: Label {
                                             text: browseLabelBtn.text
-                                            color: browseLabelBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
+                                            color: browseLabelBtn.hovered ? Theme.primaryGlow : Theme.textMain
                                             font: browseLabelBtn.font
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
@@ -847,7 +848,7 @@ Item {
                                         }
                                         contentItem: Label {
                                             text: clearLabelBtn.text
-                                            color: clearLabelBtn.hovered ? Theme.primaryGlow : Theme.textPrimary
+                                            color: clearLabelBtn.hovered ? Theme.primaryGlow : Theme.textMain
                                             font: clearLabelBtn.font
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
@@ -915,7 +916,7 @@ Item {
                                 text: "正在分析目录文件..."
                                 font.pixelSize: Theme.fontSizeNormal
                                 font.family: Theme.fontFamily
-                                color: Theme.textSecondary
+                                color: Theme.textMuted
                                 Layout.alignment: Qt.AlignHCenter
                             }
 
@@ -930,7 +931,7 @@ Item {
                                     font.pixelSize: Theme.fontSizeSubheading
                                     font.bold: true
                                     font.family: Theme.fontFamily
-                                    color: Theme.textPrimary
+                                    color: Theme.textMain
                                 }
 
                                 // 格式徽章 + 匹配统计卡片
@@ -958,11 +959,11 @@ Item {
                                             radius: Theme.radiusSmall
                                             color: {
                                                 var fmt = root.scanResult ? root.scanResult.detectedFormat : ""
-                                                if (fmt === "yolo_txt") return Theme.accentPrimary
-                                                if (fmt === "coco_json") return Theme.accentSecondary
-                                                if (fmt === "labelme_json") return Theme.accentWarning
-                                                if (fmt === "anomaly_unsupervised") return Theme.accentWarning
-                                                if (fmt === "classify_folder") return Theme.accentSecondary
+                                                if (fmt === "yolo_txt") return Theme.primary
+                                                if (fmt === "coco_json") return Theme.primaryGlow
+                                                if (fmt === "labelme_json") return Theme.warning
+                                                if (fmt === "anomaly_unsupervised") return Theme.warning
+                                                if (fmt === "classify_folder") return Theme.primaryGlow
                                                 if (fmt === "image_only") return Theme.textMuted
                                                 return Theme.textMuted
                                             }
@@ -983,7 +984,7 @@ Item {
                                                 font.pixelSize: Theme.fontSizeCaption
                                                 font.bold: true
                                                 font.family: Theme.fontFamily
-                                                color: Theme.textPrimary
+                                                color: Theme.textMain
                                             }
                                         }
 
@@ -1001,7 +1002,7 @@ Item {
                                                 font.pixelSize: Theme.fontSizeLarge
                                                 font.bold: true
                                                 font.family: Theme.fontFamily
-                                                color: Theme.textPrimary
+                                                color: Theme.textMain
                                             }
                                         }
 
@@ -1020,7 +1021,7 @@ Item {
                                                 font.pixelSize: Theme.fontSizeLarge
                                                 font.bold: true
                                                 font.family: Theme.fontFamily
-                                                color: Theme.accentSuccess
+                                                color: Theme.success
                                             }
                                         }
 
@@ -1039,7 +1040,7 @@ Item {
                                                 font.pixelSize: Theme.fontSizeLarge
                                                 font.bold: true
                                                 font.family: Theme.fontFamily
-                                                color: root.scanResult && root.scanResult.unmatchedImagesCount > 0 ? Theme.accentWarning : Theme.textPrimary
+                                                color: root.scanResult && root.scanResult.unmatchedImagesCount > 0 ? Theme.warning : Theme.textMain
                                             }
                                         }
 
@@ -1058,7 +1059,7 @@ Item {
                                                 font.pixelSize: Theme.fontSizeLarge
                                                 font.bold: true
                                                 font.family: Theme.fontFamily
-                                                color: Theme.accentSuccess
+                                                color: Theme.success
                                             }
                                         }
 
@@ -1076,7 +1077,7 @@ Item {
                                                 font.pixelSize: Theme.fontSizeLarge
                                                 font.bold: true
                                                 font.family: Theme.fontFamily
-                                                color: Theme.accentError
+                                                color: Theme.danger
                                             }
                                         }
 
@@ -1095,7 +1096,7 @@ Item {
                                                 font.pixelSize: Theme.fontSizeLarge
                                                 font.bold: true
                                                 font.family: Theme.fontFamily
-                                                color: Theme.accentSecondary
+                                                color: Theme.primaryGlow
                                             }
                                         }
                                     }
@@ -1122,7 +1123,7 @@ Item {
                                             font.pixelSize: Theme.fontSizeNormal
                                             font.bold: true
                                             font.family: Theme.fontFamily
-                                            color: Theme.textPrimary
+                                            color: Theme.textMain
                                         }
 
                                         Flow {
@@ -1148,7 +1149,7 @@ Item {
                                                         }
                                                         font.pixelSize: Theme.fontSizeCaption
                                                         font.family: Theme.fontFamily
-                                                        color: Theme.textPrimary
+                                                        color: Theme.textMain
                                                     }
                                                 }
                                             }
@@ -1163,7 +1164,7 @@ Item {
                                     height: 48
                                     color: Theme.bgInput
                                     radius: Theme.radiusSmall
-                                    border.color: Theme.accentError
+                                    border.color: Theme.danger
                                     border.width: 1
 
                                     Label {
@@ -1172,7 +1173,7 @@ Item {
                                         text: root.scanResult ? root.scanResult.error : ""
                                         font.pixelSize: Theme.fontSizeNormal
                                         font.family: Theme.fontFamily
-                                        color: Theme.accentError
+                                        color: Theme.danger
                                         wrapMode: Text.WordWrap
                                         verticalAlignment: Text.AlignVCenter
                                     }
@@ -1187,14 +1188,14 @@ Item {
                                         text: "数据集名称"
                                         font.pixelSize: Theme.fontSizeNormal
                                         font.family: Theme.fontFamily
-                                        color: Theme.textPrimary
+                                        color: Theme.textMain
                                     }
 
                                     TextField {
                                         id: datasetNameField
                                         Layout.fillWidth: true
                                         placeholderText: "输入数据集名称"
-                                        color: Theme.textPrimary
+                                        color: Theme.textMain
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeNormal
                                         text: root.scanResult ? extractFolderName(root.selectedImagePath) : ""
@@ -1302,7 +1303,7 @@ Item {
                                     Label {
                                         id: importErrorLabel
                                         visible: false
-                                        color: Theme.accentError
+                                        color: Theme.danger
                                         font.pixelSize: Theme.fontSizeCaption
                                         font.family: Theme.fontFamily
                                     }
@@ -1402,8 +1403,8 @@ Item {
         standardButtons: Dialog.NoButton
 
         background: Rectangle {
-            color: Theme.bgSecondary
-            border.color: Theme.border
+            color: Theme.bgSide
+            border.color: Theme.borderColor
             border.width: 1
             radius: Theme.radiusLarge
         }
@@ -1422,14 +1423,14 @@ Item {
             Label {
                 text: "🎉 数据集导入成功"
                 font.bold: true
-                color: Theme.accentSuccess
+                color: Theme.success
                 font.pixelSize: Theme.fontSizeSubheading
                 font.family: Theme.fontFamily
             }
 
             Label {
                 id: importSuccessMsg
-                color: Theme.textSecondary
+                color: Theme.textMuted
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
                 font.family: Theme.fontFamily

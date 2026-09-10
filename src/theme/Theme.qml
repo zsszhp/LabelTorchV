@@ -4,33 +4,22 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-    // === 背景色系（赛博蓝灰，亮度 15-25%，告别纯黑，对标 V4 设计） ===
-    readonly property color bgMain: "#1A1D2E"
-    readonly property color bgSide: "#222639"
-    readonly property color bgCard: "#252A3E"
-    readonly property color bgInput: "#1E2235"
-    readonly property color bgInputDropdown: "#2A2F44"
-    readonly property color bgHover: "#343A52"
-    readonly property color bgSelected: "#3B4263"
+    // === 背景色系（对标参考UI: --bg-main:#0F131A, --bg-side:#151A22, --bg-card:#1E2530） ===
+    readonly property color bgMain: "#0F131A"
+    readonly property color bgSide: "#151A22"
+    readonly property color bgCard: "#1E2530"
+    readonly property color bgInput: "#121720"
+    readonly property color bgInputDropdown: "#1A2030"
+    readonly property color bgHover: "#1E2530"
+    readonly property color bgSelected: "#262F3D"
     readonly property color bgChart: "#05070A"
     readonly property color bgChartPanel: "#07090D"
     readonly property color bgPreview: "#0C0F14"
-
-    // 兼容旧属性名（逐步迁移）
-    readonly property color bgPrimary: bgMain
-    readonly property color bgSecondary: bgSide
-    readonly property color bgTertiary: bgCard
-    readonly property color bgCardOld: bgCard
 
     // === 主色调（蓝色系，对标 #0077FF） ===
     readonly property color primary: "#0077FF"
     readonly property color primaryGlow: "#00E5FF"
     readonly property color primaryDark: "#0055CC"
-
-    // 兼容旧属性名
-    readonly property color accentPrimary: primary
-    readonly property color accentSecondary: primaryGlow
-    readonly property color borderFocus: primaryGlow
 
     // === 状态色（对标参考UI语义色） ===
     readonly property color success: "#00E676"
@@ -38,36 +27,19 @@ QtObject {
     readonly property color warning: "#FF9100"
     readonly property color info: primaryGlow
 
-    // 兼容旧属性名
-    readonly property color accentSuccess: success
-    readonly property color accentWarning: warning
-    readonly property color accentError: danger
-    readonly property color accentPurple: "#D500F9"
-    readonly property color statusSuccess: success
-    readonly property color statusWarning: warning
-    readonly property color statusError: danger
-    readonly property color statusInfo: info
-
     // === 文字色（对标参考UI） ===
     readonly property color textMain: "#E2E8F0"
-    readonly property color textMuted: "#8E9AA8"
-    readonly property color textDisabled: "#64748B"
+    readonly property color textMuted: "#64748B"
+    readonly property color textDisabled: "#475569"
     readonly property color textAccent: primaryGlow
 
-    // 兼容旧属性名
-    readonly property color textPrimary: textMain
+    // 二级文字色（比 textMuted 更亮，用于次要辅助信息）
     readonly property color textSecondary: "#94A3B8"
-    readonly property color textMutedOld: textMuted
 
-    // === 边框与分割线（对标 #262F3D） ===
-    readonly property color borderColor: "#3E4C61"
+    // === 边框与分割线（对标参考UI: --border-color:#262F3D） ===
+    readonly property color borderColor: "#262F3D"
     readonly property color borderHover: primaryGlow
-    readonly property color dividerColor: "#2E3846"
-
-    // 兼容旧属性名
-    readonly property color border: borderColor
-    readonly property color borderNormal: borderColor
-    readonly property color divider: dividerColor
+    readonly property color dividerColor: "#1E2530"
 
     // === 渐变色 ===
     readonly property string gradientPrimary: "linear-gradient(135deg, " + primary + ", " + primaryDark + ")"
@@ -147,11 +119,6 @@ QtObject {
     readonly property int subTabHeight: 40
     readonly property int logPanelHeight: 180
     readonly property int toolbarHeight: 36
-
-    // 兼容旧属性名
-    readonly property int sidebarExpandedWidth: sidebarWidth
-    readonly property int sidebarCollapsedWidth: 64
-    readonly property int statusBarHeight: footerHeight
 
     // === 步进器尺寸 ===
     readonly property int stepperButtonWidth: 28

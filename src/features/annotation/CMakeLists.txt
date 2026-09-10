@@ -7,9 +7,6 @@ qt_add_qml_module(labeltorch_annotation
     RESOURCE_PREFIX /qt/qml
     QML_FILES
         qml/AnnotationPage.qml
-        qml/AnnotCanvas.qml
-        qml/ClassPanel.qml
-        qml/SampleList.qml
     SOURCES
         geometry/Geometry.h
         geometry/AxisAlignedBox.h
@@ -19,8 +16,6 @@ qt_add_qml_module(labeltorch_annotation
         canvas/CanvasController.h
         canvas/CanvasController.cpp
         canvas/RenderLayer.h
-        canvas/InteractionManager.h
-        canvas/InteractionManager.cpp
         canvas/AnnotCanvasItem.h
         canvas/AnnotCanvasItem.cpp
         labelio/YoloTxtReader.h

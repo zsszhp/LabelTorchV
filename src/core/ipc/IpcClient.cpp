@@ -17,8 +17,10 @@ IpcClient::IpcClient(QObject *parent)
     m_watchdog->setInterval(30000);
     connect(m_watchdog, &QTimer::timeout, this, [this]() {
         if (m_connected) {
-            sendRequest("environment.check", {});
+            sendRequest(IpcProtocol::CMD_ENV_CHECK, {});
         }
+        // 扫描超时请求并清理（A2：请求超时机制）
+        cleanupTimedOutRequests();
     });
 }
 
@@ -104,6 +106,7 @@ void IpcClient::startBackend(const QString &pythonPath, const QString &scriptPat
         ltInfo(LT_LOG_IPC()) << "Backend process started, pid=" << m_process->processId();
         m_connected = true;
         m_restartCount = 0; // 重置重启计数器
+        m_autoRestart = true; // A3：手动启动后恢复自动重启标志
         emit connectedChanged();
         m_watchdog->start();
     } else {
@@ -120,7 +123,7 @@ void IpcClient::stopBackend()
     m_autoRestart = false;
 
     if (m_process && m_process->state() != QProcess::NotRunning) {
-        sendRequest("shutdown", {});
+        sendRequest(IpcProtocol::CMD_SHUTDOWN, {});
         m_process->waitForFinished(3000);
         if (m_process->state() != QProcess::NotRunning) {
             m_process->kill();
@@ -134,24 +137,46 @@ void IpcClient::stopBackend()
     }
 }
 
-void IpcClient::sendRequest(const QString &command, const QJsonObject &payload)
+QString IpcClient::sendRequest(const QString &command, const QJsonObject &payload)
 {
     if (!m_process || m_process->state() != QProcess::Running) {
         ltWarning(LT_LOG_IPC()) << "Cannot send request, backend not running";
-        return;
+        return {};
     }
 
     QString requestId = QStringLiteral("req_%1_%2")
         .arg(++m_requestCounter)
         .arg(QRandomGenerator::global()->bounded(10000));
 
-    m_pendingCommands[requestId] = command;
+    // 记录待响应请求（含时间戳，用于超时清理）
+    m_pendingCommands[requestId] = PendingCommand{command, QDateTime::currentDateTime()};
 
     QJsonObject request = IpcProtocol::createRequest(requestId, command, payload);
     QByteArray data = QJsonDocument(request).toJson(QJsonDocument::Compact) + "\n";
 
     ltDebug(LT_LOG_IPC()) << "sendRequest id=" << requestId << "command=" << command;
     m_process->write(data);
+    return requestId;
+}
+
+void IpcClient::cleanupTimedOutRequests()
+{
+    if (m_pendingCommands.isEmpty()) return;
+
+    QDateTime now = QDateTime::currentDateTime();
+    QStringList timedOutIds;
+    for (auto it = m_pendingCommands.begin(); it != m_pendingCommands.end(); ++it) {
+        if (it.value().startTime.msecsTo(now) >= REQUEST_TIMEOUT_MS) {
+            timedOutIds.append(it.key());
+        }
+    }
+
+    for (const QString &id : timedOutIds) {
+        QString cmd = m_pendingCommands.value(id).command;
+        m_pendingCommands.remove(id);
+        ltWarning(LT_LOG_IPC()) << "Request timed out id=" << id << "command=" << cmd;
+        emit requestTimeout(id, cmd);
+    }
 }
 
 void IpcClient::onBackendReadyRead()
@@ -181,7 +206,7 @@ void IpcClient::processMessage(const QJsonObject &msg)
 
         if (!response.contains(QStringLiteral("command"))) {
             if (m_pendingCommands.contains(requestId)) {
-                response[QStringLiteral("command")] = m_pendingCommands[requestId];
+                response[QStringLiteral("command")] = m_pendingCommands[requestId].command;
             }
             m_pendingCommands.remove(requestId);
         }

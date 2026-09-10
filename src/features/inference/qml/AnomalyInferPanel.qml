@@ -13,7 +13,7 @@ import LabelTorch.Theme
 Rectangle {
     id: root
 
-    color: Theme.bgPrimary
+    color: Theme.bgMain
 
     // 外部属性
     property string currentProjectId: ""
@@ -56,7 +56,7 @@ Rectangle {
                 text: "异常检测推理"
                 font.pixelSize: Theme.fontSizeLarge
                 font.bold: true
-                color: Theme.textPrimary
+                color: Theme.textMain
             }
 
             Item { Layout.fillWidth: true }
@@ -66,14 +66,14 @@ Rectangle {
                 Layout.preferredHeight: 28
                 Layout.preferredWidth: modelStatusText.implicitWidth + 20
                 radius: Theme.radiusSmall
-                color: root.modelLoaded ? Theme.accentSuccess : Theme.bgTertiary
-                border.color: root.modelLoaded ? Theme.accentSuccess : Theme.border
+                color: root.modelLoaded ? Theme.success : Theme.bgCard
+                border.color: root.modelLoaded ? Theme.success : Theme.borderColor
 
                 Label {
                     id: modelStatusText
                     anchors.centerIn: parent
                     text: root.modelLoaded ? "模型已加载" : "模型未加载"
-                    color: root.modelLoaded ? Theme.textPrimary : Theme.textMuted
+                    color: root.modelLoaded ? Theme.textMain : Theme.textMuted
                     font.pixelSize: Theme.fontSizeCaption
                 }
             }
@@ -82,9 +82,9 @@ Rectangle {
         // 推理配置区域
         Rectangle {
             Layout.fillWidth: true
-            color: Theme.bgSecondary
+            color: Theme.bgSide
             radius: Theme.radiusNormal
-            border.color: Theme.border
+            border.color: Theme.borderColor
             implicitHeight: configGrid.implicitHeight + Theme.spacingLarge * 2
 
             GridLayout {
@@ -97,20 +97,20 @@ Rectangle {
 
                 Label {
                     text: "权重文件："
-                    color: Theme.textSecondary
+                    color: Theme.textMuted
                     font.pixelSize: Theme.fontSizeNormal
                 }
                 Label {
                     Layout.fillWidth: true
                     text: root.currentWeightPath ? root.currentWeightPath.split("/").pop().split("\\").pop() : "未选择"
-                    color: root.currentWeightPath ? Theme.textPrimary : Theme.textMuted
+                    color: root.currentWeightPath ? Theme.textMain : Theme.textMuted
                     font.pixelSize: Theme.fontSizeNormal
                     elide: Text.ElideMiddle
                 }
 
                 Label {
                     text: "推理设备："
-                    color: Theme.textSecondary
+                    color: Theme.textMuted
                     font.pixelSize: Theme.fontSizeNormal
                 }
                 ComboBox {
@@ -120,13 +120,13 @@ Rectangle {
                     currentIndex: 0
                     onCurrentTextChanged: root.selectedDevice = currentText
                     background: Rectangle {
-                        color: Theme.bgTertiary
+                        color: Theme.bgCard
                         radius: Theme.radiusSmall
-                        border.color: Theme.border
+                        border.color: Theme.borderColor
                     }
                     contentItem: Label {
                         text: deviceCombo.displayText
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.pixelSize: Theme.fontSizeNormal
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -134,7 +134,7 @@ Rectangle {
 
                 Label {
                     text: "图片尺寸："
-                    color: Theme.textSecondary
+                    color: Theme.textMuted
                     font.pixelSize: Theme.fontSizeNormal
                 }
                 SpinBox {
@@ -146,9 +146,9 @@ Rectangle {
                     value: 256
                     onValueChanged: root.selectedImgSize = value
                     background: Rectangle {
-                        color: Theme.bgTertiary
+                        color: Theme.bgCard
                         radius: Theme.radiusSmall
-                        border.color: Theme.border
+                        border.color: Theme.borderColor
                     }
                 }
 
@@ -166,12 +166,12 @@ Rectangle {
                     }
                     background: Rectangle {
                         implicitHeight: 32
-                        color: parent.enabled ? Theme.accentSecondary : Theme.bgTertiary
+                        color: parent.enabled ? Theme.primaryGlow : Theme.bgCard
                         radius: Theme.radiusSmall
                     }
                     contentItem: Label {
                         text: parent.text
-                        color: parent.enabled ? Theme.textPrimary : Theme.textMuted
+                        color: parent.enabled ? Theme.textMain : Theme.textMuted
                         font.pixelSize: Theme.fontSizeNormal
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -191,13 +191,13 @@ Rectangle {
                 background: Rectangle {
                     implicitWidth: 90
                     implicitHeight: 36
-                    color: Theme.bgTertiary
+                    color: Theme.bgCard
                     radius: Theme.radiusSmall
-                    border.color: Theme.border
+                    border.color: Theme.borderColor
                 }
                 contentItem: Label {
                     text: parent.text
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: Theme.fontSizeNormal
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -211,12 +211,12 @@ Rectangle {
                 background: Rectangle {
                     implicitWidth: 120
                     implicitHeight: 36
-                    color: parent.enabled ? Theme.accentPrimary : Theme.bgTertiary
+                    color: parent.enabled ? Theme.primary : Theme.bgCard
                     radius: Theme.radiusSmall
                 }
                 contentItem: Label {
                     text: parent.text
-                    color: parent.enabled ? Theme.textPrimary : Theme.textMuted
+                    color: parent.enabled ? Theme.textMain : Theme.textMuted
                     font.pixelSize: Theme.fontSizeNormal
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -226,7 +226,7 @@ Rectangle {
             Label {
                 Layout.fillWidth: true
                 text: root.currentImagePath ? root.currentImagePath.split("/").pop().split("\\").pop() : ""
-                color: Theme.textSecondary
+                color: Theme.textMuted
                 font.pixelSize: Theme.fontSizeNormal
                 elide: Text.ElideMiddle
             }
@@ -238,9 +238,9 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.minimumHeight: 300
-            color: Theme.bgSecondary
+            color: Theme.bgSide
             radius: Theme.radiusNormal
-            border.color: root.isAnomalous === 1 ? (root.ngFlash ? Theme.accentError : "transparent") : Theme.border
+            border.color: root.isAnomalous === 1 ? (root.ngFlash ? Theme.danger : "transparent") : Theme.borderColor
             border.width: root.isAnomalous === 1 ? 3 : 1
 
             // NG 闪烁动画
@@ -262,14 +262,14 @@ Rectangle {
                 width: statusText.implicitWidth + 24
                 height: 36
                 radius: Theme.radiusSmall
-                color: root.isAnomalous === 1 ? Theme.accentError : Theme.accentSuccess
+                color: root.isAnomalous === 1 ? Theme.danger : Theme.success
                 visible: root.currentResult !== null
 
                 Label {
                     id: statusText
                     anchors.centerIn: parent
                     text: root.isAnomalous === 1 ? "NG" : "OK"
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: Theme.fontSizeLarge
                     font.bold: true
                 }
@@ -283,7 +283,7 @@ Rectangle {
                 width: scoreColumn.implicitWidth + 20
                 height: scoreColumn.implicitHeight + 16
                 radius: Theme.radiusSmall
-                color: Theme.bgPrimary
+                color: Theme.bgMain
                 visible: root.currentResult !== null
 
                 ColumnLayout {
@@ -293,13 +293,13 @@ Rectangle {
 
                     Label {
                         text: "异常评分"
-                        color: Theme.textSecondary
+                        color: Theme.textMuted
                         font.pixelSize: Theme.fontSizeCaption
                     }
 
                     Label {
                         text: (root.anomalyScore * 100).toFixed(1) + "%"
-                        color: root.isAnomalous === 1 ? Theme.accentError : Theme.accentSuccess
+                        color: root.isAnomalous === 1 ? Theme.danger : Theme.success
                         font.pixelSize: Theme.fontSizeDisplay
                         font.bold: true
                     }
@@ -313,13 +313,13 @@ Rectangle {
                         value: root.anomalyScore
                         background: Rectangle {
                             radius: 3
-                            color: Theme.bgTertiary
+                            color: Theme.bgCard
                         }
                         contentItem: Rectangle {
                             implicitWidth: 120
                             implicitHeight: 6
                             radius: 3
-                            color: root.isAnomalous === 1 ? Theme.accentError : Theme.accentSuccess
+                            color: root.isAnomalous === 1 ? Theme.danger : Theme.success
                             width: parent.visualPosition * parent.width
                         }
                     }
@@ -393,7 +393,7 @@ Rectangle {
 
             Label {
                 text: "热力图不透明度："
-                color: Theme.textSecondary
+                color: Theme.textMuted
                 font.pixelSize: Theme.fontSizeNormal
             }
 
@@ -413,13 +413,13 @@ Rectangle {
                     width: opacitySlider.availableWidth
                     height: implicitHeight
                     radius: 2
-                    color: Theme.bgTertiary
+                    color: Theme.bgCard
 
                     Rectangle {
                         width: opacitySlider.visualPosition * parent.width
                         height: parent.height
                         radius: 2
-                        color: Theme.accentPrimary
+                        color: Theme.primary
                     }
                 }
                 handle: Rectangle {
@@ -428,14 +428,14 @@ Rectangle {
                     implicitWidth: 16
                     implicitHeight: 16
                     radius: 8
-                    color: opacitySlider.pressed ? Theme.accentPrimary : Theme.textPrimary
-                    border.color: Theme.accentPrimary
+                    color: opacitySlider.pressed ? Theme.primary : Theme.textMain
+                    border.color: Theme.primary
                 }
             }
 
             Label {
                 text: (root.heatmapOpacity * 100).toFixed(0) + "%"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: Theme.fontSizeNormal
                 Layout.preferredWidth: 40
             }
@@ -445,9 +445,9 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 160
-            color: Theme.bgSecondary
+            color: Theme.bgSide
             radius: Theme.radiusNormal
-            border.color: Theme.border
+            border.color: Theme.borderColor
 
             ColumnLayout {
                 anchors.fill: parent
@@ -459,7 +459,7 @@ Rectangle {
 
                     Label {
                         text: "推理历史"
-                        color: Theme.textSecondary
+                        color: Theme.textMuted
                         font.pixelSize: Theme.fontSizeSubheading
                     }
 
@@ -477,12 +477,12 @@ Rectangle {
                         background: Rectangle {
                             implicitWidth: 50
                             implicitHeight: 24
-                            color: Theme.bgTertiary
+                            color: Theme.bgCard
                             radius: Theme.radiusSmall
                         }
                         contentItem: Label {
                             text: parent.text
-                            color: Theme.textSecondary
+                            color: Theme.textMuted
                             font.pixelSize: Theme.fontSizeCaption
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
@@ -502,8 +502,8 @@ Rectangle {
                         width: historyList.width
                         height: 36
                         radius: Theme.radiusSmall
-                        color: modelData.isAnomalous === 1 ? Theme.bgPrimary : Theme.bgTertiary
-                        border.color: modelData.isAnomalous === 1 ? Theme.accentError : "transparent"
+                        color: modelData.isAnomalous === 1 ? Theme.bgMain : Theme.bgCard
+                        border.color: modelData.isAnomalous === 1 ? Theme.danger : "transparent"
                         border.width: modelData.isAnomalous === 1 ? 1 : 0
 
                         RowLayout {
@@ -517,12 +517,12 @@ Rectangle {
                                 Layout.preferredWidth: 32
                                 Layout.preferredHeight: 20
                                 radius: Theme.radiusSmall
-                                color: modelData.isAnomalous === 1 ? Theme.accentError : Theme.accentSuccess
+                                color: modelData.isAnomalous === 1 ? Theme.danger : Theme.success
 
                                 Label {
                                     anchors.centerIn: parent
                                     text: modelData.isAnomalous === 1 ? "NG" : "OK"
-                                    color: Theme.textPrimary
+                                    color: Theme.textMain
                                     font.pixelSize: Theme.fontSizeCaption
                                     font.bold: true
                                 }
@@ -532,7 +532,7 @@ Rectangle {
                             Label {
                                 Layout.fillWidth: true
                                 text: modelData.fileName || ""
-                                color: Theme.textPrimary
+                                color: Theme.textMain
                                 font.pixelSize: Theme.fontSizeNormal
                                 elide: Text.ElideMiddle
                             }
@@ -540,7 +540,7 @@ Rectangle {
                             // 异常评分
                             Label {
                                 text: (modelData.anomalyScore * 100).toFixed(1) + "%"
-                                color: modelData.isAnomalous === 1 ? Theme.accentError : Theme.accentSuccess
+                                color: modelData.isAnomalous === 1 ? Theme.danger : Theme.success
                                 font.pixelSize: Theme.fontSizeNormal
                                 font.bold: true
                             }
@@ -558,12 +558,12 @@ Rectangle {
                                 background: Rectangle {
                                     implicitWidth: 40
                                     implicitHeight: 22
-                                    color: Theme.accentSecondary
+                                    color: Theme.primaryGlow
                                     radius: Theme.radiusSmall
                                 }
                                 contentItem: Label {
                                     text: parent.text
-                                    color: Theme.textPrimary
+                                    color: Theme.textMain
                                     font.pixelSize: Theme.fontSizeCaption
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter

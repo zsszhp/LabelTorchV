@@ -20,6 +20,8 @@
 #include "TaxonomyModel.h"
 #include "DatasetService.h"
 #include "DatasetModel.h"
+#include "TagService.h"
+#include "TagModel.h"
 #include "ClassMappingService.h"
 #include "AnnotationService.h"
 #include "AnnotationModel.h"
@@ -195,6 +197,9 @@ int main(int argc, char *argv[])
     TaxonomyModel taxonomyModel;
     DatasetService datasetService;
     DatasetModel datasetModel;
+    TagService tagService;       // A6：数据集标签服务
+    TagModel tagModel;           // A6：标签列表模型
+    tagModel.setTagService(&tagService);
     ClassMappingService classMappingService;
     AnnotationService annotationService;
     AnnotationModel annotationModel;
@@ -233,6 +238,8 @@ int main(int argc, char *argv[])
     projectService.setTaxonomyService(&taxonomyService);
     trainingService.setIpcClient(&ipcClient);
     trainingService.setModelRegistry(&modelRegistry);
+    snapshotService.setIpcClient(&ipcClient); // P0-2：快照预览图
+    datasetService.setIpcClient(&ipcClient); // P1-4 / P2-5：数据集统计与格式转换
     inferenceService.setIpcClient(&ipcClient);
     anomalyService.setIpcClient(&ipcClient);
     exportService.setIpcClient(&ipcClient);
@@ -271,6 +278,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("taxonomyModel", &taxonomyModel);
     engine.rootContext()->setContextProperty("datasetService", &datasetService);
     engine.rootContext()->setContextProperty("datasetModel", &datasetModel);
+    engine.rootContext()->setContextProperty("tagService", &tagService);
+    engine.rootContext()->setContextProperty("tagModel", &tagModel);
     engine.rootContext()->setContextProperty("classMappingService", &classMappingService);
     engine.rootContext()->setContextProperty("annotationService", &annotationService);
     engine.rootContext()->setContextProperty("annotationModel", &annotationModel);

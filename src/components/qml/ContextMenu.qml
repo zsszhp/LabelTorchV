@@ -23,7 +23,7 @@ Menu {
         contentItem: Text {
             text: menuItem.text
             font.pixelSize: Theme.fontSizeSmall
-            color: menuItem.hovered ? Theme.textMain : Theme.textSecondary
+            color: menuItem.hovered ? Theme.textMain : Theme.textMuted
             verticalAlignment: Text.AlignVCenter
             leftPadding: Theme.spacingLarge
         }

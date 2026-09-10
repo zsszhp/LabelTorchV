@@ -5,9 +5,11 @@
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QMap>
 #include <QtConcurrent>
 
 class ImportScanner;
+class IpcClient;
 
 class DatasetService : public QObject
 {
@@ -15,6 +17,12 @@ class DatasetService : public QObject
 
 public:
     explicit DatasetService(QObject *parent = nullptr);
+
+    /**
+     * @brief 注入 IPC 客户端依赖（用于 dataset.stats / dataset.convert_to_yolo 等命令）。
+     * @param client IpcClient 实例。
+     */
+    void setIpcClient(IpcClient *client);
 
     /**
      * @brief Import a dataset from YOLO txt format directories.
@@ -120,15 +128,33 @@ public:
     Q_INVOKABLE QVariantMap getSampleStats(const QString &datasetId);
 
     /**
+     * @brief 异步获取样本统计信息
+     *
+     * 在后台线程执行 getSampleStats，通过 sampleStatsReady 信号回传结果。
+     * 避免在 UI 主线程执行耗时的标签文件扫描操作（M14）。
+     * @param datasetId 数据集 ID
+     */
+    Q_INVOKABLE void getSampleStatsAsync(const QString &datasetId);
+
+    /**
      * @brief Detect anomalies in the dataset.
      * Returns QVariantMap with:
      * - "emptyLabels": QVariantList of sample IDs with empty label files
      * - "classErrors": QVariantList of sample IDs with class_id outside valid range
-     * - "sizeAnomalies": QVariantList of sample IDs with unusual image dimensions (optional, may be empty if width/height not populated)
+     * - "sizeAnomalies": QVariantList of sample IDs with unusual image dimensions (IQR 离群值检测)
      * - "duplicateImages": QVariantList of sample IDs with duplicate hash values
      * - "totalAnomalies": total count of all anomaly items
      */
     Q_INVOKABLE QVariantMap detectAnomalies(const QString &datasetId);
+
+    /**
+     * @brief 异步检测数据集异常
+     *
+     * 在后台线程执行 detectAnomalies，通过 anomaliesDetected 信号回传结果。
+     * 避免在 UI 主线程执行耗时的标签文件扫描操作（M14）。
+     * @param datasetId 数据集 ID
+     */
+    Q_INVOKABLE void detectAnomaliesAsync(const QString &datasetId);
 
     /**
      * @brief Get class distribution for a dataset.
@@ -136,6 +162,15 @@ public:
      * Ordered by count descending.
      */
     Q_INVOKABLE QVariantList getClassDistribution(const QString &datasetId);
+
+    /**
+     * @brief 异步获取类别分布
+     *
+     * 在后台线程执行 getClassDistribution，通过 classDistributionReady 信号回传结果。
+     * 避免在 UI 主线程执行耗时的标签文件扫描操作（M14）。
+     * @param datasetId 数据集 ID
+     */
+    Q_INVOKABLE void getClassDistributionAsync(const QString &datasetId);
 
     Q_INVOKABLE QVariantList listSamples(const QString &datasetId, int offset = 0, int limit = 100);
     Q_INVOKABLE int getSampleCount(const QString &datasetId);
@@ -174,12 +209,59 @@ public:
      */
     Q_INVOKABLE void scanSeparateAsync(const QString &imageDir, const QString &labelDir);
 
+    /**
+     * @brief 异步获取数据集增强统计（P1-4，supervision 集成）。
+     *
+     * 通过 IPC 调用 dataset.stats，使用 sv.DetectionDataset.from_yolo 加载数据集，
+     * 计算 class_distribution / box_size_stats / annotated_samples /
+     * unlabeled_samples / avg_boxes_per_sample 等深度统计。
+     * 完成后发射 enhancedStatsReady 信号。
+     *
+     * @param datasetId 数据集 ID。
+     * @return 请求 ID（非空表示已成功派发），空串表示失败。
+     */
+    Q_INVOKABLE QString getEnhancedStats(const QString &datasetId);
+
+    /**
+     * @brief 异步将数据集转换为 YOLO 格式（P2-5，supervision 集成）。
+     *
+     * 通过 IPC 调用 dataset.convert_to_yolo，支持 coco / pascal_voc / yolo 三种源格式，
+     * 使用 sv.DetectionDataset.from_coco / from_pascal_voc / from_yolo 加载，
+     * 通过 dataset.as_yolo 输出到 {projectRoot}/cache/yolo_converted/{datasetId}/。
+     *
+     * @param datasetId 数据集 ID。
+     * @param sourceFormat 源格式：coco / pascal_voc / yolo。
+     * @return 请求 ID（非空表示已成功派发），空串表示失败。
+     */
+    Q_INVOKABLE QString convertToYolo(const QString &datasetId, const QString &sourceFormat);
+
 signals:
     /** @brief scanFolderAsync 扫描完成信号 */
     void scanFolderFinished(const QVariantMap &result);
 
     /** @brief scanSeparateAsync 扫描完成信号 */
     void scanSeparateFinished(const QVariantMap &result);
+
+    /** @brief getSampleStatsAsync 统计完成信号 */
+    void sampleStatsReady(const QString &datasetId, const QVariantMap &stats);
+
+    /** @brief detectAnomaliesAsync 异常检测完成信号 */
+    void anomaliesDetected(const QString &datasetId, const QVariantMap &anomalies);
+
+    /** @brief getClassDistributionAsync 类别分布完成信号 */
+    void classDistributionReady(const QString &datasetId, const QVariantList &distribution);
+
+    /** @brief P1-4 增强统计完成信号 */
+    void enhancedStatsReady(const QString &datasetId, bool success,
+                            const QVariantMap &stats, const QString &error);
+
+    /** @brief P2-5 格式转换完成信号 */
+    void convertToYoloFinished(const QString &datasetId, bool success,
+                               const QString &outputDir, const QString &error);
+
+private slots:
+    /// 处理 IPC 响应（dataset.stats / dataset.convert_to_yolo）
+    void onIpcResponseReceived(const QJsonObject &response);
 
 private:
     bool updateImportStatus(const QString &datasetId, const QString &status);
@@ -226,6 +308,14 @@ private:
     bool importClassifyFolderDataset(const QString &datasetId, const QString &folderPath);
 
     ImportScanner *m_scanner;
+    /// 当前导入流程的数据集格式标识，供 extractAndStoreSchemaFromCategories 写入正确的 source_format
+    QString m_currentImportFormat;
+
+    IpcClient *m_ipcClient = nullptr;
+    /// 待响应增强统计请求映射：requestId → datasetId
+    QMap<QString, QString> m_pendingEnhancedStats;
+    /// 待响应格式转换请求映射：requestId → datasetId
+    QMap<QString, QString> m_pendingConverts;
 };
 
 #endif // DATASETSERVICE_H

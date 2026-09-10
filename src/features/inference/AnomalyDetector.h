@@ -48,6 +48,14 @@ public:
     Q_INVOKABLE bool isLoaded() const;
 
     /**
+     * @brief 检查模型是否可推理（A8：区分"元数据可读"与"可推理"）
+     *
+     * 无 ONNX Runtime 时，loadModel 返回 false，isInferable 也返回 false。
+     * 上层调用 infer 前应先检查此方法。
+     */
+    Q_INVOKABLE bool isInferable() const;
+
+    /**
      * @brief 获取模型元数据
      */
     Q_INVOKABLE QVariantMap getModelMetadata() const;

@@ -214,6 +214,20 @@ public:
 
 private:
     int m_shapeType = 0;  // 0 = HBB, 1 = OBB, 2 = Polygon
+
+    /**
+     * @brief Atomically write content to a file via temp file + rename.
+     *
+     * Creates the parent directory if missing, writes to a .tmp sidecar file,
+     * then renames it to the target path. All intermediate failures clean up
+     * the temp file and return false.
+     *
+     * @param filePath  Destination file path.
+     * @param content   Text content to write (a trailing newline is appended).
+     * @param context   Human-readable label used in error logs (e.g. "classification label").
+     * @return true on success, false on any I/O error.
+     */
+    static bool writeAtomically(const QString &filePath, const QString &content, const QString &context);
 };
 
 #endif // ANNOTATIONSERVICE_H

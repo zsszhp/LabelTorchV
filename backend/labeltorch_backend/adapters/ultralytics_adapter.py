@@ -95,22 +95,22 @@ class UltralyticsAdapter(TrainingAdapter):
             # 构建模型名称
             if model_family == "yolov8_obb":
                 model_name = f"yolov8{model_variant}-obb.pt"
-                task = "obb"
+                _task = "obb"  # 预留：任务类型
             elif model_family == "yolov8_cls":
                 model_name = f"yolov8{model_variant}-cls.pt"
-                task = "classify"
+                _task = "classify"  # 预留：任务类型
             elif model_family == "yolov5":
                 model_name = f"yolov5{model_variant}.pt"
-                task = "detect"
+                _task = "detect"  # 预留：任务类型
             elif model_family == "yolov10":
                 model_name = f"yolov10{model_variant}.pt"
-                task = "detect"
+                _task = "detect"  # 预留：任务类型
             elif model_family == "yolov11":
                 model_name = f"yolo11{model_variant}.pt"
-                task = "detect"
+                _task = "detect"  # 预留：任务类型
             else:
                 model_name = f"yolov8{model_variant}.pt"
-                task = "detect"
+                _task = "detect"  # 预留：任务类型
 
             # 加载模型
             if pretrained and not resume:
@@ -370,25 +370,32 @@ class UltralyticsAdapter(TrainingAdapter):
         return None
 
     async def export_model(self, weight_path: str, format: str, options: dict) -> dict:
-        """导出模型"""
-        from ultralytics import YOLO
-
+        """导出模型（使用 asyncio.to_thread 避免阻塞事件循环）"""
         try:
-            model = YOLO(weight_path)
-            # 根据模型类型调整默认 imgsz
-            default_imgsz = 640
-            if hasattr(model, 'task') and model.task == 'classify':
-                default_imgsz = 224
-            export_path = model.export(
-                format=format,
-                imgsz=options.get("imgsz", default_imgsz),
-                opset=options.get("opset", 13),
-                dynamic=options.get("dynamic", True),
-                simplify=options.get("simplify", True),
+            import asyncio
+            export_path = await asyncio.to_thread(
+                self._do_export, weight_path, format, options
             )
             return {"status": "succeeded", "export_path": str(export_path)}
         except Exception as e:
             return {"status": "failed", "error": str(e)}
+
+    @staticmethod
+    def _do_export(weight_path: str, format: str, options: dict) -> str:
+        """同步执行 YOLO 导出（在线程池中运行）"""
+        from ultralytics import YOLO
+
+        model = YOLO(weight_path)
+        default_imgsz = 640
+        if hasattr(model, 'task') and model.task == 'classify':
+            default_imgsz = 224
+        return model.export(
+            format=format,
+            imgsz=options.get("imgsz", default_imgsz),
+            opset=options.get("opset", 13),
+            dynamic=options.get("dynamic", True),
+            simplify=options.get("simplify", True),
+        )
 
     def get_status(self) -> dict:
         """获取当前训练状态"""

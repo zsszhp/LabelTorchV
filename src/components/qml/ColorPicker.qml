@@ -32,7 +32,7 @@ Item {
             text: "调色板"
             font.pixelSize: Theme.fontSizeCaption
             flat: true
-            palette.buttonText: Theme.textSecondary
+            palette.buttonText: Theme.textMuted
             background: Rectangle {
                 color: parent.hovered ? Theme.bgHover : Theme.bgCard
                 border.color: Theme.borderColor

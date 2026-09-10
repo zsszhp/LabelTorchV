@@ -4,9 +4,6 @@ qt_add_qml_module(labeltorch_shell
     RESOURCE_PREFIX /qt/qml
     QML_FILES
         qml/Main.qml
-        qml/NavTree.qml
-        qml/StatusBar.qml
-        qml/TaskPanel.qml
         qml/LogPanel.qml
         qml/SvgIcon.qml
     RESOURCES

@@ -100,6 +100,12 @@ async def handle_verify(payload: dict) -> dict:
 
 
 async def _verify_onnx(artifact_path: str) -> dict:
+    """使用 onnxruntime 验证 ONNX 模型（使用 asyncio.to_thread 避免阻塞）"""
+    import asyncio
+    return await asyncio.to_thread(_do_verify_onnx, artifact_path)
+
+
+def _do_verify_onnx(artifact_path: str) -> dict:
     """使用 onnxruntime 验证 ONNX 模型"""
     try:
         import onnxruntime as ort
@@ -166,6 +172,12 @@ async def _verify_onnx(artifact_path: str) -> dict:
 
 
 async def _verify_torchscript(artifact_path: str) -> dict:
+    """验证 TorchScript 模型（使用 asyncio.to_thread 避免阻塞）"""
+    import asyncio
+    return await asyncio.to_thread(_do_verify_torchscript, artifact_path)
+
+
+def _do_verify_torchscript(artifact_path: str) -> dict:
     """验证 TorchScript 模型"""
     try:
         import torch

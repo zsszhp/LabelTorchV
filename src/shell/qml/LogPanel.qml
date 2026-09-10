@@ -6,8 +6,8 @@ import LabelTorch.Theme
 
 Rectangle {
     id: root
-    color: Theme.bgSecondary
-    border.color: Theme.border
+    color: Theme.bgSide
+    border.color: Theme.borderColor
     border.width: 1
 
     property alias logText: logArea.text
@@ -39,8 +39,8 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 32
-            color: Theme.bgTertiary
-            border.color: Theme.border
+            color: Theme.bgCard
+            border.color: Theme.borderColor
             border.width: 1
 
             RowLayout {
@@ -54,13 +54,13 @@ Rectangle {
                     width: 8
                     height: 8
                     radius: 4
-                    color: Theme.accentPrimary
+                    color: Theme.primary
                     opacity: 0.8
                 }
 
                 Label {
                     text: "日志面板"
-                    color: Theme.accentPrimary
+                    color: Theme.primary
                     font.pixelSize: Theme.fontSizeSmall
                     font.bold: true
                     font.family: Theme.fontFamily
@@ -70,7 +70,7 @@ Rectangle {
 
                 Label {
                     text: autoScroll ? "自动滚动" : "手动滚动"
-                    color: autoScroll ? Theme.accentSuccess : Theme.textMuted
+                    color: autoScroll ? Theme.success : Theme.textMuted
                     font.pixelSize: Theme.fontSizeCaption
                     font.bold: true
                     font.family: Theme.fontFamilyMono
@@ -81,7 +81,7 @@ Rectangle {
                     flat: true
                     font.pixelSize: Theme.fontSizeCaption
                     font.family: Theme.fontFamily
-                    palette.buttonText: Theme.textSecondary
+                    palette.buttonText: Theme.textMuted
                     onClicked: root.clear()
                 }
 
@@ -90,7 +90,7 @@ Rectangle {
                     flat: true
                     font.pixelSize: Theme.fontSizeCaption
                     font.family: Theme.fontFamily
-                    palette.buttonText: Theme.accentPrimary
+                    palette.buttonText: Theme.primary
                     onClicked: {
                         collapsed = !collapsed
                     }
@@ -126,7 +126,7 @@ Rectangle {
                 id: logArea
                 readOnly: true
                 selectByMouse: true
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: Theme.fontSizeSmall
                 font.family: Theme.fontFamilyMono
                 wrapMode: TextEdit.NoWrap

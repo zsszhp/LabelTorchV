@@ -54,6 +54,10 @@ ApplicationWindow {
         ListElement { pageId: "check"; title: "检查"; icon: "check"; needsProject: true }
         ListElement { pageId: "training"; title: "训练"; icon: "brain"; needsProject: true }
         ListElement { pageId: "test"; title: "测试"; icon: "flask"; needsProject: true }
+        ListElement { pageId: "inference"; title: "推理"; icon: "scan"; needsProject: true }
+        ListElement { pageId: "activelearning"; title: "主动学习"; icon: "refresh"; needsProject: true }
+        ListElement { pageId: "anomaly"; title: "异常检测"; icon: "alert"; needsProject: true }
+        ListElement { pageId: "videoinference"; title: "视频推理"; icon: "video"; needsProject: true }
         ListElement { pageId: "export"; title: "导出"; icon: "export"; needsProject: true }
     }
 
@@ -122,7 +126,13 @@ ApplicationWindow {
                 root.hasRunningTraining = false
             }
         }
-        function onBackendError(error) {}
+        function onBackendError(error) {
+            // Python 后端错误：记录到日志面板（不静默吞异常）
+            console.error("[IPC] Backend error:", error)
+            if (typeof logPanel !== "undefined" && logPanel.appendLog) {
+                logPanel.appendLog("[ERROR] Python 后端错误: " + error)
+            }
+        }
     }
 
     ColumnLayout {
@@ -158,7 +168,30 @@ ApplicationWindow {
                     Layout.rightMargin: 12
                     spacing: 10
 
-
+                    // 渐变图标方块（对标参考UI: 26x26, linear-gradient(135deg, primary, primaryGlow)）
+                    Rectangle {
+                        width: 26; height: 26; radius: 6
+                        anchors.verticalCenter: parent.verticalCenter
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: Theme.primary }
+                            GradientStop { position: 1.0; color: Theme.primaryGlow }
+                        }
+                        Text {
+                            anchors.centerIn: parent
+                            text: "标"
+                            color: "#FFFFFF"
+                            font.pixelSize: 14
+                            font.weight: Font.Bold
+                            font.family: Theme.fontFamily
+                        }
+                        // 发光效果（对标 box-shadow: 0 0 10px rgba(0,229,255,0.3)）
+                        layer.enabled: true
+                        layer.effect: MultiEffect {
+                            shadowEnabled: true
+                            shadowColor: Qt.rgba(0, 0.898, 1, 0.3)
+                            shadowBlur: 0.5
+                        }
+                    }
 
                     // 渐变文字（对标参考UI: linear-gradient(to right, #ffffff, #94A3B8)）
                     Text {
@@ -183,8 +216,8 @@ ApplicationWindow {
                         delegate: ItemDelegate {
                             id: navDelegate
                             height: Theme.headerHeight
-                            leftPadding: 22
-                            rightPadding: 22
+                            leftPadding: 16
+                            rightPadding: 16
                             enabled: !model.needsProject || appController.projectOpen
 
                             contentItem: Row {
@@ -293,7 +326,16 @@ ApplicationWindow {
                         height: 14
                         color: signalMouse.containsMouse ? Theme.textMain : Theme.textMuted
                         anchors.verticalCenter: parent.verticalCenter
-                        MouseArea { id: signalMouse; anchors.fill: parent; hoverEnabled: true }
+                        MouseArea {
+                            id: signalMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: connectionInfoDialog.open()
+                        }
+                        ToolTip.visible: signalMouse.containsMouse
+                        ToolTip.text: ipcClient.connected ? "后端已连接" : "后端未连接"
+                        ToolTip.delay: 500
                     }
                     SvgIcon {
                         icon: "gear"
@@ -301,7 +343,16 @@ ApplicationWindow {
                         height: 14
                         color: gearMouse.containsMouse ? Theme.textMain : Theme.textMuted
                         anchors.verticalCenter: parent.verticalCenter
-                        MouseArea { id: gearMouse; anchors.fill: parent; hoverEnabled: true }
+                        MouseArea {
+                            id: gearMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: settingsDialog.open()
+                        }
+                        ToolTip.visible: gearMouse.containsMouse
+                        ToolTip.text: "设置"
+                        ToolTip.delay: 500
                     }
                     SvgIcon {
                         icon: "user"
@@ -309,7 +360,16 @@ ApplicationWindow {
                         height: 14
                         color: userMouse.containsMouse ? Theme.textMain : Theme.textMuted
                         anchors.verticalCenter: parent.verticalCenter
-                        MouseArea { id: userMouse; anchors.fill: parent; hoverEnabled: true }
+                        MouseArea {
+                            id: userMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: aboutDialog.open()
+                        }
+                        ToolTip.visible: userMouse.containsMouse
+                        ToolTip.text: "关于"
+                        ToolTip.delay: 500
                     }
 
                     // 分割线
@@ -381,7 +441,7 @@ ApplicationWindow {
             Layout.fillWidth: true
             Layout.preferredHeight: 38
             color: Theme.bgMain
-            visible: appController.currentPage === "check" // 数据集和标注页已内部实现
+            visible: ["dataset", "annotation", "check"].indexOf(appController.currentPage) >= 0
 
             // 底部分割线
             Rectangle {
@@ -539,7 +599,11 @@ ApplicationWindow {
                     case "check": return 3
                     case "training": return 4
                     case "test": return 5
-                    case "export": return 6
+                    case "inference": return 6
+                    case "activelearning": return 7
+                    case "anomaly": return 8
+                    case "videoinference": return 9
+                    case "export": return 10
                     default: return 0
                 }
             }
@@ -551,10 +615,14 @@ ApplicationWindow {
                 "qrc:/qt/qml/LabelTorch/Dataset/qml/CheckPage.qml",
                 "qrc:/qt/qml/LabelTorch/Training/qml/TrainingPage.qml",
                 "qrc:/qt/qml/LabelTorch/Testing/qml/TestingPage.qml",
+                "qrc:/qt/qml/LabelTorch/Inference/qml/AssistedLabelPanel.qml",
+                "qrc:/qt/qml/LabelTorch/Inference/qml/ActiveLearningPage.qml",
+                "qrc:/qt/qml/LabelTorch/Inference/qml/AnomalyInferPanel.qml",
+                "qrc:/qt/qml/LabelTorch/Inference/qml/VideoInferencePage.qml",
                 "qrc:/qt/qml/LabelTorch/Export/qml/ExportPage.qml"
             ]
 
-            property var loadedFlags: [true, false, false, false, false, false, false]
+            property var loadedFlags: [true, false, false, false, false, false, false, false, false, false, false]
 
             onCurrentIndexChanged: {
                 if (currentIndex >= 0 && currentIndex < pageSources.length) {
@@ -569,6 +637,22 @@ ApplicationWindow {
             Loader {
                 asynchronous: true
                 source: contentStack.pageSources[0]
+                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
+            }
+            Loader {
+                asynchronous: true
+                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
+            }
+            Loader {
+                asynchronous: true
+                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
+            }
+            Loader {
+                asynchronous: true
+                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
+            }
+            Loader {
+                asynchronous: true
                 onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
@@ -737,7 +821,7 @@ ApplicationWindow {
 
             Text {
                 text: "是否确实关闭"
-                color: Theme.textSecondary
+                color: Theme.textMuted
                 font.pixelSize: Theme.fontSizeNormal
                 font.family: Theme.fontFamily
                 wrapMode: Text.WordWrap
@@ -764,7 +848,7 @@ ApplicationWindow {
                 }
                 contentItem: Text {
                     text: parent.text
-                    color: Theme.textSecondary
+                    color: Theme.textMuted
                     font.pixelSize: Theme.fontSizeNormal
                     font.family: Theme.fontFamily
                     horizontalAlignment: Text.AlignHCenter
@@ -795,6 +879,367 @@ ApplicationWindow {
                     closeConfirmDialog.close()
                     root.close()
                 }
+            }
+        }
+    }
+
+    // 连接状态详情对话框
+    Dialog {
+        id: connectionInfoDialog
+        title: "连接状态"
+        modal: true
+        anchors.centerIn: parent
+        width: 360
+        height: 200
+
+        palette.window: Theme.bgMain
+        palette.windowText: Theme.textMain
+        palette.base: Theme.bgInput
+        palette.text: Theme.textMain
+        palette.button: Theme.bgCard
+        palette.buttonText: Theme.textMain
+
+        background: Rectangle {
+            color: Theme.bgMain
+            radius: Theme.radiusLarge
+            border.color: Theme.borderColor
+            border.width: 1
+        }
+
+        header: Rectangle {
+            color: Theme.bgInput
+            height: 44
+            radius: Theme.radiusLarge
+
+            Label {
+                anchors.centerIn: parent
+                text: "连接状态"
+                color: Theme.primary
+                font.pixelSize: Theme.fontSizeSubheading
+                font.bold: true
+            }
+        }
+
+        contentItem: Rectangle {
+            color: Theme.bgMain
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Theme.spacingLarge
+                spacing: Theme.spacingNormal
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label {
+                        text: "Python 后端："
+                        color: Theme.textMuted
+                        font.pixelSize: Theme.fontSizeNormal
+                    }
+                    Label {
+                        text: ipcClient.connected ? "已连接" : "未连接"
+                        color: ipcClient.connected ? Theme.success : Theme.danger
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.bold: true
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label {
+                        text: "GPU 状态："
+                        color: Theme.textMuted
+                        font.pixelSize: Theme.fontSizeNormal
+                    }
+                    Label {
+                        text: gpuStatusText
+                        color: gpuStatusColor
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.bold: true
+                    }
+                }
+
+                Item { Layout.fillHeight: true }
+            }
+        }
+
+        footer: Rectangle {
+            color: Theme.bgInput
+            height: 48
+            radius: Theme.radiusLarge
+
+            Button {
+                anchors.centerIn: parent
+                text: "关闭"
+                flat: true
+                contentItem: Label {
+                    text: parent.text
+                    color: Theme.textMain
+                    font.pixelSize: Theme.fontSizeNormal
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                onClicked: connectionInfoDialog.close()
+            }
+        }
+    }
+
+    // 设置对话框
+    Dialog {
+        id: settingsDialog
+        title: "设置"
+        modal: true
+        anchors.centerIn: parent
+        width: 420
+        height: 280
+
+        palette.window: Theme.bgMain
+        palette.windowText: Theme.textMain
+        palette.base: Theme.bgInput
+        palette.text: Theme.textMain
+        palette.button: Theme.bgCard
+        palette.buttonText: Theme.textMain
+
+        background: Rectangle {
+            color: Theme.bgMain
+            radius: Theme.radiusLarge
+            border.color: Theme.borderColor
+            border.width: 1
+        }
+
+        header: Rectangle {
+            color: Theme.bgInput
+            height: 44
+            radius: Theme.radiusLarge
+
+            Label {
+                anchors.centerIn: parent
+                text: "设置"
+                color: Theme.primary
+                font.pixelSize: Theme.fontSizeSubheading
+                font.bold: true
+            }
+        }
+
+        contentItem: Rectangle {
+            color: Theme.bgMain
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Theme.spacingLarge
+                spacing: Theme.spacingNormal
+
+                Label {
+                    text: "Python 路径："
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSizeNormal
+                }
+
+                TextField {
+                    id: pythonPathField
+                    Layout.fillWidth: true
+                    text: typeof appSettings !== "undefined" ? (appSettings.pythonPath || "C:/A/anaconda/envs/labeltorch/python.exe") : "C:/A/anaconda/envs/labeltorch/python.exe"
+                    color: Theme.textMain
+                    font.pixelSize: Theme.fontSizeNormal
+                    background: Rectangle {
+                        color: Theme.bgInput
+                        radius: Theme.radiusSmall
+                        border.color: pythonPathField.activeFocus ? Theme.primary : Theme.borderColor
+                        border.width: 1
+                        implicitHeight: 32
+                    }
+                }
+
+                Label {
+                    text: "日志级别："
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSizeNormal
+                }
+
+                ComboBox {
+                    id: logLevelCombo
+                    Layout.fillWidth: true
+                    model: ["DEBUG", "INFO", "WARNING", "ERROR"]
+                    currentIndex: 1
+
+                    contentItem: Label {
+                        text: logLevelCombo.displayText
+                        color: Theme.textMain
+                        font.pixelSize: Theme.fontSizeNormal
+                        verticalAlignment: Text.AlignVCenter
+                        leftPadding: Theme.spacingSmall
+                    }
+
+                    background: Rectangle {
+                        color: Theme.bgCard
+                        radius: Theme.radiusSmall
+                        border.color: logLevelCombo.activeFocus ? Theme.primary : Theme.borderColor
+                        border.width: 1
+                        implicitHeight: 32
+                    }
+                }
+
+                Item { Layout.fillHeight: true }
+            }
+        }
+
+        footer: Rectangle {
+            color: Theme.bgInput
+            height: 52
+            radius: Theme.radiusLarge
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: Theme.spacingLarge
+                anchors.rightMargin: Theme.spacingLarge
+                spacing: Theme.spacingNormal
+
+                Button {
+                    text: "取消"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 34
+                    flat: true
+                    contentItem: Label {
+                        text: parent.text
+                        color: Theme.textMain
+                        font.pixelSize: Theme.fontSizeNormal
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    onClicked: settingsDialog.reject()
+                }
+
+                Button {
+                    text: "保存"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 34
+                    contentItem: Label {
+                        text: parent.text
+                        color: Theme.bgMain
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    background: Rectangle {
+                        color: parent.pressed ? Qt.darker(Theme.primary, 1.2) : Theme.primary
+                        radius: Theme.radiusSmall
+                    }
+                    onClicked: {
+                        if (typeof appSettings !== "undefined") {
+                            appSettings.pythonPath = pythonPathField.text
+                        }
+                        settingsDialog.accept()
+                    }
+                }
+            }
+        }
+    }
+
+    // 关于对话框
+    Dialog {
+        id: aboutDialog
+        title: "关于"
+        modal: true
+        anchors.centerIn: parent
+        width: 380
+        height: 260
+
+        palette.window: Theme.bgMain
+        palette.windowText: Theme.textMain
+        palette.base: Theme.bgInput
+        palette.text: Theme.textMain
+        palette.button: Theme.bgCard
+        palette.buttonText: Theme.textMain
+
+        background: Rectangle {
+            color: Theme.bgMain
+            radius: Theme.radiusLarge
+            border.color: Theme.borderColor
+            border.width: 1
+        }
+
+        header: Rectangle {
+            color: Theme.bgInput
+            height: 44
+            radius: Theme.radiusLarge
+
+            Label {
+                anchors.centerIn: parent
+                text: "关于"
+                color: Theme.primary
+                font.pixelSize: Theme.fontSizeSubheading
+                font.bold: true
+            }
+        }
+
+        contentItem: Rectangle {
+            color: Theme.bgMain
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Theme.spacingLarge
+                spacing: Theme.spacingNormal
+
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "标炬 LabelTorch"
+                    color: Theme.textMain
+                    font.pixelSize: Theme.fontSizeLarge
+                    font.bold: true
+                }
+
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "版本 0.1.0"
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSizeNormal
+                }
+
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "工业缺陷检测智能一体化平台"
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSizeCaption
+                    wrapMode: Text.WordWrap
+                }
+
+                Item { Layout.fillHeight: true }
+
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "Qt 6.11 + QML + C++17 + Python 3.11"
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSizeCaption
+                    font.family: Theme.fontFamilyMono
+                }
+
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "Ultralytics + Anomalib"
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSizeCaption
+                    font.family: Theme.fontFamilyMono
+                }
+            }
+        }
+
+        footer: Rectangle {
+            color: Theme.bgInput
+            height: 48
+            radius: Theme.radiusLarge
+
+            Button {
+                anchors.centerIn: parent
+                text: "关闭"
+                flat: true
+                contentItem: Label {
+                    text: parent.text
+                    color: Theme.textMain
+                    font.pixelSize: Theme.fontSizeNormal
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                onClicked: aboutDialog.close()
             }
         }
     }

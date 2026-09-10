@@ -12,9 +12,9 @@ Item {
     property string selectedBatchId: ""
     property var selectedBatch: null
     property var candidates: []
-    property var batchStats: ({"total":0,"confirmed":0,"rejected":0,"pending":0,"edited":0})
+    property var batchStats: {"total":0,"confirmed":0,"rejected":0,"pending":0,"edited":0}
     property var lowConfSamples: []
-    property var confidenceStats: ({"totalCandidates":0,"lowConfCount":0,"highConfCount":0,"averageConfidence":0,"threshold":0.3})
+    property var confidenceStats: {"totalCandidates":0,"lowConfCount":0,"highConfCount":0,"averageConfidence":0,"threshold":0.3}
     property var hardCaseQueue: []
     property bool showHardCaseQueue: false
 
@@ -101,7 +101,7 @@ Item {
                 // 区域标题
                 Label {
                     text: "辅助标注"
-                    color: Theme.accentPrimary
+                    color: Theme.primary
                     font.pixelSize: 16
                     font.bold: true
                 }
@@ -113,7 +113,7 @@ Item {
 
                     Label {
                         text: "模型："
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.pixelSize: 13
                         Layout.preferredWidth: 52
                     }
@@ -131,7 +131,7 @@ Item {
 
                         contentItem: Label {
                             text: modelVersionCombo.displayText
-                            color: Theme.textPrimary
+                            color: Theme.textMain
                             font.pixelSize: 13
                             verticalAlignment: Text.AlignVCenter
                             leftPadding: 8
@@ -140,7 +140,7 @@ Item {
                         background: Rectangle {
                             color: Theme.bgHover
                             radius: 4
-                            border.color: modelVersionCombo.activeFocus ? Theme.accentPrimary : Theme.textDisabled
+                            border.color: modelVersionCombo.activeFocus ? Theme.primary : Theme.textDisabled
                             border.width: 1
                         }
 
@@ -158,7 +158,7 @@ Item {
                             }
 
                             background: Rectangle {
-                                color: Theme.bgPrimary
+                                color: Theme.bgMain
                                 border.color: Theme.textDisabled
                                 radius: 4
                             }
@@ -168,14 +168,14 @@ Item {
                             width: modelVersionCombo.width
                             contentItem: Label {
                                 text: model.id.substring(0, 8) + "..."
-                                color: highlighted ? Theme.accentPrimary : Theme.textPrimary
+                                color: highlighted ? Theme.primary : Theme.textMain
                                 font.pixelSize: 12
                                 font.family: "monospace"
                                 verticalAlignment: Text.AlignVCenter
                             }
                             highlighted: modelVersionCombo.highlightedIndex === index
                             background: Rectangle {
-                                color: highlighted ? Theme.bgHover : Theme.bgPrimary
+                                color: highlighted ? Theme.bgHover : Theme.bgMain
                             }
                         }
                     }
@@ -188,7 +188,7 @@ Item {
 
                     Label {
                         text: "置信度："
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.pixelSize: 13
                         Layout.preferredWidth: 52
                     }
@@ -212,7 +212,7 @@ Item {
                             Rectangle {
                                 width: confSlider.visualPosition * parent.width
                                 height: parent.height
-                                color: Theme.accentPrimary
+                                color: Theme.primary
                                 radius: 2
                             }
                         }
@@ -223,7 +223,7 @@ Item {
                             width: 16
                             height: 16
                             radius: 8
-                            color: confSlider.pressed ? Theme.accentPrimary : Theme.accentPrimary
+                            color: confSlider.pressed ? Theme.primary : Theme.primary
                         }
                     }
 
@@ -243,7 +243,7 @@ Item {
 
                     Label {
                         text: "IoU："
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.pixelSize: 13
                         Layout.preferredWidth: 52
                     }
@@ -267,7 +267,7 @@ Item {
                             Rectangle {
                                 width: iouSlider.visualPosition * parent.width
                                 height: parent.height
-                                color: Theme.accentPrimary
+                                color: Theme.primary
                                 radius: 2
                             }
                         }
@@ -278,7 +278,7 @@ Item {
                             width: 16
                             height: 16
                             radius: 8
-                            color: iouSlider.pressed ? Theme.accentPrimary : Theme.accentPrimary
+                            color: iouSlider.pressed ? Theme.primary : Theme.primary
                         }
                     }
 
@@ -298,7 +298,7 @@ Item {
 
                     Label {
                         text: "范围："
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.pixelSize: 13
                         Layout.preferredWidth: 52
                     }
@@ -311,7 +311,7 @@ Item {
 
                         contentItem: Label {
                             text: scopeCombo.currentText
-                            color: Theme.textPrimary
+                            color: Theme.textMain
                             font.pixelSize: 13
                             verticalAlignment: Text.AlignVCenter
                             leftPadding: 8
@@ -320,7 +320,7 @@ Item {
                         background: Rectangle {
                             color: Theme.bgHover
                             radius: 4
-                            border.color: scopeCombo.activeFocus ? Theme.accentPrimary : Theme.textDisabled
+                            border.color: scopeCombo.activeFocus ? Theme.primary : Theme.textDisabled
                             border.width: 1
                         }
 
@@ -338,7 +338,7 @@ Item {
                             }
 
                             background: Rectangle {
-                                color: Theme.bgPrimary
+                                color: Theme.bgMain
                                 border.color: Theme.textDisabled
                                 radius: 4
                             }
@@ -348,13 +348,13 @@ Item {
                             width: scopeCombo.width
                             contentItem: Label {
                                 text: modelData
-                                color: highlighted ? Theme.accentPrimary : Theme.textPrimary
+                                color: highlighted ? Theme.primary : Theme.textMain
                                 font.pixelSize: 13
                                 verticalAlignment: Text.AlignVCenter
                             }
                             highlighted: scopeCombo.highlightedIndex === index
                             background: Rectangle {
-                                color: highlighted ? Theme.bgHover : Theme.bgPrimary
+                                color: highlighted ? Theme.bgHover : Theme.bgMain
                             }
                         }
                     }
@@ -368,14 +368,14 @@ Item {
                     enabled: modelVersionCombo.currentIndex >= 0 && currentDatasetId !== ""
 
                     background: Rectangle {
-                        color: parent.enabled ? (parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess) : Theme.textDisabled
+                        color: parent.enabled ? (parent.pressed ? Qt.darker(Theme.success, 1.2) : Theme.success) : Theme.textDisabled
                         radius: 6
                         implicitHeight: 36
                     }
 
                     contentItem: Label {
                         text: parent.text
-                        color: parent.enabled ? Theme.bgPrimary : Theme.textDisabled
+                        color: parent.enabled ? Theme.bgMain : Theme.textDisabled
                         font.pixelSize: 13
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
@@ -394,11 +394,11 @@ Item {
                         )
                         if (batchId !== "") {
                             statusLabel.text = "批次已创建: " + batchId.substring(0, 8) + "..."
-                            statusLabel.color = Theme.accentSuccess
+                            statusLabel.color = Theme.success
                             refreshBatches()
                         } else {
                             statusLabel.text = "创建批次失败"
-                            statusLabel.color = Theme.accentError
+                            statusLabel.color = Theme.danger
                         }
                     }
                 }
@@ -408,7 +408,7 @@ Item {
                     id: statusLabel
                     Layout.fillWidth: true
                     text: ""
-                    color: Theme.accentSuccess
+                    color: Theme.success
                     font.pixelSize: 12
                     wrapMode: Text.WordWrap
                 }
@@ -423,7 +423,7 @@ Item {
                 // 低置信度反馈循环区域
                 Label {
                     text: "低置信度反馈"
-                    color: Theme.accentWarning
+                    color: Theme.warning
                     font.pixelSize: 14
                     font.bold: true
                 }
@@ -434,7 +434,7 @@ Item {
 
                     Label {
                         text: "阈值："
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.pixelSize: 12
                     }
 
@@ -465,13 +465,13 @@ Item {
                         background: Rectangle {
                             color: Theme.bgHover
                             radius: 4
-                            border.color: lowConfThresholdSpin.activeFocus ? Theme.accentWarning : Theme.textDisabled
+                            border.color: lowConfThresholdSpin.activeFocus ? Theme.warning : Theme.textDisabled
                             border.width: 1
                         }
 
                         contentItem: Label {
                             text: lowConfThresholdSpin.textFromValue(lowConfThresholdSpin.value)
-                            color: Theme.textPrimary
+                            color: Theme.textMain
                             font.pixelSize: 13
                             font.family: "monospace"
                             horizontalAlignment: Text.AlignHCenter
@@ -489,7 +489,7 @@ Item {
                             Label {
                                 anchors.centerIn: parent
                                 text: "+"
-                                color: Theme.textPrimary
+                                color: Theme.textMain
                                 font.pixelSize: 14
                                 font.bold: true
                                 horizontalAlignment: Text.AlignHCenter
@@ -509,7 +509,7 @@ Item {
                             Label {
                                 anchors.centerIn: parent
                                 text: "-"
-                                color: Theme.textPrimary
+                                color: Theme.textMain
                                 font.pixelSize: 14
                                 font.bold: true
                                 horizontalAlignment: Text.AlignHCenter
@@ -526,13 +526,13 @@ Item {
                         enabled: selectedBatchId !== ""
 
                         background: Rectangle {
-                            color: parent.enabled ? (parent.pressed ? Theme.accentWarning : Theme.accentWarning) : Theme.textDisabled
+                            color: parent.enabled ? (parent.pressed ? Theme.warning : Theme.warning) : Theme.textDisabled
                             radius: 6
                         }
 
                         contentItem: Label {
                             text: parent.text
-                            color: parent.enabled ? Theme.bgPrimary : Theme.textDisabled
+                            color: parent.enabled ? Theme.bgMain : Theme.textDisabled
                             font.pixelSize: 12
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter
@@ -551,7 +551,7 @@ Item {
                     text: "低置信度:" + confidenceStats.lowConfCount + " / " + confidenceStats.totalCandidates +
                           "  |  平均置信度: " + (parseFloat(confidenceStats.averageConfidence) || 0).toFixed(3) +
                           "  |  阈值: " + (parseFloat(confidenceStats.threshold) || 0).toFixed(2)
-                    color: confidenceStats.lowConfCount > 0 ? Theme.accentWarning : Theme.accentSuccess
+                    color: confidenceStats.lowConfCount > 0 ? Theme.warning : Theme.success
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
                 }
@@ -587,7 +587,7 @@ Item {
                 // 难例审核区域
                 Label {
                     text: "难例审核"
-                    color: Theme.accentSecondary
+                    color: Theme.primaryGlow
                     font.pixelSize: 14
                     font.bold: true
                 }
@@ -604,13 +604,13 @@ Item {
                         enabled: selectedBatchId !== ""
 
                         background: Rectangle {
-                            color: parent.enabled ? (parent.pressed ? Theme.accentSecondary : Theme.accentSecondary) : Theme.textDisabled
+                            color: parent.enabled ? (parent.pressed ? Theme.primaryGlow : Theme.primaryGlow) : Theme.textDisabled
                             radius: 6
                         }
 
                         contentItem: Label {
                             text: parent.text + (hardCaseQueue.length > 0 ? " (" + hardCaseQueue.length + ")" : "")
-                            color: parent.enabled ? Theme.bgPrimary : Theme.textDisabled
+                            color: parent.enabled ? Theme.bgMain : Theme.textDisabled
                             font.pixelSize: 12
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter
@@ -636,14 +636,14 @@ Item {
                         }
                         return false
                     }
-                    color: Theme.accentWarning
-                    border.color: Theme.accentWarning
+                    color: Theme.warning
+                    border.color: Theme.warning
                     border.width: 1
 
                     Label {
                         anchors.centerIn: parent
                         text: "! 检测到漏检 - 建议立即审核"
-                        color: Theme.accentWarning
+                        color: Theme.warning
                         font.pixelSize: 11
                         font.bold: true
                     }
@@ -680,7 +680,7 @@ Item {
 
                     Label {
                         text: "批次"
-                        color: Theme.accentPrimary
+                        color: Theme.primary
                         font.pixelSize: 14
                         font.bold: true
                     }
@@ -690,7 +690,7 @@ Item {
                     Button {
                         text: "刷新"
                         flat: true
-                        palette.buttonText: Theme.accentPrimary
+                        palette.buttonText: Theme.primary
                         font.pixelSize: 12
                         onClicked: refreshBatches()
                     }
@@ -717,8 +717,8 @@ Item {
                         width: batchList.width
                         height: 48
                         radius: 6
-                        color: batchMouseArea.containsMouse ? Theme.bgHover : Theme.bgSecondary
-                        border.color: model.id === selectedBatchId ? Theme.accentPrimary : "transparent"
+                        color: batchMouseArea.containsMouse ? Theme.bgHover : Theme.bgSide
+                        border.color: model.id === selectedBatchId ? Theme.primary : "transparent"
                         border.width: model.id === selectedBatchId ? 1 : 0
 
                         RowLayout {
@@ -734,18 +734,18 @@ Item {
                                 radius: 4
                                 color: {
                                     switch (model.status) {
-                                    case "completed": return Theme.accentSuccess
-                                    case "running": return Theme.accentWarning
+                                    case "completed": return Theme.success
+                                    case "running": return Theme.warning
                                     case "cancelled": return Theme.textDisabled
-                                    case "failed": return Theme.accentError
-                                    default: return Theme.accentPrimary
+                                    case "failed": return Theme.danger
+                                    default: return Theme.primary
                                     }
                                 }
                             }
 
                             Label {
                                 text: model.id.substring(0, 8) + "..."
-                                color: Theme.accentPrimary
+                                color: Theme.primary
                                 font.pixelSize: 12
                                 font.family: "monospace"
                             }
@@ -769,7 +769,7 @@ Item {
                                 text: "取消"
                                 flat: true
                                 visible: model.status === "pending" || model.status === "running"
-                                palette.buttonText: Theme.accentError
+                                palette.buttonText: Theme.danger
                                 font.pixelSize: 11
                                 onClicked: {
                                     inferenceService.cancelBatch(model.id)
@@ -809,7 +809,7 @@ Item {
                         text: selectedBatchId !== "" ?
                             "候选结果 - " + selectedBatchId.substring(0, 8) + "..." :
                             "候选结果"
-                        color: Theme.accentPrimary
+                        color: Theme.primary
                         font.pixelSize: 16
                         font.bold: true
                     }
@@ -835,7 +835,7 @@ Item {
 
                     Label {
                         text: "批次确认阈值："
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.pixelSize: 12
                     }
 
@@ -857,7 +857,7 @@ Item {
                             Rectangle {
                                 width: batchConfThresholdSlider.visualPosition * parent.width
                                 height: parent.height
-                                color: Theme.accentSuccess
+                                color: Theme.success
                                 radius: 2
                             }
                         }
@@ -868,7 +868,7 @@ Item {
                             width: 14
                             height: 14
                             radius: 7
-                            color: batchConfThresholdSlider.pressed ? Theme.accentSuccess : Theme.accentSuccess
+                            color: batchConfThresholdSlider.pressed ? Theme.success : Theme.success
                         }
                     }
 
@@ -885,13 +885,13 @@ Item {
                         Layout.preferredHeight: 28
 
                         background: Rectangle {
-                            color: parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess
+                            color: parent.pressed ? Qt.darker(Theme.success, 1.2) : Theme.success
                             radius: 4
                         }
 
                         contentItem: Label {
                             text: parent.text
-                            color: Theme.bgPrimary
+                            color: Theme.bgMain
                             font.pixelSize: 11
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter
@@ -915,13 +915,13 @@ Item {
                         Layout.preferredHeight: 28
 
                         background: Rectangle {
-                            color: parent.pressed ? Qt.darker(Theme.accentError, 1.2) : Theme.accentError
+                            color: parent.pressed ? Qt.darker(Theme.danger, 1.2) : Theme.danger
                             radius: 4
                         }
 
                         contentItem: Label {
                             text: parent.text
-                            color: Theme.bgPrimary
+                            color: Theme.bgMain
                             font.pixelSize: 11
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter
@@ -966,10 +966,10 @@ Item {
                         radius: 4
                         color: {
                             switch (model.state) {
-                            case "confirmed": return Theme.accentSuccess
-                            case "rejected": return Theme.accentError
-                            case "edited": return Theme.accentWarning
-                            default: return Theme.bgSecondary
+                            case "confirmed": return Theme.success
+                            case "rejected": return Theme.danger
+                            case "edited": return Theme.warning
+                            default: return Theme.bgSide
                             }
                         }
 
@@ -986,24 +986,24 @@ Item {
                                 radius: 4
                                 color: {
                                     switch (model.state) {
-                                    case "confirmed": return Theme.accentSuccess
-                                    case "rejected": return Theme.accentError
-                                    case "edited": return Theme.accentWarning
-                                    default: return Theme.accentPrimary
+                                    case "confirmed": return Theme.success
+                                    case "rejected": return Theme.danger
+                                    case "edited": return Theme.warning
+                                    default: return Theme.primary
                                     }
                                 }
                             }
 
                             Label {
                                 text: model.className || ("Class " + model.classIndex)
-                                color: Theme.textPrimary
+                                color: Theme.textMain
                                 font.pixelSize: 12
                                 Layout.preferredWidth: 100
                             }
 
                             Label {
                                 text: "置信度: " + (parseFloat(model.confidence) || 0).toFixed(3)
-                                color: (parseFloat(model.confidence) || 0) >= 0.5 ? Theme.accentSuccess : Theme.accentWarning
+                                color: (parseFloat(model.confidence) || 0) >= 0.5 ? Theme.success : Theme.warning
                                 font.pixelSize: 11
                                 font.family: "monospace"
                             }
@@ -1028,13 +1028,13 @@ Item {
                                 Layout.preferredWidth: 60
 
                                 background: Rectangle {
-                                    color: parent.pressed ? Qt.darker(Theme.accentSuccess, 1.2) : Theme.accentSuccess
+                                    color: parent.pressed ? Qt.darker(Theme.success, 1.2) : Theme.success
                                     radius: 3
                                 }
 
                                 contentItem: Label {
                                     text: parent.text
-                                    color: Theme.bgPrimary
+                                    color: Theme.bgMain
                                     font.pixelSize: 10
                                     font.bold: true
                                     horizontalAlignment: Text.AlignHCenter
@@ -1054,13 +1054,13 @@ Item {
                                 Layout.preferredWidth: 52
 
                                 background: Rectangle {
-                                    color: parent.pressed ? Qt.darker(Theme.accentError, 1.2) : Theme.accentError
+                                    color: parent.pressed ? Qt.darker(Theme.danger, 1.2) : Theme.danger
                                     radius: 3
                                 }
 
                                 contentItem: Label {
                                     text: parent.text
-                                    color: Theme.bgPrimary
+                                    color: Theme.bgMain
                                     font.pixelSize: 10
                                     font.bold: true
                                     horizontalAlignment: Text.AlignHCenter
@@ -1081,17 +1081,17 @@ Item {
                                 radius: 3
                                 color: {
                                     switch (model.state) {
-                                    case "confirmed": return Theme.accentSuccess
-                                    case "rejected": return Theme.accentError
-                                    case "edited": return Theme.accentWarning
+                                    case "confirmed": return Theme.success
+                                    case "rejected": return Theme.danger
+                                    case "edited": return Theme.warning
                                     default: return Theme.textDisabled
                                     }
                                 }
                                 border.color: {
                                     switch (model.state) {
-                                    case "confirmed": return Theme.accentSuccess
-                                    case "rejected": return Theme.accentError
-                                    case "edited": return Theme.accentWarning
+                                    case "confirmed": return Theme.success
+                                    case "rejected": return Theme.danger
+                                    case "edited": return Theme.warning
                                     default: return Theme.textDisabled
                                     }
                                 }
@@ -1103,9 +1103,9 @@ Item {
                                     text: model.state
                                     color: {
                                         switch (model.state) {
-                                        case "confirmed": return Theme.accentSuccess
-                                        case "rejected": return Theme.accentError
-                                        case "edited": return Theme.accentWarning
+                                        case "confirmed": return Theme.success
+                                        case "rejected": return Theme.danger
+                                        case "edited": return Theme.warning
                                         default: return Theme.textDisabled
                                         }
                                     }

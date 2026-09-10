@@ -287,45 +287,8 @@ bool AnnotationService::saveClassificationLabels(const QString &labelPath, const
         content = QString::number(classId);
     }
 
-    // --- Atomic write: temp file + rename (same pattern as YoloTxtWriter) ---
-    QFileInfo fi(labelPath);
-    QDir dir = fi.absoluteDir();
-    if (!dir.exists()) {
-        if (!dir.mkpath(QLatin1String("."))) {
-            ltError(LT_LOG_ANNOTATION()) << "cannot create directory for classification label:" << dir.absolutePath();
-            return false;
-        }
-    }
-
-    const QString tempPath = labelPath + QStringLiteral(".tmp");
-    {
-        QFile tempFile(tempPath);
-        if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-            ltError(LT_LOG_ANNOTATION()) << "cannot open temp file for classification label:" << tempPath;
-            return false;
-        }
-
-        QTextStream out(&tempFile);
-        out << content << QLatin1Char('\n');
-        out.flush();
-        if (!tempFile.flush()) {
-            ltError(LT_LOG_ANNOTATION()) << "flush failed for classification temp file:" << tempPath;
-            QFile::remove(tempPath);
-            return false;
-        }
-    }
-
-    if (QFile::exists(labelPath)) {
-        if (!QFile::remove(labelPath)) {
-            ltError(LT_LOG_ANNOTATION()) << "cannot remove existing classification label file:" << labelPath;
-            QFile::remove(tempPath);
-            return false;
-        }
-    }
-
-    if (!QFile::rename(tempPath, labelPath)) {
-        ltError(LT_LOG_ANNOTATION()) << "cannot rename temp file to classification label:" << labelPath;
-        QFile::remove(tempPath);
+    // --- Atomic write: temp file + rename (shared helper) ---
+    if (!writeAtomically(labelPath, content, QStringLiteral("classification label"))) {
         return false;
     }
 
@@ -417,45 +380,8 @@ bool AnnotationService::saveAnomalyLabels(const QString &labelPath, const QStrin
     // Content: "0" for normal, "1" for anomalous
     QString content = isAnomalous ? QStringLiteral("1") : QStringLiteral("0");
 
-    // --- Atomic write: temp file + rename (same pattern as saveClassificationLabels) ---
-    QFileInfo fi(labelPath);
-    QDir dir = fi.absoluteDir();
-    if (!dir.exists()) {
-        if (!dir.mkpath(QLatin1String("."))) {
-            ltError(LT_LOG_ANNOTATION()) << "cannot create directory for anomaly label:" << dir.absolutePath();
-            return false;
-        }
-    }
-
-    const QString tempPath = labelPath + QStringLiteral(".tmp");
-    {
-        QFile tempFile(tempPath);
-        if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-            ltError(LT_LOG_ANNOTATION()) << "cannot open temp file for anomaly label:" << tempPath;
-            return false;
-        }
-
-        QTextStream out(&tempFile);
-        out << content << QLatin1Char('\n');
-        out.flush();
-        if (!tempFile.flush()) {
-            ltError(LT_LOG_ANNOTATION()) << "flush failed for anomaly temp file:" << tempPath;
-            QFile::remove(tempPath);
-            return false;
-        }
-    }
-
-    if (QFile::exists(labelPath)) {
-        if (!QFile::remove(labelPath)) {
-            ltError(LT_LOG_ANNOTATION()) << "cannot remove existing anomaly label file:" << labelPath;
-            QFile::remove(tempPath);
-            return false;
-        }
-    }
-
-    if (!QFile::rename(tempPath, labelPath)) {
-        ltError(LT_LOG_ANNOTATION()) << "cannot rename temp file to anomaly label:" << labelPath;
-        QFile::remove(tempPath);
+    // --- Atomic write: temp file + rename (shared helper) ---
+    if (!writeAtomically(labelPath, content, QStringLiteral("anomaly label"))) {
         return false;
     }
 
@@ -475,6 +401,53 @@ bool AnnotationService::saveAnomalyLabels(const QString &labelPath, const QStrin
     }
 
     ltInfo(LT_LOG_ANNOTATION()) << "Saved anomaly labels to" << labelPath << "isAnomalous=" << isAnomalous;
+    return true;
+}
+
+bool AnnotationService::writeAtomically(const QString &filePath, const QString &content, const QString &context)
+{
+    // --- Atomic write: temp file + rename (shared by classification/anomaly label writers) ---
+    QFileInfo fi(filePath);
+    QDir dir = fi.absoluteDir();
+    if (!dir.exists()) {
+        if (!dir.mkpath(QLatin1String("."))) {
+            ltError(LT_LOG_ANNOTATION()) << "cannot create directory for" << context << ":" << dir.absolutePath();
+            return false;
+        }
+    }
+
+    const QString tempPath = filePath + QStringLiteral(".tmp");
+    {
+        QFile tempFile(tempPath);
+        if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+            ltError(LT_LOG_ANNOTATION()) << "cannot open temp file for" << context << ":" << tempPath;
+            return false;
+        }
+
+        QTextStream out(&tempFile);
+        out << content << QLatin1Char('\n');
+        out.flush();
+        if (!tempFile.flush()) {
+            ltError(LT_LOG_ANNOTATION()) << "flush failed for" << context << "temp file:" << tempPath;
+            QFile::remove(tempPath);
+            return false;
+        }
+    }
+
+    if (QFile::exists(filePath)) {
+        if (!QFile::remove(filePath)) {
+            ltError(LT_LOG_ANNOTATION()) << "cannot remove existing" << context << "file:" << filePath;
+            QFile::remove(tempPath);
+            return false;
+        }
+    }
+
+    if (!QFile::rename(tempPath, filePath)) {
+        ltError(LT_LOG_ANNOTATION()) << "cannot rename temp file to" << context << ":" << filePath;
+        QFile::remove(tempPath);
+        return false;
+    }
+
     return true;
 }
 

@@ -5,6 +5,8 @@
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QMap>
+#include <QSet>
 
 class IpcClient;
 
@@ -71,6 +73,26 @@ public:
      */
     Q_INVOKABLE bool cancelBatch(const QString &batchId);
 
+    /**
+     * @brief 启动视频流推理（P2-6，supervision 集成）。
+     *
+     * 异步调用 Python 后端 inference.run_video 命令，使用 sv.VideoInfo +
+     * sv.VideoSink + sv.get_video_frames_generator 逐帧推理并渲染标注框，
+     * 输出标注后视频到指定路径。完成后发射 videoInferenceFinished 信号。
+     *
+     * @param modelVersionId 模型版本 ID（用于解析权重文件路径）。
+     * @param videoPath 输入视频文件路径。
+     * @param outputPath 输出视频文件路径（空则自动派生到项目 cache 目录）。
+     * @param confThreshold 置信度阈值（0-1）。
+     * @param iouThreshold IoU 阈值（0-1）。
+     * @return 请求 ID（非空表示已成功派发），空串表示失败。
+     */
+    Q_INVOKABLE QString runVideoInference(const QString &modelVersionId,
+                                           const QString &videoPath,
+                                           const QString &outputPath,
+                                           double confThreshold,
+                                           double iouThreshold);
+
 signals:
     /**
      * @brief Emitted when an inference batch status changes.
@@ -79,8 +101,36 @@ signals:
      */
     void batchStatusChanged(const QString &batchId, const QString &status);
 
+    /**
+     * @brief Emitted when an inference batch completes (success or failure).
+     * @param batchId The batch ID.
+     * @param success Whether inference succeeded.
+     * @param candidateCount Number of candidate boxes detected.
+     */
+    void batchCompleted(const QString &batchId, bool success, int candidateCount);
+
+    /**
+     * @brief P2-6 视频推理完成信号。
+     * @param outputPath 输出视频路径（成功时为绝对路径，失败时为空串）。
+     * @param success 是否成功。
+     * @param totalFrames 总帧数。
+     * @param totalDetections 总检测框数。
+     * @param error 错误信息（失败时）。
+     */
+    void videoInferenceFinished(const QString &outputPath, bool success,
+                                int totalFrames, int totalDetections,
+                                const QString &error);
+
+private slots:
+    /// 处理 IPC 响应（A1：推理结果回传）
+    void onResponseReceived(const QJsonObject &response);
+
 private:
     IpcClient *m_ipcClient = nullptr;
+    /// 待响应推理请求映射：requestId → batchId（用于关联 IPC 响应与批次）
+    QMap<QString, QString> m_pendingBatches;
+    /// 待响应视频推理请求集合（requestId 集合）
+    QSet<QString> m_pendingVideoRequests;
 };
 
 #endif // INFERENCESERVICE_H

@@ -182,6 +182,16 @@ QStringList Schema::createTableStatements()
         "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
         "  started_at DATETIME,"
         "  finished_at DATETIME"
+        ")",
+
+        // 数据集标签表（A6：用于数据集分类与筛选）
+        "CREATE TABLE IF NOT EXISTS dataset_tags ("
+        "  id TEXT PRIMARY KEY,"
+        "  dataset_id TEXT NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,"
+        "  name TEXT NOT NULL,"
+        "  shortcut TEXT,"
+        "  created_at TEXT NOT NULL,"
+        "  UNIQUE(dataset_id, name)"
         ")"
     };
 }

@@ -36,9 +36,13 @@ Item {
 
     // 数据增强开关
     property bool augmentationEnabled: true
+    // P0-2 快照预览图状态
+    property bool snapshotPreviewGenerating: false
+    property string snapshotPreviewPath: ""
+    property string snapshotPreviewError: ""
     property var ultralyticsModelFamilies: ["yolov5", "yolov8", "yolov8_obb", "yolov8_cls", "yolov10", "yolov11"]
     property var anomalibModelFamilies: ["patchcore", "padim", "efficient_ad", "stfpm"]
-    property var environmentInfo: ({})
+    property var environmentInfo: null
     property var availableDeviceOptions: {
         var options = ["auto", "cpu"]
         var gpuCount = environmentInfo.gpu_count || 0
@@ -283,6 +287,26 @@ Item {
         function onResponseReceived(response) {
             if ((response.command || "") === "environment.check" && response.success) {
                 root.environmentInfo = response.result || {}
+            }
+        }
+    }
+
+    // P0-2 监听快照预览图生成结果
+    Connections {
+        target: snapshotService
+
+        function onPreviewGenerated(snapshotId, previewPath, success, error) {
+            root.snapshotPreviewGenerating = false
+            if (success) {
+                // 若 previewPath 为空（后端未返回），尝试从本地查询
+                if (previewPath === "") {
+                    previewPath = snapshotService.getPreviewPath(snapshotId)
+                }
+                root.snapshotPreviewPath = previewPath
+                root.snapshotPreviewError = ""
+            } else {
+                root.snapshotPreviewPath = ""
+                root.snapshotPreviewError = error || "生成预览失败"
             }
         }
     }
@@ -555,7 +579,7 @@ Item {
 
         Text {
             text: "请先打开一个项目"
-            color: Theme.textSecondary
+            color: Theme.textMuted
             font.pixelSize: Theme.fontSizeTitle
             font.bold: true
             Layout.alignment: Qt.AlignHCenter
@@ -1058,6 +1082,81 @@ Item {
                                                 var taxVer = snapshotModel.data(snapshotModel.index(idx, 0), Qt.UserRole + 5)
                                                 if (trainCount === undefined) return ""
                                                 return "Train: " + trainCount + " | Val: " + valCount + " | Taxonomy: " + (taxVer || "unknown")
+                                            }
+                                        }
+
+                                        // P0-2 快照预览图（supervision 集成）
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: Theme.spacingSmall
+
+                                            Button {
+                                                text: snapshotPreviewGenerating ? "生成中..." : "生成预览图"
+                                                font.family: Theme.fontFamily
+                                                implicitHeight: 26
+                                                Layout.preferredWidth: 120
+                                                enabled: snapshotCombo.currentIndex >= 0 && !snapshotPreviewGenerating
+                                                background: Rectangle {
+                                                    color: parent.hovered ? Theme.bgHover : Theme.bgInput
+                                                    radius: Theme.radiusSmall
+                                                    border.color: Theme.primary
+                                                    border.width: 1
+                                                }
+                                                contentItem: Text {
+                                                    text: parent.text
+                                                    color: parent.enabled ? Theme.primary : Theme.textDisabled
+                                                    font.pixelSize: Theme.fontSizeCaption
+                                                    horizontalAlignment: Text.AlignHCenter
+                                                    verticalAlignment: Text.AlignVCenter
+                                                }
+                                                onClicked: {
+                                                    var sid = snapshotCombo.currentValue
+                                                    if (!sid) return
+                                                    snapshotPreviewGenerating = true
+                                                    snapshotPreviewError = ""
+                                                    snapshotService.generatePreview(sid)
+                                                }
+                                            }
+
+                                            Text {
+                                                Layout.fillWidth: true
+                                                color: snapshotPreviewError ? Theme.danger : Theme.textMuted
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                text: snapshotPreviewError ? snapshotPreviewError
+                                                    : (snapshotPreviewPath ? "预览图已生成，点击下方查看" : "使用 supervision 渲染 GT 框网格预览")
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+
+                                        // 预览图显示区（仅在生成成功后显示）
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: snapshotPreviewPath ? 220 : 0
+                                            Layout.maximumHeight: snapshotPreviewPath ? 220 : 0
+                                            color: Theme.bgMain
+                                            radius: Theme.radiusSmall
+                                            border.color: Theme.borderColor
+                                            border.width: 1
+                                            visible: snapshotPreviewPath !== ""
+                                            clip: true
+
+                                            Image {
+                                                anchors.fill: parent
+                                                anchors.margins: 4
+                                                source: snapshotPreviewPath ? ("file:///" + snapshotPreviewPath) : ""
+                                                fillMode: Image.PreserveAspectFit
+                                                smooth: true
+                                                asynchronous: true
+                                            }
+
+                                            Text {
+                                                anchors.top: parent.top
+                                                anchors.right: parent.right
+                                                anchors.margins: 6
+                                                text: "预览图 (preview.jpg)"
+                                                color: Theme.textMuted
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                font.family: Theme.fontFamilyMono
                                             }
                                         }
 
@@ -1805,7 +1904,7 @@ Item {
                                                 }
                                                 contentItem: Text {
                                                     text: parent.text
-                                                    color: Theme.textSecondary
+                                                    color: Theme.textMuted
                                                     font.pixelSize: Theme.fontSizeCaption
                                                     horizontalAlignment: Text.AlignHCenter
                                                     verticalAlignment: Text.AlignVCenter
@@ -2501,7 +2600,7 @@ Item {
 
             Text {
                 text: "从当前项目的数据集创建不可变快照，用于训练。"
-                color: Theme.textSecondary
+                color: Theme.textMuted
                 font.pixelSize: Theme.fontSizeSmall
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
@@ -2622,7 +2721,7 @@ Item {
                     }
                     contentItem: Text {
                         text: parent.text
-                        color: Theme.textSecondary
+                        color: Theme.textMuted
                         font.pixelSize: Theme.fontSizeSmall
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -2804,7 +2903,7 @@ Item {
                     }
                     contentItem: Text {
                         text: parent.text
-                        color: Theme.textSecondary
+                        color: Theme.textMuted
                         font.pixelSize: Theme.fontSizeSmall
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter

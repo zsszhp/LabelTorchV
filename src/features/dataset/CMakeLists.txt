@@ -21,6 +21,10 @@ qt_add_qml_module(labeltorch_dataset
         ClassMappingService.cpp
         DatasetModel.h
         DatasetModel.cpp
+        TagService.h
+        TagService.cpp
+        TagModel.h
+        TagModel.cpp
 )
 
 target_include_directories(labeltorch_dataset PUBLIC

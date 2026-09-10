@@ -94,9 +94,9 @@ class AnomalibAdapter(TrainingAdapter):
         batch = config.get("batch", 32)
         device = config.get("device", "auto")
         project_dir = config.get("project_dir", "")
-        run_name = config.get("run_name", "anomaly_train")
-        seed = config.get("seed", 42)
-        task = config.get("task", "classification")
+        _run_name = config.get("run_name", "anomaly_train")  # 预留：训练运行名称
+        _seed = config.get("seed", 42)  # 预留：随机种子
+        _task = config.get("task", "classification")  # 预留：任务类型
 
         self._status = "running"
         self._stop_event.clear()
@@ -142,15 +142,34 @@ class AnomalibAdapter(TrainingAdapter):
                 max_epochs=epochs,
                 default_root_dir=project_dir if project_dir else "results",
             )
-            # 自适应显卡判断
+            # A16：自适应显卡判断，与 UltralyticsAdapter 降级逻辑保持一致
+            # - device="auto"：CUDA 可用→gpu，不可用→cpu + 警告
+            # - device="cuda"/"0"/"gpu" 但 CUDA 不可用：警告 + 降级到 cpu
+            # - device="cpu"：强制使用 cpu
             import torch
-            if device and device != "auto":
-                actual_acc = "gpu" if ("cuda" in device or device.isdigit()) and torch.cuda.is_available() else "cpu"
-                engine_kwargs["accelerator"] = actual_acc
-                if actual_acc == "gpu" and device.isdigit():
-                    engine_kwargs["devices"] = [int(device)]
-            else:
-                engine_kwargs["accelerator"] = "gpu" if torch.cuda.is_available() else "cpu"
+            actual_acc = "cpu"
+            devices = None
+            if device == "auto":
+                if torch.cuda.is_available():
+                    actual_acc = "gpu"
+                else:
+                    logger.warning("CUDA is not available. Falling back to CPU training (device=auto).")
+                    actual_acc = "cpu"
+            elif device and device != "cpu":
+                # 用户明确请求 GPU（cuda/0/gpu 等）
+                if torch.cuda.is_available():
+                    actual_acc = "gpu"
+                    if device.isdigit():
+                        devices = [int(device)]
+                else:
+                    logger.warning(
+                        f"CUDA is not available. Falling back to CPU training (requested device was: {device})."
+                    )
+                    actual_acc = "cpu"
+            # device == "cpu"：保持 cpu
+            engine_kwargs["accelerator"] = actual_acc
+            if devices is not None:
+                engine_kwargs["devices"] = devices
 
             engine = Engine(**engine_kwargs)
             self._engine = engine
@@ -247,7 +266,7 @@ class AnomalibAdapter(TrainingAdapter):
         if callbacks:
             engine.fit(model=model, datamodule=datamodule, callbacks=callbacks)
         else:
-            results = engine.fit(model=model, datamodule=datamodule)
+            engine.fit(model=model, datamodule=datamodule)
 
         # 获取训练结果目录
         try:
@@ -376,14 +395,13 @@ class AnomalibAdapter(TrainingAdapter):
             logger.warning(f"Failed to extract metrics from engine: {e}")
 
     async def export_model(self, weight_path: str, format: str, options: dict) -> dict:
-        """导出异常检测模型"""
+        """导出异常检测模型（使用 asyncio.to_thread 避免阻塞事件循环）"""
         try:
-            import torch
-
+            import asyncio
             if format == "onnx":
-                return await self._export_onnx(weight_path, options)
+                return await asyncio.to_thread(self._do_export_onnx, weight_path, options)
             elif format == "pt":
-                return await self._export_pt(weight_path, options)
+                return await asyncio.to_thread(self._do_export_pt, weight_path, options)
             else:
                 return {"status": "failed", "error": f"异常检测模型不支持导出格式: {format}"}
 
@@ -392,7 +410,7 @@ class AnomalibAdapter(TrainingAdapter):
         except Exception as e:
             return {"status": "failed", "error": str(e)}
 
-    async def _export_onnx(self, weight_path: str, options: dict) -> dict:
+    def _do_export_onnx(self, weight_path: str, options: dict) -> dict:
         """导出ONNX格式并写入自定义元数据"""
         import json
 
@@ -422,6 +440,7 @@ class AnomalibAdapter(TrainingAdapter):
             if not exported_via_engine and weight_path.endswith(".ckpt"):
                 try:
                     from anomalib.deploy import ExportType
+                    from anomalib.engine import Engine
                     from anomalib.models import get_model
                     import torch
 
@@ -567,7 +586,7 @@ class AnomalibAdapter(TrainingAdapter):
             logger.error(f"Failed to export ONNX: {e}")
             return {"status": "failed", "error": str(e)}
 
-    async def _export_pt(self, weight_path: str, options: dict) -> dict:
+    def _do_export_pt(self, weight_path: str, options: dict) -> dict:
         """复制pt权重文件"""
         import shutil
 

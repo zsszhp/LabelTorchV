@@ -56,7 +56,7 @@ void TestDatabase::testSchemaVersion()
     QSqlQuery query(Database::instance().database());
     QVERIFY(query.exec("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1"));
     QVERIFY(query.next());
-    QCOMPARE(query.value(0).toInt(), 1);
+    QCOMPARE(query.value(0).toInt(), 2);
 }
 
 void TestDatabase::testImportLabelMeUser()

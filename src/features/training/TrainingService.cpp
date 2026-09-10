@@ -15,6 +15,8 @@
 #include <QUuid>
 #include <QDateTime>
 #include <QtConcurrent>
+#include <QTimer>  // A11：stopTraining 超时定时器
+#include <stdexcept>  // A10：std::runtime_error 用于事务回滚
 
 TrainingService::TrainingService(QObject *parent) : QObject(parent)
 {
@@ -84,83 +86,96 @@ void TrainingService::handleTrainingEvent(const QVariantMap &event)
             if (runQuery.exec() && runQuery.next()) {
                 QString projectId = runQuery.value(0).toString();
 
-                // 通过 ModelRegistry 注册模型版本（统一入口）
-                QString versionId;
-                if (m_modelRegistry) {
-                    versionId = m_modelRegistry->registerModelVersion(
-                        taskId, bestWeight, lastWeight, metricsJson);
-                } else {
-                    // 兜底：直接SQL插入
-                    versionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-                    QSqlQuery versionQuery(Database::instance().database());
-                    versionQuery.prepare(
-                        "INSERT INTO model_versions (id, run_id, best_weight_path, last_weight_path, "
-                        "metrics_snapshot_json, source, project_id, created_at) VALUES (?, ?, ?, ?, ?, 'trained', ?, datetime('now'))"
-                    );
-                    versionQuery.addBindValue(versionId);
-                    versionQuery.addBindValue(taskId);
-                    versionQuery.addBindValue(bestWeight);
-                    versionQuery.addBindValue(lastWeight);
-                    versionQuery.addBindValue(metricsJson);
-                    versionQuery.addBindValue(projectId);
-                    if (!versionQuery.exec()) {
-                        ltError(LT_LOG_TRAINING()) << "Failed to register model version:"
-                                                   << versionQuery.lastError().text();
-                        versionId.clear();
-                    }
-                }
+                // 事务包裹：模型版本注册 + 父版本设置 + 标签设置（保证血缘追踪原子性）
+                QSqlDatabase db = Database::instance().database();
+                db.transaction();
 
-                if (!versionId.isEmpty()) {
-                    ltInfo(LT_LOG_TRAINING()) << "Auto-registered model version:" << versionId
-                                              << "for run:" << taskId;
-
-                    // 血缘追踪：查找同项目之前的最佳版本，设为父版本
+                try {
+                    // 通过 ModelRegistry 注册模型版本（统一入口）
+                    QString versionId;
                     if (m_modelRegistry) {
-                        QVariantList existingVersions = m_modelRegistry->listModelVersions(projectId);
-                        QString bestPreviousVersionId;
-                        double bestPreviousMap = -1.0;
+                        versionId = m_modelRegistry->registerModelVersion(
+                            taskId, bestWeight, lastWeight, metricsJson);
+                    } else {
+                        // 兜底：直接SQL插入
+                        versionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+                        QSqlQuery versionQuery(db);
+                        versionQuery.prepare(
+                            "INSERT INTO model_versions (id, run_id, best_weight_path, last_weight_path, "
+                            "metrics_snapshot_json, source, project_id, created_at) VALUES (?, ?, ?, ?, ?, 'trained', ?, datetime('now'))"
+                        );
+                        versionQuery.addBindValue(versionId);
+                        versionQuery.addBindValue(taskId);
+                        versionQuery.addBindValue(bestWeight);
+                        versionQuery.addBindValue(lastWeight);
+                        versionQuery.addBindValue(metricsJson);
+                        versionQuery.addBindValue(projectId);
+                        // A10：SQL 失败时抛异常触发 rollback，避免部分提交
+                        if (!versionQuery.exec()) {
+                            ltError(LT_LOG_TRAINING()) << "Failed to register model version:"
+                                                       << versionQuery.lastError().text();
+                            throw std::runtime_error(
+                                ("Failed to register model version: " + versionQuery.lastError().text()).toStdString());
+                        }
+                    }
 
-                        for (const QVariant &v : existingVersions) {
-                            QVariantMap ver = v.toMap();
-                            if (ver[QStringLiteral("id")].toString() == versionId) continue;
+                    if (!versionId.isEmpty()) {
+                        ltInfo(LT_LOG_TRAINING()) << "Auto-registered model version:" << versionId
+                                                  << "for run:" << taskId;
 
-                            // 解析指标中的 mAP50-95
-                            QString mJson = ver[QStringLiteral("metricsJson")].toString();
-                            if (!mJson.isEmpty()) {
-                                QJsonObject mObj = QJsonDocument::fromJson(mJson.toUtf8()).object();
-                                double map = mObj.value(QStringLiteral("mAP50-95")).toDouble(-1.0);
-                                if (map > bestPreviousMap) {
-                                    bestPreviousMap = map;
-                                    bestPreviousVersionId = ver[QStringLiteral("id")].toString();
+                        // 血缘追踪：查找同项目之前的最佳版本，设为父版本
+                        if (m_modelRegistry) {
+                            QVariantList existingVersions = m_modelRegistry->listModelVersions(projectId);
+                            QString bestPreviousVersionId;
+                            double bestPreviousMap = -1.0;
+
+                            for (const QVariant &v : existingVersions) {
+                                QVariantMap ver = v.toMap();
+                                if (ver[QStringLiteral("id")].toString() == versionId) continue;
+
+                                // 解析指标中的 mAP50-95
+                                QString mJson = ver[QStringLiteral("metricsJson")].toString();
+                                if (!mJson.isEmpty()) {
+                                    QJsonObject mObj = QJsonDocument::fromJson(mJson.toUtf8()).object();
+                                    double map = mObj.value(QStringLiteral("mAP50-95")).toDouble(-1.0);
+                                    if (map > bestPreviousMap) {
+                                        bestPreviousMap = map;
+                                        bestPreviousVersionId = ver[QStringLiteral("id")].toString();
+                                    }
+                                }
+                            }
+
+                            // 设置父版本（血缘追踪）
+                            if (!bestPreviousVersionId.isEmpty()) {
+                                m_modelRegistry->setParentVersion(versionId, bestPreviousVersionId);
+                                ltInfo(LT_LOG_TRAINING()) << "Set parent version:" << versionId
+                                                          << "->" << bestPreviousVersionId;
+                            }
+
+                            // 自动标签：首个版本标为 baseline，指标更优则标 best-so-far
+                            if (existingVersions.size() <= 1) {
+                                m_modelRegistry->setTag(versionId, QStringLiteral("baseline"));
+                                m_modelRegistry->setTag(versionId, QStringLiteral("best-so-far"));
+                                ltInfo(LT_LOG_TRAINING()) << "First version, tagged as baseline + best-so-far:" << versionId;
+                            } else {
+                                // 比较当前版本与历史最佳版本的 mAP50-95
+                                double currentMap = metricsObj.value(QStringLiteral("mAP50-95")).toDouble(-1.0);
+                                if (currentMap > bestPreviousMap && bestPreviousMap >= 0) {
+                                    // 当前版本更优，移除旧版本的 best-so-far 标签
+                                    m_modelRegistry->removeTag(bestPreviousVersionId, QStringLiteral("best-so-far"));
+                                    m_modelRegistry->setTag(versionId, QStringLiteral("best-so-far"));
+                                    ltInfo(LT_LOG_TRAINING()) << "New best-so-far version:" << versionId
+                                                              << "mAP50-95:" << currentMap
+                                                              << "> previous:" << bestPreviousMap;
                                 }
                             }
                         }
-
-                        // 设置父版本（血缘追踪）
-                        if (!bestPreviousVersionId.isEmpty()) {
-                            m_modelRegistry->setParentVersion(versionId, bestPreviousVersionId);
-                            ltInfo(LT_LOG_TRAINING()) << "Set parent version:" << versionId
-                                                      << "->" << bestPreviousVersionId;
-                        }
-
-                        // 自动标签：首个版本标为 baseline，指标更优则标 best-so-far
-                        if (existingVersions.size() <= 1) {
-                            m_modelRegistry->setTag(versionId, QStringLiteral("baseline"));
-                            m_modelRegistry->setTag(versionId, QStringLiteral("best-so-far"));
-                            ltInfo(LT_LOG_TRAINING()) << "First version, tagged as baseline + best-so-far:" << versionId;
-                        } else {
-                            // 比较当前版本与历史最佳版本的 mAP50-95
-                            double currentMap = metricsObj.value(QStringLiteral("mAP50-95")).toDouble(-1.0);
-                            if (currentMap > bestPreviousMap && bestPreviousMap >= 0) {
-                                // 当前版本更优，移除旧版本的 best-so-far 标签
-                                m_modelRegistry->removeTag(bestPreviousVersionId, QStringLiteral("best-so-far"));
-                                m_modelRegistry->setTag(versionId, QStringLiteral("best-so-far"));
-                                ltInfo(LT_LOG_TRAINING()) << "New best-so-far version:" << versionId
-                                                          << "mAP50-95:" << currentMap
-                                                          << "> previous:" << bestPreviousMap;
-                            }
-                        }
                     }
+
+                    db.commit();
+                } catch (...) {
+                    db.rollback();
+                    ltError(LT_LOG_TRAINING()) << "Failed to register model version (transaction rolled back):" << taskId;
                 }
             }
         }
@@ -352,6 +367,14 @@ bool TrainingService::startTraining(const QString &runId)
             }
 
             if (m_ipcClient) {
+                // A5：检查 IPC 连接状态，断连时任务标记为 failed
+                if (!m_ipcClient->connected()) {
+                    ltError(LT_LOG_TRAINING()) << "IPC not connected, cannot start training:" << runId;
+                    updateRunStatus(runId, "failed");
+                    emit runStatusChanged(runId, "failed");
+                    emit trainingWarning(runId, QStringLiteral("IPC 未连接，无法启动训练"));
+                    return;
+                }
                 QSqlQuery runQuery(db);
                 runQuery.prepare("SELECT snapshot_id, config_snapshot_json FROM training_runs WHERE id = ?");
                 runQuery.addBindValue(runId);
@@ -368,8 +391,15 @@ bool TrainingService::startTraining(const QString &runId)
                     configObj["run_name"] = runId;
 
                     payload["config"] = configObj;
-                    m_ipcClient->sendRequest("train.start", payload);
+                    m_ipcClient->sendRequest(IpcProtocol::CMD_TRAIN_START, payload);
                 }
+            } else {
+                // A5：无 IPC 客户端，任务标记为 failed
+                ltError(LT_LOG_TRAINING()) << "No IPC client, cannot start training:" << runId;
+                updateRunStatus(runId, "failed");
+                emit runStatusChanged(runId, "failed");
+                emit trainingWarning(runId, QStringLiteral("IPC 客户端未初始化"));
+                return;
             }
 
             ltInfo(LT_LOG_TRAINING()) << "Training run started:" << runId;
@@ -394,33 +424,70 @@ bool TrainingService::stopTraining(const QString &runId)
     if (!checkQuery.exec() || !checkQuery.next()) return false;
 
     QString currentStatus = checkQuery.value(0).toString();
-    if (currentStatus != "running") {
+    if (currentStatus != "running" && currentStatus != "preparing") {
         ltWarning(LT_LOG_TRAINING()) << "Cannot stop training run in status:" << currentStatus;
         return false;
     }
 
-    // Send train.stop via IpcClient if available
-    if (m_ipcClient) {
-        QJsonObject payload;
-        payload["run_id"] = runId;
-        m_ipcClient->sendRequest("train.stop", payload);
-    }
-
-    // Update status to stopped, set finished_at
+    // A11：先标记为 'stopping' 中间态，等待后端 task.stopped 事件再更新为 'stopped'
+    // 这样 UI 显示与实际状态一致，避免后端仍在运行时 UI 已显示停止
     QSqlQuery updateQuery(db);
-    updateQuery.prepare(
-        "UPDATE training_runs SET status = 'stopped', finished_at = ? WHERE id = ?"
-    );
-    updateQuery.addBindValue(QDateTime::currentDateTime().toString(Qt::ISODate));
+    updateQuery.prepare("UPDATE training_runs SET status = 'stopping' WHERE id = ?");
     updateQuery.addBindValue(runId);
 
     if (!updateQuery.exec()) {
-        ltError(LT_LOG_TRAINING()) << "Failed to update training run status:" << updateQuery.lastError().text();
+        ltError(LT_LOG_TRAINING()) << "Failed to update training run to stopping:" << updateQuery.lastError().text();
         return false;
     }
 
-    ltInfo(LT_LOG_TRAINING()) << "Training run stopped:" << runId;
-    emit runStatusChanged(runId, "stopped");
+    emit runStatusChanged(runId, "stopping");
+
+    // Send train.stop via IpcClient if available
+    if (m_ipcClient && m_ipcClient->connected()) {
+        QJsonObject payload;
+        payload["run_id"] = runId;
+        m_ipcClient->sendRequest(IpcProtocol::CMD_TRAIN_STOP, payload);
+    } else {
+        // IPC 不可用，直接标记为 stopped
+        QSqlQuery finalQuery(db);
+        finalQuery.prepare(
+            "UPDATE training_runs SET status = 'stopped', finished_at = ? WHERE id = ?"
+        );
+        finalQuery.addBindValue(QDateTime::currentDateTime().toString(Qt::ISODate));
+        finalQuery.addBindValue(runId);
+        if (finalQuery.exec()) {
+            emit runStatusChanged(runId, "stopped");
+        }
+        ltWarning(LT_LOG_TRAINING()) << "IPC not connected, force stopped training run:" << runId;
+        return true;
+    }
+
+    // A11：启动 30 秒超时定时器，超时未收到 task.stopped 则标记为 failed
+    QTimer::singleShot(30000, this, [this, runId]() {
+        auto db = Database::instance().database();
+        QSqlQuery checkQuery(db);
+        checkQuery.prepare("SELECT status FROM training_runs WHERE id = ?");
+        checkQuery.addBindValue(runId);
+        if (checkQuery.exec() && checkQuery.next()) {
+            QString status = checkQuery.value(0).toString();
+            if (status == "stopping") {
+                // 超时仍未收到停止确认，标记为 failed
+                QSqlQuery timeoutQuery(db);
+                timeoutQuery.prepare(
+                    "UPDATE training_runs SET status = 'failed', finished_at = ? WHERE id = ?"
+                );
+                timeoutQuery.addBindValue(QDateTime::currentDateTime().toString(Qt::ISODate));
+                timeoutQuery.addBindValue(runId);
+                if (timeoutQuery.exec()) {
+                    emit runStatusChanged(runId, "failed");
+                    emit trainingWarning(runId, QStringLiteral("停止训练超时，未收到后端确认"));
+                }
+                ltError(LT_LOG_TRAINING()) << "Stop training timeout, marked as failed:" << runId;
+            }
+        }
+    });
+
+    ltInfo(LT_LOG_TRAINING()) << "Training run stopping:" << runId;
     return true;
 }
 

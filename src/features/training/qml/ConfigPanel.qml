@@ -53,7 +53,7 @@ Rectangle {
 
         Label {
             text: "训练参数"
-            color: Theme.accentPrimary
+            color: Theme.primary
             font.pixelSize: 14
             font.bold: true
         }
@@ -65,7 +65,7 @@ Rectangle {
 
             Label {
                 text: "模型:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -78,7 +78,7 @@ Rectangle {
 
                 contentItem: Label {
                     text: modelFamilyCombo.displayText
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 13
                     verticalAlignment: Text.AlignVCenter
                     leftPadding: 8
@@ -122,7 +122,7 @@ Rectangle {
                     width: modelFamilyCombo.width
                     contentItem: Label {
                         text: modelData
-                        color: highlighted ? Theme.primaryGlow : Theme.textPrimary
+                        color: highlighted ? Theme.primaryGlow : Theme.textMain
                         font.pixelSize: 13
                         verticalAlignment: Text.AlignVCenter
                         leftPadding: 8
@@ -142,7 +142,7 @@ Rectangle {
 
             Label {
                 text: "类型:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -155,7 +155,7 @@ Rectangle {
 
                 contentItem: Label {
                     text: trainingTypeCombo.displayText
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 13
                     verticalAlignment: Text.AlignVCenter
                     leftPadding: 8
@@ -199,7 +199,7 @@ Rectangle {
                     width: trainingTypeCombo.width
                     contentItem: Label {
                         text: modelData
-                        color: highlighted ? Theme.primaryGlow : Theme.textPrimary
+                        color: highlighted ? Theme.primaryGlow : Theme.textMain
                         font.pixelSize: 13
                         verticalAlignment: Text.AlignVCenter
                         leftPadding: 8
@@ -220,7 +220,7 @@ Rectangle {
 
             Label {
                 text: "父版本:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -236,7 +236,7 @@ Rectangle {
                     text: parentVersionCombo.currentIndex >= 0 ?
                         parentVersionCombo.currentValue.substring(0, 8) + "..." :
                         "选择父版本"
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
@@ -281,7 +281,7 @@ Rectangle {
                     width: parentVersionCombo.width
                     contentItem: Label {
                         text: model.versionId.substring(0, 8) + "... (" + model.bestWeight + ")"
-                        color: highlighted ? Theme.primaryGlow : Theme.textPrimary
+                        color: highlighted ? Theme.primaryGlow : Theme.textMain
                         font.pixelSize: 12
                         font.family: "monospace"
                         verticalAlignment: Text.AlignVCenter
@@ -301,7 +301,7 @@ Rectangle {
 
             Label {
                 text: "图片尺寸:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -320,7 +320,7 @@ Rectangle {
 
                 contentItem: TextInput {
                     text: imgSizeSpin.displayText
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
@@ -343,7 +343,7 @@ Rectangle {
                     Label {
                         anchors.centerIn: parent
                         text: "+"
-                        color: imgSizeSpin.up.hovered ? Theme.primaryGlow : Theme.textPrimary
+                        color: imgSizeSpin.up.hovered ? Theme.primaryGlow : Theme.textMain
                         font.pixelSize: 14
                         font.bold: true
                     }
@@ -361,7 +361,7 @@ Rectangle {
                     Label {
                         anchors.centerIn: parent
                         text: "-"
-                        color: imgSizeSpin.down.hovered ? Theme.primaryGlow : Theme.textPrimary
+                        color: imgSizeSpin.down.hovered ? Theme.primaryGlow : Theme.textMain
                         font.pixelSize: 14
                         font.bold: true
                     }
@@ -390,7 +390,7 @@ Rectangle {
 
             Label {
                 text: "批大小:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -406,7 +406,7 @@ Rectangle {
 
                 contentItem: TextInput {
                     text: batchSpin.displayText
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
@@ -425,7 +425,7 @@ Rectangle {
                     border.color: Theme.borderColor
                     radius: Theme.radiusSmall
                     Behavior on color { ColorAnimation { duration: 100 } }
-                    Label { anchors.centerIn: parent; text: "+"; color: batchSpin.up.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
+                    Label { anchors.centerIn: parent; text: "+"; color: batchSpin.up.hovered ? Theme.primaryGlow : Theme.textMain; font.pixelSize: 14; font.bold: true }
                 }
 
                 down.indicator: Rectangle {
@@ -436,7 +436,7 @@ Rectangle {
                     border.color: Theme.borderColor
                     radius: Theme.radiusSmall
                     Behavior on color { ColorAnimation { duration: 100 } }
-                    Label { anchors.centerIn: parent; text: "-"; color: batchSpin.down.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
+                    Label { anchors.centerIn: parent; text: "-"; color: batchSpin.down.hovered ? Theme.primaryGlow : Theme.textMain; font.pixelSize: 14; font.bold: true }
                 }
 
                 background: Rectangle {
@@ -462,7 +462,7 @@ Rectangle {
 
             Label {
                 text: "训练轮数:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -478,7 +478,7 @@ Rectangle {
 
                 contentItem: TextInput {
                     text: epochsSpin.displayText
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
@@ -497,7 +497,7 @@ Rectangle {
                     border.color: Theme.borderColor
                     radius: Theme.radiusSmall
                     Behavior on color { ColorAnimation { duration: 100 } }
-                    Label { anchors.centerIn: parent; text: "+"; color: epochsSpin.up.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
+                    Label { anchors.centerIn: parent; text: "+"; color: epochsSpin.up.hovered ? Theme.primaryGlow : Theme.textMain; font.pixelSize: 14; font.bold: true }
                 }
 
                 down.indicator: Rectangle {
@@ -508,7 +508,7 @@ Rectangle {
                     border.color: Theme.borderColor
                     radius: Theme.radiusSmall
                     Behavior on color { ColorAnimation { duration: 100 } }
-                    Label { anchors.centerIn: parent; text: "-"; color: epochsSpin.down.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
+                    Label { anchors.centerIn: parent; text: "-"; color: epochsSpin.down.hovered ? Theme.primaryGlow : Theme.textMain; font.pixelSize: 14; font.bold: true }
                 }
 
                 background: Rectangle {
@@ -534,7 +534,7 @@ Rectangle {
 
             Label {
                 text: "早停耐心:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -550,7 +550,7 @@ Rectangle {
 
                 contentItem: TextInput {
                     text: patienceSpin.displayText
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
@@ -569,7 +569,7 @@ Rectangle {
                     border.color: Theme.borderColor
                     radius: Theme.radiusSmall
                     Behavior on color { ColorAnimation { duration: 100 } }
-                    Label { anchors.centerIn: parent; text: "+"; color: patienceSpin.up.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
+                    Label { anchors.centerIn: parent; text: "+"; color: patienceSpin.up.hovered ? Theme.primaryGlow : Theme.textMain; font.pixelSize: 14; font.bold: true }
                 }
 
                 down.indicator: Rectangle {
@@ -580,7 +580,7 @@ Rectangle {
                     border.color: Theme.borderColor
                     radius: Theme.radiusSmall
                     Behavior on color { ColorAnimation { duration: 100 } }
-                    Label { anchors.centerIn: parent; text: "-"; color: patienceSpin.down.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
+                    Label { anchors.centerIn: parent; text: "-"; color: patienceSpin.down.hovered ? Theme.primaryGlow : Theme.textMain; font.pixelSize: 14; font.bold: true }
                 }
 
                 background: Rectangle {
@@ -606,7 +606,7 @@ Rectangle {
 
             Label {
                 text: "工作线程:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -622,7 +622,7 @@ Rectangle {
 
                 contentItem: TextInput {
                     text: workersSpin.displayText
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 13
                     font.family: "monospace"
                     verticalAlignment: Text.AlignVCenter
@@ -641,7 +641,7 @@ Rectangle {
                     border.color: Theme.borderColor
                     radius: Theme.radiusSmall
                     Behavior on color { ColorAnimation { duration: 100 } }
-                    Label { anchors.centerIn: parent; text: "+"; color: workersSpin.up.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
+                    Label { anchors.centerIn: parent; text: "+"; color: workersSpin.up.hovered ? Theme.primaryGlow : Theme.textMain; font.pixelSize: 14; font.bold: true }
                 }
 
                 down.indicator: Rectangle {
@@ -652,7 +652,7 @@ Rectangle {
                     border.color: Theme.borderColor
                     radius: Theme.radiusSmall
                     Behavior on color { ColorAnimation { duration: 100 } }
-                    Label { anchors.centerIn: parent; text: "-"; color: workersSpin.down.hovered ? Theme.primaryGlow : Theme.textPrimary; font.pixelSize: 14; font.bold: true }
+                    Label { anchors.centerIn: parent; text: "-"; color: workersSpin.down.hovered ? Theme.primaryGlow : Theme.textMain; font.pixelSize: 14; font.bold: true }
                 }
 
                 background: Rectangle {
@@ -678,7 +678,7 @@ Rectangle {
 
             Label {
                 text: "混合精度:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -722,7 +722,7 @@ Rectangle {
 
             Label {
                 text: "继续训练:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -766,7 +766,7 @@ Rectangle {
 
             Label {
                 text: "设备:"
-                color: Theme.textPrimary
+                color: Theme.textMain
                 font.pixelSize: 13
                 Layout.preferredWidth: 80
             }
@@ -779,7 +779,7 @@ Rectangle {
 
                 contentItem: Label {
                     text: deviceCombo.displayText
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 13
                     verticalAlignment: Text.AlignVCenter
                     leftPadding: 8
@@ -823,7 +823,7 @@ Rectangle {
                     width: deviceCombo.width
                     contentItem: Label {
                         text: modelData
-                        color: highlighted ? Theme.primaryGlow : Theme.textPrimary
+                        color: highlighted ? Theme.primaryGlow : Theme.textMain
                         font.pixelSize: 13
                         verticalAlignment: Text.AlignVCenter
                         leftPadding: 8

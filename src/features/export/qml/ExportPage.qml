@@ -19,9 +19,9 @@ Item {
     property string currentTaskType: currentProjectId !== "" ? projectService.getTaskType(currentProjectId) : "detect"
     property bool isAnomalyProject: currentTaskType === "anomaly"
     property string selectedArtifactId: ""
-    property var selectedArtifactDetails: ({})
+    property var selectedArtifactDetails: null
     property var parsedValidationDetails: {
-        if (!selectedArtifactDetails.validationResult)
+        if (!selectedArtifactDetails || !selectedArtifactDetails.validationResult)
             return ({})
         try {
             return JSON.parse(selectedArtifactDetails.validationResult)
@@ -458,7 +458,7 @@ Item {
                                                 text: "选择"
                                                 font.pixelSize: Theme.fontSizeCaption
                                                 font.family: Theme.fontFamily
-                                                color: Theme.textSecondary
+                                                color: Theme.textMuted
                                             }
 
                                             MouseArea {
@@ -546,15 +546,30 @@ Item {
 
                                 // 导出模型按钮 (btn-secondary)
                                 Rectangle {
+                                    id: exportBtnRect
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 36
                                     Layout.topMargin: Theme.spacingSmall
                                     radius: Theme.radiusNormal
+                                    // 禁用条件：未选择版本 或 正在导出
+                                    property bool btnDisabled: !root.selectedVersionId || exportStatus === "running"
                                     color: {
-                                        if (!root.selectedVersionId) return Theme.bgCard
+                                        if (btnDisabled) return Theme.bgCard
                                         if (exportBtnMouse.pressed) return Qt.darker(Theme.primary, 1.3)
                                         if (exportBtnMouse.containsMouse) return Qt.lighter(Theme.primary, 1.1)
                                         return Theme.primary
+                                    }
+                                    opacity: exportStatus === "running" ? 0.6 : 1.0
+
+                                    // 导出中显示进度指示器
+                                    BusyIndicator {
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 12
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        running: exportStatus === "running"
+                                        visible: exportStatus === "running"
+                                        implicitWidth: 18
+                                        implicitHeight: 18
                                     }
 
                                     Text {
@@ -563,16 +578,16 @@ Item {
                                         font.pixelSize: Theme.fontSizeNormal
                                         font.weight: Font.DemiBold
                                         font.family: Theme.fontFamily
-                                        color: root.selectedVersionId ? "#FFFFFF" : Theme.textDisabled
+                                        color: btnDisabled ? Theme.textDisabled : "#FFFFFF"
                                     }
 
                                     MouseArea {
                                         id: exportBtnMouse
                                         anchors.fill: parent
                                         hoverEnabled: true
-                                        cursorShape: root.selectedVersionId ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+                                        cursorShape: btnDisabled ? Qt.ForbiddenCursor : Qt.PointingHandCursor
                                         onClicked: {
-                                            if (!root.selectedVersionId || exportStatus === "running") return
+                                            if (btnDisabled) return
                                             root.startExportWithValidation()
                                         }
                                     }
@@ -653,7 +668,7 @@ Item {
                                         text: "导出报告"
                                         font.pixelSize: Theme.fontSizeNormal
                                         font.family: Theme.fontFamily
-                                        color: Theme.textSecondary
+                                        color: Theme.textMuted
                                     }
 
                                     MouseArea {
@@ -964,7 +979,7 @@ Item {
                                                                 text: "验证"
                                                                 font.pixelSize: Theme.fontSizeCaption - 1
                                                                 font.family: Theme.fontFamily
-                                                                color: Theme.textSecondary
+                                                                color: Theme.textMuted
                                                             }
 
                                                             MouseArea {
@@ -1051,7 +1066,7 @@ Item {
                                                 wrapMode: Text.WrapAnywhere
                                                 font.pixelSize: Theme.fontSizeCaption
                                                 font.family: Theme.fontFamilyMono
-                                                color: Theme.textSecondary
+                                                color: Theme.textMuted
                                                 Layout.fillWidth: true
                                             }
 
@@ -1060,7 +1075,7 @@ Item {
                                                 text: "验证引擎：" + root.parsedValidationDetails.provider
                                                 font.pixelSize: Theme.fontSizeCaption
                                                 font.family: Theme.fontFamily
-                                                color: Theme.textSecondary
+                                                color: Theme.textMuted
                                             }
 
                                             Text {
@@ -1069,7 +1084,7 @@ Item {
                                                 wrapMode: Text.WrapAnywhere
                                                 font.pixelSize: Theme.fontSizeCaption
                                                 font.family: Theme.fontFamily
-                                                color: Theme.textSecondary
+                                                color: Theme.textMuted
                                                 Layout.fillWidth: true
                                             }
 
@@ -1113,7 +1128,7 @@ Item {
                                                             text: "Shape: " + root.formatShape(modelData.shape)
                                                             font.pixelSize: Theme.fontSizeCaption
                                                             font.family: Theme.fontFamilyMono
-                                                            color: Theme.textSecondary
+                                                            color: Theme.textMuted
                                                         }
 
                                                         Text {
@@ -1157,7 +1172,7 @@ Item {
                                                             text: "Shape: " + root.formatShape(modelData.shape)
                                                             font.pixelSize: Theme.fontSizeCaption
                                                             font.family: Theme.fontFamilyMono
-                                                            color: Theme.textSecondary
+                                                            color: Theme.textMuted
                                                         }
 
                                                         Text {
@@ -1179,7 +1194,7 @@ Item {
                                         wrapMode: Text.WrapAnywhere
                                         font.pixelSize: Theme.fontSizeSmall
                                         font.family: Theme.fontFamily
-                                        color: Theme.textSecondary
+                                        color: Theme.textMuted
                                         Layout.fillWidth: true
                                     }
 

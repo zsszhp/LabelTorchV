@@ -6,7 +6,7 @@ Item {
     implicitWidth: 16
     implicitHeight: 16
 
-    property string icon: "folder" // folder, images, edit, check, brain, flask, export, plus, eye, marker, trash, close, arrow-down, signal, gear, user
+    property string icon: "folder" // folder, images, edit, check, brain, flask, export, plus, eye, marker, trash, close, arrow-down, signal, gear, user, alert, scan, refresh
     property color color: "#64748B"
 
     Shape {
@@ -72,6 +72,18 @@ Item {
                             return "M 15.5 14 h -.8 l -.3-.3 C 15.4 12.6 16 11.1 16 9.5 16 5.9 13.1 3 9.5 3 S 3 5.9 3 9.5 5.9 16 9.5 16 c 1.6 0 3.1-.6 4.2-1.6 l .3 .3 v .8 l 5 5 1.5-1.5-5-5 z M 9.5 14 C 7 14 5 12 5 9.5 S 7 5 9.5 5 14 7 14 9.5 12 14 9.5 14 z M 9 6 h 1 v 3 h 3 v 1 h-3 v 3 h-1 v-3 h-3 v-1 h 3 z"
                         case "zoom-out":
                             return "M 15.5 14 h -.8 l -.3-.3 C 15.4 12.6 16 11.1 16 9.5 16 5.9 13.1 3 9.5 3 S 3 5.9 3 9.5 5.9 16 9.5 16 c 1.6 0 3.1-.6 4.2-1.6 l .3 .3 v .8 l 5 5 1.5-1.5-5-5 z M 9.5 14 C 7 14 5 12 5 9.5 S 7 5 9.5 5 14 7 14 9.5 12 14 9.5 14 z M 6 9 h 7 v 1 H 6 Z"
+                        case "alert":
+                            // 异常检测：三角警告图标
+                            return "M 1 21 H 23 L 12 2 Z M 13 18 H 11 V 14 H 13 Z M 13 12 H 11 V 8 H 13 Z"
+                        case "scan":
+                            // 推理：扫描框图标
+                            return "M 4 4 H 8 V 2 H 2 V 8 H 4 Z M 16 2 V 4 H 20 V 8 H 22 V 2 Z M 20 16 V 20 H 16 V 22 H 22 V 16 Z M 4 20 H 8 V 22 H 2 V 16 H 4 Z M 12 7 C 9.24 7 7 9.24 7 12 C 7 14.76 9.24 17 12 17 C 14.76 17 17 14.76 17 12 C 17 9.24 14.76 7 12 7 Z"
+                        case "refresh":
+                            // 主动学习：循环刷新图标
+                            return "M 17.65 6.35 C 16.2 4.9 14.21 4 12 4 C 7.58 4 4.01 7.58 4.01 12 C 4.01 16.42 7.58 20 12 20 C 15.73 20 18.84 17.45 19.73 14 H 17.65 C 16.83 16.33 14.61 18 12 18 C 8.69 18 6 15.31 6 12 C 6 8.69 8.69 6 12 6 C 13.66 6 15.14 6.69 16.22 7.78 L 13 11 H 20 V 4 Z"
+                        case "video":
+                            // 视频推理：摄像机图标
+                            return "M 17 10.5 V 7 C 17 6.45 16.55 6 16 6 H 4 C 3.45 6 3 6.45 3 7 V 17 C 3 17.55 3.45 18 4 18 H 16 C 16.55 18 17 17.55 17 17 V 13.5 L 21 17.5 V 6.5 L 17 10.5 Z"
                         default:
                             return ""
                     }

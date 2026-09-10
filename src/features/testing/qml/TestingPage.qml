@@ -14,14 +14,14 @@ Item {
     property string currentProjectId: appController.currentProjectId
     property string selectedTaskId: ""
     property string selectedModelVersionId: ""
-    property var testMetrics: ({})
-    property var confusionMatrix: ({})
-    property var prCurveData: ([])
+    property var testMetrics: null
+    property var confusionMatrix: null
+    property var prCurveData: []
     property string testActionMessage: ""
     property string testActionTone: "neutral"
     property string currentTaskType: currentProjectId !== "" ? projectService.getTaskType(currentProjectId) : "detect"
     property bool isAnomalyProject: currentTaskType === "anomaly"
-    property var environmentInfo: ({})
+    property var environmentInfo: null
     property var availableDeviceOptions: {
         var options = ["auto", "cpu"]
         var gpuCount = environmentInfo.gpu_count || 0
@@ -682,7 +682,7 @@ Item {
                                         font.pixelSize: Theme.fontSizeSmall
                                         font.weight: Font.DemiBold
                                         font.family: Theme.fontFamily
-                                        color: Theme.textSecondary
+                                        color: Theme.textMuted
                                     }
 
                                     ParamRow {
@@ -732,7 +732,7 @@ Item {
                                         font.pixelSize: Theme.fontSizeSmall
                                         font.weight: Font.DemiBold
                                         font.family: Theme.fontFamily
-                                        color: Theme.textSecondary
+                                        color: Theme.textMuted
                                     }
 
                                     ParamRow {
@@ -836,7 +836,7 @@ Item {
                                         font.pixelSize: Theme.fontSizeSmall
                                         font.weight: Font.DemiBold
                                         font.family: Theme.fontFamily
-                                        color: Theme.textSecondary
+                                        color: Theme.textMuted
                                     }
 
                                     ParamRow {
@@ -915,7 +915,7 @@ Item {
                                         font.pixelSize: Theme.fontSizeSmall
                                         font.weight: Font.DemiBold
                                         font.family: Theme.fontFamily
-                                        color: Theme.textSecondary
+                                        color: Theme.textMuted
                                     }
 
                                     // 漏检率 + 误检率 圆环
@@ -978,7 +978,7 @@ Item {
                                             text: "类别配置"
                                             font.pixelSize: Theme.fontSizeSmall
                                             font.family: Theme.fontFamily
-                                            color: Theme.textSecondary
+                                            color: Theme.textMuted
                                         }
 
                                         MouseArea {
@@ -1001,7 +1001,7 @@ Item {
                                         font.pixelSize: Theme.fontSizeSmall
                                         font.weight: Font.DemiBold
                                         font.family: Theme.fontFamily
-                                        color: Theme.textSecondary
+                                        color: Theme.textMuted
                                     }
 
                                     // 超检率 / 召回率
@@ -1098,7 +1098,7 @@ Item {
                                         font.pixelSize: Theme.fontSizeSmall
                                         font.weight: Font.DemiBold
                                         font.family: Theme.fontFamily
-                                        color: Theme.textSecondary
+                                        color: Theme.textMuted
                                     }
 
                                     // PR曲线画布
@@ -1312,7 +1312,7 @@ Item {
                                                     text: "导出"
                                                     font.pixelSize: Theme.fontSizeSmall
                                                     font.family: Theme.fontFamily
-                                                    color: Theme.textSecondary
+                                                    color: Theme.textMuted
                                                 }
 
                                                 MouseArea {
@@ -1487,7 +1487,7 @@ Item {
                                                             font.pixelSize: Theme.fontSizeCaption
                                                             font.font.weight: Font.DemiBold
                                                             font.family: Theme.fontFamily
-                                                            color: Theme.textSecondary
+                                                            color: Theme.textMuted
                                                         }
                                                     }
 
@@ -1660,7 +1660,7 @@ Item {
                                                     font.pixelSize: Theme.fontSizeSmall
                                                     font.weight: Font.DemiBold
                                                     font.family: Theme.fontFamily
-                                                    color: Theme.textSecondary
+                                                    color: Theme.textMuted
                                                 }
 
                                                 // 指标详情

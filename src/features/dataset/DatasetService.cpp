@@ -1,26 +1,239 @@
 #include "DatasetService.h"
 #include "ImportScanner.h"
 #include "database/Database.h"
+#include "ipc/IpcClient.h"
+#include "ipc/IpcProtocol.h"
 #include "utils/Id.h"
 #include "utils/Log.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QJsonArray>
 #include <QSet>
 #include <QFile>
 #include <QTextStream>
 #include <QDir>
 #include <QFileInfo>
+#include <QPointer>
 #include <algorithm>
 #include <cmath>
+#include <tuple>
 
 DatasetService::DatasetService(QObject *parent)
     : QObject(parent)
     , m_scanner(new ImportScanner(this))
 {
     ltTrace(LT_LOG_DATASET()) << "DatasetService parent=" << parent;
+}
+
+// ============================================================================
+// P1-4 / P2-5: supervision 集成（数据集统计 + 格式转换）
+// ============================================================================
+
+void DatasetService::setIpcClient(IpcClient *client)
+{
+    ltTrace(LT_LOG_DATASET()) << "client=" << client;
+    if (m_ipcClient) {
+        disconnect(m_ipcClient, &IpcClient::responseReceived,
+                   this, &DatasetService::onIpcResponseReceived);
+    }
+    m_ipcClient = client;
+    if (m_ipcClient) {
+        connect(m_ipcClient, &IpcClient::responseReceived,
+                this, &DatasetService::onIpcResponseReceived);
+    }
+}
+
+QString DatasetService::getEnhancedStats(const QString &datasetId)
+{
+    ltTrace(LT_LOG_DATASET()) << "datasetId=" << datasetId;
+
+    if (!m_ipcClient) {
+        ltError(LT_LOG_DATASET()) << "IpcClient not injected for enhanced stats";
+        emit enhancedStatsReady(datasetId, false, QVariantMap(),
+                                QStringLiteral("IPC 客户端未注入"));
+        return {};
+    }
+
+    auto db = Database::instance().database();
+    if (!db.isOpen()) {
+        emit enhancedStatsReady(datasetId, false, QVariantMap(),
+                                QStringLiteral("数据库未打开"));
+        return {};
+    }
+
+    // 解析数据集 image_root + label_root（YOLO 格式）
+    QSqlQuery query(db);
+    query.prepare("SELECT image_root, label_root, name FROM datasets WHERE id = ?");
+    query.addBindValue(datasetId);
+    if (!query.exec() || !query.next()) {
+        ltError(LT_LOG_DATASET()) << "Dataset not found:" << datasetId;
+        emit enhancedStatsReady(datasetId, false, QVariantMap(),
+                                QStringLiteral("数据集不存在"));
+        return {};
+    }
+    QString imageRoot = query.value(0).toString();
+    QString labelRoot = query.value(1).toString();
+    QString datasetName = query.value(2).toString();
+
+    // 获取项目根目录用于定位 data.yaml（若已生成）
+    QSqlQuery projQuery(db);
+    projQuery.prepare(
+        "SELECT p.root_path, p.task_type FROM projects p "
+        "JOIN datasets d ON d.project_id = p.id WHERE d.id = ?");
+    projQuery.addBindValue(datasetId);
+    QString projectRoot;
+    QString taskType;
+    if (projQuery.exec() && projQuery.next()) {
+        projectRoot = projQuery.value(0).toString();
+        taskType = projQuery.value(1).toString();
+    }
+
+    QJsonObject payload;
+    payload["dataset_id"] = datasetId;
+    payload["image_root"] = imageRoot;
+    payload["label_root"] = labelRoot;
+    payload["dataset_name"] = datasetName;
+    payload["project_root"] = projectRoot;
+    payload["task_type"] = taskType;
+
+    QString requestId = m_ipcClient->sendRequest(IpcProtocol::CMD_DATASET_STATS, payload);
+    if (requestId.isEmpty()) {
+        ltError(LT_LOG_DATASET()) << "Failed to send dataset.stats request";
+        emit enhancedStatsReady(datasetId, false, QVariantMap(),
+                                QStringLiteral("IPC 请求发送失败"));
+        return {};
+    }
+
+    m_pendingEnhancedStats[requestId] = datasetId;
+    ltInfo(LT_LOG_DATASET()) << "Enhanced stats requested for dataset:" << datasetId
+                             << "requestId=" << requestId;
+    return requestId;
+}
+
+QString DatasetService::convertToYolo(const QString &datasetId, const QString &sourceFormat)
+{
+    ltTrace(LT_LOG_DATASET()) << "datasetId=" << datasetId
+                              << "sourceFormat=" << sourceFormat;
+
+    if (!m_ipcClient) {
+        ltError(LT_LOG_DATASET()) << "IpcClient not injected for convert to yolo";
+        emit convertToYoloFinished(datasetId, false, QString(),
+                                   QStringLiteral("IPC 客户端未注入"));
+        return {};
+    }
+
+    if (sourceFormat.isEmpty()) {
+        emit convertToYoloFinished(datasetId, false, QString(),
+                                   QStringLiteral("源格式不能为空"));
+        return {};
+    }
+
+    auto db = Database::instance().database();
+    if (!db.isOpen()) {
+        emit convertToYoloFinished(datasetId, false, QString(),
+                                   QStringLiteral("数据库未打开"));
+        return {};
+    }
+
+    // 解析数据集路径
+    QSqlQuery query(db);
+    query.prepare("SELECT image_root, label_root, name FROM datasets WHERE id = ?");
+    query.addBindValue(datasetId);
+    if (!query.exec() || !query.next()) {
+        ltError(LT_LOG_DATASET()) << "Dataset not found:" << datasetId;
+        emit convertToYoloFinished(datasetId, false, QString(),
+                                   QStringLiteral("数据集不存在"));
+        return {};
+    }
+    QString imageRoot = query.value(0).toString();
+    QString labelRoot = query.value(1).toString();
+    QString datasetName = query.value(2).toString();
+
+    // 解析项目根目录作为输出基目录
+    QSqlQuery projQuery(db);
+    projQuery.prepare(
+        "SELECT p.root_path FROM projects p "
+        "JOIN datasets d ON d.project_id = p.id WHERE d.id = ?");
+    projQuery.addBindValue(datasetId);
+    QString projectRoot;
+    if (projQuery.exec() && projQuery.next()) {
+        projectRoot = projQuery.value(0).toString();
+    }
+
+    // 输出目录：{projectRoot}/cache/yolo_converted/{datasetId}/
+    QString outputDir = projectRoot + QStringLiteral("/cache/yolo_converted/") + datasetId;
+
+    QJsonObject payload;
+    payload["dataset_id"] = datasetId;
+    payload["source_format"] = sourceFormat;
+    payload["image_root"] = imageRoot;
+    payload["label_root"] = labelRoot;
+    payload["dataset_name"] = datasetName;
+    payload["output_dir"] = outputDir;
+
+    QString requestId = m_ipcClient->sendRequest(IpcProtocol::CMD_DATASET_CONVERT_TO_YOLO, payload);
+    if (requestId.isEmpty()) {
+        ltError(LT_LOG_DATASET()) << "Failed to send dataset.convert_to_yolo request";
+        emit convertToYoloFinished(datasetId, false, QString(),
+                                   QStringLiteral("IPC 请求发送失败"));
+        return {};
+    }
+
+    m_pendingConverts[requestId] = datasetId;
+    ltInfo(LT_LOG_DATASET()) << "Convert to YOLO requested for dataset:" << datasetId
+                             << "format=" << sourceFormat
+                             << "requestId=" << requestId;
+    return requestId;
+}
+
+void DatasetService::onIpcResponseReceived(const QJsonObject &response)
+{
+    QString command = response.value("command").toString();
+
+    if (command == IpcProtocol::CMD_DATASET_STATS) {
+        QString requestId = response.value("request_id").toString();
+        if (!m_pendingEnhancedStats.contains(requestId)) return;
+
+        QString datasetId = m_pendingEnhancedStats.take(requestId);
+        bool success = response.value("success").toBool(false);
+        QJsonObject result = response.value("result").toObject();
+        QString error = response.value("error").toObject().value("message").toString();
+
+        if (success) {
+            QVariantMap stats = result.toVariantMap();
+            ltInfo(LT_LOG_DATASET()) << "Enhanced stats ready for:" << datasetId
+                                     << "classes=" << stats.value("class_distribution").toList().size();
+            emit enhancedStatsReady(datasetId, true, stats, QString());
+        } else {
+            ltError(LT_LOG_DATASET()) << "Enhanced stats failed for:" << datasetId
+                                      << "error=" << error;
+            emit enhancedStatsReady(datasetId, false, QVariantMap(),
+                                    error.isEmpty() ? QStringLiteral("后端统计失败") : error);
+        }
+    } else if (command == IpcProtocol::CMD_DATASET_CONVERT_TO_YOLO) {
+        QString requestId = response.value("request_id").toString();
+        if (!m_pendingConverts.contains(requestId)) return;
+
+        QString datasetId = m_pendingConverts.take(requestId);
+        bool success = response.value("success").toBool(false);
+        QJsonObject result = response.value("result").toObject();
+        QString error = response.value("error").toObject().value("message").toString();
+
+        QString outputDir = result.value("output_dir").toString();
+        if (success) {
+            ltInfo(LT_LOG_DATASET()) << "Convert to YOLO success:" << datasetId
+                                     << "output=" << outputDir;
+            emit convertToYoloFinished(datasetId, true, outputDir, QString());
+        } else {
+            ltError(LT_LOG_DATASET()) << "Convert to YOLO failed:" << datasetId
+                                      << "error=" << error;
+            emit convertToYoloFinished(datasetId, false, QString(),
+                                       error.isEmpty() ? QStringLiteral("后端转换失败") : error);
+        }
+    }
 }
 
 QString DatasetService::importDataset(const QString &projectId, const QString &name,
@@ -656,8 +869,75 @@ QVariantMap DatasetService::detectAnomalies(const QString &datasetId)
         }
     }
 
-    // Size anomalies: placeholder (width/height not typically populated)
-    // Could be extended later when image dimensions are populated in DB
+    // Size anomalies: L1 基于 width/height 的 IQR 离群值检测
+    // 仅当数据库中 width/height 已填充时检测，否则跳过
+    {
+        QSqlQuery sizeQuery(db);
+        sizeQuery.prepare("SELECT id, width, height FROM dataset_samples "
+                          "WHERE dataset_id = ? AND width IS NOT NULL AND width > 0 "
+                          "AND height IS NOT NULL AND height > 0");
+        sizeQuery.addBindValue(datasetId);
+
+        if (sizeQuery.exec()) {
+            // 收集所有样本的尺寸数据
+            struct SampleSize {
+                QString id;
+                double width;
+                double height;
+                double ratio; // width / height
+            };
+            QList<SampleSize> samples;
+            QList<double> widths;
+            QList<double> heights;
+            QList<double> ratios;
+
+            while (sizeQuery.next()) {
+                SampleSize s;
+                s.id = sizeQuery.value(0).toString();
+                s.width = sizeQuery.value(1).toDouble();
+                s.height = sizeQuery.value(2).toDouble();
+                s.ratio = (s.height > 0) ? (s.width / s.height) : 0.0;
+                samples.append(s);
+                widths.append(s.width);
+                heights.append(s.height);
+                ratios.append(s.ratio);
+            }
+
+            // IQR 离群值检测需要至少 4 个样本（保证分位数有意义）
+            if (samples.size() >= 4) {
+                auto computeIqrBounds = [](QList<double> values) -> std::tuple<double, double, bool> {
+                    std::sort(values.begin(), values.end());
+                    int n = values.size();
+                    // Q1 = 25th percentile, Q3 = 75th percentile
+                    double q1 = values[n / 4];
+                    double q3 = values[(3 * n) / 4];
+                    double iqr = q3 - q1;
+                    // 离群值边界：[Q1 - 1.5*IQR, Q3 + 1.5*IQR]
+                    double lower = q1 - 1.5 * iqr;
+                    double upper = q3 + 1.5 * iqr;
+                    return std::make_tuple(lower, upper, true);
+                };
+
+                auto [wLow, wHigh, wOk] = computeIqrBounds(widths);
+                auto [hLow, hHigh, hOk] = computeIqrBounds(heights);
+                auto [rLow, rHigh, rOk] = computeIqrBounds(ratios);
+
+                if (wOk && hOk && rOk) {
+                    for (const auto &s : samples) {
+                        bool isOutlier = false;
+                        if (s.width < wLow || s.width > wHigh) isOutlier = true;
+                        if (s.height < hLow || s.height > hHigh) isOutlier = true;
+                        if (s.ratio < rLow || s.ratio > rHigh) isOutlier = true;
+                        if (isOutlier) {
+                            sizeAnomalies.append(s.id);
+                        }
+                    }
+                }
+            }
+        } else {
+            ltWarning(LT_LOG_DATASET()) << "detectAnomalies: size query failed:" << sizeQuery.lastError().text();
+        }
+    }
 
     result["emptyLabels"] = emptyLabels;
     result["classErrors"] = classErrors;
@@ -765,6 +1045,71 @@ QVariantList DatasetService::getClassDistribution(const QString &datasetId)
                               << "classes:" << result.size();
 
     return result;
+}
+
+// A17：异步版本实现，使用 QtConcurrent::run 在后台线程执行，避免阻塞 UI 主线程
+void DatasetService::getSampleStatsAsync(const QString &datasetId)
+{
+    ltTrace(LT_LOG_DATASET()) << "getSampleStatsAsync datasetId=" << datasetId;
+    QString id = datasetId;
+    QPointer<DatasetService> safeThis(this);
+
+    QtConcurrent::run([safeThis, id]() {
+        QVariantMap result;
+        if (safeThis) {
+            result = safeThis->getSampleStats(id);
+        }
+        if (safeThis) {
+            // 通过 Qt::QueuedConnection 在主线程触发信号
+            QMetaObject::invokeMethod(safeThis.data(), [safeThis, id, result]() {
+                if (safeThis) {
+                    emit safeThis->sampleStatsReady(id, result);
+                }
+            }, Qt::QueuedConnection);
+        }
+    });
+}
+
+void DatasetService::detectAnomaliesAsync(const QString &datasetId)
+{
+    ltTrace(LT_LOG_DATASET()) << "detectAnomaliesAsync datasetId=" << datasetId;
+    QString id = datasetId;
+    QPointer<DatasetService> safeThis(this);
+
+    QtConcurrent::run([safeThis, id]() {
+        QVariantMap result;
+        if (safeThis) {
+            result = safeThis->detectAnomalies(id);
+        }
+        if (safeThis) {
+            QMetaObject::invokeMethod(safeThis.data(), [safeThis, id, result]() {
+                if (safeThis) {
+                    emit safeThis->anomaliesDetected(id, result);
+                }
+            }, Qt::QueuedConnection);
+        }
+    });
+}
+
+void DatasetService::getClassDistributionAsync(const QString &datasetId)
+{
+    ltTrace(LT_LOG_DATASET()) << "getClassDistributionAsync datasetId=" << datasetId;
+    QString id = datasetId;
+    QPointer<DatasetService> safeThis(this);
+
+    QtConcurrent::run([safeThis, id]() {
+        QVariantList result;
+        if (safeThis) {
+            result = safeThis->getClassDistribution(id);
+        }
+        if (safeThis) {
+            QMetaObject::invokeMethod(safeThis.data(), [safeThis, id, result]() {
+                if (safeThis) {
+                    emit safeThis->classDistributionReady(id, result);
+                }
+            }, Qt::QueuedConnection);
+        }
+    });
 }
 
 bool DatasetService::updateImportStatus(const QString &datasetId, const QString &status)
@@ -1382,14 +1727,29 @@ QString DatasetService::importDatasetJson(const QString &projectId, const QStrin
         }
     }
 
-    // 步骤3: 更新状态为导入中
-    if (!updateImportStatus(datasetId, QStringLiteral("importing"))) {
+    // A4-4：使用事务保证原子性（多表关联操作必须在同一事务内完成）
+    QSqlDatabase db = Database::instance().database();
+    if (!db.transaction()) {
+        ltError(LT_LOG_DATASET()) << "importDatasetJson: 开启事务失败";
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return {};
     }
 
+    // 步骤3: 更新状态为导入中（事务内）
+    {
+        QSqlQuery statusQuery(db);
+        statusQuery.prepare("UPDATE datasets SET import_status = 'importing' WHERE id = ?");
+        statusQuery.addBindValue(datasetId);
+        if (!statusQuery.exec()) {
+            ltError(LT_LOG_DATASET()) << "importDatasetJson: 更新状态为导入中失败:" << statusQuery.lastError().text();
+            db.rollback();
+            updateImportStatus(datasetId, QStringLiteral("failed"));
+            return {};
+        }
+    }
+
     // 步骤4: 为 JSON 导入的样本生成 YOLO txt 标签文件
-    QSqlQuery projectQuery(Database::instance().database());
+    QSqlQuery projectQuery(db);
     projectQuery.prepare("SELECT root_path FROM projects WHERE id = ?");
     projectQuery.addBindValue(projectId);
     QString projectRoot;
@@ -1430,14 +1790,15 @@ QString DatasetService::importDatasetJson(const QString &projectId, const QStrin
         }
     }
 
-    // 步骤5: 插入样本到数据库
+    // 步骤5: 插入样本到数据库（事务内）
     if (!insertSamples(datasetId, matchedSamples)) {
         ltError(LT_LOG_DATASET()) << "Failed to insert samples from JSON import";
+        db.rollback();
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return {};
     }
 
-    // 步骤6: 提取并存储类别体系（使用 JSON 中的 categories）
+    // 步骤6: 提取并存储类别体系（使用 JSON 中的 categories，事务内）
     QVariantMap categories = scanResult["categories"].toMap();
     if (!categories.isEmpty()) {
         if (!extractAndStoreSchemaFromCategories(datasetId, categories)) {
@@ -1448,14 +1809,23 @@ QString DatasetService::importDatasetJson(const QString &projectId, const QStrin
         extractAndStoreSchema(datasetId, matchedSamples);
     }
 
-    // 步骤7: 更新样本数和最终状态
-    QSqlQuery updateQuery(Database::instance().database());
+    // 步骤7: 更新样本数和最终状态（事务内）
+    QSqlQuery updateQuery(db);
     updateQuery.prepare("UPDATE datasets SET sample_count = ?, import_status = 'completed' WHERE id = ?");
     updateQuery.addBindValue(matchedSamples.size());
     updateQuery.addBindValue(datasetId);
 
     if (!updateQuery.exec()) {
         ltError(LT_LOG_DATASET()) << "Failed to finalize dataset:" << updateQuery.lastError().text();
+        db.rollback();
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return {};
+    }
+
+    // 提交事务
+    if (!db.commit()) {
+        ltError(LT_LOG_DATASET()) << "importDatasetJson: 提交事务失败:" << db.lastError().text();
+        db.rollback();
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return {};
     }
@@ -1830,7 +2200,13 @@ bool DatasetService::importAnomalyDataset(const QString &datasetId, const QStrin
     };
 
     int totalSamples = 0;
+    // A4：使用事务保证原子性
     QSqlDatabase db = Database::instance().database();
+    if (!db.transaction()) {
+        ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 开启事务失败";
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return false;
+    }
 
     // 扫描 train/good 目录
     QDir trainGoodDir(baseDir.filePath(QStringLiteral("train/good")));
@@ -1851,6 +2227,8 @@ bool DatasetService::importAnomalyDataset(const QString &datasetId, const QStrin
             if (!query.exec()) {
                 ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 插入 train/good 样本失败:"
                                           << query.lastError().text();
+                db.rollback();
+                updateImportStatus(datasetId, QStringLiteral("failed"));
                 return false;
             }
             totalSamples++;
@@ -1889,6 +2267,8 @@ bool DatasetService::importAnomalyDataset(const QString &datasetId, const QStrin
                 if (!query.exec()) {
                     ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 插入 test/" << category
                                               << "样本失败:" << query.lastError().text();
+                    db.rollback();
+                    updateImportStatus(datasetId, QStringLiteral("failed"));
                     return false;
                 }
                 totalSamples++;
@@ -1903,13 +2283,22 @@ bool DatasetService::importAnomalyDataset(const QString &datasetId, const QStrin
 
     if (totalSamples == 0) {
         ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 在" << folderPath << "中未找到任何样本";
+        db.rollback();
+        updateImportStatus(datasetId, QStringLiteral("failed"));
         return false;
     }
 
     // 更新状态为导入中
-    if (!updateImportStatus(datasetId, QStringLiteral("importing"))) {
-        ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 更新状态为 importing 失败";
-        return false;
+    {
+        QSqlQuery statusQuery(db);
+        statusQuery.prepare("UPDATE datasets SET import_status = 'importing' WHERE id = ?");
+        statusQuery.addBindValue(datasetId);
+        if (!statusQuery.exec()) {
+            ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 更新状态为 importing 失败:" << statusQuery.lastError().text();
+            db.rollback();
+            updateImportStatus(datasetId, QStringLiteral("failed"));
+            return false;
+        }
     }
 
     // 更新样本数和最终状态
@@ -1921,6 +2310,15 @@ bool DatasetService::importAnomalyDataset(const QString &datasetId, const QStrin
     if (!updateQuery.exec()) {
         ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 完成数据集更新失败:"
                                   << updateQuery.lastError().text();
+        db.rollback();
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return false;
+    }
+
+    // 提交事务
+    if (!db.commit()) {
+        ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 提交事务失败:" << db.lastError().text();
+        db.rollback();
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return false;
     }
@@ -1979,7 +2377,13 @@ bool DatasetService::importClassifyFolderDataset(const QString &datasetId, const
 
     classDirs.sort(); // 按名称排序，确保类别索引稳定
 
+    // A4：使用事务保证原子性
     QSqlDatabase db = Database::instance().database();
+    if (!db.transaction()) {
+        ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 开启事务失败";
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return false;
+    }
     int totalSamples = 0;
 
     // 遍历每个类别目录，插入样本记录
@@ -2006,6 +2410,8 @@ bool DatasetService::importClassifyFolderDataset(const QString &datasetId, const
             if (!query.exec()) {
                 ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 插入样本失败:"
                                           << query.lastError().text();
+                db.rollback();
+                updateImportStatus(datasetId, QStringLiteral("failed"));
                 return false;
             }
             totalSamples++;
@@ -2017,13 +2423,22 @@ bool DatasetService::importClassifyFolderDataset(const QString &datasetId, const
 
     if (totalSamples == 0) {
         ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 在" << folderPath << "中未找到任何样本";
+        db.rollback();
+        updateImportStatus(datasetId, QStringLiteral("failed"));
         return false;
     }
 
     // 更新状态为导入中
-    if (!updateImportStatus(datasetId, QStringLiteral("importing"))) {
-        ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 更新状态为 importing 失败";
-        return false;
+    {
+        QSqlQuery statusQuery(db);
+        statusQuery.prepare("UPDATE datasets SET import_status = 'importing' WHERE id = ?");
+        statusQuery.addBindValue(datasetId);
+        if (!statusQuery.exec()) {
+            ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 更新状态为 importing 失败:" << statusQuery.lastError().text();
+            db.rollback();
+            updateImportStatus(datasetId, QStringLiteral("failed"));
+            return false;
+        }
     }
 
     // 存储类别 schema
@@ -2031,6 +2446,8 @@ bool DatasetService::importClassifyFolderDataset(const QString &datasetId, const
     for (int i = 0; i < classDirs.size(); ++i) {
         categories[QString::number(i)] = classDirs[i];
     }
+    // 设置当前导入格式，供 extractAndStoreSchemaFromCategories 使用正确的 source_format
+    m_currentImportFormat = QStringLiteral("classify_folder");
     extractAndStoreSchemaFromCategories(datasetId, categories);
 
     // 更新样本数和最终状态
@@ -2042,6 +2459,15 @@ bool DatasetService::importClassifyFolderDataset(const QString &datasetId, const
     if (!updateQuery.exec()) {
         ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 完成数据集更新失败:"
                                   << updateQuery.lastError().text();
+        db.rollback();
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return false;
+    }
+
+    // 提交事务
+    if (!db.commit()) {
+        ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 提交事务失败:" << db.lastError().text();
+        db.rollback();
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return false;
     }
@@ -2105,11 +2531,12 @@ bool DatasetService::extractAndStoreSchemaFromCategories(const QString &datasetI
     QSqlQuery query(Database::instance().database());
     query.prepare("INSERT INTO imported_label_schemas "
                   "(id, dataset_id, raw_class_names_json, raw_class_order_json, source_format) "
-                  "VALUES (?, ?, ?, ?, 'coco_json')");
+                  "VALUES (?, ?, ?, ?, ?)");
     query.addBindValue(schemaId);
     query.addBindValue(datasetId);
     query.addBindValue(classNamesJson);
     query.addBindValue(classOrderJson);
+    query.addBindValue(m_currentImportFormat.isEmpty() ? QStringLiteral("coco_json") : m_currentImportFormat);
 
     if (!query.exec()) {
         ltError(LT_LOG_DATASET()) << "Failed to insert label schema from categories:" << query.lastError().text();
@@ -2147,17 +2574,31 @@ bool DatasetService::importLabelMeDataset(const QString &datasetId, const QStrin
         }
     }
 
-    // 更新状态为导入中
-    if (!updateImportStatus(datasetId, QStringLiteral("importing"))) {
-        ltError(LT_LOG_DATASET()) << "importLabelMeDataset: 更新状态为导入中失败";
+    // A4：使用事务保证原子性（多表关联操作必须在同一事务内完成）
+    QSqlDatabase db = Database::instance().database();
+    if (!db.transaction()) {
+        ltError(LT_LOG_DATASET()) << "importLabelMeDataset: 开启事务失败";
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return false;
+    }
+
+    // 更新状态为导入中
+    {
+        QSqlQuery statusQuery(db);
+        statusQuery.prepare("UPDATE datasets SET import_status = 'importing' WHERE id = ?");
+        statusQuery.addBindValue(datasetId);
+        if (!statusQuery.exec()) {
+            ltError(LT_LOG_DATASET()) << "importLabelMeDataset: 更新状态为导入中失败:" << statusQuery.lastError().text();
+            db.rollback();
+            updateImportStatus(datasetId, QStringLiteral("failed"));
+            return false;
+        }
     }
 
     // 通过 dataset_id 反查 project_id，再查 project_root 获取项目根目录
     QString projectRoot;
     {
-        QSqlQuery dsQuery(Database::instance().database());
+        QSqlQuery dsQuery(db);
         dsQuery.prepare("SELECT root_path FROM projects WHERE id = "
                         "(SELECT project_id FROM datasets WHERE id = ?)");
         dsQuery.addBindValue(datasetId);
@@ -2165,8 +2606,10 @@ bool DatasetService::importLabelMeDataset(const QString &datasetId, const QStrin
             projectRoot = dsQuery.value(0).toString();
         }
     }
+    // M13：projectRoot 为空时 early return，避免生成无效路径
     if (projectRoot.isEmpty()) {
         ltError(LT_LOG_DATASET()) << "importLabelMeDataset: 无法获取项目根目录";
+        db.rollback();
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return false;
     }
@@ -2216,6 +2659,7 @@ bool DatasetService::importLabelMeDataset(const QString &datasetId, const QStrin
     // 插入样本到数据库
     if (!insertSamples(datasetId, matchedSamples)) {
         ltError(LT_LOG_DATASET()) << "importLabelMeDataset: 插入样本失败";
+        db.rollback();
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return false;
     }
@@ -2229,23 +2673,34 @@ bool DatasetService::importLabelMeDataset(const QString &datasetId, const QStrin
             extractAndStoreSchema(datasetId, matchedSamples);
         } else {
             // 更新 source_format 为 labelme_json
-            QSqlQuery fmtQuery(Database::instance().database());
+            QSqlQuery fmtQuery(db);
             fmtQuery.prepare("UPDATE imported_label_schemas SET source_format = 'labelme_json' WHERE dataset_id = ?");
             fmtQuery.addBindValue(datasetId);
-            fmtQuery.exec();
+            if (!fmtQuery.exec()) {
+                ltWarning(LT_LOG_DATASET()) << "importLabelMeDataset: 更新 source_format 失败:" << fmtQuery.lastError().text();
+            }
         }
     } else {
         extractAndStoreSchema(datasetId, matchedSamples);
     }
 
     // 更新样本数和最终状态
-    QSqlQuery updateQuery(Database::instance().database());
+    QSqlQuery updateQuery(db);
     updateQuery.prepare("UPDATE datasets SET sample_count = ?, import_status = 'completed' WHERE id = ?");
     updateQuery.addBindValue(matchedSamples.size());
     updateQuery.addBindValue(datasetId);
 
     if (!updateQuery.exec()) {
         ltError(LT_LOG_DATASET()) << "importLabelMeDataset: 完成数据集更新失败:" << updateQuery.lastError().text();
+        db.rollback();
+        updateImportStatus(datasetId, QStringLiteral("failed"));
+        return false;
+    }
+
+    // 提交事务
+    if (!db.commit()) {
+        ltError(LT_LOG_DATASET()) << "importLabelMeDataset: 提交事务失败:" << db.lastError().text();
+        db.rollback();
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return false;
     }

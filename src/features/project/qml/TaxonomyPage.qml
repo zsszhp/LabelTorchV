@@ -21,7 +21,7 @@ Item {
                 font.pixelSize: Theme.fontSizeTitle
                 font.bold: true
                 font.family: Theme.fontFamily
-                color: Theme.textPrimary
+                color: Theme.textMain
             }
 
             Item { Layout.fillWidth: true }
@@ -30,7 +30,7 @@ Item {
                 text: taxonomyModel.taxonomyId ? "版本: v" + taxonomyService.getTaxonomyVersion(taxonomyModel.taxonomyId) : ""
                 font.pixelSize: Theme.fontSizeNormal
                 font.family: Theme.fontFamily
-                color: Theme.textSecondary
+                color: Theme.textMuted
             }
         }
 
@@ -40,7 +40,7 @@ Item {
             text: "请先打开一个项目以管理类别体系"
             font.pixelSize: Theme.fontSizeSubheading
             font.family: Theme.fontFamily
-            color: Theme.textSecondary
+            color: Theme.textMuted
             Layout.fillWidth: true
         }
 
@@ -66,14 +66,14 @@ Item {
                         id: newClassField
                         Layout.fillWidth: true
                         placeholderText: "输入类别名称..."
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.pixelSize: Theme.fontSizeNormal
                         font.family: Theme.fontFamily
 
                         background: Rectangle {
                             color: Theme.bgInput
                             radius: Theme.radiusSmall
-                            border.color: newClassField.activeFocus ? Theme.accentPrimary : Theme.borderNormal
+                            border.color: newClassField.activeFocus ? Theme.primary : Theme.borderColor
                             border.width: 1
                         }
 
@@ -105,7 +105,7 @@ Item {
                     delegate: Rectangle {
                         width: classListView.width
                         height: 40
-                        color: mouseArea.containsMouse ? Theme.bgHover : Theme.bgTertiary
+                        color: mouseArea.containsMouse ? Theme.bgHover : Theme.bgCard
                         radius: Theme.radiusSmall
 
                         MouseArea {
@@ -126,14 +126,14 @@ Item {
                                 width: 28
                                 height: 28
                                 radius: Theme.radiusSmall
-                                color: Theme.borderNormal
+                                color: Theme.borderColor
 
                                 Label {
                                     anchors.centerIn: parent
                                     text: model.classIndex
                                     font.pixelSize: Theme.fontSizeCaption
                                     font.family: Theme.fontFamily
-                                    color: Theme.textPrimary
+                                    color: Theme.textMain
                                 }
                             }
 
@@ -144,7 +144,7 @@ Item {
                                 text: model.className
                                 font.pixelSize: Theme.fontSizeNormal
                                 font.family: Theme.fontFamily
-                                color: Theme.textPrimary
+                                color: Theme.textMain
                                 visible: !editLoader.active
                             }
 
@@ -155,7 +155,7 @@ Item {
 
                                 sourceComponent: TextField {
                                     text: model.className
-                                    color: Theme.textPrimary
+                                    color: Theme.textMain
                                     font.pixelSize: Theme.fontSizeNormal
                                     font.family: Theme.fontFamily
                                     horizontalAlignment: TextInput.AlignLeft
@@ -163,7 +163,7 @@ Item {
                                     background: Rectangle {
                                         color: Theme.bgInput
                                         radius: Theme.radiusSmall
-                                        border.color: Theme.accentPrimary
+                                        border.color: Theme.primary
                                         border.width: 1
                                     }
 
@@ -191,7 +191,7 @@ Item {
                                 contentItem: Label {
                                     text: parent.text
                                     font.pixelSize: parent.font.pixelSize
-                                    color: Theme.accentPrimary
+                                    color: Theme.primary
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }
@@ -209,7 +209,7 @@ Item {
                                 contentItem: Label {
                                     text: parent.text
                                     font.pixelSize: parent.font.pixelSize
-                                    color: Theme.accentError
+                                    color: Theme.danger
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }

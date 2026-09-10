@@ -1,6 +1,7 @@
 #include "ExportService.h"
 #include "Database.h"
 #include "ipc/IpcClient.h"
+#include "ipc/IpcProtocol.h"
 #include "filesystem/ProjectFs.h"
 #include "utils/Log.h"
 #include "utils/Id.h"
@@ -137,7 +138,8 @@ QString ExportService::exportModel(const QString &modelVersionId,
     }
 
     // 发送 IPC 导出指令
-    if (m_ipcClient) {
+    // A12+M7：检查 IPC 连接状态，断连时标记为 failed 并清理
+    if (m_ipcClient && m_ipcClient->connected()) {
         QJsonObject payload;
         payload["artifact_id"] = artifactId;
         payload["model_version_id"] = modelVersionId;
@@ -146,7 +148,20 @@ QString ExportService::exportModel(const QString &modelVersionId,
         payload["output_path"] = outputPath;
         payload["adapter"] = adapter; // 传入正确适配器
         payload["options"] = QJsonDocument::fromJson(validatedOptionsJson.toUtf8()).object();
-        m_ipcClient->sendRequest("export.run", payload);
+        QString reqId = m_ipcClient->sendRequest(IpcProtocol::CMD_EXPORT_RUN, payload);
+        if (reqId.isEmpty()) {
+            // IPC 发送失败，标记为 failed
+            ltError(LT_LOG_EXPORT()) << "IPC send failed for export artifact:" << artifactId;
+            updateExportStatus(artifactId, QStringLiteral("failed"));
+            emit exportStatusChanged(artifactId, QStringLiteral("failed"));
+            return artifactId;
+        }
+    } else {
+        // M7：IPC 未连接，标记为 failed
+        ltError(LT_LOG_EXPORT()) << "IPC not connected, cannot export artifact:" << artifactId;
+        updateExportStatus(artifactId, QStringLiteral("failed"));
+        emit exportStatusChanged(artifactId, QStringLiteral("failed"));
+        return artifactId;
     }
 
     updateExportStatus(artifactId, "running");
@@ -265,7 +280,7 @@ bool ExportService::verifyExport(const QString &artifactId)
         payload["model_version_id"] = details["modelVersionId"].toString();
         payload["format"] = details["format"].toString();
         payload["output_path"] = details["outputPath"].toString();
-        m_ipcClient->sendRequest("artifact.verify", payload);
+        m_ipcClient->sendRequest(IpcProtocol::CMD_ARTIFACT_VERIFY, payload);
     }
 
     ltInfo(LT_LOG_EXPORT()) << "Verifying export artifact:" << artifactId;
@@ -307,38 +322,43 @@ void ExportService::handleIpcResponse(const QJsonObject &response)
     bool success = response[QStringLiteral("success")].toBool();
     QJsonObject result = response[QStringLiteral("result")].toObject();
 
-    if (command == QStringLiteral("export.run")) {
+    if (command == IpcProtocol::CMD_EXPORT_RUN) {
+        // A7：移除 request_id 回退逻辑，artifact_id 为空时记录错误并返回
         QString artifactId = result[QStringLiteral("artifact_id")].toString();
         if (artifactId.isEmpty()) {
-            artifactId = response[QStringLiteral("request_id")].toString();
+            ltError(LT_LOG_EXPORT()) << "Export response missing artifact_id, request_id="
+                                     << response[QStringLiteral("request_id")].toString();
+            return;
         }
         QString status = result[QStringLiteral("status")].toString();
 
         if (success && status == QStringLiteral("succeeded")) {
             QString exportPath = result[QStringLiteral("export_path")].toString();
-            int fileSize = result[QStringLiteral("file_size_bytes")].toInt();
 
-            // 更新 output_path
+            // A12：检查 exec 返回值
             auto db = Database::instance().database();
             QSqlQuery updateQuery(db);
             updateQuery.prepare("UPDATE export_artifacts SET output_path = ? WHERE id = ?");
             updateQuery.addBindValue(exportPath);
             updateQuery.addBindValue(artifactId);
-            updateQuery.exec();
+            if (!updateQuery.exec()) {
+                ltError(LT_LOG_EXPORT()) << "Failed to update output_path for artifact:"
+                                         << artifactId << updateQuery.lastError().text();
+            }
 
             // 导出成功后自动进入验证阶段，而非直接标记为succeeded
             updateExportStatus(artifactId, QStringLiteral("verifying"));
             ltInfo(LT_LOG_EXPORT()) << "Export succeeded, auto-starting verification for artifact:" << artifactId << "path:" << exportPath;
 
             // 自动发送 artifact.verify IPC请求
-            if (m_ipcClient) {
+            if (m_ipcClient && m_ipcClient->connected()) {
                 QVariantMap details = getExportStatus(artifactId);
                 QJsonObject verifyPayload;
                 verifyPayload["artifact_id"] = artifactId;
                 verifyPayload["model_version_id"] = details["modelVersionId"].toString();
                 verifyPayload["format"] = details["format"].toString();
                 verifyPayload["output_path"] = details["outputPath"].toString();
-                m_ipcClient->sendRequest("artifact.verify", verifyPayload);
+                m_ipcClient->sendRequest(IpcProtocol::CMD_ARTIFACT_VERIFY, verifyPayload);
                 ltInfo(LT_LOG_EXPORT()) << "Auto-verify request sent for artifact:" << artifactId;
             }
         } else {
@@ -347,8 +367,14 @@ void ExportService::handleIpcResponse(const QJsonObject &response)
                             response[QStringLiteral("error")].toObject()[QStringLiteral("message")].toString();
             ltError(LT_LOG_EXPORT()) << "Export failed for artifact:" << artifactId << "error:" << error;
         }
-    } else if (command == QStringLiteral("artifact.verify")) {
+    } else if (command == IpcProtocol::CMD_ARTIFACT_VERIFY) {
         QString artifactId = result[QStringLiteral("artifact_id")].toString();
+        // A7：artifact_id 为空时记录错误并返回
+        if (artifactId.isEmpty()) {
+            ltError(LT_LOG_EXPORT()) << "Verify response missing artifact_id, request_id="
+                                     << response[QStringLiteral("request_id")].toString();
+            return;
+        }
         if (success) {
             QString validationResult = QString::fromUtf8(QJsonDocument(result).toJson(QJsonDocument::Compact));
             auto db = Database::instance().database();
@@ -356,7 +382,11 @@ void ExportService::handleIpcResponse(const QJsonObject &response)
             updateQuery.prepare("UPDATE export_artifacts SET validation_result = ? WHERE id = ?");
             updateQuery.addBindValue(validationResult);
             updateQuery.addBindValue(artifactId);
-            updateQuery.exec();
+            // A12：检查 exec 返回值
+            if (!updateQuery.exec()) {
+                ltError(LT_LOG_EXPORT()) << "Failed to update validation_result for artifact:"
+                                         << artifactId << updateQuery.lastError().text();
+            }
 
             updateExportStatus(artifactId, QStringLiteral("succeeded"));
             ltInfo(LT_LOG_EXPORT()) << "Validation succeeded for artifact:" << artifactId;
@@ -372,7 +402,11 @@ void ExportService::handleIpcResponse(const QJsonObject &response)
             updateQuery.prepare("UPDATE export_artifacts SET validation_result = ? WHERE id = ?");
             updateQuery.addBindValue(errorJson);
             updateQuery.addBindValue(artifactId);
-            updateQuery.exec();
+            // A12：检查 exec 返回值
+            if (!updateQuery.exec()) {
+                ltError(LT_LOG_EXPORT()) << "Failed to update validation_result (error) for artifact:"
+                                         << artifactId << updateQuery.lastError().text();
+            }
 
             updateExportStatus(artifactId, QStringLiteral("failed"));
             ltError(LT_LOG_EXPORT()) << "Validation failed for artifact:" << artifactId << "error:" << errorResult["error"].toString();

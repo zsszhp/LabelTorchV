@@ -38,7 +38,7 @@ RowLayout {
         }
 
         background: Rectangle {
-            color: detectBtn.highlighted ? Theme.accentPrimary : (detectBtn.hovered ? Theme.bgHover : Theme.bgTertiary)
+            color: detectBtn.highlighted ? Theme.primary : (detectBtn.hovered ? Theme.bgHover : Theme.bgCard)
             radius: 3
         }
 
@@ -46,7 +46,7 @@ RowLayout {
             text: detectBtn.text
             font.pixelSize: 11
             font.bold: detectBtn.highlighted
-            color: detectBtn.highlighted ? Theme.textPrimary : (detectBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
+            color: detectBtn.highlighted ? Theme.textMain : (detectBtn.enabled ? Theme.textMuted : Theme.textDisabled)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
@@ -73,7 +73,7 @@ RowLayout {
         }
 
         background: Rectangle {
-            color: obbBtn.highlighted ? Theme.accentSecondary : (obbBtn.hovered ? Theme.bgHover : Theme.bgTertiary)
+            color: obbBtn.highlighted ? Theme.primaryGlow : (obbBtn.hovered ? Theme.bgHover : Theme.bgCard)
             radius: 3
         }
 
@@ -81,7 +81,7 @@ RowLayout {
             text: obbBtn.text
             font.pixelSize: 11
             font.bold: obbBtn.highlighted
-            color: obbBtn.highlighted ? Theme.textPrimary : (obbBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
+            color: obbBtn.highlighted ? Theme.textMain : (obbBtn.enabled ? Theme.textMuted : Theme.textDisabled)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
@@ -108,7 +108,7 @@ RowLayout {
         }
 
         background: Rectangle {
-            color: classifyBtn.highlighted ? Theme.accentSuccess : (classifyBtn.hovered ? Theme.bgHover : Theme.bgTertiary)
+            color: classifyBtn.highlighted ? Theme.success : (classifyBtn.hovered ? Theme.bgHover : Theme.bgCard)
             radius: 3
         }
 
@@ -116,7 +116,7 @@ RowLayout {
             text: classifyBtn.text
             font.pixelSize: 11
             font.bold: classifyBtn.highlighted
-            color: classifyBtn.highlighted ? Theme.textPrimary : (classifyBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
+            color: classifyBtn.highlighted ? Theme.textMain : (classifyBtn.enabled ? Theme.textMuted : Theme.textDisabled)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
@@ -143,7 +143,7 @@ RowLayout {
         }
 
         background: Rectangle {
-            color: anomalyBtn.highlighted ? Theme.accentWarning : (anomalyBtn.hovered ? Theme.bgHover : Theme.bgTertiary)
+            color: anomalyBtn.highlighted ? Theme.warning : (anomalyBtn.hovered ? Theme.bgHover : Theme.bgCard)
             radius: 3
         }
 
@@ -151,7 +151,7 @@ RowLayout {
             text: anomalyBtn.text
             font.pixelSize: 11
             font.bold: anomalyBtn.highlighted
-            color: anomalyBtn.highlighted ? Theme.bgPrimary : (anomalyBtn.enabled ? Theme.textSecondary : Theme.textDisabled)
+            color: anomalyBtn.highlighted ? Theme.bgMain : (anomalyBtn.enabled ? Theme.textMuted : Theme.textDisabled)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }

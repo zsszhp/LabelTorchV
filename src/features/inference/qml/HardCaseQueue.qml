@@ -45,9 +45,9 @@ Item {
     }
 
     function getPriorityColor(reason) {
-        if (reason === "false_negative") return Theme.accentError
-        if (reason === "low_confidence") return Theme.accentWarning
-        if (reason === "false_positive") return Theme.accentPrimary
+        if (reason === "false_negative") return Theme.danger
+        if (reason === "low_confidence") return Theme.warning
+        if (reason === "false_positive") return Theme.primary
         return Theme.textDisabled
     }
 
@@ -65,7 +65,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: Theme.bgPrimary
+        color: Theme.bgMain
         radius: 8
 
         ColumnLayout {
@@ -80,7 +80,7 @@ Item {
 
                 Label {
                     text: "难例队列"
-                    color: Theme.accentSecondary
+                    color: Theme.primaryGlow
                     font.pixelSize: 16
                     font.bold: true
                 }
@@ -89,7 +89,7 @@ Item {
 
                 Label {
                     text: "排序："
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 12
                 }
 
@@ -101,7 +101,7 @@ Item {
 
                     contentItem: Label {
                         text: sortCombo.currentText
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.pixelSize: 12
                         verticalAlignment: Text.AlignVCenter
                         leftPadding: 8
@@ -110,7 +110,7 @@ Item {
                     background: Rectangle {
                         color: Theme.bgHover
                         radius: 4
-                        border.color: sortCombo.activeFocus ? Theme.accentSecondary : Theme.textDisabled
+                        border.color: sortCombo.activeFocus ? Theme.primaryGlow : Theme.textDisabled
                         border.width: 1
                     }
 
@@ -128,7 +128,7 @@ Item {
                         }
 
                         background: Rectangle {
-                            color: Theme.bgPrimary
+                            color: Theme.bgMain
                             border.color: Theme.textDisabled
                             radius: 4
                         }
@@ -138,13 +138,13 @@ Item {
                         width: sortCombo.width
                         contentItem: Label {
                             text: modelData
-                            color: highlighted ? Theme.accentSecondary : Theme.textPrimary
+                            color: highlighted ? Theme.primaryGlow : Theme.textMain
                             font.pixelSize: 12
                             verticalAlignment: Text.AlignVCenter
                         }
                         highlighted: sortCombo.highlightedIndex === index
                         background: Rectangle {
-                            color: highlighted ? Theme.bgHover : Theme.bgPrimary
+                            color: highlighted ? Theme.bgHover : Theme.bgMain
                         }
                     }
 
@@ -161,13 +161,13 @@ Item {
                     background: Rectangle {
                         color: parent.pressed ? Theme.textDisabled : Theme.bgHover
                         radius: 4
-                        border.color: Theme.accentSecondary
+                        border.color: Theme.primaryGlow
                         border.width: 1
                     }
 
                     contentItem: Label {
                         text: parent.text
-                        color: Theme.accentSecondary
+                        color: Theme.primaryGlow
                         font.pixelSize: 11
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
@@ -184,8 +184,8 @@ Item {
                 height: 36
                 radius: 6
                 visible: countByReason("false_negative") > 0
-                color: Theme.accentWarning
-                border.color: Theme.accentWarning
+                color: Theme.warning
+                border.color: Theme.warning
                 border.width: 1
 
                 RowLayout {
@@ -196,14 +196,14 @@ Item {
 
                     Label {
                         text: "!"
-                        color: Theme.accentWarning
+                        color: Theme.warning
                         font.pixelSize: 16
                         font.bold: true
                     }
 
                     Label {
                         text: countByReason("false_negative") + " 个漏检需要立即审核"
-                        color: Theme.accentWarning
+                        color: Theme.warning
                         font.pixelSize: 12
                         font.bold: true
                         Layout.fillWidth: true
@@ -211,7 +211,7 @@ Item {
 
                     Label {
                         text: "模型在这些样本中漏检了目标"
-                        color: Theme.accentWarning
+                        color: Theme.warning
                         font.pixelSize: 11
                     }
                 }
@@ -238,7 +238,7 @@ Item {
                     width: hardCaseList.width
                     height: 52
                     radius: 6
-                    color: delegateMouseArea.containsMouse ? Theme.bgHover : Theme.bgSecondary
+                    color: delegateMouseArea.containsMouse ? Theme.bgHover : Theme.bgSide
                     border.color: {
                         var pc = getPriorityColor(model.reason)
                         Qt.rgba(pc.r, pc.g, pc.b, 0.3)
@@ -296,7 +296,7 @@ Item {
                                 if (sid.length > 12) return sid.substring(0, 12) + "..."
                                 return sid || ("候选 #" + model.candidateIndex)
                             }
-                            color: Theme.textPrimary
+                            color: Theme.textMain
                             font.pixelSize: 12
                             font.family: "monospace"
                             Layout.preferredWidth: 110
@@ -315,7 +315,7 @@ Item {
                         Label {
                             visible: model.reason !== "false_negative"
                             text: "置信度: " + (parseFloat(model.confidence) || 0).toFixed(3)
-                            color: (parseFloat(model.confidence) || 0) < 0.2 ? Theme.accentError : Theme.accentWarning
+                            color: (parseFloat(model.confidence) || 0) < 0.2 ? Theme.danger : Theme.warning
                             font.pixelSize: 11
                             font.family: "monospace"
                         }
@@ -337,13 +337,13 @@ Item {
                             Layout.preferredWidth: 64
 
                             background: Rectangle {
-                                color: parent.pressed ? Theme.accentSecondary : Theme.accentSecondary
+                                color: parent.pressed ? Theme.primaryGlow : Theme.primaryGlow
                                 radius: 4
                             }
 
                             contentItem: Label {
                                 text: parent.text
-                                color: Theme.bgPrimary
+                                color: Theme.bgMain
                                 font.pixelSize: 10
                                 font.bold: true
                                 horizontalAlignment: Text.AlignHCenter
@@ -393,12 +393,12 @@ Item {
                         width: 8
                         height: 8
                         radius: 4
-                        color: Theme.accentError
+                        color: Theme.danger
                     }
 
                     Label {
                         text: "漏检: " + countByReason("false_negative")
-                        color: Theme.accentError
+                        color: Theme.danger
                         font.pixelSize: 12
                         font.bold: true
                     }
@@ -412,12 +412,12 @@ Item {
                         width: 8
                         height: 8
                         radius: 4
-                        color: Theme.accentWarning
+                        color: Theme.warning
                     }
 
                     Label {
                         text: "低置信度: " + countByReason("low_confidence")
-                        color: Theme.accentWarning
+                        color: Theme.warning
                         font.pixelSize: 12
                         font.bold: true
                     }
@@ -431,12 +431,12 @@ Item {
                         width: 8
                         height: 8
                         radius: 4
-                        color: Theme.accentPrimary
+                        color: Theme.primary
                     }
 
                     Label {
                         text: "误检: " + countByReason("false_positive")
-                        color: Theme.accentPrimary
+                        color: Theme.primary
                         font.pixelSize: 12
                         font.bold: true
                     }
@@ -446,7 +446,7 @@ Item {
 
                 Label {
                     text: "总计: " + hardCases.length
-                    color: Theme.textPrimary
+                    color: Theme.textMain
                     font.pixelSize: 12
                 }
             }

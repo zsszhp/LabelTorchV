@@ -33,7 +33,7 @@ async def handle_check(payload: dict) -> dict:
             result["gpu_name"] = "N/A"
             result["gpu_count"] = 0
             result["gpu_memory_total_mb"] = 0
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to import torch or check CUDA")
         result["torch"] = None
         result["cuda_available"] = False

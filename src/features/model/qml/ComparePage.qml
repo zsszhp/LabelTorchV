@@ -45,7 +45,7 @@ Item {
 
                     Label {
                         text: "选择版本"
-                        color: Theme.accentPrimary
+                        color: Theme.primary
                         font.pixelSize: 16
                         font.bold: true
                     }
@@ -66,7 +66,7 @@ Item {
 
                     Label {
                         text: "模式："
-                        color: Theme.textPrimary
+                        color: Theme.textMain
                         font.pixelSize: 12
                     }
 
@@ -75,13 +75,13 @@ Item {
                         text: "水平"
                         font.pixelSize: 11
                         flat: true
-                        palette.buttonText: compareMode === "horizontal" ? Theme.accentPrimary : Theme.textMuted
+                        palette.buttonText: compareMode === "horizontal" ? Theme.primary : Theme.textMuted
                         onClicked: compareMode = "horizontal"
 
                         background: Rectangle {
                             radius: 4
                             color: compareMode === "horizontal" ? Theme.bgInput : "transparent"
-                            border.color: compareMode === "horizontal" ? Theme.accentPrimary : "transparent"
+                            border.color: compareMode === "horizontal" ? Theme.primary : "transparent"
                             border.width: compareMode === "horizontal" ? 1 : 0
                         }
                     }
@@ -91,13 +91,13 @@ Item {
                         text: "垂直（链式）"
                         font.pixelSize: 11
                         flat: true
-                        palette.buttonText: compareMode === "vertical" ? Theme.accentPrimary : Theme.textMuted
+                        palette.buttonText: compareMode === "vertical" ? Theme.primary : Theme.textMuted
                         onClicked: compareMode = "vertical"
 
                         background: Rectangle {
                             radius: 4
                             color: compareMode === "vertical" ? Theme.bgInput : "transparent"
-                            border.color: compareMode === "vertical" ? Theme.accentPrimary : "transparent"
+                            border.color: compareMode === "vertical" ? Theme.primary : "transparent"
                             border.width: compareMode === "vertical" ? 1 : 0
                         }
                     }
@@ -137,8 +137,8 @@ Item {
                         width: versionCheckList.width
                         height: 56
                         radius: 6
-                        color: isChecked ? Theme.bgInput : (checkMouseArea.containsMouse ? Theme.bgSecondary : Theme.bgPrimary)
-                        border.color: isChecked ? Theme.accentPrimary : "transparent"
+                        color: isChecked ? Theme.bgInput : (checkMouseArea.containsMouse ? Theme.bgSide : Theme.bgMain)
+                        border.color: isChecked ? Theme.primary : "transparent"
                         border.width: isChecked ? 1 : 0
 
                         property bool isChecked: selectedVersionIds.indexOf(model.versionId) >= 0
@@ -169,13 +169,13 @@ Item {
                                     x: versionCheckBox.leftPadding
                                     y: parent.height / 2 - height / 2
                                     radius: 3
-                                    color: versionCheckBox.checked ? Theme.accentPrimary : Theme.bgCard
-                                    border.color: versionCheckBox.checked ? Theme.accentPrimary : Theme.textMuted
+                                    color: versionCheckBox.checked ? Theme.primary : Theme.bgCard
+                                    border.color: versionCheckBox.checked ? Theme.primary : Theme.textMuted
 
                                     Label {
                                         anchors.centerIn: parent
                                         text: versionCheckBox.checked ? "\u2713" : ""
-                                        color: Theme.bgPrimary
+                                        color: Theme.bgMain
                                         font.pixelSize: 12
                                         font.bold: true
                                     }
@@ -188,7 +188,7 @@ Item {
 
                                 Label {
                                     text: model.versionId.substring(0, 8) + "..."
-                                    color: Theme.accentPrimary
+                                    color: Theme.primary
                                     font.pixelSize: 12
                                     font.family: "monospace"
                                 }
@@ -224,14 +224,14 @@ Item {
 
                         background: Rectangle {
                             radius: 6
-                            color: parent.enabled ? Theme.accentPrimary : Theme.bgInput
+                            color: parent.enabled ? Theme.primary : Theme.bgInput
                             implicitHeight: 32
                             implicitWidth: 120
                         }
 
                         contentItem: Label {
                             text: parent.text
-                            color: parent.enabled ? Theme.bgPrimary : Theme.textMuted
+                            color: parent.enabled ? Theme.bgMain : Theme.textMuted
                             font.pixelSize: 12
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter
@@ -253,7 +253,7 @@ Item {
                         enabled: selectedVersionIds.length > 0
                         font.pixelSize: 12
                         flat: true
-                        palette.buttonText: Theme.accentError
+                        palette.buttonText: Theme.danger
 
                         onClicked: {
                             selectedVersionIds = []
@@ -269,7 +269,7 @@ Item {
                         enabled: versionCheckList.count > 0
                         font.pixelSize: 11
                         flat: true
-                        palette.buttonText: Theme.accentSuccess
+                        palette.buttonText: Theme.success
 
                         onClicked: {
                             var ids = []
@@ -303,7 +303,7 @@ Item {
 
                     Label {
                         text: "对比结果"
-                        color: Theme.accentPrimary
+                        color: Theme.primary
                         font.pixelSize: 16
                         font.bold: true
                     }
@@ -313,7 +313,7 @@ Item {
                     Label {
                         visible: hasCompared && comparisonData.length >= 2
                         text: compareMode === "horizontal" ? "水平：同快照" : "垂直：增量链"
-                        color: compareMode === "horizontal" ? Theme.accentSuccess : Theme.accentWarning
+                        color: compareMode === "horizontal" ? Theme.success : Theme.warning
                         font.pixelSize: 11
                     }
                 }
@@ -358,7 +358,7 @@ Item {
                                 Label {
                                     anchors.centerIn: parent
                                     text: "指标"
-                                    color: Theme.textPrimary
+                                    color: Theme.textMain
                                     font.pixelSize: 12
                                     font.bold: true
                                 }
@@ -380,7 +380,7 @@ Item {
 
                                         Label {
                                             text: modelData.versionId.substring(0, 8) + "..."
-                                            color: Theme.accentPrimary
+                                            color: Theme.primary
                                             font.pixelSize: 11
                                             font.family: "monospace"
                                             Layout.alignment: Qt.AlignHCenter
@@ -422,13 +422,13 @@ Item {
                                     Rectangle {
                                         width: 140
                                         height: 40
-                                        color: Theme.bgPrimary
+                                        color: Theme.bgMain
                                         radius: 4
 
                                         Label {
                                             anchors.centerIn: parent
                                             text: modelData
-                                            color: Theme.textPrimary
+                                            color: Theme.textMain
                                             font.pixelSize: 12
                                             font.bold: true
                                         }
@@ -447,7 +447,7 @@ Item {
                                             color: {
                                                 var metricName = metricRowRepeater.model[index]
                                                 var val = modelData.metrics[metricName]
-                                                if (val === undefined || isNaN(Number(val))) return Theme.bgPrimary
+                                                if (val === undefined || isNaN(Number(val))) return Theme.bgMain
 
                                                 // Collect all valid values for this metric across versions
                                                 var values = []
@@ -458,15 +458,15 @@ Item {
                                                     }
                                                 }
 
-                                                if (values.length < 2) return Theme.bgPrimary
+                                                if (values.length < 2) return Theme.bgMain
 
                                                 var numVal = Number(val)
                                                 var maxVal = Math.max.apply(null, values)
                                                 var minVal = Math.min.apply(null, values)
 
-                                                if (numVal === maxVal) return Theme.accentSuccess
-                                                if (numVal === minVal) return Theme.accentError
-                                                return Theme.bgPrimary
+                                                if (numVal === maxVal) return Theme.success
+                                                if (numVal === minVal) return Theme.danger
+                                                return Theme.bgMain
                                             }
 
                                             border.color: {
@@ -488,8 +488,8 @@ Item {
                                                 var maxVal = Math.max.apply(null, values)
                                                 var minVal = Math.min.apply(null, values)
 
-                                                if (numVal === maxVal) return Theme.accentSuccess  // green border for best
-                                                if (numVal === minVal) return Theme.accentError   // red border for worst
+                                                if (numVal === maxVal) return Theme.success  // green border for best
+                                                if (numVal === minVal) return Theme.danger   // red border for worst
                                                 return "transparent"
                                             }
                                             border.width: 1
@@ -517,15 +517,15 @@ Item {
                                                         }
                                                     }
 
-                                                    if (values.length < 2) return Theme.textPrimary
+                                                    if (values.length < 2) return Theme.textMain
 
                                                     var numVal = Number(val)
                                                     var maxVal = Math.max.apply(null, values)
                                                     var minVal = Math.min.apply(null, values)
 
-                                                    if (numVal === maxVal) return Theme.accentSuccess  // green text for best
-                                                    if (numVal === minVal) return Theme.accentError   // red text for worst
-                                                    return Theme.textPrimary
+                                                    if (numVal === maxVal) return Theme.success  // green text for best
+                                                    if (numVal === minVal) return Theme.danger   // red text for worst
+                                                    return Theme.textMain
                                                 }
                                                 font.pixelSize: 13
                                                 font.bold: true
@@ -556,13 +556,13 @@ Item {
                                     width: 12
                                     height: 12
                                     radius: 2
-                                    color: Theme.accentSuccess
-                                    border.color: Theme.accentSuccess
+                                    color: Theme.success
+                                    border.color: Theme.success
                                     border.width: 1
                                 }
                                 Label {
                                     text: "最优"
-                                    color: Theme.accentSuccess
+                                    color: Theme.success
                                     font.pixelSize: 11
                                 }
                             }
@@ -573,13 +573,13 @@ Item {
                                     width: 12
                                     height: 12
                                     radius: 2
-                                    color: Theme.accentError
-                                    border.color: Theme.accentError
+                                    color: Theme.danger
+                                    border.color: Theme.danger
                                     border.width: 1
                                 }
                                 Label {
                                     text: "最差"
-                                    color: Theme.accentError
+                                    color: Theme.danger
                                     font.pixelSize: 11
                                 }
                             }

@@ -13,6 +13,7 @@ qt_add_qml_module(labeltorch_inference
         qml/ActiveLearningPage.qml
         qml/QueueStatsPanel.qml
         qml/AnomalyInferPanel.qml
+        qml/VideoInferencePage.qml
     SOURCES
         InferenceService.h
         InferenceService.cpp
