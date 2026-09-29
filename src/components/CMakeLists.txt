@@ -18,6 +18,7 @@ qt_add_qml_module(labeltorch_components
         qml/RingProgress.qml
         qml/ColorPicker.qml
         qml/StatusTag.qml
+        qml/LtButton.qml
         qml/ToastBus.qml
         qml/Toast.qml
         qml/EmptyState.qml

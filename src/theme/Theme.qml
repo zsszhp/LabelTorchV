@@ -1,64 +1,69 @@
-// Theme.qml - V5 Dihuge DLTools 工业缺陷检测视觉设计系统
-// 像素级对标参考UI：极深蓝黑 + 青色高亮 + 工业科技风
+// Theme.qml - 标炬视觉设计系统（深色工业科技风）
+// 所有颜色/字体/间距/圆角/阴影统一由此发放，业务侧禁止硬编码视觉值
 pragma Singleton
 import QtQuick
 
 QtObject {
-    // === 背景色系（对标参考UI: --bg-main:#0F131A, --bg-side:#151A22, --bg-card:#1E2530） ===
-    readonly property color bgMain: "#0F131A"
-    readonly property color bgSide: "#151A22"
-    readonly property color bgCard: "#1E2530"
-    readonly property color bgInput: "#121720"
-    readonly property color bgInputDropdown: "#1A2030"
-    readonly property color bgHover: "#1E2530"
-    readonly property color bgSelected: "#262F3D"
-    readonly property color bgChart: "#05070A"
-    readonly property color bgChartPanel: "#07090D"
-    readonly property color bgPreview: "#0C0F14"
+    // === 背景层次（由深到浅，保证卡片/侧栏/输入框可区分） ===
+    readonly property color bgMain: "#0B1220"
+    readonly property color bgSide: "#131C2E"
+    readonly property color bgCard: "#1B263C"
+    readonly property color bgInput: "#0F1829"
+    readonly property color bgInputDropdown: "#1E2B44"
+    readonly property color bgHover: "#243350"
+    readonly property color bgSelected: "#2B3B58"
+    readonly property color bgChart: "#070D18"
+    readonly property color bgChartPanel: "#0A1220"
+    readonly property color bgPreview: "#09101C"
 
-    // === 主色调（蓝色系，对标 #0077FF） ===
-    readonly property color primary: "#0077FF"
-    readonly property color primaryGlow: "#00E5FF"
-    readonly property color primaryDark: "#0055CC"
+    // === 主色（年轻青色系） ===
+    readonly property color primary: "#22D3EE"
+    readonly property color primaryGlow: "#67E8F9"
+    readonly property color primaryDark: "#0284C7"
 
-    // === 状态色（对标参考UI语义色） ===
-    readonly property color success: "#00E676"
-    readonly property color danger: "#FF1744"
-    readonly property color warning: "#FF9100"
+    // === 状态色（降饱和，长时间盯屏不易疲劳） ===
+    readonly property color success: "#34D399"
+    readonly property color danger: "#F87171"
+    readonly property color warning: "#FBBF24"
     readonly property color info: primaryGlow
 
-    // === 文字色（对标参考UI） ===
+    // === 文字色 ===
     readonly property color textMain: "#E2E8F0"
     readonly property color textMuted: "#64748B"
     readonly property color textDisabled: "#475569"
     readonly property color textAccent: primaryGlow
-
-    // 二级文字色（比 textMuted 更亮，用于次要辅助信息）
     readonly property color textSecondary: "#94A3B8"
 
-    // === 边框与分割线（对标参考UI: --border-color:#262F3D） ===
-    readonly property color borderColor: "#262F3D"
+    // === 边框与分割线 ===
+    readonly property color borderColor: "#2C3E5C"
     readonly property color borderHover: primaryGlow
-    readonly property color dividerColor: "#1E2530"
+    readonly property color dividerColor: "#243350"
 
-    // === 渐变色 ===
-    readonly property string gradientPrimary: "linear-gradient(135deg, " + primary + ", " + primaryDark + ")"
-    readonly property string gradientLogo: "linear-gradient(135deg, " + primary + ", " + primaryGlow + ")"
-    readonly property string gradientLogoText: "linear-gradient(to right, #ffffff, #94A3B8)"
-    readonly property string gradientProgress: "linear-gradient(90deg, " + primary + ", " + primaryGlow + ")"
-    readonly property string gradientNavActive: "linear-gradient(to bottom, transparent 70%, rgba(0, 229, 255, 0.05))"
+    // === 焦点环（键盘/输入焦点） ===
+    // rgba(34,211,238,0.28) 对应 #AARRGGBB
+    readonly property color focusRing: "#4722D3EE"
+    readonly property int focusRingWidth: 2
 
-    // === 发光效果 ===
-    readonly property color glowCyan: "#2000E5FF"
-    readonly property color glowCyanStrong: "#4000E5FF"
-    readonly property color glowBlue: "#200077FF"
-    readonly property color glowRed: "#20FF1744"
-    readonly property color glowGreen: "#2000E676"
+    // === 层次阴影（双层：贴近深影 + 外扩淡影） ===
+    // 供 MultiEffect / 手绘阴影层使用，近影压边、远影拉出悬浮感
+    readonly property color elevationNearColor: "#26000000"
+    readonly property color elevationFarColor: "#14000000"
+    readonly property real elevationNearBlur: 0.35
+    readonly property real elevationFarBlur: 1.0
+    readonly property real elevationNearOffsetY: 1
+    readonly property real elevationFarOffsetY: 4
+
+    // === 发光效果（强调高亮） ===
+    readonly property color glowCyan: "#2022D3EE"
+    readonly property color glowCyanStrong: "#4022D3EE"
+    readonly property color glowBlue: "#200EA5E9"
+    readonly property color glowRed: "#20F87171"
+    readonly property color glowGreen: "#2034D399"
 
     // === 品牌/发光（顶栏 Logo 等） ===
     readonly property color logoText: "#C8D4E0"
     readonly property color logoBgText: "#FFFFFF"
-    readonly property color glowCyanRaw: "#00E5FF"
+    readonly property color glowCyanRaw: "#22D3EE"
     readonly property color overlayMask: "#B3000000"
 
     // === 磨砂玻璃 ===
@@ -67,31 +72,31 @@ QtObject {
     readonly property color glassBorder: borderColor
     readonly property color glassBorderGlow: glowCyan
 
-    // === 图表专用色 ===
-    readonly property color chartBoxLoss: "#0077FF"
-    readonly property color chartSegLoss: "#00E676"
-    readonly property color chartClsLoss: "#00E5FF"
-    readonly property color chartDflLoss: "#FF9100"
-    readonly property color chartSevereLoss: "#D500F9"
-    readonly property color chartMap50B: "#00E676"
+    // === 图表专用色（与状态色/主色同族，降饱和） ===
+    readonly property color chartBoxLoss: primary
+    readonly property color chartSegLoss: success
+    readonly property color chartClsLoss: primaryGlow
+    readonly property color chartDflLoss: warning
+    readonly property color chartSevereLoss: "#C084FC"
+    readonly property color chartMap50B: success
     readonly property color chartMap5095B: "#FFFFFF"
-    readonly property color chartMap50M: "#00E5FF"
-    readonly property color chartMap5095M: "#D500F9"
-    readonly property color chartRecallB: "#FFD600"
-    readonly property color chartRecallM: "#00E676"
-    readonly property color chartPrecisionB: "#FFD600"
-    readonly property color chartPrecisionM: "#00E676"
-    readonly property color chartGridLine: "#20FF1744"
-    readonly property color chartBaseline: "#FFD600"
+    readonly property color chartMap50M: primaryGlow
+    readonly property color chartMap5095M: "#C084FC"
+    readonly property color chartRecallB: warning
+    readonly property color chartRecallM: success
+    readonly property color chartPrecisionB: warning
+    readonly property color chartPrecisionM: success
+    readonly property color chartGridLine: "#20F87171"
+    readonly property color chartBaseline: warning
 
     // === 标签色 ===
     readonly property color tagBaseline: primary
     readonly property color tagBest: success
-    readonly property color tagProduction: "#FFD600"
+    readonly property color tagProduction: warning
 
-    // === 字体（中文优先回退） ===
-    readonly property string fontFamily: "Segoe UI, Microsoft YaHei, PingFang SC, sans-serif"
-    readonly property string fontFamilyMono: "Cascadia Code, Consolas, monospace"
+    // === 字体（Qt 只认单一字体名，逗号列表无效） ===
+    readonly property string fontFamily: "Microsoft YaHei UI"
+    readonly property string fontFamilyMono: "Consolas"
     readonly property int fontSizeCaption: 11
     readonly property int fontSizeSmall: 12
     readonly property int fontSizeNormal: 13
@@ -121,9 +126,9 @@ QtObject {
 
     // === 弹窗阴影/层次 ===
     readonly property color shadowDialog: "#66000000"
-    readonly property color dialogTitleBg: "#1A2332"
-    readonly property color dialogFooterBg: "#161C28"
-    readonly property color dialogBodyBg: "#121822"
+    readonly property color dialogTitleBg: "#1A2A42"
+    readonly property color dialogFooterBg: "#152238"
+    readonly property color dialogBodyBg: "#111C2E"
     readonly property color accentBar: primaryGlow
 
     // === Toast 反馈 ===
@@ -131,22 +136,23 @@ QtObject {
     readonly property int toastErrorDuration: 0        // 0 = 常驻，需手动关闭
     readonly property int toastWidth: 320
     readonly property int toastMaxVisible: 3
-    readonly property color toastSuccessBg: "#1A00E676"
-    readonly property color toastErrorBg: "#1AFF1744"
-    readonly property color toastInfoBg: "#1A00E5FF"
+    readonly property color toastSuccessBg: "#1A34D399"
+    readonly property color toastErrorBg: "#1AF87171"
+    readonly property color toastInfoBg: "#1A22D3EE"
 
     // === 空态与确认弹窗 ===
-    readonly property int emptyIconSize: 48
+    readonly property int emptyIconSize: 56
     readonly property int confirmDialogWidth: 440
     readonly property int overlayMaskAlpha: 179         // 0xB3 的十进制，弹窗遮罩不透明度
 
     // === 导航分组 ===
     readonly property int navGroupGap: 14
-    readonly property color navGroupDivider: "#2A3344"
+    readonly property color navGroupDivider: "#2A3A56"
 
     // === 表单校验 ===
     readonly property color fieldErrorBorder: danger
-    readonly property color fieldErrorText: "#FF8A9B"
+    readonly property color fieldErrorText: "#FCA5A5"
+    readonly property int formLabelWidth: 96
 
     // === 布局尺寸 ===
     readonly property int headerHeight: 56
@@ -157,6 +163,10 @@ QtObject {
     readonly property int subTabHeight: 40
     readonly property int logPanelHeight: 180
     readonly property int toolbarHeight: 36
+
+    // === 按钮尺寸 ===
+    readonly property int buttonHeight: 36
+    readonly property int buttonHeightCompact: 32
 
     // === 步进器尺寸 ===
     readonly property int stepperButtonWidth: 28
@@ -169,11 +179,18 @@ QtObject {
     readonly property int toggleSmallWidth: 28
     readonly property int toggleSmallHeight: 16
 
-    // === 类别配色（高饱和度，深色背景上醒目） ===
+    // === 类别配色（按色相环排序，中等饱和度，深底上可辨且不刺眼） ===
     readonly property var classColors: [
-        "#0077FF", "#00E676", "#D500F9", "#FFD600",
-        "#FF1744", "#FF9100", "#00E5FF", "#E879F9",
-        "#2DD4BF", "#F472B6"
+        "#F87171",  // 红
+        "#FB923C",  // 橙
+        "#FBBF24",  // 黄
+        "#A3E635",  // 黄绿
+        "#34D399",  // 翠绿
+        "#2DD4BF",  // 青绿
+        "#22D3EE",  // 青
+        "#60A5FA",  // 蓝
+        "#A78BFA",  // 紫
+        "#E879F9"   // 品红
     ]
 
     function classColor(index) {
