@@ -1,6 +1,6 @@
 // DatasetPage.qml - V6 数据集页（像素级复刻参考UI设计）
 // 左侧sidebar(240px) + resizer-v(4px) + 中心缩略图网格
-// 布局：图库选择器 → 数据集卡片列表 → 图像属性 → Tag标签
+// 布局：图库选择器 → 数据集卡片列表 → 图像属性 → 标签
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -605,10 +605,10 @@ Item {
                         color: Theme.dividerColor
                     }
 
-                    // === Tag 可折叠区块 ===
+                    // === 标签可折叠区块 ===
                     CollapsibleSection {
                         Layout.fillWidth: true
-                        title: "Tag"
+                        title: "标签"
                         expanded: true
 
                         ColumnLayout {
@@ -772,34 +772,52 @@ Item {
                 }
 
                 // 空状态提示：未打开项目
-                Text {
+                EmptyState {
                     visible: !appController.projectOpen
-                    text: "请先打开项目"
-                    font.pixelSize: Theme.fontSizeSubheading
-                    font.family: Theme.fontFamily
-                    color: Theme.textMuted
+                    icon: "folder"
+                    title: "请先打开项目"
+                    description: "在项目管理中创建或打开项目后即可管理数据集"
+                    actionText: "前往项目管理"
+                    onActionClicked: appController.currentPage = "project"
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: Theme.spacingXLarge
                 }
 
                 // 空状态提示：未选择数据集
-                Text {
+                EmptyState {
                     visible: appController.projectOpen && currentDatasetId === ""
-                    text: "请从左侧选择一个数据集"
-                    font.pixelSize: Theme.fontSizeSubheading
-                    font.family: Theme.fontFamily
-                    color: Theme.textMuted
+                    icon: "images"
+                    title: "请选择数据集"
+                    description: "从左侧图库列表中选择一个数据集开始浏览"
+                    actionText: "导入数据"
+                    onActionClicked: importDialogRoot.open()
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: Theme.spacingXLarge
                 }
 
                 // 空状态提示：数据集无图片
-                Text {
-                    visible: appController.projectOpen && currentDatasetId !== "" && sampleListModel.count === 0
-                    text: "该数据集暂无图片"
-                    font.pixelSize: Theme.fontSizeSubheading
-                    font.family: Theme.fontFamily
-                    color: Theme.textMuted
+                EmptyState {
+                    visible: appController.projectOpen && currentDatasetId !== "" && rawSamples.length === 0
+                    icon: "images"
+                    title: "该数据集暂无图片"
+                    description: "可重新导入数据集，或检查图片目录是否正确"
+                    actionText: "导入数据"
+                    onActionClicked: importDialogRoot.open()
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: Theme.spacingXLarge
+                }
+
+                // 空状态提示：数据集无标签（有图但筛选后无标签样本）
+                EmptyState {
+                    visible: appController.projectOpen && currentDatasetId !== ""
+                             && rawSamples.length > 0 && sampleListModel.count === 0
+                    icon: "brain"
+                    title: labeledSamples === 0 ? "该数据集暂无标签" : "无符合筛选条件的样本"
+                    description: labeledSamples === 0
+                                 ? "可前往标注页为图片添加标签"
+                                 : "调整筛选条件后查看其他样本"
+                    actionText: labeledSamples === 0 ? "前往标注" : ""
+                    onActionClicked: appController.currentPage = "annotation"
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: Theme.spacingXLarge
                 }
@@ -1064,11 +1082,11 @@ Item {
     }
 
     // ================================================================
-    // 添加Tag弹窗
+    // 添加标签弹窗
     // ================================================================
     Dialog {
         id: addTagDialog
-        title: "添加Tag"
+        title: "添加标签"
         modal: true
         // 挂到 Overlay 才能稳定居中显示，否则点 + 看起来“没反应”
         parent: Overlay.overlay
@@ -1088,29 +1106,23 @@ Item {
             spacing: Theme.spacingLarge
 
             Text {
-                text: "添加新的图像Tag标签"
+                text: "添加新的图像标签"
                 font.pixelSize: Theme.fontSizeSubheading
                 font.bold: true
                 font.family: Theme.fontFamily
                 color: Theme.textMain
             }
 
-            // Tag名称输入
-            ColumnLayout {
+            // 标签名称输入
+            FormField {
+                label: "标签名称"
+                required: true
                 Layout.fillWidth: true
-                spacing: Theme.spacingSmall
-
-                Text {
-                    text: "Tag名称"
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.family: Theme.fontFamily
-                    color: Theme.textMuted
-                }
 
                 TextField {
                     id: tagNameField
-                    Layout.fillWidth: true
-                    placeholderText: "输入Tag名称"
+                    anchors.fill: parent
+                    placeholderText: "输入标签名称"
                     placeholderTextColor: Theme.textDisabled
                     color: Theme.textMain
                     font.pixelSize: Theme.fontSizeNormal
@@ -1126,20 +1138,13 @@ Item {
             }
 
             // 快捷键输入
-            ColumnLayout {
+            FormField {
+                label: "快捷键"
                 Layout.fillWidth: true
-                spacing: Theme.spacingSmall
-
-                Text {
-                    text: "快捷键"
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.family: Theme.fontFamily
-                    color: Theme.textMuted
-                }
 
                 TextField {
                     id: tagShortcutField
-                    Layout.fillWidth: true
+                    anchors.fill: parent
                     placeholderText: "按下一个键作为快捷键"
                     placeholderTextColor: Theme.textDisabled
                     color: Theme.textMain
@@ -1195,7 +1200,7 @@ Item {
                 Button {
                     Layout.preferredHeight: 36
                     Layout.preferredWidth: 100
-                    text: "确认添加"
+                    text: "添加"
                     font.pixelSize: Theme.fontSizeNormal
                     font.bold: true
                     font.family: Theme.fontFamily
@@ -1226,7 +1231,7 @@ Item {
             var name = tagNameField.text.trim()
             var shortcut = tagShortcutField.text.trim()
             if (!name) {
-                if (typeof ToastBus !== "undefined") ToastBus.error("请输入 Tag 名称")
+                if (typeof ToastBus !== "undefined") ToastBus.error("请输入标签名称")
                 return
             }
             if (!currentDatasetId) {
@@ -1238,7 +1243,7 @@ Item {
                 tagModel.setDatasetId(currentDatasetId)
                 tagModel.refresh()
                 root.updateTagSummary && root.updateTagSummary()
-                if (typeof ToastBus !== "undefined") ToastBus.success("已添加 Tag：" + name)
+                if (typeof ToastBus !== "undefined") ToastBus.success("已添加标签：" + name)
             } else {
                 if (typeof ToastBus !== "undefined") ToastBus.error("添加失败：标签可能已存在")
             }
@@ -1743,7 +1748,7 @@ Item {
                 Button {
                     Layout.preferredHeight: 36
                     Layout.preferredWidth: 100
-                    text: "确认导入"
+                    text: "导入"
                     font.pixelSize: Theme.fontSizeNormal
                     font.bold: true
                     font.family: Theme.fontFamily

@@ -22,47 +22,14 @@ Item {
     property string lastImportedDatasetId: ""
 
     // 未打开项目时的空状态提示
-    ColumnLayout {
+    EmptyState {
         anchors.centerIn: parent
         visible: appController.currentProjectId === ""
-        spacing: 16
-
-        Label {
-            text: "请先打开一个项目"
-            color: Theme.textMuted
-            font.pixelSize: Theme.fontSizeTitle
-            font.bold: true
-            Layout.alignment: Qt.AlignHCenter
-        }
-
-        Label {
-            text: "在左侧项目中心创建或打开项目后，即可导入数据集"
-            color: Theme.textMuted
-            font.pixelSize: Theme.fontSizeNormal
-            Layout.alignment: Qt.AlignHCenter
-        }
-
-        Button {
-            text: "前往项目中心"
-            font.family: Theme.fontFamily
-            Layout.alignment: Qt.AlignHCenter
-            background: Rectangle {
-                color: parent.hovered ? Theme.primary : Theme.bgCard
-                radius: Theme.radiusSmall
-                border.color: Theme.primary
-                border.width: 1
-                implicitWidth: 140
-                implicitHeight: 36
-            }
-            contentItem: Label {
-                text: parent.text
-                color: Theme.primary
-                font.pixelSize: Theme.fontSizeNormal
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-            onClicked: appController.currentPage = "project"
-        }
+        icon: "folder"
+        title: "请先打开一个项目"
+        description: "在项目中心创建或打开项目后，即可导入数据集"
+        actionText: "前往项目管理"
+        onActionClicked: appController.currentPage = "project"
     }
 
     // 按当前项目过滤数据集列表
@@ -1186,7 +1153,7 @@ Item {
                                     }
                                 }
 
-                                // 数据集名称 + 确认导入
+                                // 数据集名称 + 导入
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: Theme.spacingNormal
@@ -1223,7 +1190,7 @@ Item {
 
                                     Button {
                                         id: confirmImportBtn
-                                        text: "确认导入"
+                                        text: "导入"
                                         enabled: root.scanResult
                                                  && root.scanResult.isValid
                                                  && datasetNameField.text.trim().length > 0
@@ -1430,7 +1397,7 @@ Item {
             spacing: Theme.spacingLarge
 
             Label {
-                text: "🎉 数据集导入成功"
+                text: "数据集导入成功"
                 font.bold: true
                 color: Theme.success
                 font.pixelSize: Theme.fontSizeSubheading

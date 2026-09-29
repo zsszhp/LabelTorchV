@@ -492,14 +492,6 @@ Item {
                         spacing: Theme.spacingSmall
 
                         Text {
-                            text: root.testStatus === "running" ? "■" : "▶"
-                            font.pixelSize: Theme.fontSizeSmall
-                            font.family: Theme.fontFamily
-                            color: root.selectedModelVersionId ? "#FFFFFF" : Theme.textDisabled
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-
-                        Text {
                             text: root.testStatus === "running" ? "停止测试" : "开始测试"
                             font.pixelSize: Theme.fontSizeNormal
                             font.weight: Font.DemiBold
@@ -687,7 +679,7 @@ Item {
 
                                     ParamRow {
                                         label: "测试集"
-                                        labelWidth: 60
+                                        labelWidth: 100
                                         Layout.fillWidth: true
 
                                         ComboBox {
@@ -737,7 +729,7 @@ Item {
 
                                     ParamRow {
                                         label: "批量大小"
-                                        labelWidth: 80
+                                        labelWidth: 100
                                         Layout.fillWidth: true
                                         Stepper {
                                             id: batchSizeStepper
@@ -750,7 +742,7 @@ Item {
 
                                     ParamRow {
                                         label: "IoU阈值"
-                                        labelWidth: 80
+                                        labelWidth: 100
                                         Layout.fillWidth: true
                                         Stepper {
                                             id: iouThresholdStepper
@@ -764,7 +756,7 @@ Item {
 
                                     ParamRow {
                                         label: "评估置信度"
-                                        labelWidth: 80
+                                        labelWidth: 100
                                         Layout.fillWidth: true
                                         Stepper {
                                             id: confThresholdStepper
@@ -778,7 +770,7 @@ Item {
 
                                     ParamRow {
                                         label: "设备"
-                                        labelWidth: 80
+                                        labelWidth: 100
                                         Layout.fillWidth: true
                                         ComboBox {
                                             id: deviceCombo
@@ -816,7 +808,7 @@ Item {
 
                                     ParamRow {
                                         label: "测试权重"
-                                        labelWidth: 80
+                                        labelWidth: 100
                                         Layout.fillWidth: true
                                         ComboBox {
                                             id: weightCombo
@@ -1189,11 +1181,11 @@ Item {
                                                     ctx.fillText("异常检测当前显示摘要指标", w / 2, h / 2 - 12)
                                                     ctx.fillText(root.primaryMetricLabel + ": " + (root.primaryMetricValue * 100).toFixed(2) + "%", w / 2, h / 2 + 12)
                                                 } else {
-                                                    // 无数据提示
+                                                    // 图表空态蒙层文案：与其余空态口径一致
                                                     ctx.fillStyle = Theme.textMuted
                                                     ctx.font = Theme.fontSizeNormal + "px " + Theme.fontFamily
                                                     ctx.textAlign = "center"
-                                                    ctx.fillText("暂无PR曲线数据", w / 2, h / 2)
+                                                    ctx.fillText("暂无数据，完成测试后展示", w / 2, h / 2)
                                                 }
                                             }
 
@@ -1401,7 +1393,7 @@ Item {
                                                                 ctx.fillStyle = Theme.textMuted
                                                                 ctx.font = Theme.fontSizeSmall + "px " + Theme.fontFamily
                                                                 ctx.textAlign = "center"
-                                                                ctx.fillText("暂无混淆矩阵数据", w / 2, h / 2)
+                                                                ctx.fillText("暂无数据，完成测试后展示", w / 2, h / 2)
                                                                 return
                                                             }
 

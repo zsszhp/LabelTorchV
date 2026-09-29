@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import LabelTorch.Theme
+import LabelTorch.Components
 
 Item {
     id: root
@@ -705,12 +706,14 @@ Item {
                     model: batchListModel
                     spacing: 4
 
-                    Label {
+                    // 空状态：统一 EmptyState
+                    EmptyState {
                         anchors.centerIn: parent
+                        width: parent.width - Theme.spacingXLarge * 2
                         visible: batchList.count === 0
-                        text: "暂无推理批次"
-                        color: Theme.textDisabled
-                        font.pixelSize: 14
+                        icon: "scan"
+                        title: "暂无推理批次"
+                        description: "发起辅助标注推理后，批次将在此列出"
                     }
 
                     delegate: Rectangle {

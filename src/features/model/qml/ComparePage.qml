@@ -125,15 +125,7 @@ Item {
                     model: modelVersionModel
                     spacing: 4
 
-                    Label {
-                        anchors.centerIn: parent
-                        visible: versionCheckList.count === 0
-                        text: "暂无模型版本"
-                        color: Theme.textMuted
-                        font.pixelSize: 14
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-
+                    // 空状态：统一 EmptyState
                     EmptyState {
                         anchors.centerIn: parent
                         width: parent.width - Theme.spacingXLarge * 2

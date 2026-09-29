@@ -19,47 +19,14 @@ Item {
     }
 
     // 未打开项目时的空状态提示
-    ColumnLayout {
+    EmptyState {
         anchors.centerIn: parent
         visible: currentProjectId === ""
-        spacing: 16
-
-        Label {
-            text: "🏷️ 请先打开一个项目"
-            color: Theme.textMuted
-            font.pixelSize: Theme.fontSizeTitle
-            font.bold: true
-            Layout.alignment: Qt.AlignHCenter
-        }
-
-        Label {
-            text: "完成训练后，在此管理模型版本"
-            color: Theme.textMuted
-            font.pixelSize: Theme.fontSizeNormal
-            Layout.alignment: Qt.AlignHCenter
-        }
-
-        Button {
-            text: "前往项目中心"
-            font.family: Theme.fontFamily
-            Layout.alignment: Qt.AlignHCenter
-            background: Rectangle {
-                color: parent.hovered ? Theme.primary : Theme.bgCard
-                radius: Theme.radiusSmall
-                border.color: Theme.primary
-                border.width: 1
-                implicitWidth: 140
-                implicitHeight: 36
-            }
-            contentItem: Label {
-                text: parent.text
-                color: Theme.primary
-                font.pixelSize: Theme.fontSizeNormal
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-            onClicked: appController.currentPage = "project"
-        }
+        icon: "brain"
+        title: "请先打开一个项目"
+        description: "完成训练后，在此管理模型版本"
+        actionText: "前往项目管理"
+        onActionClicked: appController.currentPage = "project"
     }
 
     ColumnLayout {
@@ -174,15 +141,7 @@ Item {
                             model: modelVersionModel
                             spacing: 4
 
-                            Label {
-                                anchors.centerIn: parent
-                                visible: versionList.count === 0
-                                text: "暂无模型版本\n完成训练后将自动注册版本"
-                                color: Theme.textMuted
-                                font.pixelSize: 14
-                                horizontalAlignment: Text.AlignHCenter
-                            }
-
+                            // 空状态：统一 EmptyState
                             EmptyState {
                                 anchors.centerIn: parent
                                 width: parent.width - Theme.spacingXLarge * 2

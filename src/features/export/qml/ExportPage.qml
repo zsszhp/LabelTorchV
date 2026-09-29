@@ -433,78 +433,51 @@ Item {
                                     }
                                 }
 
-                                // 设备 ComboBox
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 4
-
-                                    Text {
-                                        text: "设备"
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textMuted
-                                    }
+                                // 设备
+                                ParamRow {
+                                    label: "设备"
+                                    labelWidth: 100
 
                                     ComboBox {
                                         id: deviceCombo
-                                        Layout.fillWidth: true
-                                        model: ["auto", "cpu", "0"]
+                                        // 显示中文设备名，导出时映射回后端设备串
+                                        model: ["自动", "CPU", "GPU 0"]
+                                        property var deviceValues: ["auto", "cpu", "0"]
+                                        property string deviceValue: deviceValues[currentIndex] || "auto"
                                     }
                                 }
 
-                                // 测试权重 ComboBox
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 4
-
-                                    Text {
-                                        text: "测试权重"
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textMuted
-                                    }
+                                // 测试权重
+                                ParamRow {
+                                    label: "测试权重"
+                                    labelWidth: 100
 
                                     ComboBox {
                                         id: weightCombo
-                                        Layout.fillWidth: true
                                         model: ["最佳权重", "最末权重"]
                                     }
                                 }
 
-                                // 导出格式 ComboBox
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 4
-
-                                    Text {
-                                        text: "导出格式"
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textMuted
-                                    }
+                                // 导出格式
+                                ParamRow {
+                                    label: "导出格式"
+                                    labelWidth: 100
 
                                     ComboBox {
                                         id: formatCombo
-                                        Layout.fillWidth: true
                                         model: root.isAnomalyProject ? ["pt", "onnx"] : ["pt", "onnx"]
                                         currentIndex: 1
                                     }
                                 }
 
-                                // 导出路径: input + "选择"按钮
-                                ColumnLayout {
+                                // 导出路径: input + "选择"按钮（FormField 承载内联校验）
+                                FormField {
+                                    label: "导出路径"
+                                    errorText: root.fieldError("outputPath")
                                     Layout.fillWidth: true
-                                    spacing: 4
-
-                                    Text {
-                                        text: "导出路径"
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textMuted
-                                    }
 
                                     RowLayout {
-                                        Layout.fillWidth: true
+                                        anchors.fill: parent
                                         spacing: Theme.spacingSmall
 
                                         TextField {
@@ -516,7 +489,6 @@ Item {
                                             font.family: Theme.fontFamilyMono
                                             background: Rectangle {
                                                 color: Theme.bgInput
-                                                // 内联校验：错误时红框
                                                 border.color: {
                                                     if (root.fieldError("outputPath") !== "") return Theme.fieldErrorBorder
                                                     return outputPathField.activeFocus ? Theme.primary : Theme.borderColor
@@ -524,15 +496,6 @@ Item {
                                                 border.width: 1
                                                 radius: Theme.radiusSmall
                                             }
-                                        }
-
-                                        // 输出路径错误文案
-                                        Text {
-                                            visible: root.fieldError("outputPath") !== ""
-                                            text: root.fieldError("outputPath")
-                                            color: Theme.fieldErrorText
-                                            font.pixelSize: Theme.fontSizeCaption
-                                            font.family: Theme.fontFamily
                                         }
 
                                         // "选择"按钮
@@ -576,16 +539,9 @@ Item {
                                     }
 
                                     // Opset版本
-                                    ColumnLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 4
-
-                                        Text {
-                                            text: "Opset版本"
-                                            font.pixelSize: Theme.fontSizeCaption
-                                            font.family: Theme.fontFamily
-                                            color: Theme.textMuted
-                                        }
+                                    ParamRow {
+                                        label: "Opset 版本"
+                                        labelWidth: 100
 
                                         Stepper {
                                             id: opsetStepper
@@ -606,17 +562,9 @@ Item {
                                     }
 
                                     // 简化模型
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        spacing: Theme.spacingNormal
-
-                                        Text {
-                                            text: "简化模型"
-                                            font.pixelSize: Theme.fontSizeCaption
-                                            font.family: Theme.fontFamily
-                                            color: Theme.textMuted
-                                            Layout.fillWidth: true
-                                        }
+                                    ParamRow {
+                                        label: "简化模型"
+                                        labelWidth: 100
 
                                         ToggleSwitch {
                                             id: simplifySwitch
@@ -625,17 +573,9 @@ Item {
                                     }
 
                                     // 动态轴
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        spacing: Theme.spacingNormal
-
-                                        Text {
-                                            text: "动态轴"
-                                            font.pixelSize: Theme.fontSizeCaption
-                                            font.family: Theme.fontFamily
-                                            color: Theme.textMuted
-                                            Layout.fillWidth: true
-                                        }
+                                    ParamRow {
+                                        label: "动态轴"
+                                        labelWidth: 100
 
                                         ToggleSwitch {
                                             id: dynamicSwitch
@@ -955,7 +895,7 @@ Item {
                                             text: "暂无导出记录"
                                             font.pixelSize: Theme.fontSizeSmall
                                             font.family: Theme.fontFamily
-                                            color: Theme.textDisabled
+                                            color: Theme.textMuted
                                         }
 
                                         // 有数据时显示列表

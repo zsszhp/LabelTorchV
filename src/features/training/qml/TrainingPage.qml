@@ -1047,7 +1047,7 @@ Item {
                                         // 训练集（数据冻结版）选择
                                         ParamRow {
                                             label: "训练集"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
 
                                             ComboBox {
@@ -1240,7 +1240,7 @@ Item {
                                         // 验证集（与训练集同快照，只读显示）
                                         ParamRow {
                                             label: "验证集"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
 
                                             Text {
@@ -1723,7 +1723,7 @@ Item {
                                         // 适配器选择
                                         ParamRow {
                                             label: "训练适配器"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
 
                                             ComboBox {
@@ -1765,7 +1765,7 @@ Item {
                                         // 网络结构（模型系列）
                                         ParamRow {
                                             label: "网络结构"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
 
                                             ComboBox {
@@ -1803,7 +1803,7 @@ Item {
                                         // 预训练模型
                                         ParamRow {
                                             label: "预训练模型"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
 
                                             ComboBox {
@@ -1841,7 +1841,7 @@ Item {
                                         // 图像大小
                                         ParamRow {
                                             label: "图像大小"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
 
                                             Stepper {
@@ -1858,7 +1858,7 @@ Item {
                                         // 图像通道
                                         ParamRow {
                                             label: "图像通道"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
 
                                             ComboBox {
@@ -1970,7 +1970,7 @@ Item {
                                         // 增强参数
                                         ParamRow {
                                             label: "平移"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
                                             enabled: root.augmentationEnabled
                                             Stepper {
@@ -1985,7 +1985,7 @@ Item {
 
                                         ParamRow {
                                             label: "旋转"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
                                             enabled: root.augmentationEnabled
                                             Stepper {
@@ -2000,7 +2000,7 @@ Item {
 
                                         ParamRow {
                                             label: "缩放"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
                                             enabled: root.augmentationEnabled
                                             Stepper {
@@ -2015,7 +2015,7 @@ Item {
 
                                         ParamRow {
                                             label: "水平翻转"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
                                             enabled: root.augmentationEnabled
                                             ToggleSwitch {
@@ -2026,7 +2026,7 @@ Item {
 
                                         ParamRow {
                                             label: "垂直翻转"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
                                             enabled: root.augmentationEnabled
                                             ToggleSwitch {
@@ -2037,7 +2037,7 @@ Item {
 
                                         ParamRow {
                                             label: "亮度"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
                                             enabled: root.augmentationEnabled
                                             Stepper {
@@ -2052,7 +2052,7 @@ Item {
 
                                         ParamRow {
                                             label: "色调"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
                                             enabled: root.augmentationEnabled
                                             Stepper {
@@ -2067,7 +2067,7 @@ Item {
 
                                         ParamRow {
                                             label: "饱和度"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
                                             enabled: root.augmentationEnabled
                                             Stepper {
@@ -2082,7 +2082,7 @@ Item {
 
                                         ParamRow {
                                             label: "Mosaic"
-                                            labelWidth: 80
+                                            labelWidth: 100
                                             Layout.fillWidth: true
                                             enabled: root.augmentationEnabled
                                             ToggleSwitch {
@@ -2127,7 +2127,7 @@ Item {
                                 // Epoch
                                 ParamRow {
                                     label: "Epoch"
-                                    labelWidth: 60
+                                    labelWidth: 100
                                     Layout.fillWidth: true
                                     Text {
                                         id: statusEpochText
@@ -2143,7 +2143,7 @@ Item {
                                 // 学习率
                                 ParamRow {
                                     label: "学习率"
-                                    labelWidth: 60
+                                    labelWidth: 100
                                     Layout.fillWidth: true
                                     Text {
                                         id: statusLrText
@@ -2159,7 +2159,7 @@ Item {
                                 // 损失
                                 ParamRow {
                                     label: "损失"
-                                    labelWidth: 60
+                                    labelWidth: 100
                                     Layout.fillWidth: true
                                     Text {
                                         id: statusLossText
@@ -2210,7 +2210,7 @@ Item {
                                 // 精度指标
                                 ParamRow {
                                     label: metricName
-                                    labelWidth: 60
+                                    labelWidth: 100
                                     Layout.fillWidth: true
                                     Text {
                                         id: statusMetricText
@@ -2227,7 +2227,7 @@ Item {
                                 // 最佳Epoch
                                 ParamRow {
                                     label: "最佳Epoch"
-                                    labelWidth: 60
+                                    labelWidth: 100
                                     Layout.fillWidth: true
                                     Text {
                                         id: statusBestEpochText
@@ -2302,12 +2302,14 @@ Item {
                                         model: trainingModel
                                         spacing: 2
 
-                                        Text {
+                                        // 空状态：统一 EmptyState
+                                        EmptyState {
                                             anchors.centerIn: parent
+                                            width: parent.width - Theme.spacingXLarge * 2
                                             visible: runHistoryList.count === 0
-                                            text: "暂无训练记录"
-                                            color: Theme.textMuted
-                                            font.pixelSize: Theme.fontSizeNormal
+                                            icon: "brain"
+                                            title: "暂无训练记录"
+                                            description: "启动训练后将在此展示运行历史"
                                         }
 
                                         delegate: Rectangle {
@@ -2656,7 +2658,7 @@ Item {
             // 数据集选择
             ParamRow {
                 label: "数据集"
-                labelWidth: 60
+                labelWidth: 100
                 Layout.fillWidth: true
 
                 ComboBox {
@@ -2700,7 +2702,7 @@ Item {
             // 训练比例
             ParamRow {
                 label: "训练比例"
-                labelWidth: 60
+                labelWidth: 100
                 Layout.fillWidth: true
 
                 Stepper {
@@ -2716,7 +2718,7 @@ Item {
             // 划分策略
             ParamRow {
                 label: "划分策略"
-                labelWidth: 60
+                labelWidth: 100
                 Layout.fillWidth: true
 
                 ComboBox {
@@ -2850,7 +2852,7 @@ Item {
             // 模型名称
             ParamRow {
                 label: "模型名称"
-                labelWidth: 70
+                labelWidth: 100
                 Layout.fillWidth: true
 
                 TextField {
@@ -2871,7 +2873,7 @@ Item {
             // 模型类型
             ParamRow {
                 label: "模型类型"
-                labelWidth: 70
+                labelWidth: 100
                 Layout.fillWidth: true
 
                 ComboBox {
@@ -2968,7 +2970,7 @@ Item {
                 }
 
                 Button {
-                    text: "确认添加"
+                    text: "添加"
                     font.family: Theme.fontFamily
                     background: Rectangle {
                         color: parent.hovered ? Theme.primary : Theme.bgInput

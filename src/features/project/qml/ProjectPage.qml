@@ -191,7 +191,7 @@ Item {
                                 spacing: Theme.spacingSmall
 
                                 Text {
-                                    text: "完整管理类别体系 →"
+                                    text: "完整管理类别体系"
                                     color: taxonomyHubMouse.containsMouse ? Theme.primaryGlow : Theme.textMuted
                                     font.pixelSize: Theme.fontSizeCaption
                                     font.family: Theme.fontFamily
@@ -425,16 +425,16 @@ Item {
                     model: projectModel
                     spacing: Theme.spacingSmall
 
-                    // 空状态提示
-                    Text {
+                    // 空状态：统一 EmptyState，主按钮直达新建项目
+                    EmptyState {
                         anchors.centerIn: parent
+                        width: parent.width - Theme.spacingXLarge * 2
                         visible: projectList.count === 0
-                        text: "还没有项目\n点击左侧「新建项目」开始"
-                        color: Theme.textMuted
-                        font.pixelSize: Theme.fontSizeSubheading
-                        font.family: Theme.fontFamily
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                        icon: "folder"
+                        title: "暂无项目"
+                        description: "创建项目后即可导入数据集并开始训练"
+                        actionText: "新建项目"
+                        onActionClicked: newProjectDialog.open()
                     }
 
                     delegate: Rectangle {
@@ -556,19 +556,19 @@ Item {
                                 color: Theme.textMuted
                             }
 
-                            // ACTIVE 徽章
+                            // 当前项目徽章
                             Rectangle {
                                 visible: appController.currentProjectId === model.projectId
                                 color: Qt.alpha(Theme.primary, 0.15)
                                 border.color: Theme.primary
                                 border.width: 1
                                 radius: Theme.radiusSmall
-                                width: 56
+                                width: 64
                                 height: 22
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "ACTIVE"
+                                    text: "当前项目"
                                     font.pixelSize: Theme.fontSizeCaption
                                     font.bold: true
                                     font.family: Theme.fontFamilyMono
@@ -778,7 +778,7 @@ Item {
                     Repeater {
                         model: pathValidationResult.errors
                         delegate: Text {
-                            text: "✗ " + modelData
+                            text: "错误：" + modelData
                             color: Theme.danger
                             font.pixelSize: Theme.fontSizeCaption
                             font.family: Theme.fontFamily
@@ -789,7 +789,7 @@ Item {
                     Repeater {
                         model: pathValidationResult.warnings
                         delegate: Text {
-                            text: "⚠ " + modelData
+                            text: "警告：" + modelData
                             color: Theme.warning
                             font.pixelSize: Theme.fontSizeCaption
                             font.family: Theme.fontFamily
@@ -1010,7 +1010,7 @@ Item {
                     id: confirmCreateBtn
                     Layout.preferredHeight: 36
                     Layout.preferredWidth: 120
-                    text: "确认创建"
+                    text: "创建"
                     font.pixelSize: Theme.fontSizeNormal
                     font.bold: true
                     font.family: Theme.fontFamily

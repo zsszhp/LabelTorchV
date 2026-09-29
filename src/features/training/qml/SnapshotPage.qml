@@ -127,23 +127,11 @@ Item {
             }
 
             Button {
+                id: createSnapshotBtn
                 text: "创建冻结版"
                 highlighted: true
                 enabled: datasetCombo.currentValue !== undefined
-                onClicked: {
-                    var ratio = trainRatioSpin.realValue / 100.0
-                    var strategy = splitStrategyCombo.currentText
-                    var datasetId = datasetCombo.currentValue
-                    var snapId = snapshotService.createSnapshot(datasetId, ratio, strategy)
-                    if (snapId !== "") {
-                        snapshotModel.refresh()
-                        statusLabel.text = "快照创建成功: " + snapId.substring(0, 8) + "..."
-                        statusLabel.color = Theme.success
-                    } else {
-                        statusLabel.text = "快照创建失败"
-                        statusLabel.color = Theme.danger
-                    }
-                }
+                onClicked: root.createSnapshot()
             }
 
             Label {
@@ -248,12 +236,18 @@ Item {
                 }
             }
 
-            Label {
+            // 空状态：统一 EmptyState，主按钮直达创建冻结版
+            EmptyState {
                 anchors.centerIn: parent
+                width: parent.width - Theme.spacingXLarge * 2
                 visible: snapshotList.count === 0
-                text: datasetCombo.currentValue ? "暂无冻结版，点击\"创建冻结版\"添加" : "请先选择数据集"
-                color: Theme.textMuted
-                font.pixelSize: 14
+                icon: "brain"
+                title: datasetCombo.currentValue ? "暂无冻结版" : "请先选择数据集"
+                description: datasetCombo.currentValue
+                             ? "创建冻结版后可基于不可变数据快照启动训练"
+                             : "从上方数据集下拉框中选择一个数据集"
+                actionText: datasetCombo.currentValue ? "创建冻结版" : ""
+                onActionClicked: root.createSnapshot()
             }
         }
 
@@ -312,6 +306,22 @@ Item {
                 var valIds = split.val || []
                 splitDetailLabel.text = "训练集: " + trainIds.length + " 样本 | 验证集: " + valIds.length + " 样本"
             }
+        }
+    }
+
+    // === 创建数据冻结版（工具栏按钮与空态主按钮共用） ===
+    function createSnapshot() {
+        var ratio = trainRatioSpin.realValue / 100.0
+        var strategy = splitStrategyCombo.currentText
+        var datasetId = datasetCombo.currentValue
+        var snapId = snapshotService.createSnapshot(datasetId, ratio, strategy)
+        if (snapId !== "") {
+            snapshotModel.refresh()
+            statusLabel.text = "冻结版创建成功: " + snapId.substring(0, 8) + "..."
+            statusLabel.color = Theme.success
+        } else {
+            statusLabel.text = "冻结版创建失败"
+            statusLabel.color = Theme.danger
         }
     }
 

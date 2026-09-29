@@ -679,13 +679,33 @@ Item {
             Layout.fillHeight: true
             color: Theme.bgMain
 
-            // 空状态提示
-            Text {
+            // 空状态：统一 EmptyState，给出导入/标注双入口
+            EmptyState {
                 anchors.centerIn: parent
-                text: filteredSamples.length === 0 ? "暂无样本数据" : ""
-                font.pixelSize: Theme.fontSizeSubheading
-                color: Theme.textMuted
+                width: parent.width - Theme.spacingXLarge * 2
                 visible: filteredSamples.length === 0
+                icon: "images"
+                title: "暂无样本"
+                description: datasetCount === 0
+                             ? "当前项目还没有数据集，请先导入数据"
+                             : "当前筛选条件下没有匹配的样本"
+                actionText: datasetCount === 0 ? "导入数据" : "清除筛选"
+                secondaryText: datasetCount === 0 ? "前往标注" : "导入数据"
+                onActionClicked: {
+                    if (datasetCount === 0)
+                        appController.currentPage = "dataset"
+                    else {
+                        selectedClassIds = []
+                        severityMode = false
+                        refreshData()
+                    }
+                }
+                onSecondaryClicked: {
+                    if (datasetCount === 0)
+                        appController.currentPage = "annotation"
+                    else
+                        appController.currentPage = "dataset"
+                }
             }
 
             // 缺陷图像网格（auto-fill, minmax(130px, 1fr)）
