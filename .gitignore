@@ -172,3 +172,6 @@ TODO/
 *.lz
 *.lzma
 *.iso
+
+# 本地生成的图片中间产物（正式图标在 src/app/icons）
+generated-*.png
