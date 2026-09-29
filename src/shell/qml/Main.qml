@@ -2,6 +2,7 @@
 // 顶栏(50px) + 全宽中心内容 + 底栏(34px)
 // 每个页面内部自行管理左侧边栏 + 分割线 + 中心内容
 import QtQuick
+import QtQuick.Window
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Effects
@@ -20,6 +21,8 @@ ApplicationWindow {
     visible: true
     x: 100
     y: 100
+    // 无边框：去掉系统白条，窗口控制并入深色顶栏
+    flags: Qt.Window | Qt.FramelessWindowHint
 
     property string currentTaskType: "detect"
     property string gpuStatusText: "GPU: 检测中..."
@@ -312,6 +315,25 @@ ApplicationWindow {
             Layout.preferredHeight: Theme.headerHeight
             color: Theme.bgSide
 
+            // 顶栏空白区拖拽窗口；双击最大化/还原
+            MouseArea {
+                anchors.fill: parent
+                z: -1
+                onPressed: function(mouse) {
+                    if (root.visibility === Window.Maximized) {
+                        // 最大化下拖拽还原并跟随
+                        root.showNormal()
+                    }
+                    root.startSystemMove()
+                }
+                onDoubleClicked: {
+                    if (root.visibility === Window.Maximized)
+                        root.showNormal()
+                    else
+                        root.showMaximized()
+                }
+            }
+
             // 底部分割线
             Rectangle {
                 anchors.left: parent.left
@@ -424,19 +446,20 @@ ApplicationWindow {
                                 delegate: ItemDelegate {
                                     id: navDelegate
                                     height: Theme.headerHeight
-                                    leftPadding: 16
-                                    rightPadding: 16
+                                    // 主导航加大间距，与页内筛选条拉开层级
+                                    leftPadding: 18
+                                    rightPadding: 18
                                     visible: model.group === groupRow.modelData.key && root.navItemVisible(model)
                                     enabled: !model.needsProject || appController.projectOpen
 
                                     contentItem: Row {
                                         id: navContentRow
-                                        spacing: Theme.spacingSmall
+                                        spacing: 8
 
                                         SvgIcon {
                                             icon: model.icon
-                                            width: 14
-                                            height: 14
+                                            width: 16
+                                            height: 16
                                             anchors.verticalCenter: parent.verticalCenter
                                             color: {
                                                 if (!navDelegate.enabled) return Theme.textDisabled
@@ -449,14 +472,15 @@ ApplicationWindow {
 
                                         Text {
                                             text: model.title
-                                            font.pixelSize: 13
-                                            font.weight: appController.currentPage === model.pageId ? Font.DemiBold : Font.Normal
+                                            // 一级导航用更大字号+半粗，明显区分页内控件
+                                            font.pixelSize: 15
+                                            font.weight: appController.currentPage === model.pageId ? Font.Bold : Font.DemiBold
                                             font.family: Theme.fontFamily
                                             color: {
                                                 if (!navDelegate.enabled) return Theme.textDisabled
                                                 if (appController.currentPage === model.pageId) return Theme.primaryGlow
                                                 if (navDelegate.hovered) return Theme.textMain
-                                                return Theme.textMuted
+                                                return Theme.textSecondary
                                             }
                                             anchors.verticalCenter: parent.verticalCenter
 
@@ -490,7 +514,12 @@ ApplicationWindow {
                                     }
 
                                     background: Rectangle {
-                                        color: !navDelegate.enabled ? "transparent" : (navDelegate.hovered && appController.currentPage !== model.pageId ? Qt.alpha(Theme.textMain, 0.02) : "transparent")
+                                        color: {
+                                            if (!navDelegate.enabled) return "transparent"
+                                            if (appController.currentPage === model.pageId)
+                                                return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.12)
+                                            return navDelegate.hovered ? Qt.rgba(1, 1, 1, 0.04) : "transparent"
+                                        }
 
                                         // 激活状态下：垂直亮青渐变背景
                                         gradient: Gradient {
@@ -499,12 +528,13 @@ ApplicationWindow {
                                             GradientStop { position: 1.0; color: (navDelegate.enabled && appController.currentPage === model.pageId) ? Qt.rgba(0, 0.898, 1, 0.05) : "transparent" }
                                         }
 
-                                        // 激活标签底部指示线
+                                        // 激活标签底部指示线（加粗，强化一级导航）
                                         Rectangle {
                                             visible: navDelegate.enabled && appController.currentPage === model.pageId
-                                            height: 2
-                                            anchors.left: parent.left
-                                            anchors.right: parent.right
+                                            height: 2.5
+                                            radius: 1
+                                            width: parent.width * 0.7
+                                            anchors.horizontalCenter: parent.horizontalCenter
                                             anchors.bottom: parent.bottom
                                             color: Theme.primaryGlow
                                         }
@@ -683,6 +713,75 @@ ApplicationWindow {
                             font.family: Theme.fontFamily
                             color: ipcClient.connected ? Theme.textSecondary : Theme.textDisabled
                             anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+
+                    // 窗口控制（无边框模式替代系统标题栏按钮）
+                    Row {
+                        spacing: 0
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        // 最小化
+                        Rectangle {
+                            width: 36
+                            height: Theme.headerHeight
+                            color: minBtnMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
+                            Text {
+                                anchors.centerIn: parent
+                                text: "—"
+                                color: Theme.textSecondary
+                                font.pixelSize: 12
+                            }
+                            MouseArea {
+                                id: minBtnMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.showMinimized()
+                            }
+                        }
+                        // 最大化/还原
+                        Rectangle {
+                            width: 36
+                            height: Theme.headerHeight
+                            color: maxBtnMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
+                            Text {
+                                anchors.centerIn: parent
+                                text: root.visibility === Window.Maximized ? "❐" : "□"
+                                color: Theme.textSecondary
+                                font.pixelSize: 12
+                            }
+                            MouseArea {
+                                id: maxBtnMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (root.visibility === Window.Maximized)
+                                        root.showNormal()
+                                    else
+                                        root.showMaximized()
+                                }
+                            }
+                        }
+                        // 关闭
+                        Rectangle {
+                            width: 40
+                            height: Theme.headerHeight
+                            color: closeBtnMouse.containsMouse ? "#E81123" : "transparent"
+                            Text {
+                                anchors.centerIn: parent
+                                text: "✕"
+                                color: closeBtnMouse.containsMouse ? "#FFFFFF" : Theme.textSecondary
+                                font.pixelSize: 12
+                            }
+                            MouseArea {
+                                id: closeBtnMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.close()
+                            }
                         }
                     }
                 }

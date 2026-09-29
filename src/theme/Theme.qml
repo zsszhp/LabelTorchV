@@ -140,7 +140,7 @@ QtObject {
     readonly property color fieldErrorText: "#FF8A9B"
 
     // === 布局尺寸 ===
-    readonly property int headerHeight: 50
+    readonly property int headerHeight: 56
     readonly property int footerHeight: 34
     readonly property int sidebarWidth: 240
     readonly property int sidebarMinWidth: 120
