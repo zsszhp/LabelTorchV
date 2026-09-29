@@ -395,6 +395,12 @@ QVariantList ProjectService::listProjects()
     return projects;
 }
 
+bool ProjectService::pathExists(const QString &path) const
+{
+    if (path.isEmpty()) return false;
+    return QDir(path).exists();
+}
+
 QVariantMap ProjectService::previewProjectDeletion(const QString &projectId)
 {
     ltTrace(LT_LOG_PROJECT()) << "previewProjectDeletion id=" << projectId;

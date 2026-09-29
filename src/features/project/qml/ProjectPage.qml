@@ -25,9 +25,19 @@ Item {
     property string projectActionMessage: ""
     property string projectActionTone: "neutral"
 
+    // 根路径是否存在（换机/改盘符后项目可能打不开）
+    function pathExists(p) {
+        if (typeof projectService === "undefined" || !p) return true
+        return projectService.pathExists(p)
+    }
+
     SplitView {
         anchors.fill: parent
         orientation: Qt.Horizontal
+
+        // 页面显示时强制刷新项目列表，避免空列表/模型未同步
+        Component.onCompleted: projectModel.refresh()
+        onVisibleChanged: if (visible) projectModel.refresh()
 
         handle: Rectangle {
             implicitWidth: 4
@@ -440,7 +450,7 @@ Item {
                     delegate: Rectangle {
                         id: cardRect
                         width: projectList.width
-                        height: 56
+                        height: 64
                         color: {
                             if (appController.currentProjectId === model.projectId) return Theme.bgSelected
                             if (cardMouseArea.containsMouse) return Theme.bgHover
@@ -535,13 +545,25 @@ Item {
                                 }
 
                                 // 路径（11px muted）
-                                Text {
-                                    text: model.path
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    font.family: Theme.fontFamilyMono
-                                    color: Theme.textMuted
+                                RowLayout {
                                     Layout.fillWidth: true
-                                    elide: Text.ElideMiddle
+                                    spacing: Theme.spacingSmall
+
+                                    Text {
+                                        text: model.path
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamilyMono
+                                        color: Theme.textMuted
+                                        Layout.fillWidth: true
+                                        elide: Text.ElideMiddle
+                                    }
+
+                                    // 根路径不存在时提示（换机/移盘后常见）
+                                    StatusTag {
+                                        visible: !pathExists(model.path)
+                                        text: "路径缺失"
+                                        tone: "warning"
+                                    }
                                 }
                             }
 

@@ -40,6 +40,8 @@ public:
      */
     Q_INVOKABLE bool deleteProject(const QString &projectId);
     Q_INVOKABLE bool openProject(const QString &projectId);
+    /// 项目根路径是否在磁盘上存在（换机/移盘后用于 UI 提示）
+    Q_INVOKABLE bool pathExists(const QString &path) const;
     Q_INVOKABLE void closeProject();
     Q_INVOKABLE QVariantMap getCurrentProject() const;
     Q_INVOKABLE bool saveProjectConfig(const QString &projectId);

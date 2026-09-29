@@ -347,47 +347,22 @@ ApplicationWindow {
                 anchors.rightMargin: Theme.spacingLarge
                 spacing: 0
 
-                // Logo 区域（对标参考UI：26x26渐变方块 + 渐变文字）
+                // Logo：应用图标，不显示文字
                 Row {
                     Layout.alignment: Qt.AlignVCenter
                     Layout.leftMargin: Theme.spacingLarge
-                    Layout.rightMargin: 12
-                    spacing: 10
+                    Layout.rightMargin: 16
+                    spacing: 0
 
-                    // 渐变图标方块（对标参考UI: 26x26, linear-gradient(135deg, primary, primaryGlow)）
-                    Rectangle {
-                        width: 26; height: 26; radius: 6
+                    Image {
+                        source: "qrc:/icons/labeltorch_64x64.png"
+                        width: 32
+                        height: 32
                         anchors.verticalCenter: parent.verticalCenter
-                        gradient: Gradient {
-                            GradientStop { position: 0.0; color: Theme.primary }
-                            GradientStop { position: 1.0; color: Theme.primaryGlow }
-                        }
-                        Text {
-                            anchors.centerIn: parent
-                            text: "标"
-                            color: Theme.logoBgText
-                            font.pixelSize: 14
-                            font.weight: Font.Bold
-                            font.family: Theme.fontFamily
-                        }
-                        // 发光效果（对标 box-shadow: 0 0 10px rgba(0,229,255,0.3)）
-                        layer.enabled: true
-                        layer.effect: MultiEffect {
-                            shadowEnabled: true
-                            shadowColor: Qt.alpha(Theme.glowCyanRaw, 0.3)
-                            shadowBlur: 0.5
-                        }
-                    }
-
-                    // 渐变文字（对标参考UI: linear-gradient(to right, #ffffff, #94A3B8)）
-                    Text {
-                        text: "标炬"
-                        font.pixelSize: 16
-                        font.weight: Font.DemiBold
-                        font.family: Theme.fontFamily
-                        anchors.verticalCenter: parent.verticalCenter
-                        // QML Text 不支持渐变，用近似色模拟渐变中值
-                        color: Theme.logoText
+                        sourceSize.width: 64
+                        sourceSize.height: 64
+                        smooth: true
+                        mipmap: true
                     }
                 }
 
