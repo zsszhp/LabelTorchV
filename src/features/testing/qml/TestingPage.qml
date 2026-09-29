@@ -1477,7 +1477,7 @@ Item {
                                                             anchors.centerIn: parent
                                                             text: "检查图像 (" + root.checkImageList.length + ")"
                                                             font.pixelSize: Theme.fontSizeCaption
-                                                            font.font.weight: Font.DemiBold
+                                                            font.weight: Font.DemiBold
                                                             font.family: Theme.fontFamily
                                                             color: Theme.textMuted
                                                         }

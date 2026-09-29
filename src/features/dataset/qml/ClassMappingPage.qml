@@ -102,7 +102,7 @@ Item {
 
                 Text {
                     text: "类别映射向导"
-                    font.pixelSize: Theme.fontSizeHeading
+                    font.pixelSize: Theme.fontSizeLarge
                     font.weight: Font.DemiBold
                     font.family: Theme.fontFamily
                     color: Theme.textMain

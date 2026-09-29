@@ -959,62 +959,49 @@ ApplicationWindow {
             }
 
             // 14 个 Loader：主 8 页 + 孤 6 页
+            // 不要用 opacity=0 + 共享 NumberAnimation：多 Loader 竞态会把页面卡成全透明
             Loader {
-                asynchronous: true
+                asynchronous: false
                 source: contentStack.pageSources[0]
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
                 asynchronous: true
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
                 asynchronous: true
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
                 asynchronous: true
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
                 asynchronous: true
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
                 asynchronous: true
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
                 asynchronous: true
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
                 asynchronous: true
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
                 asynchronous: true
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
                 asynchronous: true
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
                 asynchronous: true
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
                 asynchronous: true
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
                 asynchronous: true
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
             Loader {
                 asynchronous: true
-                onLoaded: if (item) item.opacity = 0, fadeInAnim.target = item, fadeInAnim.start()
             }
         }
 
@@ -1200,14 +1187,7 @@ ApplicationWindow {
         }
     }
 
-    NumberAnimation {
-        id: fadeInAnim
-        property: "opacity"
-        from: 0.0
-        to: 1.0
-        duration: Theme.animDuration
-        easing.type: Easing.OutCubic
-    }
+    // 页面切换不再做 opacity 淡入，避免与 Loader 竞态导致空白页
 
     // === P1-B 全局 Toast 层（接收 ToastBus 通知） ===
     Toast {
