@@ -1306,63 +1306,93 @@ ApplicationWindow {
 
     ModalDialog {
         id: closeConfirmDialog
-        title: "确认退出"
-        dialogWidth: 360
+        title: "退出标炬"
+        subtitle: "确认关闭当前工作区？"
+        dialogWidth: 420
 
         ColumnLayout {
-            width: parent.width - Theme.spacingLarge * 2
+            width: parent.width - Theme.spacingXLarge * 2
             anchors.horizontalCenter: parent.horizontalCenter
             spacing: Theme.spacingLarge
 
-            Text {
-                text: "是否确实关闭"
-                color: Theme.textMuted
-                font.pixelSize: Theme.fontSizeNormal
-                font.family: Theme.fontFamily
-                wrapMode: Text.WordWrap
+            // 图标 + 说明一体化
+            RowLayout {
                 Layout.fillWidth: true
-                Layout.topMargin: Theme.spacingLarge
-                Layout.bottomMargin: Theme.spacingLarge
+                spacing: Theme.spacingLarge
+                Layout.topMargin: Theme.spacingSmall
+
+                Rectangle {
+                    width: 44
+                    height: 44
+                    radius: Theme.radiusNormal
+                    color: Theme.glowRed
+                    Layout.alignment: Qt.AlignTop
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "⏻"
+                        font.pixelSize: 22
+                        color: Theme.danger
+                    }
+                }
+
+                Text {
+                    text: "将关闭所有页面并退出程序。\n未保存的标注会按当前自动保存策略处理。"
+                    color: Theme.textSecondary
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.family: Theme.fontFamily
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                    lineHeight: 1.45
+                }
             }
         }
 
         footerContent: Row {
-            spacing: Theme.spacingLarge
+            spacing: Theme.spacingNormal
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
 
+            // 取消：默认焦点，危险操作先给退路
             Button {
+                id: cancelCloseBtn
                 text: "取消"
-                width: 90
+                width: 96
+                height: 34
+                focus: true
+                activeFocusOnTab: true
                 background: Rectangle {
-                    color: parent.hovered ? Theme.bgHover : Theme.bgCard
-                    border.color: Theme.borderColor
-                    border.width: 1
-                    radius: Theme.radiusSmall
-                    implicitHeight: 32
+                    color: cancelCloseBtn.activeFocus || cancelCloseBtn.hovered ? Theme.bgHover : Theme.bgCard
+                    border.color: cancelCloseBtn.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                    border.width: cancelCloseBtn.activeFocus ? 1.5 : 1
+                    radius: Theme.radiusNormal
                 }
                 contentItem: Text {
                     text: parent.text
-                    color: Theme.textMuted
+                    color: Theme.textMain
                     font.pixelSize: Theme.fontSizeNormal
                     font.family: Theme.fontFamily
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
                 onClicked: closeConfirmDialog.close()
+                Keys.onReturnPressed: clicked()
+                Keys.onEnterPressed: clicked()
             }
 
             Button {
-                text: "确定退出"
-                width: 90
+                id: confirmCloseBtn
+                text: "退出程序"
+                width: 110
+                height: 34
                 background: Rectangle {
-                    color: parent.pressed ? Qt.darker(Theme.danger, 1.2) : (parent.hovered ? Qt.lighter(Theme.danger, 1.1) : Theme.danger)
-                    radius: Theme.radiusSmall
-                    implicitHeight: 32
+                    color: confirmCloseBtn.pressed ? Qt.darker(Theme.danger, 1.15)
+                         : (confirmCloseBtn.hovered ? Qt.lighter(Theme.danger, 1.08) : Theme.danger)
+                    radius: Theme.radiusNormal
                 }
                 contentItem: Text {
                     text: parent.text
-                    color: Theme.textMain
+                    color: "#FFFFFF"
                     font.bold: true
                     font.pixelSize: Theme.fontSizeNormal
                     font.family: Theme.fontFamily

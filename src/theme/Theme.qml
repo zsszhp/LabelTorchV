@@ -89,9 +89,9 @@ QtObject {
     readonly property color tagBest: success
     readonly property color tagProduction: "#FFD600"
 
-    // === 字体 ===
-    readonly property string fontFamily: "Segoe UI"
-    readonly property string fontFamilyMono: "Cascadia Code"
+    // === 字体（中文优先回退） ===
+    readonly property string fontFamily: "Segoe UI, Microsoft YaHei, PingFang SC, sans-serif"
+    readonly property string fontFamilyMono: "Cascadia Code, Consolas, monospace"
     readonly property int fontSizeCaption: 11
     readonly property int fontSizeSmall: 12
     readonly property int fontSizeNormal: 13
@@ -104,18 +104,27 @@ QtObject {
     readonly property int spacingTiny: 2
     readonly property int spacingSmall: 4
     readonly property int spacingNormal: 8
+    readonly property int spacingMedium: 12
     readonly property int spacingLarge: 16
     readonly property int spacingXLarge: 24
 
-    // === 圆角 ===
-    readonly property int radiusSmall: 4
-    readonly property int radiusNormal: 6
-    readonly property int radiusLarge: 8
+    // === 圆角（弹窗/卡片更大，控件克制） ===
+    readonly property int radiusSmall: 6
+    readonly property int radiusNormal: 10
+    readonly property int radiusLarge: 14
+    readonly property int radiusXLarge: 18
 
     // === 动画 ===
     readonly property int animDuration: 200
     readonly property int animDurationSlow: 300
     readonly property int animDurationFast: 120
+
+    // === 弹窗阴影/层次 ===
+    readonly property color shadowDialog: "#66000000"
+    readonly property color dialogTitleBg: "#1A2332"
+    readonly property color dialogFooterBg: "#161C28"
+    readonly property color dialogBodyBg: "#121822"
+    readonly property color accentBar: primaryGlow
 
     // === Toast 反馈 ===
     readonly property int toastSuccessDuration: 2000   // 成功提示自动消失
