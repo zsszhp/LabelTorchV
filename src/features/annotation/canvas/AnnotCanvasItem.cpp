@@ -132,6 +132,9 @@ void AnnotCanvasItem::loadImage(const QString& imagePath, const QString& labelPa
 {
     ltInfo(LT_LOG_ANNOTATION()) << "Loading image:" << imagePath;
 
+    // 换图前丢弃未闭合多边形，避免顶点残留到新图
+    cancelCurrentPolygon();
+
     // P1-24：只走一次共享解码；controller->loadImage 随后触发的
     // currentImageChanged 因路径相同会跳过重载
     loadSharedImage(imagePath);
@@ -544,6 +547,7 @@ void AnnotCanvasItem::mousePressEvent(QMouseEvent* event)
         QPointF pos = event->position();
 
         if (m_interactionMode == QStringLiteral("draw") && m_shapeMode == 2) {
+            // 多边形点选模式：单击加点，靠近起点闭合（对标 X-AnyLabeling）
             if (m_nearStartPoint && m_polygonPoints.size() >= 3) {
                 finishDrawing();
             } else {
@@ -551,9 +555,20 @@ void AnnotCanvasItem::mousePressEvent(QMouseEvent* event)
                     m_isDrawingPolygon = true;
                     m_polygonPoints.clear();
                 }
+                // 过滤双击产生的重复点（第二次 press 与上一点几乎重合）
+                if (!m_polygonPoints.isEmpty()) {
+                    QPointF last = m_polygonPoints.last();
+                    QPointF delta = pos - last;
+                    if (delta.x() * delta.x() + delta.y() * delta.y() < 4.0) {
+                        event->accept();
+                        return;
+                    }
+                }
                 m_polygonPoints.append(pos);
                 m_nearStartPoint = false;
+                if (m_controller) m_controller->setPolygonDrawing(true);
             }
+            update();
             event->accept();
             return;
         }
@@ -756,11 +771,20 @@ void AnnotCanvasItem::mouseMoveEvent(QMouseEvent* event)
     event->accept();
 }
 
-// 双击标注弹出编辑标签对话框（参考 X-AnyLabeling）
+// 双击：多边形绘制中闭合；否则双击标注弹出编辑标签对话框（参考 X-AnyLabeling）
 void AnnotCanvasItem::mouseDoubleClickEvent(QMouseEvent* event)
 {
     if (event->button() != Qt::LeftButton || !m_model) {
         event->ignore();
+        return;
+    }
+
+    // 多边形绘制中：双击闭合（第二次 press 的重复点已被 mousePress 过滤，这里直接闭合）
+    if (m_isDrawingPolygon && m_interactionMode == QStringLiteral("draw") && m_shapeMode == 2) {
+        if (m_polygonPoints.size() >= 3) {
+            finishDrawing();
+        }
+        event->accept();
         return;
     }
 
@@ -912,12 +936,11 @@ void AnnotCanvasItem::keyPressEvent(QKeyEvent* event)
     switch (event->key()) {
     case Qt::Key_Escape:
         if (m_isDrawingPolygon) {
-            m_isDrawingPolygon = false;
-            m_polygonPoints.clear();
-            m_nearStartPoint = false;
-            update();
+            // Esc 取消当前多边形，保持多边形模式
+            cancelCurrentPolygon();
         } else {
-            setInteractionMode(QStringLiteral("select"));
+            // Esc 回选择模式：发信号由 QML 更新 drawMode，避免打断属性绑定
+            emit drawToolChanged(-1, QStringLiteral("select"));
         }
         event->accept();
         return;
@@ -929,6 +952,10 @@ void AnnotCanvasItem::keyPressEvent(QKeyEvent* event)
         if (m_isDrawingPolygon && !m_polygonPoints.isEmpty()) {
             m_polygonPoints.removeLast();
             m_nearStartPoint = false;
+            if (m_polygonPoints.isEmpty()) {
+                m_isDrawingPolygon = false;
+                if (m_controller) m_controller->setPolygonDrawing(false);
+            }
             update();
         } else {
             deleteSelected();
@@ -944,18 +971,16 @@ void AnnotCanvasItem::keyPressEvent(QKeyEvent* event)
         return;
     case Qt::Key_W:
     case Qt::Key_R:
-        setShapeMode(0);
-        setInteractionMode(QStringLiteral("draw"));
+        // 快捷键切水平框：通知 QML 同步，不在 C++ 侧写属性（会打断绑定）
+        emit drawToolChanged(0, QStringLiteral("draw"));
         event->accept();
         return;
     case Qt::Key_O:
-        setShapeMode(1);
-        setInteractionMode(QStringLiteral("draw"));
+        emit drawToolChanged(1, QStringLiteral("draw"));
         event->accept();
         return;
     case Qt::Key_P:
-        setShapeMode(2);
-        setInteractionMode(QStringLiteral("draw"));
+        emit drawToolChanged(2, QStringLiteral("draw"));
         event->accept();
         return;
     case Qt::Key_F:
@@ -1002,7 +1027,7 @@ void AnnotCanvasItem::keyPressEvent(QKeyEvent* event)
             if (hasSelectedObb) {
                 rotateSelected(1.0f);
             } else {
-                setInteractionMode(QStringLiteral("select"));
+                emit drawToolChanged(-1, QStringLiteral("select"));
             }
             event->accept();
             return;
@@ -1317,7 +1342,8 @@ void AnnotCanvasItem::finishDrawing()
 {
     if (m_isDrawing) {
         m_isDrawing = false;
-        setInteractionMode(QStringLiteral("select"));
+        // 连续绘制：完成后保持 draw 模式，由 Esc 切回选择
+        update();
     }
     if (m_isDrawingPolygon) {
         if (m_polygonPoints.size() >= 3 && m_model) {
@@ -1333,9 +1359,21 @@ void AnnotCanvasItem::finishDrawing()
         m_isDrawingPolygon = false;
         m_polygonPoints.clear();
         m_nearStartPoint = false;
-        setInteractionMode(QStringLiteral("select"));
+        if (m_controller) m_controller->setPolygonDrawing(false);
+        // 连续绘制：闭合后保持多边形模式，可继续画下一个
         update();
     }
+}
+
+void AnnotCanvasItem::cancelCurrentPolygon()
+{
+    if (!m_isDrawingPolygon && m_polygonPoints.isEmpty()) return;
+    m_isDrawingPolygon = false;
+    m_polygonPoints.clear();
+    m_nearStartPoint = false;
+    m_polygonHoverPoint = QPointF();
+    if (m_controller) m_controller->setPolygonDrawing(false);
+    update();
 }
 
 // 方向键微调移动选中标注（像素步长，对标 X-AnyLabeling）

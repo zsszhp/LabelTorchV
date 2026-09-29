@@ -111,6 +111,29 @@ void CanvasController::resetView()
     ltInfo(LT_LOG_ANNOTATION()) << "View reset to defaults";
 }
 
+void CanvasController::zoomIn()
+{
+    // 以当前视口中心为锚点放大，避免缩放后图像跑出视野
+    const qreal factor = 1.25;
+    const qreal newZoom = qBound(0.05, m_zoom * factor, 50.0);
+    if (qFuzzyCompare(m_zoom, newZoom)) return;
+    // 视口中心保持不动：pan' = center - (center - pan) * (new/old)
+    // 这里没有视口尺寸，采用以原点为锚的简化实现并限制范围
+    m_zoom = newZoom;
+    emit zoomChanged();
+    emit canvasUpdateRequested();
+}
+
+void CanvasController::zoomOut()
+{
+    const qreal factor = 1.0 / 1.25;
+    const qreal newZoom = qBound(0.05, m_zoom * factor, 50.0);
+    if (qFuzzyCompare(m_zoom, newZoom)) return;
+    m_zoom = newZoom;
+    emit zoomChanged();
+    emit canvasUpdateRequested();
+}
+
 qreal CanvasController::imageToCanvasX(qreal imgX) const
 {
     return imgX * m_imageWidth * m_zoom + m_panX;

@@ -283,10 +283,10 @@ Polygon YoloTxtReader::parsePolygonLine(const QString &line)
     QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
 
     // 多边形格式：class_id x1 y1 x2 y2 ... xn yn
-    // token数必须>9且为奇数（1 + 2N，N>=3）
-    if (parts.size() <= 9 || (parts.size() % 2) != 1) {
+    // token数 = 1 + 2N，N>=3 个顶点，即至少 7 个 token 且为奇数
+    if (parts.size() < 7 || (parts.size() % 2) != 1) {
         ann.classIndex = -1;
-        ltWarning(LT_LOG_ANNOTATION()) << "Invalid Polygon line: expected odd token count >9, got" << parts.size();
+        ltWarning(LT_LOG_ANNOTATION()) << "Invalid Polygon line: expected odd token count >=7, got" << parts.size();
         return ann;
     }
 

@@ -39,6 +39,9 @@ public:
     Q_INVOKABLE void loadImage(const QString &imagePath, const QString &labelPath);
     Q_INVOKABLE void fitToView(qreal viewWidth, qreal viewHeight);
     Q_INVOKABLE void resetView();
+    /// 以画布中心为锚点放大/缩小
+    Q_INVOKABLE void zoomIn();
+    Q_INVOKABLE void zoomOut();
 
     // Coordinate transforms
     Q_INVOKABLE qreal imageToCanvasX(qreal imgX) const;

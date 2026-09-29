@@ -80,6 +80,10 @@ public:
     Q_INVOKABLE void duplicateSelected();
     Q_INVOKABLE void finishDrawing();
     Q_INVOKABLE void nudgeSelected(int dxPixels, int dyPixels);
+    /// 取消未闭合的多边形（切换工具/样本前调用）
+    Q_INVOKABLE void cancelCurrentPolygon();
+    /// 是否正在绘制多边形（未闭合）
+    Q_INVOKABLE bool isDrawingPolygon() const { return m_isDrawingPolygon; }
 
 signals:
     void controllerChanged();
@@ -95,6 +99,8 @@ signals:
     void saveRequested();
     void editLabelRequested(int annotationIndex);
     void changeClassRequested(int direction);
+    /// C++ 侧切换工具（快捷键 W/O/P/Esc）后通知 QML 同步工具栏与 shapeType
+    void drawToolChanged(int shapeMode, const QString &interactionMode);
 
 protected:
     void mousePressEvent(QMouseEvent* event) override;

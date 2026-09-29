@@ -55,7 +55,12 @@ public:
     int count() const;
 
     // --- QML-invokable API ---
-    Q_INVOKABLE void loadFromLabel(const QString &labelPath);
+    /**
+     * @brief 从 YOLO txt 加载标注
+     * @param labelPath  标签文件路径
+     * @param shapeType  0=HBB, 1=OBB, 2=Polygon；决定用哪个 reader 解析
+     */
+    Q_INVOKABLE void loadFromLabel(const QString &labelPath, int shapeType = 0);
     Q_INVOKABLE void addAnnotation(int classIndex, const QString &className,
                                    float cx, float cy, float w, float h);
     Q_INVOKABLE void addOBBAnnotation(int classIndex, const QString &className,

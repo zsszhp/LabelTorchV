@@ -51,19 +51,21 @@ Item {
         var taskType = projectService.getTaskType(appController.currentProjectId)
         if (taskType === "detect") {
             root.annotationMode = "detect"
+            // 只写 root 属性，由绑定同步到画布，避免命令式赋值打断 QML 绑定
             root.shapeMode = 0
             annotationService.setShapeType(0)
-            canvasItem.shapeMode = 0
         } else if (taskType === "obb") {
             root.annotationMode = "detect"
             root.shapeMode = 1
             annotationService.setShapeType(1)
-            canvasItem.shapeMode = 1
         } else if (taskType === "classify") {
             root.annotationMode = "classify"
         } else if (taskType === "anomaly") {
             root.annotationMode = "anomaly"
         }
+        // 切页后回到选择模式，避免残留绘制态
+        canvasController.drawMode = "select"
+        canvasController.setPolygonDrawing(false)
     }
 
     // === 刷新样本列表（受全局数据集/类别筛选约束，分页加载） ===
@@ -152,6 +154,8 @@ Item {
 
     // === 加载样本 ===
     function loadSample(sampleData) {
+        // 切样本前先静默落盘，避免上一张的标注丢失
+        flushPendingSave()
         if (annotationMode === "classify") {
             var clsLabels = annotationService.loadClassificationLabels(sampleData.labelPath || "")
             if (clsLabels.labelType === "multi") {
@@ -164,7 +168,7 @@ Item {
             var anomalyLabels = annotationService.loadAnomalyLabels(sampleData.labelPath || "")
             isAnomalous = anomalyLabels.isAnomalous || false
         } else {
-            annotationModel.loadFromLabel(sampleData.labelPath || "")
+            annotationModel.loadFromLabel(sampleData.labelPath || "", shapeMode)
         }
         canvasItem.loadImage(sampleData.imagePath || "", sampleData.labelPath || "")
         // 更新当前样本索引
@@ -186,8 +190,8 @@ Item {
         return "class_" + classIndex
     }
 
-    // === 保存当前标注 ===
-    function saveCurrentAnnotations() {
+    // === 保存当前标注（silent=true 时不弹 Toast，仅状态栏反馈） ===
+    function saveCurrentAnnotations(silent) {
         if (annotationMode === "classify") {
             if (classificationMultiCheck.checked ? selectedMultiClassIds.length > 0 : selectedClassId >= 0) {
                 var labels = {}
@@ -201,22 +205,43 @@ Item {
                 annotationService.saveClassificationLabels(
                     canvasController.currentLabelPath, "", "", labels
                 )
+                canvasController.clearDirty()
             }
         } else if (annotationMode === "anomaly") {
             annotationService.saveAnomalyLabels(
                 canvasController.currentLabelPath, "", "", isAnomalous
             )
+            canvasController.clearDirty()
         } else {
-            if (canvasController.dirty) {
+            if (canvasController.dirty && canvasController.currentLabelPath !== "") {
                 canvasItem.commitUndoState()
-                annotationService.saveAnnotations(
+                var ok = annotationService.saveAnnotations(
                     canvasController.currentLabelPath, "", "",
                     annotationModel.toVariantList()
                 )
-                canvasController.clearDirty()
-                ToastBus.success("标注已保存")
+                if (ok) {
+                    canvasController.clearDirty()
+                    if (!silent)
+                        ToastBus.success("标注已保存")
+                } else {
+                    ToastBus.error("标注保存失败，请检查标签目录权限")
+                }
             }
         }
+    }
+
+    // 自动保存防抖：标注变更后 300ms 静默落盘（原子写），防止连续绘制时丢框
+    Timer {
+        id: autoSaveTimer
+        interval: 300
+        repeat: false
+        onTriggered: saveCurrentAnnotations(true)
+    }
+
+    // 切换样本前冲刷未保存标注
+    function flushPendingSave() {
+        autoSaveTimer.stop()
+        saveCurrentAnnotations(true)
     }
 
     // === 导航前后样本 ===
@@ -236,26 +261,30 @@ Item {
     }
 
     // === 切换绘制模式 ===
+    // 只写 root / canvasController / annotationService，画布属性靠绑定同步，
+    // 禁止命令式写 canvasItem.shapeMode / interactionMode（会打断 QML 绑定）
     function setDrawTool(tool) {
         // tool: "select" / "rect" / "rotatedRect" / "polygon"
         if (tool === "select") {
             canvasController.drawMode = "select"
             canvasController.setPolygonDrawing(false)
+            canvasItem.cancelCurrentPolygon()
         } else {
             canvasController.drawMode = "draw"
-            canvasController.setPolygonDrawing(tool === "polygon")
             if (tool === "rect") {
-                shapeMode = 0
-                canvasItem.shapeMode = 0
+                root.shapeMode = 0
                 annotationService.setShapeType(0)
+                canvasController.setPolygonDrawing(false)
+                canvasItem.cancelCurrentPolygon()
             } else if (tool === "rotatedRect") {
-                shapeMode = 1
-                canvasItem.shapeMode = 1
+                root.shapeMode = 1
                 annotationService.setShapeType(1)
+                canvasController.setPolygonDrawing(false)
+                canvasItem.cancelCurrentPolygon()
             } else if (tool === "polygon") {
-                shapeMode = 2
-                canvasItem.shapeMode = 2
+                root.shapeMode = 2
                 annotationService.setShapeType(2)
+                canvasController.setPolygonDrawing(true)
             }
         }
     }
@@ -681,7 +710,7 @@ Item {
                         color: Theme.borderColor
                     }
 
-                    // ====== 区域4：Tag ======
+                    // ====== 区域4：标签 ======
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.margins: 12
@@ -694,7 +723,7 @@ Item {
                             spacing: 4
 
                             Text {
-                                text: "Tag"
+                                text: "标签"
                                 font.pixelSize: 12
                                 font.weight: Font.Normal
                                 font.family: Theme.fontFamily
@@ -960,17 +989,32 @@ Item {
                         anchors.fill: parent
                         controller: canvasController
                         annotationModel: annotationModel
+                        // 绑定到 root：禁止在其他地方命令式赋值，否则绑定被替换后工具栏失灵
                         shapeMode: root.shapeMode
                         currentClassIndex: selectedClassId >= 0 ? selectedClassId : 0
                         currentClassName: selectedClassId >= 0 ? getClassName(selectedClassId) : "class_0"
                         interactionMode: (annotationMode === "detect" && canvasController.drawMode === "draw") ? "draw" : "select"
 
-                        onAnnotationModified: canvasController.markDirty()
+                        onAnnotationModified: {
+                            canvasController.markDirty()
+                            // 防抖自动保存：连续绘制时合并写盘
+                            autoSaveTimer.restart()
+                        }
+
+                        // C++ 快捷键切工具后同步 QML 状态（shapeMode=-1 表示只改交互模式）
+                        onDrawToolChanged: function(shapeMode, interactionMode) {
+                            if (shapeMode >= 0) {
+                                root.shapeMode = shapeMode
+                                annotationService.setShapeType(shapeMode)
+                            }
+                            canvasController.drawMode = interactionMode === "draw" ? "draw" : "select"
+                            canvasController.setPolygonDrawing(shapeMode === 2 && interactionMode === "draw")
+                        }
 
                         // C++ 层发出的导航信号
                         onNavigatePrevious: navigateToPrevious()
                         onNavigateNext: navigateToNext()
-                        onSaveRequested: saveCurrentAnnotations()
+                        onSaveRequested: saveCurrentAnnotations(false)
 
                         // 双击标注弹出编辑标签对话框（参考 X-AnyLabeling）
                         onEditLabelRequested: function(annotationIndex) {
@@ -1072,14 +1116,13 @@ Item {
                                         cursorShape: Qt.PointingHandCursor
                                         hoverEnabled: true
                                         onClicked: {
+                                            // 统一走 setDrawTool：同步 shapeMode/drawMode/shapeType/polygonDrawing
                                             if (modelData.isShape) {
-                                                root.shapeMode = modelData.mode
-                                                canvasController.drawMode = "draw"
+                                                setDrawTool(modelData.name === "obb" ? "rotatedRect" : modelData.name)
                                             } else if (modelData.name === "select") {
-                                                canvasController.drawMode = "select"
+                                                setDrawTool("select")
                                             } else if (modelData.name === "hand") {
-                                                // 拖拽模式
-                                                canvasController.drawMode = "select"
+                                                setDrawTool("select")
                                             } else if (modelData.name === "zoom_in") {
                                                 canvasController.zoomIn()
                                             } else if (modelData.name === "zoom_out") {
@@ -1334,7 +1377,7 @@ Item {
                                 Item { Layout.fillWidth: true }
 
                                 Button {
-                                    text: "保存"
+                                    text: "保存标注"
                                     font.pixelSize: Theme.fontSizeSmall
                                     Layout.preferredHeight: 36
 
@@ -1793,33 +1836,27 @@ Item {
     }
 
     // ================================================================
-    // 添加 Tag 弹窗
+    // 添加标签弹窗
     // ================================================================
     ModalDialog {
         id: addTagDialog
-        title: "添加 Tag"
+        title: "添加标签"
         dialogWidth: 400
 
         ColumnLayout {
             width: parent.width
             spacing: Theme.spacingNormal
 
-            // Tag 名称
-            RowLayout {
+            // 标签名称
+            FormField {
+                label: "标签名称"
+                required: true
                 Layout.fillWidth: true
-                spacing: Theme.spacingNormal
-
-                Text {
-                    text: "名称"
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Theme.textMain
-                    Layout.preferredWidth: 50
-                }
 
                 TextField {
                     id: tagNameField
-                    Layout.fillWidth: true
-                    placeholderText: "输入 Tag 名称"
+                    anchors.fill: parent
+                    placeholderText: "输入标签名称"
                     placeholderTextColor: Theme.textMuted
                     color: Theme.textMain
                     font.pixelSize: Theme.fontSizeSmall
@@ -1832,20 +1869,13 @@ Item {
                 }
             }
 
-            // Tag 颜色
-            RowLayout {
+            // 标签颜色
+            FormField {
+                label: "标签颜色"
                 Layout.fillWidth: true
-                spacing: Theme.spacingNormal
-
-                Text {
-                    text: "颜色"
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Theme.textMain
-                    Layout.preferredWidth: 50
-                }
 
                 RowLayout {
-                    Layout.fillWidth: true
+                    anchors.fill: parent
                     spacing: Theme.spacingSmall
 
                     Repeater {
@@ -1912,7 +1942,7 @@ Item {
             }
 
             Button {
-                text: "确定"
+                text: "添加"
                 font.pixelSize: Theme.fontSizeSmall
                 enabled: tagNameField.text.trim().length > 0
 

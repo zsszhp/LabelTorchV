@@ -106,11 +106,13 @@ int AnnotationModel::count() const
     return m_annotations.size();
 }
 
-void AnnotationModel::loadFromLabel(const QString &labelPath)
+void AnnotationModel::loadFromLabel(const QString &labelPath, int shapeType)
 {
-    ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath;
+    ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath << "shapeType=" << shapeType;
 
     AnnotationService svc;
+    // 按调用方指定的形状类型解析，避免多边形/OBB 被 HBB reader 误读
+    svc.setShapeType(shapeType);
     QVariantList loaded = svc.loadAnnotations(labelPath);
 
     beginResetModel();

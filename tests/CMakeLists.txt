@@ -287,4 +287,16 @@ target_link_libraries(test_audit_log PRIVATE
     Qt6::Test
     Qt6::Sql
 )
+
+# 标注自动保存与多边形落盘回读
+add_executable(test_annotation_autosave
+    test_annotation_autosave.cpp
+)
+target_link_libraries(test_annotation_autosave PRIVATE
+    labeltorch_core
+    labeltorch_annotation
+    Qt6::Test
+    Qt6::Sql
+)
+add_test(NAME AnnotationAutosaveTest COMMAND test_annotation_autosave)
 add_test(NAME AuditLogTest COMMAND test_audit_log)
