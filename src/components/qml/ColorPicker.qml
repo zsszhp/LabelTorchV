@@ -11,7 +11,7 @@ Item {
     implicitHeight: 28
 
     property color selectedColor: "#0077FF"
-    signal colorSelected(color color)
+    signal colorSelected(color value)
 
     Row {
         anchors.fill: parent
@@ -44,7 +44,7 @@ Item {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: root.selectedColor
+            text: root.selectedColor.toString()
             font.pixelSize: Theme.fontSizeCaption
             font.family: Theme.fontFamilyMono
             color: Theme.textMuted

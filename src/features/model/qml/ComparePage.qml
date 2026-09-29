@@ -8,7 +8,7 @@ import QtQuick.Layouts
 Item {
     id: root
 
-    property string currentProjectId: ""
+    property string currentProjectId: appController.currentProjectId
 
     // Internal state
     property var selectedVersionIds: []

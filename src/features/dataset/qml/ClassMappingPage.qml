@@ -16,6 +16,24 @@ Item {
     property var targetClasses: []
     property var mappingRules: null
 
+    // 进入页面时刷新数据集列表并自动选中首项，避免 combo 空白/源类别不加载
+    function initDatasetList() {
+        if (typeof appController === "undefined" || !appController.projectOpen)
+            return
+        datasetModel.setProjectId(appController.currentProjectId)
+        datasetModel.refresh()
+        if (datasetCombo && datasetCombo.count > 0) {
+            datasetCombo.currentIndex = 0
+            root.currentDatasetId = datasetCombo.currentValue
+            root.loadSourceClasses()
+            root.loadTargetClasses()
+            root.mappingRules = root.generateMappingSuggestions()
+        }
+    }
+
+    Component.onCompleted: initDatasetList()
+    onVisibleChanged: if (visible) initDatasetList()
+
     function loadSourceClasses() {
         if (!currentDatasetId) {
             sourceClasses = []
@@ -37,8 +55,9 @@ Item {
         var classes = []
         for (var i = 0; i < taxonomyModel.rowCount(); i++) {
             var idx = taxonomyModel.index(i, 0)
-            var className = taxonomyModel.data(idx, 1)
-            var classIndex = taxonomyModel.data(idx, 0)
+            // ClassNameRole = Qt.UserRole + 1，IndexRole = Qt.UserRole + 2
+            var className = taxonomyModel.data(idx, Qt.UserRole + 1)
+            var classIndex = taxonomyModel.data(idx, Qt.UserRole + 2)
             classes.push({name: className, index: classIndex})
         }
         targetClasses = classes

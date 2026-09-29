@@ -34,7 +34,7 @@ public:
     QString drawMode() const { return m_drawMode; }
     void setDrawMode(const QString &mode);
     bool polygonDrawing() const { return m_polygonDrawing; }
-    void setPolygonDrawing(bool drawing);
+    Q_INVOKABLE void setPolygonDrawing(bool drawing);
 
     Q_INVOKABLE void loadImage(const QString &imagePath, const QString &labelPath);
     Q_INVOKABLE void fitToView(qreal viewWidth, qreal viewHeight);

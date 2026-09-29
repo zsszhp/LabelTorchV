@@ -175,3 +175,7 @@ TODO/
 
 # 本地生成的图片中间产物（正式图标在 src/app/icons）
 generated-*.png
+
+# 本地调试日志
+qml_err.txt
+qml_out.txt

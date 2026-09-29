@@ -177,7 +177,7 @@ Item {
                 // 项目名标题
                 Text {
                     Layout.fillWidth: true
-                    text: appController.projectOpen ? projectService.getProject(appController.currentProjectId).name : "未打开项目"
+                    text: appController.projectOpen ? appController.currentProjectName : "未打开项目"
                     font.pixelSize: Theme.fontSizeSubheading  // 15px
                     font.weight: Font.Bold
                     color: Theme.textMain

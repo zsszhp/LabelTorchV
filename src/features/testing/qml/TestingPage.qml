@@ -2142,10 +2142,13 @@ Item {
                     // 从混淆矩阵获取类别名
                     var names = root.confusionMatrix.names || []
                     if (names.length > 0) return names
-                    // 从taxonomy获取类别
+                    // 从taxonomy获取类别（listTaxonomies 解析项目默认体系，getClasses 取类名）
                     if (root.currentProjectId) {
-                        var classes = taxonomyService.listClasses(root.currentProjectId)
-                        return classes || []
+                        var taxonomies = taxonomyService.listTaxonomies(root.currentProjectId)
+                        if (taxonomies && taxonomies.length > 0) {
+                            var classes = taxonomyService.getClasses(taxonomies[0].id)
+                            return classes || []
+                        }
                     }
                     return []
                 }

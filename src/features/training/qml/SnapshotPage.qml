@@ -9,6 +9,23 @@ import QtQuick.Dialogs
 Item {
     id: root
 
+    // 页面显示时刷新数据集下拉（覆盖首次加载与切换项目后再进入）
+    function reloadDatasets() {
+        if (typeof appController === "undefined" || !appController.projectOpen)
+            return
+        datasetModel.setProjectId(appController.currentProjectId)
+        datasetModel.refresh()
+        if (datasetCombo.count > 0 && datasetCombo.currentIndex < 0) {
+            datasetCombo.currentIndex = 0
+        }
+        if (datasetCombo.count > 0) {
+            snapshotModel.setDatasetId(datasetCombo.currentValue)
+        }
+    }
+
+    Component.onCompleted: reloadDatasets()
+    onVisibleChanged: if (visible) reloadDatasets()
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 16
@@ -36,6 +53,11 @@ Item {
                 }
 
                 Component.onCompleted: {
+                    // 进入页面时用当前项目刷新数据集列表，否则 combo 可能为空/残留他项目
+                    if (typeof appController !== "undefined" && appController.projectOpen) {
+                        datasetModel.setProjectId(appController.currentProjectId)
+                        datasetModel.refresh()
+                    }
                     if (count > 0) {
                         currentIndex = 0
                         snapshotModel.setDatasetId(currentValue)

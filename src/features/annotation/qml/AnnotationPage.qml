@@ -620,6 +620,34 @@ Item {
                                 font.family: Theme.fontFamily
                                 color: Theme.textMain
                             }
+
+                            Item { Layout.fillWidth: true }
+
+                            // 添加类别入口
+                            Button {
+                                text: "+"
+                                font.pixelSize: 14
+                                font.bold: true
+                                Layout.preferredWidth: 22
+                                Layout.preferredHeight: 22
+
+                                background: Rectangle {
+                                    color: parent.hovered ? Theme.primary : Theme.bgCard
+                                    radius: 4
+                                    border.color: Theme.primary
+                                    border.width: 1
+                                }
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: parent.hovered ? Theme.bgMain : Theme.primary
+                                    font: parent.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                onClicked: addLabelDialog.open()
+                            }
                         }
 
                         // 类别列表（对标参考UI：选中项蓝色高亮，未选中暗色卡片）
@@ -728,6 +756,34 @@ Item {
                                 font.weight: Font.Normal
                                 font.family: Theme.fontFamily
                                 color: Theme.textMain
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            // 添加标签入口
+                            Button {
+                                text: "+"
+                                font.pixelSize: 14
+                                font.bold: true
+                                Layout.preferredWidth: 22
+                                Layout.preferredHeight: 22
+
+                                background: Rectangle {
+                                    color: parent.hovered ? Theme.primary : Theme.bgCard
+                                    radius: 4
+                                    border.color: Theme.primary
+                                    border.width: 1
+                                }
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: parent.hovered ? Theme.bgMain : Theme.primary
+                                    font: parent.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                onClicked: addTagDialog.open()
                             }
                         }
 
@@ -1038,9 +1094,9 @@ Item {
                                 var totalClasses = taxonomyModel.rowCount()
                                 var newClassIdx = (currentClass + direction + totalClasses) % totalClasses
                                 
-                                // 获取新类别的名字
+                                // 获取新类别的名字（ClassNameRole = Qt.UserRole + 1）
                                 var idxTax = taxonomyModel.index(newClassIdx, 0)
-                                var newClassName = taxonomyModel.data(idxTax, 1) || ("class_" + newClassIdx)
+                                var newClassName = taxonomyModel.data(idxTax, Qt.UserRole + 1) || ("class_" + newClassIdx)
                                 
                                 // 更新该标注的类别
                                 annotationModel.setClassIndex(selectedRow, newClassIdx, newClassName)
@@ -1999,7 +2055,7 @@ Item {
             // 当前标注信息
             Text {
                 text: editLabelTargetIndex >= 0 && editLabelTargetIndex < annotationModel.rowCount()
-                      ? "当前类别: " + (annotationModel.data(annotationModel.index(editLabelTargetIndex, 0), 258) || "未知")
+                      ? "当前类别: " + (annotationModel.data(annotationModel.index(editLabelTargetIndex, 0), Qt.UserRole + 3) || "未知")
                       : "未选中标注"
                 font.pixelSize: Theme.fontSizeNormal
                 font.family: Theme.fontFamily
