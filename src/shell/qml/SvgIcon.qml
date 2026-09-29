@@ -21,7 +21,8 @@ Item {
     property bool glowing: false
 
     // 语义双色调色板：主体更亮、强调点缀
-    readonly property var palette: ({
+    // 注意：禁止命名为 palette，会遮蔽 QQuickItem::palette 导致控件异常
+    readonly property var iconPalette: ({
         "folder":     { main: "#FBBF24", accent: "#F59E0B" },   // 琥珀
         "images":     { main: "#38BDF8", accent: "#0EA5E9" },   // 天蓝
         "edit":       { main: "#F472B6", accent: "#EC4899" },   // 粉
@@ -53,12 +54,12 @@ Item {
 
     readonly property color mainColor: {
         if (control.color.a > 0.01) return control.color
-        var p = palette[control.icon]
+        var p = iconPalette[control.icon]
         return p ? p.main : "#22D3EE"
     }
     readonly property color accentColor: {
         if (control.accent.a > 0.01) return control.accent
-        var p = palette[control.icon]
+        var p = iconPalette[control.icon]
         return p ? p.accent : "#06B6D4"
     }
 
@@ -183,13 +184,13 @@ Item {
         ShapePath {
             fillColor: control.mainColor
             strokeColor: "transparent"
-            PathSvg { path: pathMain(control.icon) }
+            PathSvg { path: control.pathMain(control.icon) }
         }
         // 强调细节
         ShapePath {
             fillColor: control.accentColor
             strokeColor: "transparent"
-            PathSvg { path: pathAccent(control.icon) }
+            PathSvg { path: control.pathAccent(control.icon) }
         }
     }
 

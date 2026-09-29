@@ -79,90 +79,23 @@ Item {
                         text: "项目管理"
                     }
 
-                    // 新建项目按钮（渐变背景 primary→primaryDark）
-                    Button {
+                    // 新建项目
+                    LtButton {
                         id: newProjectBtn
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 36
-                        Layout.bottomMargin: Theme.spacingNormal
                         text: "新建项目"
-                        font.pixelSize: Theme.fontSizeNormal
-                        font.bold: true
-                        font.family: Theme.fontFamily
-
-                        background: Rectangle {
-                            gradient: Gradient {
-                                GradientStop { position: 0.0; color: Theme.primary }
-                                GradientStop { position: 1.0; color: Theme.primaryDark }
-                            }
-                            radius: Theme.radiusNormal
-                        }
-
-                        contentItem: Item {
-                            implicitWidth: newProjectRow.implicitWidth
-                            implicitHeight: newProjectRow.implicitHeight
-                            Row {
-                                id: newProjectRow
-                                spacing: 8
-                                anchors.centerIn: parent
-                                SvgIcon {
-                                    icon: "plus"
-                                    width: 14
-                                    height: 14
-                                    color: Theme.textMain
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                                Text {
-                                    text: newProjectBtn.text
-                                    color: Theme.textMain
-                                    font: newProjectBtn.font
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                            }
-                        }
-
+                        variant: "primary"
+                        icon: "plus"
                         onClicked: newProjectDialog.open()
                     }
 
-                    // 打开项目按钮（bgCard + border）
-                    Button {
+                    // 打开/导入项目
+                    LtButton {
                         id: openProjectBtn
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 36
                         text: "打开项目"
-                        font.pixelSize: Theme.fontSizeNormal
-                        font.family: Theme.fontFamily
-
-                        background: Rectangle {
-                            color: openProjectBtn.hovered ? Theme.bgHover : Theme.bgCard
-                            border.color: Theme.borderColor
-                            border.width: 1
-                            radius: Theme.radiusNormal
-                        }
-
-                        contentItem: Item {
-                            implicitWidth: openProjectRow.implicitWidth
-                            implicitHeight: openProjectRow.implicitHeight
-                            Row {
-                                id: openProjectRow
-                                spacing: 8
-                                anchors.centerIn: parent
-                                SvgIcon {
-                                    icon: "folder"
-                                    width: 14
-                                    height: 14
-                                    color: Theme.textMain
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                                Text {
-                                    text: openProjectBtn.text
-                                    color: Theme.textMain
-                                    font: openProjectBtn.font
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                            }
-                        }
-
+                        variant: "secondary"
+                        icon: "folder"
                         onClicked: importFolderDialog.open()
                     }
 
