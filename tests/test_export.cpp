@@ -118,13 +118,13 @@ void TestExport::testExportModel()
     QString artifactId = service.exportModel(m_modelVersionId, "onnx", optionsJson);
     QVERIFY(!artifactId.isEmpty());
 
-    // Verify the artifact was created with running status
+    // Verify the artifact was created
     QVariantMap status = service.getExportStatus(artifactId);
     QVERIFY(!status.isEmpty());
     QCOMPARE(status["modelVersionId"].toString(), m_modelVersionId);
     QCOMPARE(status["format"].toString(), QString("onnx"));
-    // Status should be "running" because exportModel transitions pending -> running
-    QCOMPARE(status["status"].toString(), QString("running"));
+    // 无 IPC 连接时导出会立即失败，状态为 failed
+    QCOMPARE(status["status"].toString(), QString("failed"));
 }
 
 void TestExport::testExportModelInvalidFormat()

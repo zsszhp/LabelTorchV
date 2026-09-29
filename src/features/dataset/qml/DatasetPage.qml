@@ -21,6 +21,22 @@ Item {
     property string selectedTag: "默认"
     property string galleryFilterLabel: "全部图像"
     property var rawSamples: []
+    property int filterClassIndex: -1   // 全局类别过滤（-1 = 不限）
+    // P1-21：当前项目缩略图缓存目录（cache/thumbnails）
+    property string thumbCacheDir: ""
+
+    // P1-21：解析缩略图路径——已生成则走缩略图，否则回退原图并靠 sourceSize 限解码
+    function resolveThumbSource(imagePath) {
+        if (!imagePath) return ""
+        var raw = String(imagePath).replace(/^file:\/\/\//, "").replace(/\\/g, "/")
+        if (pageRoot.thumbCacheDir) {
+            var thumb = thumbnailGenerator.resolve(raw, pageRoot.thumbCacheDir)
+            if (thumb && thumb.length > 0) {
+                return "file:///" + thumb.replace(/\\/g, "/")
+            }
+        }
+        return "file:///" + raw
+    }
 
     // === 页面初始化与可见性刷新 ===
     Component.onCompleted: {
@@ -71,7 +87,7 @@ Item {
         handle: Rectangle {
             implicitWidth: 4
             color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
-            Behavior on color { ColorAnimation { duration: 150 } }
+            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
         }
 
         // ============================================================
@@ -303,6 +319,38 @@ Item {
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: importDialogRoot.open()
+                                    }
+                                }
+                                // 导入向导（完整导入页，含扫描分析与类别映射入口）
+                                Text {
+                                    text: "导入向导"
+                                    color: wizardBtn.containsMouse ? Theme.primaryGlow : Theme.textMuted
+                                    font.pixelSize: Theme.fontSizeCaption
+                                    font.family: Theme.fontFamily
+                                    verticalAlignment: Text.AlignVCenter
+                                    MouseArea {
+                                        id: wizardBtn
+                                        anchors.fill: parent
+                                        anchors.margins: -4
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: appController.currentPage = "import"
+                                    }
+                                }
+                                // 类别映射（源 schema → 类别体系）
+                                Text {
+                                    text: "类别映射"
+                                    color: mapBtn.containsMouse ? Theme.primaryGlow : Theme.textMuted
+                                    font.pixelSize: Theme.fontSizeCaption
+                                    font.family: Theme.fontFamily
+                                    verticalAlignment: Text.AlignVCenter
+                                    MouseArea {
+                                        id: mapBtn
+                                        anchors.fill: parent
+                                        anchors.margins: -4
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: appController.currentPage = "classmap"
                                     }
                                 }
                                 // 导入图标
@@ -829,7 +877,10 @@ Item {
                                     Layout.fillWidth: true
                                     Layout.fillHeight: true
                                     Layout.minimumHeight: 0
-                                    source: model.imagePath
+                                    // P1-21：优先缩略图，回退原图；sourceSize 限制解码像素
+                                    source: pageRoot.resolveThumbSource(model.imagePath)
+                                    sourceSize.width: 256
+                                    sourceSize.height: 256
                                     fillMode: Image.PreserveAspectCrop
                                     asynchronous: true
                                     cache: true
@@ -887,16 +938,45 @@ Item {
 
             var matchSplit = splitFilter === "全部划分" || splitValue === splitFilter
 
-            if (!matchStatus || !matchSplit)
+            // 类别过滤：仅保留包含目标类别的样本
+            var matchClass = true
+            if (filterClassIndex >= 0) {
+                var cis = sample.classIndices || []
+                matchClass = cis.indexOf(filterClassIndex) >= 0
+            }
+
+            if (!matchStatus || !matchSplit || !matchClass)
                 continue
 
             sampleListModel.append(sample)
             filteredCount += 1
         }
 
-        galleryFilterLabel = statusFilter === "全部状态" && splitFilter === "全部划分"
+        galleryFilterLabel = statusFilter === "全部状态" && splitFilter === "全部划分" && filterClassIndex < 0
             ? "全部图像"
-            : (statusFilter + " / " + splitFilter)
+            : (statusFilter + " / " + splitFilter + (filterClassIndex >= 0 ? " / 类别" + filterClassIndex : ""))
+    }
+
+    // === 全局筛选接口：数据集过滤 ===
+    function setDatasetFilter(dsId) {
+        if (dsId) {
+            selectDataset(dsId)
+        } else {
+            // 清空选择，回到"请选择数据集"状态
+            currentDatasetId = ""
+            currentDatasetName = ""
+            selectedSample = null
+            sampleListModel.clear()
+            rawSamples = []
+            tagModel.setDatasetId("")
+        }
+    }
+
+    // === 全局筛选接口：标签类别过滤（classIndex < 0 表示不过滤） ===
+    function setClassFilter(clsIndex) {
+        filterClassIndex = (clsIndex !== undefined && clsIndex !== null && Number(clsIndex) >= 0)
+            ? Number(clsIndex) : -1
+        applySampleFilters()
     }
 
     // ================================================================
@@ -907,6 +987,8 @@ Item {
         selectedSample = null
         sampleListModel.clear()
         rawSamples = []
+        // P1-21：解析缩略图目录
+        pageRoot.thumbCacheDir = projectService.thumbnailCacheDir(appController.currentProjectId)
 
         // 从listDatasets获取数据集名称
         var datasets = datasetService.listDatasets(appController.currentProjectId)
@@ -924,10 +1006,21 @@ Item {
 
         // 加载样本列表到ListModel
         var samples = datasetService.listSamples(dsId, 0, 500)
+        var rawPaths = []
         for (var j = 0; j < samples.length; j++) {
             var s = samples[j]
             var imgPath = s.image_path || s.imagePath || ""
             var fileName = imgPath.split("/").pop().split("\\").pop()
+            // 收集样本类别索引，供全局类别过滤使用
+            var classIndices = []
+            if (s.labelPath) {
+                var annotations = annotationService.loadAnnotations(s.labelPath)
+                for (var k = 0; k < annotations.length; k++) {
+                    var cid = annotations[k].classIndex
+                    if (classIndices.indexOf(cid) < 0)
+                        classIndices.push(cid)
+                }
+            }
             rawSamples.push({
                 "sampleId": s.id || "",
                 "fileName": fileName,
@@ -937,8 +1030,15 @@ Item {
                 "labelCount": s.labelPath ? 1 : 0,
                 "labelPath": s.labelPath || "",
                 "validationStatus": s.validationStatus || "",
-                "split": s.split || "unspecified"
+                "split": s.split || "unspecified",
+                "classIndices": classIndices
             })
+            if (imgPath) rawPaths.push(imgPath.replace(/\\/g, "/"))
+        }
+
+        // P1-21：后台补齐本页缩略图
+        if (pageRoot.thumbCacheDir && rawPaths.length > 0) {
+            thumbnailGenerator.generate(rawPaths, pageRoot.thumbCacheDir)
         }
 
         applySampleFilters()

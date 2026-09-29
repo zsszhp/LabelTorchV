@@ -141,9 +141,14 @@ private:
 
     void updateCursor(const QPointF& canvasPos);
 
+    /// P1-24：经 ImageDecodeCache 加载并填充 m_image/m_loadedPath
+    void loadSharedImage(const QString& imagePath);
+
     CanvasController* m_controller = nullptr;
     AnnotationModel* m_model = nullptr;
     QImage m_image;
+    /// 当前已加载图片的路径，用于避免同一图重复解码
+    QString m_loadedPath;
     qreal m_imageWidth = 0;
     qreal m_imageHeight = 0;
 

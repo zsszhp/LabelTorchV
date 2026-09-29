@@ -5,6 +5,54 @@
 #include <QTextStream>
 #include <QFileInfo>
 #include <QDir>
+#include <cstdio>
+
+#ifdef Q_OS_WIN
+// NOGDI：排除 wingdi.h，避免其 Polygon 函数与标注结构体 Polygon 命名冲突
+#define NOGDI
+#include <windows.h>
+#endif
+
+// ---------------------------------------------------------------------------
+// P0-4: 原子替换工具
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief 将临时文件原子替换到目标路径（P0-4）。
+ *
+ * Windows 使用 MoveFileEx(MOVEFILE_REPLACE_EXISTING)：NTFS 上替换操作是原子的，
+ * 失败时原文件保持完好——消除先 remove 再 rename 的断电丢文件窗口。
+ * 非 Windows 平台使用 POSIX rename()，同样是原子替换语义。
+ *
+ * @param fromPath 临时文件路径（已写入完毕并关闭）。
+ * @param toPath   目标文件路径。
+ * @return 成功返回 true；失败返回 false（原文件不受影响）。
+ */
+static bool atomicReplaceFile(const QString &fromPath, const QString &toPath)
+{
+#ifdef Q_OS_WIN
+    // MoveFileExW 带 MOVEFILE_REPLACE_EXISTING：若目标存在则原子替换，
+    // MOVEFILE_WRITE_THROUGH 确保元数据写入磁盘后再返回
+    std::wstring fromW = fromPath.toStdWString();
+    std::wstring toW = toPath.toStdWString();
+    if (!MoveFileExW(fromW.c_str(), toW.c_str(),
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        ltError(LT_LOG_ANNOTATION()) << "MoveFileExW failed from" << fromPath
+                                     << "to" << toPath
+                                     << "GetLastError=" << GetLastError();
+        return false;
+    }
+    return true;
+#else
+    // POSIX rename() 在同一文件系统内是原子替换
+    if (std::rename(fromPath.toLocal8Bit().constData(),
+                    toPath.toLocal8Bit().constData()) != 0) {
+        ltError(LT_LOG_ANNOTATION()) << "rename failed from" << fromPath << "to" << toPath;
+        return false;
+    }
+    return true;
+#endif
+}
 
 // ---------------------------------------------------------------------------
 // HBB methods
@@ -24,7 +72,7 @@ bool YoloTxtWriter::write(const QString &filePath, const QVector<AxisAlignedBox>
         }
     }
 
-    // --- Atomic write: temp file + rename ---
+    // --- Atomic write: temp file + atomic replace ---
     const QString tempPath = filePath + QStringLiteral(".tmp");
 
     {
@@ -47,18 +95,9 @@ bool YoloTxtWriter::write(const QString &filePath, const QVector<AxisAlignedBox>
         }
     }   // tempFile closed here
 
-    // Remove the existing destination file (if any)
-    if (QFile::exists(filePath)) {
-        if (!QFile::remove(filePath)) {
-            ltError(LT_LOG_ANNOTATION()) << "cannot remove existing file:" << filePath;
-            QFile::remove(tempPath);
-            return false;
-        }
-    }
-
-    // Rename temp file to the final destination
-    if (!QFile::rename(tempPath, filePath)) {
-        ltError(LT_LOG_ANNOTATION()) << "cannot rename temp file to:" << filePath;
+    // 原子替换：MoveFileEx 替换已有文件，失败时原文件完好（P0-4）
+    if (!atomicReplaceFile(tempPath, filePath)) {
+        ltError(LT_LOG_ANNOTATION()) << "atomic replace failed for:" << filePath;
         QFile::remove(tempPath);
         return false;
     }
@@ -98,7 +137,7 @@ bool YoloTxtWriter::writeOBB(const QString &filePath, const QVector<RotatedBox> 
         }
     }
 
-    // --- Atomic write: temp file + rename ---
+    // --- Atomic write: temp file + atomic replace ---
     const QString tempPath = filePath + QStringLiteral(".tmp");
 
     {
@@ -121,18 +160,9 @@ bool YoloTxtWriter::writeOBB(const QString &filePath, const QVector<RotatedBox> 
         }
     }   // tempFile closed here
 
-    // Remove the existing destination file (if any)
-    if (QFile::exists(filePath)) {
-        if (!QFile::remove(filePath)) {
-            ltError(LT_LOG_ANNOTATION()) << "cannot remove existing file for OBB:" << filePath;
-            QFile::remove(tempPath);
-            return false;
-        }
-    }
-
-    // Rename temp file to the final destination
-    if (!QFile::rename(tempPath, filePath)) {
-        ltError(LT_LOG_ANNOTATION()) << "cannot rename temp file to OBB:" << filePath;
+    // 原子替换：MoveFileEx 替换已有文件，失败时原文件完好（P0-4）
+    if (!atomicReplaceFile(tempPath, filePath)) {
+        ltError(LT_LOG_ANNOTATION()) << "atomic replace failed for OBB:" << filePath;
         QFile::remove(tempPath);
         return false;
     }
@@ -174,7 +204,7 @@ bool YoloTxtWriter::writePolygon(const QString &filePath, const QVector<Polygon>
         }
     }
 
-    // --- 原子写入：临时文件 + 重命名 ---
+    // --- 原子写入：临时文件 + 原子替换 ---
     const QString tempPath = filePath + QStringLiteral(".tmp");
 
     {
@@ -197,18 +227,9 @@ bool YoloTxtWriter::writePolygon(const QString &filePath, const QVector<Polygon>
         }
     }   // tempFile closed here
 
-    // 删除已有目标文件
-    if (QFile::exists(filePath)) {
-        if (!QFile::remove(filePath)) {
-            ltError(LT_LOG_ANNOTATION()) << "cannot remove existing file for Polygon:" << filePath;
-            QFile::remove(tempPath);
-            return false;
-        }
-    }
-
-    // 重命名临时文件到目标路径
-    if (!QFile::rename(tempPath, filePath)) {
-        ltError(LT_LOG_ANNOTATION()) << "cannot rename temp file to Polygon:" << filePath;
+    // 原子替换：MoveFileEx 替换已有文件，失败时原文件完好（P0-4）
+    if (!atomicReplaceFile(tempPath, filePath)) {
+        ltError(LT_LOG_ANNOTATION()) << "atomic replace failed for Polygon:" << filePath;
         QFile::remove(tempPath);
         return false;
     }

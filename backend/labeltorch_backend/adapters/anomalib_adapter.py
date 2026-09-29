@@ -442,11 +442,12 @@ class AnomalibAdapter(TrainingAdapter):
                     from anomalib.deploy import ExportType
                     from anomalib.engine import Engine
                     from anomalib.models import get_model
-                    import torch
 
                     model_family = options.get("model_family", "efficient_ad")
                     model = get_model(model_family)
-                    checkpoint = torch.load(weight_path, map_location="cpu", weights_only=False)
+                    # 安全加载：优先 weights_only=True，anomalib ckpt 回退时校验路径并告警
+                    from ..tools.safe_loading import safe_load_weight
+                    checkpoint = safe_load_weight(weight_path, map_location="cpu")
                     if "state_dict" in checkpoint:
                         model.load_state_dict(checkpoint["state_dict"])
                     elif "model" in checkpoint:
@@ -470,7 +471,9 @@ class AnomalibAdapter(TrainingAdapter):
             if not exported_via_engine:
                 import torch
 
-                checkpoint = torch.load(weight_path, map_location="cpu", weights_only=False)
+                # 安全加载：优先 weights_only=True，回退时校验路径并告警
+                from ..tools.safe_loading import safe_load_weight
+                checkpoint = safe_load_weight(weight_path, map_location="cpu")
                 if isinstance(checkpoint, dict) and "model" in checkpoint:
                     model = checkpoint["model"]
                 elif isinstance(checkpoint, dict) and "state_dict" in checkpoint:
@@ -516,8 +519,9 @@ class AnomalibAdapter(TrainingAdapter):
             # 来源2：从 checkpoint 文件中提取 Anomalib 标准化阈值（优先级最高）
             if weight_path.endswith(".ckpt"):
                 try:
-                    import torch
-                    ckpt = torch.load(weight_path, map_location="cpu", weights_only=False)
+                    # 安全加载：优先 weights_only=True，回退时校验路径并告警
+                    from ..tools.safe_loading import safe_load_weight
+                    ckpt = safe_load_weight(weight_path, map_location="cpu")
                     if isinstance(ckpt, dict):
                         # Anomalib 2.x 标准格式：ckpt["Normalization"]
                         if "Normalization" in ckpt:

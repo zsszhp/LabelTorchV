@@ -57,6 +57,44 @@ class UltralyticsAdapter(TrainingAdapter):
         """准备训练数据"""
         return {"snapshot_path": snapshot_path, "data_yaml": data_yaml, "ready": True}
 
+    @staticmethod
+    def _locate_resume_checkpoint(config: dict, project_dir: str, run_name: str) -> Optional[str]:
+        """
+        定位增量训练断点权重 last.pt。
+
+        查找顺序：
+        1. 显式 resume_weight / last_weight_path（调用方指定断点）
+        2. pretrained 指向 last.pt 且文件存在（用户把断点当预训练传入）
+        3. {project_dir}/{run_name}/weights/last.pt（Ultralytics 默认训练输出布局）
+        4. {project_dir}/{run_name}/last.pt（兼容部分导出布局）
+        找不到返回 None，由调用方决定报错，避免静默从头训练。
+        """
+        candidates = []
+        for key in ("resume_weight", "resumeWeight", "last_weight_path", "lastWeightPath"):
+            value = config.get(key)
+            if value:
+                candidates.append(str(value))
+
+        pretrained = config.get("pretrained", config.get("pretrained_weights", None))
+        if pretrained and str(pretrained).lower().endswith("last.pt"):
+            candidates.append(str(pretrained))
+
+        if project_dir and run_name:
+            run_dir = os.path.join(project_dir, run_name)
+            candidates.append(os.path.join(run_dir, "weights", "last.pt"))
+            candidates.append(os.path.join(run_dir, "last.pt"))
+        elif project_dir:
+            candidates.append(os.path.join(project_dir, "weights", "last.pt"))
+
+        run_dir_cfg = config.get("run_dir", config.get("runDir", ""))
+        if run_dir_cfg:
+            candidates.append(os.path.join(str(run_dir_cfg), "weights", "last.pt"))
+
+        for candidate in candidates:
+            if candidate and os.path.isfile(candidate):
+                return os.path.abspath(candidate)
+        return None
+
     async def start_training(self, config: dict) -> dict:
         """
         启动Ultralytics训练
@@ -112,8 +150,22 @@ class UltralyticsAdapter(TrainingAdapter):
                 model_name = f"yolov8{model_variant}.pt"
                 _task = "detect"  # 预留：任务类型
 
-            # 加载模型
-            if pretrained and not resume:
+            # 加载模型：
+            # - 增量训练(resume=True)必须加载断点权重 last.pt，才能恢复 epoch/优化器状态，
+            #   否则只是「从头再训」，与增量语义不符
+            # - 普通训练：优先使用用户指定的预训练权重，否则加载模型家族默认权重
+            if resume:
+                last_pt = self._locate_resume_checkpoint(config, project_dir, run_name)
+                if not last_pt:
+                    # 无断点权重时明确失败，不静默退化为从头训练
+                    self._status = "failed"
+                    logger.error("resume=True 但未找到断点权重 last.pt")
+                    return {"status": "failed", "error": "无断点权重，无法增量训练"}
+                logger.info(f"加载断点权重进行增量训练: {last_pt}")
+                # 风险说明：YOLO(pt) 内部经 torch.load 反序列化，路径必须来自项目内训练产物
+                self._model = YOLO(last_pt)
+            elif pretrained:
+                # 风险说明：YOLO(pt) 内部经 torch.load 反序列化，路径必须来自项目内
                 self._model = YOLO(pretrained)
             else:
                 self._model = YOLO(model_name)
@@ -385,6 +437,7 @@ class UltralyticsAdapter(TrainingAdapter):
         """同步执行 YOLO 导出（在线程池中运行）"""
         from ultralytics import YOLO
 
+        # 风险说明：YOLO(pt) 内部经 torch.load 反序列化，路径必须来自项目内训练产物
         model = YOLO(weight_path)
         default_imgsz = 640
         if hasattr(model, 'task') and model.task == 'classify':

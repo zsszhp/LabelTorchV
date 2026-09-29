@@ -2,6 +2,7 @@
 #include "Database.h"
 #include "ipc/IpcClient.h"
 #include "ipc/IpcProtocol.h"
+#include "utils/AuditLog.h"
 #include "utils/Log.h"
 #include "SnapshotService.h"
 #include "MetricService.h"
@@ -181,7 +182,29 @@ void TrainingService::handleTrainingEvent(const QVariantMap &event)
         }
     } else if (eventType == QStringLiteral("task.stopped")) {
         updateRunStatus(taskId, QStringLiteral("stopped"));
+        m_logTails.remove(taskId);
     } else if (eventType == QStringLiteral("task.failed")) {
+        // P1-19：失败时保留日志尾部 + 结构化诊断，写入 training_runs.failure_info_json
+        QString error = payload[QStringLiteral("error")].toString();
+        QStringList logTail;
+        const QVariantList backendTail = payload[QStringLiteral("log_tail")].toList();
+        if (!backendTail.isEmpty()) {
+            for (const QVariant &line : backendTail) {
+                logTail.append(line.toString());
+            }
+        } else {
+            logTail = takeLogTail(taskId);
+        }
+
+        QVariantMap diagnosis;
+        const QVariant diagVar = payload[QStringLiteral("diagnosis")];
+        if (diagVar.isValid() && !diagVar.toMap().isEmpty()) {
+            diagnosis = diagVar.toMap();
+        } else {
+            diagnosis = diagnoseLocally(error);
+        }
+
+        storeFailureInfo(taskId, error, logTail, diagnosis);
         updateRunStatus(taskId, QStringLiteral("failed"));
     } else if (eventType == QStringLiteral("task.started")) {
         updateRunStatus(taskId, QStringLiteral("running"));
@@ -238,7 +261,27 @@ void TrainingService::handleTrainingEvent(const QVariantMap &event)
             logLine = payload[QStringLiteral("line")].toString();
         }
         if (!logLine.isEmpty()) {
+            appendLogTail(taskId, logLine);
             emit trainingLog(taskId, logLine);
+        }
+    } else if (eventType == QStringLiteral("task.log_batch")) {
+        // P1-25：后端批量推送的日志（100ms/50 行合并），一次刷新 UI
+        const QVariantList lines = payload[QStringLiteral("lines")].toList();
+        QString joined;
+        joined.reserve(lines.size() * 64);
+        for (const QVariant &lv : lines) {
+            const QVariantMap item = lv.toMap();
+            QString logLine = item[QStringLiteral("message")].toString();
+            if (logLine.isEmpty()) logLine = item[QStringLiteral("log")].toString();
+            if (logLine.isEmpty()) logLine = item[QStringLiteral("line")].toString();
+            if (logLine.isEmpty()) logLine = item[QStringLiteral("msg")].toString();
+            if (logLine.isEmpty()) continue;
+            appendLogTail(taskId, logLine);
+            if (!joined.isEmpty()) joined += QLatin1Char('\n');
+            joined += logLine;
+        }
+        if (!joined.isEmpty()) {
+            emit trainingLog(taskId, joined);
         }
     } else if (eventType == QStringLiteral("task.warning")) {
         // 训练警告事件
@@ -328,6 +371,15 @@ bool TrainingService::startTraining(const QString &runId)
         if (!updateQuery.exec()) return false;
     }
     emit runStatusChanged(runId, "preparing");
+
+    // 审计：训练启动落库留痕
+    {
+        QVariantMap auditPayload;
+        auditPayload[QStringLiteral("projectId")] = projectId;
+        auditPayload[QStringLiteral("snapshotId")] = snapshotId;
+        AuditLog::record(QStringLiteral("training"), runId,
+                         QStringLiteral("train_start"), auditPayload);
+    }
 
     // 在后台线程准备物理快照目录（大量文件拷贝，不能在UI线程执行）
     QString capturedProjectRoot = projectRoot;
@@ -442,6 +494,9 @@ bool TrainingService::stopTraining(const QString &runId)
 
     emit runStatusChanged(runId, "stopping");
 
+    // 审计：训练停止请求落库留痕
+    AuditLog::record(QStringLiteral("training"), runId, QStringLiteral("train_stop"));
+
     // Send train.stop via IpcClient if available
     if (m_ipcClient && m_ipcClient->connected()) {
         QJsonObject payload;
@@ -536,7 +591,7 @@ QVariantMap TrainingService::getRun(const QString &runId)
     QSqlQuery query(db);
     query.prepare(
         "SELECT id, project_id, snapshot_id, config_snapshot_json, "
-        "runtime_env_snapshot_json, status, log_uri, started_at, finished_at "
+        "runtime_env_snapshot_json, status, log_uri, started_at, finished_at, failure_info_json "
         "FROM training_runs WHERE id = ?"
     );
     query.addBindValue(runId);
@@ -552,6 +607,7 @@ QVariantMap TrainingService::getRun(const QString &runId)
     result["logUri"] = query.value(6).toString();
     result["startedAt"] = query.value(7).toString();
     result["finishedAt"] = query.value(8).toString();
+    result["failureInfoJson"] = query.value(9).toString();
 
     return result;
 }
@@ -581,6 +637,12 @@ bool TrainingService::deleteRun(const QString &runId)
 
     if (deleteQuery.exec()) {
         ltInfo(LT_LOG_TRAINING()) << "Deleted training run:" << runId;
+
+        // 审计：训练运行删除为不可逆操作，落库留痕
+        QVariantMap auditPayload;
+        auditPayload[QStringLiteral("status")] = status;
+        AuditLog::record(QStringLiteral("training"), runId,
+                         QStringLiteral("deleted"), auditPayload);
         return true;
     }
     return false;
@@ -716,4 +778,162 @@ int TrainingService::reconcileStaleRuns()
     }
 
     return fixed;
+}
+
+// ============================================================================
+// P1-19：训练失败可诊断 —— 日志尾部保留 + 结构化建议
+// ============================================================================
+
+namespace {
+/// 日志尾部最多保留行数
+constexpr int kLogTailMaxLines = 50;
+} // namespace
+
+void TrainingService::appendLogTail(const QString &runId, const QString &line)
+{
+    if (runId.isEmpty() || line.isEmpty()) return;
+
+    QStringList &tail = m_logTails[runId];
+    tail.append(line);
+    while (tail.size() > kLogTailMaxLines) {
+        tail.removeFirst();
+    }
+}
+
+QStringList TrainingService::takeLogTail(const QString &runId)
+{
+    return m_logTails.take(runId);
+}
+
+QVariantMap TrainingService::diagnoseLocally(const QString &error)
+{
+    // 后端未返回 diagnosis 时的本地兜底（与 Python 侧规则保持一致）
+    const QString lowered = error.toLower();
+
+    auto makeResult = [](const QString &code, const QString &message, const QStringList &suggestions) {
+        QVariantMap map;
+        map[QStringLiteral("code")] = code;
+        map[QStringLiteral("message")] = message;
+        map[QStringLiteral("suggestions")] = suggestions;
+        return map;
+    };
+
+    if (lowered.contains(QLatin1String("out of memory")) ||
+        lowered.contains(QLatin1String("oom")) ||
+        lowered.contains(QLatin1String("cudnn_status_alloc_failed"))) {
+        return makeResult(QStringLiteral("OOM"),
+                          QStringLiteral("显存不足（OOM）导致训练失败"),
+                          {QStringLiteral("建议将 batch 减半、imgsz 降至 320"),
+                           QStringLiteral("建议改用更小模型或关闭其他 GPU 进程")});
+    }
+
+    if (lowered.contains(QLatin1String("label")) ||
+        lowered.contains(QLatin1String("dataset")) ||
+        lowered.contains(QLatin1String("no such file")) ||
+        lowered.contains(QLatin1String("filenotfound")) ||
+        lowered.contains(QLatin1String("corrupt"))) {
+        return makeResult(QStringLiteral("DATA_ERROR"),
+                          QStringLiteral("数据集或标签存在问题导致训练失败"),
+                          {QStringLiteral("建议检查标签文件格式（class_id cx cy w h，归一化 0-1）"),
+                           QStringLiteral("建议检查图片与标签路径对应关系")});
+    }
+
+    if (lowered.contains(QLatin1String("config")) ||
+        lowered.contains(QLatin1String("size mismatch")) ||
+        lowered.contains(QLatin1String("state_dict")) ||
+        lowered.contains(QLatin1String("missing key"))) {
+        return makeResult(QStringLiteral("CONFIG_ERROR"),
+                          QStringLiteral("训练配置或权重不匹配导致训练失败"),
+                          {QStringLiteral("建议检查模型族与任务类型是否匹配"),
+                           QStringLiteral("建议检查类别数与数据集类别定义是否一致")});
+    }
+
+    return makeResult(QStringLiteral("UNKNOWN"),
+                      QStringLiteral("训练失败，原因未归类"),
+                      {QStringLiteral("建议查看日志尾部定位具体报错"),
+                       QStringLiteral("建议降低 batch / epochs 后重试")});
+}
+
+bool TrainingService::storeFailureInfo(const QString &runId,
+                                       const QString &error,
+                                       const QStringList &logTail,
+                                       const QVariantMap &diagnosis)
+{
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return false;
+
+    QJsonObject info;
+    info[QStringLiteral("error")] = error;
+    QJsonArray tailArray;
+    for (const QString &line : logTail) {
+        tailArray.append(line);
+    }
+    info[QStringLiteral("logTail")] = tailArray;
+    info[QStringLiteral("diagnosisCode")] = diagnosis.value(QStringLiteral("code")).toString();
+    info[QStringLiteral("diagnosisMessage")] = diagnosis.value(QStringLiteral("message")).toString();
+
+    QJsonArray suggestions;
+    for (const QVariant &item : diagnosis.value(QStringLiteral("suggestions")).toList()) {
+        suggestions.append(item.toString());
+    }
+    info[QStringLiteral("suggestions")] = suggestions;
+    info[QStringLiteral("timestamp")] = QDateTime::currentDateTime().toString(Qt::ISODate);
+
+    QString infoJson = QString::fromUtf8(QJsonDocument(info).toJson(QJsonDocument::Compact));
+
+    QSqlQuery query(db);
+    query.prepare("UPDATE training_runs SET failure_info_json = ? WHERE id = ?");
+    query.addBindValue(infoJson);
+    query.addBindValue(runId);
+    if (!query.exec()) {
+        ltError(LT_LOG_TRAINING()) << "Failed to store failure info:" << query.lastError().text();
+        return false;
+    }
+
+    ltInfo(LT_LOG_TRAINING()) << "Stored failure info for run:" << runId
+                              << "code:" << info[QStringLiteral("diagnosisCode")].toString()
+                              << "logTailLines:" << logTail.size();
+    return true;
+}
+
+QVariantMap TrainingService::getFailureInfo(const QString &runId)
+{
+    ltTrace(LT_LOG_TRAINING()) << "runId=" << runId;
+
+    auto db = Database::instance().database();
+    QVariantMap result;
+    if (!db.isOpen()) return result;
+
+    QSqlQuery query(db);
+    query.prepare("SELECT failure_info_json FROM training_runs WHERE id = ?");
+    query.addBindValue(runId);
+    if (!query.exec() || !query.next()) return result;
+
+    QString json = query.value(0).toString();
+    if (json.isEmpty()) return result;
+
+    QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8());
+    if (!doc.isObject()) return result;
+
+    QJsonObject obj = doc.object();
+    // 统一字段名，便于 UI 结论卡绑定
+    result[QStringLiteral("error")] = obj.value(QStringLiteral("error")).toString();
+
+    QVariantList logTail;
+    for (const auto &val : obj.value(QStringLiteral("logTail")).toArray()) {
+        logTail.append(val.toString());
+    }
+    result[QStringLiteral("logTail")] = logTail;
+
+    result[QStringLiteral("diagnosisCode")] = obj.value(QStringLiteral("diagnosisCode")).toString();
+    result[QStringLiteral("diagnosisMessage")] = obj.value(QStringLiteral("diagnosisMessage")).toString();
+
+    QVariantList suggestions;
+    for (const auto &val : obj.value(QStringLiteral("suggestions")).toArray()) {
+        suggestions.append(val.toString());
+    }
+    result[QStringLiteral("suggestions")] = suggestions;
+    result[QStringLiteral("timestamp")] = obj.value(QStringLiteral("timestamp")).toString();
+
+    return result;
 }

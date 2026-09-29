@@ -137,14 +137,15 @@ Item {
                                 }
                             }
 
-                            // 类别名称（可内联编辑）
+                            // 类别名称（可内联编辑；已废弃槽位只读）
                             Label {
                                 id: classLabel
                                 Layout.fillWidth: true
-                                text: model.className
+                                // 空名为废弃占位：class_id 仍占用，显示「已废弃」
+                                text: model.className === "" ? "已废弃" : model.className
                                 font.pixelSize: Theme.fontSizeNormal
                                 font.family: Theme.fontFamily
-                                color: Theme.textMain
+                                color: model.className === "" ? Theme.textMuted : Theme.textMain
                                 visible: !editLoader.active
                             }
 
@@ -154,6 +155,7 @@ Item {
                                 Layout.fillWidth: true
 
                                 sourceComponent: TextField {
+                                    // 已废弃槽位可改名复活，初始文本保留原空名
                                     text: model.className
                                     color: Theme.textMain
                                     font.pixelSize: Theme.fontSizeNormal
@@ -200,6 +202,8 @@ Item {
                             ToolButton {
                                 text: "\u2715"
                                 font.pixelSize: Theme.fontSizeNormal
+                                // 已废弃槽位无需再删（物理删除另走带引用检查的流程）
+                                visible: model.className !== ""
                                 onClicked: taxonomyModel.removeClass(model.classIndex)
 
                                 background: Rectangle {

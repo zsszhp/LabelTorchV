@@ -84,6 +84,15 @@ bool Database::initializeSchema()
         }
     }
 
+    // P1-23：核心查询路径索引（幂等，老库也会在此补齐）
+    const auto &indexStatements = Schema::createIndexStatements();
+    for (const auto &sql : indexStatements) {
+        if (!query.exec(sql)) {
+            ltError(LT_LOG_DB()) << "Failed to create index:" << query.lastError().text();
+            return false;
+        }
+    }
+
     int version = currentSchemaVersion();
     ltDebug(LT_LOG_DB()) << "Current schema version:" << version;
 
@@ -157,6 +166,43 @@ bool Database::migrate()
         ltInfo(LT_LOG_DB()) << "Migration V1→V2 completed successfully";
     }
 
+    // 迁移 V2→V3：training_runs 新增 failure_info_json（失败日志尾部+结构化诊断，P1-19）
+    if (version < 3) {
+        ltInfo(LT_LOG_DB()) << "Running migration V2→V3: training_runs add failure_info_json";
+
+        bool ok = true;
+
+        // 探测列是否已存在（新建库的 DDL 已包含该列）
+        QSqlQuery probe(m_db);
+        probe.exec("SELECT failure_info_json FROM training_runs LIMIT 0");
+        if (probe.lastError().isValid()) {
+            ok = query.exec("ALTER TABLE training_runs ADD COLUMN failure_info_json TEXT");
+            if (!ok) {
+                ltError(LT_LOG_DB()) << "Migration V2→V3 failed:" << query.lastError().text();
+                return false;
+            }
+        }
+
+        query.exec("INSERT INTO schema_version (version) VALUES (3)");
+        ltInfo(LT_LOG_DB()) << "Migration V2→V3 completed successfully";
+    }
+
+    // 迁移 V3→V4：补建核心查询路径索引（P1-23 性能索引，幂等）
+    if (version < 4) {
+        ltInfo(LT_LOG_DB()) << "Running migration V3→V4: create performance indexes";
+
+        const auto &indexStatements = Schema::createIndexStatements();
+        for (const auto &sql : indexStatements) {
+            if (!query.exec(sql)) {
+                ltError(LT_LOG_DB()) << "Migration V3→V4 failed on index:" << query.lastError().text();
+                return false;
+            }
+        }
+
+        query.exec("INSERT INTO schema_version (version) VALUES (4)");
+        ltInfo(LT_LOG_DB()) << "Migration V3→V4 completed successfully";
+    }
+
     return true;
 }
 
@@ -193,8 +239,17 @@ bool Database::createTables()
         }
     }
 
-    // 记录当前schema版本
-    query.exec("INSERT INTO schema_version (version) VALUES (1)");
+    // 创建核心查询路径索引（P1-23）
+    const auto &indexStatements = Schema::createIndexStatements();
+    for (const auto &sql : indexStatements) {
+        if (!query.exec(sql)) {
+            ltError(LT_LOG_DB()) << "Failed to create index:" << query.lastError().text();
+            return false;
+        }
+    }
+
+    // 记录当前schema版本（含索引迁移版本）
+    query.exec("INSERT INTO schema_version (version) VALUES (4)");
     ltInfo(LT_LOG_DB()) << "Schema initialized successfully";
     return true;
 }

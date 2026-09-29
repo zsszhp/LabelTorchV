@@ -2,6 +2,7 @@
 #include "TaxonomyService.h"
 #include "database/Database.h"
 #include "filesystem/ProjectFs.h"
+#include "utils/AuditLog.h"
 #include "utils/Id.h"
 #include "utils/Log.h"
 #include <QSqlQuery>
@@ -13,6 +14,35 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
+
+/// 原子性写入文件：先写 .tmp 再 rename 替换，防止崩溃/断电导致半写损坏
+static bool writeFileAtomically(const QString &targetPath, const QByteArray &content)
+{
+    QString tmpPath = targetPath + QStringLiteral(".tmp");
+    QFile tmpFile(tmpPath);
+    if (!tmpFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        ltError(LT_LOG_PROJECT()) << "Failed to create temp file:" << tmpPath;
+        return false;
+    }
+    qint64 written = tmpFile.write(content);
+    tmpFile.flush();
+    tmpFile.close();
+    if (written != content.size()) {
+        ltError(LT_LOG_PROJECT()) << "Incomplete write to temp file:" << tmpPath
+                                  << "written=" << written << "expected=" << content.size();
+        QFile::remove(tmpPath);
+        return false;
+    }
+
+    // rename 不会覆盖已存在的目标文件，先移除
+    QFile::remove(targetPath);
+    if (!tmpFile.rename(targetPath)) {
+        ltError(LT_LOG_PROJECT()) << "Failed to rename temp file to:" << targetPath;
+        QFile::remove(tmpPath);
+        return false;
+    }
+    return true;
+}
 
 ProjectService::ProjectService(QObject *parent) : QObject(parent) {}
 
@@ -365,21 +395,233 @@ QVariantList ProjectService::listProjects()
     return projects;
 }
 
+QVariantMap ProjectService::previewProjectDeletion(const QString &projectId)
+{
+    ltTrace(LT_LOG_PROJECT()) << "previewProjectDeletion id=" << projectId;
+
+    QVariantMap summary;
+    summary["datasetCount"] = 0;
+    summary["sampleCount"] = 0;
+    summary["snapshotCount"] = 0;
+    summary["trainingRunCount"] = 0;
+    summary["modelCount"] = 0;
+    summary["taxonomyCount"] = 0;
+    summary["rootPath"] = QString();
+    summary["projectName"] = QString();
+
+    if (projectId.isEmpty()) return summary;
+
+    QSqlDatabase db = Database::instance().database();
+    QSqlQuery query(db);
+    query.prepare("SELECT name, root_path FROM projects WHERE id = ?");
+    query.addBindValue(projectId);
+    if (!query.exec() || !query.next()) {
+        ltWarning(LT_LOG_PROJECT()) << "previewProjectDeletion: project not found:" << projectId;
+        return summary;
+    }
+    summary["projectName"] = query.value(0).toString();
+    summary["rootPath"] = query.value(1).toString();
+
+    // 统计各子表受影响行数，供 UI 确认框展示删除影响摘要
+    auto countOf = [&db](const QString &sql, const QVariant &bind) -> int {
+        QSqlQuery q(db);
+        q.prepare(sql);
+        q.addBindValue(bind);
+        if (q.exec() && q.next()) return q.value(0).toInt();
+        return 0;
+    };
+
+    summary["datasetCount"] = countOf(
+        QStringLiteral("SELECT COUNT(*) FROM datasets WHERE project_id = ?"), projectId);
+    summary["sampleCount"] = countOf(
+        QStringLiteral("SELECT COUNT(*) FROM dataset_samples WHERE dataset_id IN "
+                       "(SELECT id FROM datasets WHERE project_id = ?)"), projectId);
+    summary["snapshotCount"] = countOf(
+        QStringLiteral("SELECT COUNT(*) FROM dataset_snapshots WHERE dataset_id IN "
+                       "(SELECT id FROM datasets WHERE project_id = ?)"), projectId);
+    summary["trainingRunCount"] = countOf(
+        QStringLiteral("SELECT COUNT(*) FROM training_runs WHERE project_id = ?"), projectId);
+    // model_versions 有两条来源路径（project_id 直挂 / 经 training_runs 关联），需两个绑定参数
+    {
+        QSqlQuery q(db);
+        q.prepare(QStringLiteral("SELECT COUNT(*) FROM model_versions WHERE project_id = ? "
+                                 "OR run_id IN (SELECT id FROM training_runs WHERE project_id = ?)"));
+        q.addBindValue(projectId);
+        q.addBindValue(projectId);
+        if (q.exec() && q.next()) summary["modelCount"] = q.value(0).toInt();
+    }
+    summary["taxonomyCount"] = countOf(
+        QStringLiteral("SELECT COUNT(*) FROM taxonomies WHERE project_id = ?"), projectId);
+
+    ltDebug(LT_LOG_PROJECT()) << "previewProjectDeletion summary:" << summary;
+    return summary;
+}
+
 bool ProjectService::deleteProject(const QString &projectId)
 {
     ltTrace(LT_LOG_PROJECT()) << "deleteProject id=" << projectId;
 
-    QSqlQuery query(Database::instance().database());
-    query.prepare("DELETE FROM projects WHERE id = ?");
-    query.addBindValue(projectId);
-    bool ok = query.exec();
-
-    if (ok) {
-        ltInfo(LT_LOG_PROJECT()) << "Project deleted:" << projectId;
-    } else {
-        ltError(LT_LOG_PROJECT()) << "Failed to delete project:" << query.lastError().text();
+    if (projectId.isEmpty()) {
+        ltError(LT_LOG_PROJECT()) << "deleteProject: empty projectId";
+        return false;
     }
-    return ok;
+
+    QSqlDatabase db = Database::instance().database();
+
+    // 1. 取出项目根路径与名称（磁盘清理在数据库事务成功提交后执行；审计需要删除前快照）
+    QString rootPath;
+    QString projectName;
+    {
+        QSqlQuery rootQuery(db);
+        rootQuery.prepare("SELECT root_path, name FROM projects WHERE id = ?");
+        rootQuery.addBindValue(projectId);
+        if (!rootQuery.exec() || !rootQuery.next()) {
+            ltError(LT_LOG_PROJECT()) << "deleteProject: project not found:" << projectId;
+            return false;
+        }
+        rootPath = rootQuery.value(0).toString();
+        projectName = rootQuery.value(1).toString();
+    }
+
+    // 审计快照：删除前统计连带影响，供事后追溯
+    const QVariantMap deletionPreview = previewProjectDeletion(projectId);
+
+    // 2. 临时关闭外键约束（事务外执行），避免子表删除顺序触犯约束
+    QSqlQuery pragmaQuery(db);
+    pragmaQuery.exec("PRAGMA foreign_keys = OFF");
+
+    if (!db.transaction()) {
+        ltError(LT_LOG_PROJECT()) << "deleteProject: failed to start transaction";
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
+        return false;
+    }
+
+    // 级联删除顺序：先叶子依赖，后主体记录（参考 DatasetService::deleteDataset）
+    struct CascadeStep {
+        const char *sql;
+        int bindCount;
+    };
+    const CascadeStep steps[] = {
+        // 训练指标（经 training_runs 关联）
+        {"DELETE FROM run_metrics WHERE run_id IN "
+         "(SELECT id FROM training_runs WHERE project_id = ?)", 1},
+        // 导出产物（经 model_versions 关联）
+        {"DELETE FROM export_artifacts WHERE model_version_id IN "
+         "(SELECT id FROM model_versions WHERE project_id = ? "
+         " OR run_id IN (SELECT id FROM training_runs WHERE project_id = ?))", 2},
+        // 辅助标注批次（经 dataset / model_version 关联）
+        {"DELETE FROM assisted_label_batches WHERE dataset_id IN "
+         "(SELECT id FROM datasets WHERE project_id = ?) OR model_version_id IN "
+         "(SELECT id FROM model_versions WHERE project_id = ? "
+         " OR run_id IN (SELECT id FROM training_runs WHERE project_id = ?))", 3},
+        // 测试运行
+        {"DELETE FROM testing_runs WHERE project_id = ?", 1},
+        // 模型版本（含外部导入的 project_id 直挂与训练产出的 run_id 关联）
+        {"DELETE FROM model_versions WHERE project_id = ? OR run_id IN "
+         "(SELECT id FROM training_runs WHERE project_id = ?)", 2},
+        // 训练运行
+        {"DELETE FROM training_runs WHERE project_id = ?", 1},
+        // 数据快照（经 datasets 关联）
+        {"DELETE FROM dataset_snapshots WHERE dataset_id IN "
+         "(SELECT id FROM datasets WHERE project_id = ?)", 1},
+        // 标注修订
+        {"DELETE FROM annotation_revisions WHERE dataset_id IN "
+         "(SELECT id FROM datasets WHERE project_id = ?)", 1},
+        // 类别映射修订
+        {"DELETE FROM class_mapping_revisions WHERE dataset_id IN "
+         "(SELECT id FROM datasets WHERE project_id = ?)", 1},
+        // 导入原始标签 schema
+        {"DELETE FROM imported_label_schemas WHERE dataset_id IN "
+         "(SELECT id FROM datasets WHERE project_id = ?)", 1},
+        // 数据集标签
+        {"DELETE FROM dataset_tags WHERE dataset_id IN "
+         "(SELECT id FROM datasets WHERE project_id = ?)", 1},
+        // 样本
+        {"DELETE FROM dataset_samples WHERE dataset_id IN "
+         "(SELECT id FROM datasets WHERE project_id = ?)", 1},
+        // 数据集
+        {"DELETE FROM datasets WHERE project_id = ?", 1},
+        // 类别体系
+        {"DELETE FROM taxonomies WHERE project_id = ?", 1},
+    };
+
+    for (const auto &step : steps) {
+        QSqlQuery delQuery(db);
+        delQuery.prepare(QString::fromUtf8(step.sql));
+        for (int i = 0; i < step.bindCount; ++i) {
+            delQuery.addBindValue(projectId);
+        }
+        if (!delQuery.exec()) {
+            ltError(LT_LOG_PROJECT()) << "deleteProject: cascade delete failed:"
+                                      << delQuery.lastError().text() << "sql=" << step.sql;
+            db.rollback();
+            pragmaQuery.exec("PRAGMA foreign_keys = ON");
+            return false;
+        }
+    }
+
+    // 最后删除项目本身
+    {
+        QSqlQuery projectQuery(db);
+        projectQuery.prepare("DELETE FROM projects WHERE id = ?");
+        projectQuery.addBindValue(projectId);
+        if (!projectQuery.exec()) {
+            ltError(LT_LOG_PROJECT()) << "deleteProject: failed to delete project row:"
+                                      << projectQuery.lastError().text();
+            db.rollback();
+            pragmaQuery.exec("PRAGMA foreign_keys = ON");
+            return false;
+        }
+    }
+
+    if (!db.commit()) {
+        ltError(LT_LOG_PROJECT()) << "deleteProject: commit failed:" << db.lastError().text();
+        db.rollback();
+        pragmaQuery.exec("PRAGMA foreign_keys = ON");
+        return false;
+    }
+    pragmaQuery.exec("PRAGMA foreign_keys = ON");
+
+    // 3. 若删除的是当前打开项目，先关闭
+    if (m_currentProjectId == projectId) {
+        closeProject();
+    }
+
+    // 4. 清理项目磁盘目录：仅删除已注册的项目根目录树
+    //    安全校验：路径非空、不是盘符根/文件系统根、目录存在
+    if (!rootPath.isEmpty()) {
+        QDir rootDir(rootPath);
+        QString canonical = rootDir.canonicalPath();
+        // 拒绝危险路径：空、根目录、盘符根（如 C:/ 或 /）
+        bool dangerous = canonical.isEmpty()
+                         || canonical == QStringLiteral("/")
+                         || canonical == QDir::rootPath()
+                         || QRegularExpression(QStringLiteral("^[A-Za-z]:[/\\\\]?$")).match(canonical).hasMatch();
+        if (dangerous) {
+            ltWarning(LT_LOG_PROJECT()) << "deleteProject: refuse to remove unsafe path:" << rootPath
+                                        << "canonical=" << canonical;
+        } else if (rootDir.exists()) {
+            if (rootDir.removeRecursively()) {
+                ltInfo(LT_LOG_PROJECT()) << "Project directory removed:" << canonical;
+            } else {
+                // 磁盘清理失败不影响数据库删除结果，但必须向上传播日志
+                ltError(LT_LOG_PROJECT()) << "Failed to remove project directory:" << canonical;
+            }
+        }
+    }
+
+    ltInfo(LT_LOG_PROJECT()) << "Project deleted with cascade:" << projectId;
+
+    // 审计：项目删除为不可逆操作，落库留痕（task_events 不随项目级联删除）
+    {
+        QVariantMap auditPayload;
+        auditPayload[QStringLiteral("projectName")] = projectName;
+        auditPayload[QStringLiteral("rootPath")] = rootPath;
+        auditPayload[QStringLiteral("cascade")] = deletionPreview;
+        AuditLog::record(QStringLiteral("project"), projectId,
+                         QStringLiteral("deleted"), auditPayload);
+    }
+    return true;
 }
 
 bool ProjectService::openProject(const QString &projectId)
@@ -499,6 +741,29 @@ bool ProjectService::setTaskType(const QString &projectId, const QString &taskTy
 
     ltError(LT_LOG_PROJECT()) << "Failed to set task type:" << query.lastError().text();
     return false;
+}
+
+QString ProjectService::thumbnailCacheDir(const QString &projectId)
+{
+    ltTrace(LT_LOG_PROJECT()) << "thumbnailCacheDir projectId=" << projectId;
+
+    if (projectId.isEmpty()) return {};
+
+    QSqlQuery query(Database::instance().database());
+    query.prepare("SELECT root_path FROM projects WHERE id = ?");
+    query.addBindValue(projectId);
+    if (!query.exec() || !query.next()) {
+        ltWarning(LT_LOG_PROJECT()) << "thumbnailCacheDir: project not found:" << projectId;
+        return {};
+    }
+
+    const QString rootPath = query.value(0).toString();
+    if (rootPath.isEmpty()) return {};
+
+    // 统一走 ProjectFs 派生 cache/thumbnails，避免各处硬编码相对路径
+    const QString thumbDir = ProjectFs::thumbnailsDir(rootPath);
+    QDir().mkpath(thumbDir);
+    return thumbDir;
 }
 
 bool ProjectService::saveProjectConfig(const QString &projectId)
@@ -652,17 +917,13 @@ bool ProjectService::saveProjectConfig(const QString &projectId)
     }
     rootObj["model_versions"] = modelsArray;
 
-    // 原子写入项目根目录下的 project.json 文件
+    // 原子写入项目根目录下的 project.json：先写 .tmp 再 rename，防止半写损坏
     QString configPath = rootPath + QStringLiteral("/project.json");
-    QFile file(configPath);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        ltError(LT_LOG_PROJECT()) << "saveProjectConfig: failed to open config file for writing:" << configPath;
+    QJsonDocument doc(rootObj);
+    if (!writeFileAtomically(configPath, doc.toJson(QJsonDocument::Indented))) {
+        ltError(LT_LOG_PROJECT()) << "saveProjectConfig: atomic write failed:" << configPath;
         return false;
     }
-
-    QJsonDocument doc(rootObj);
-    file.write(doc.toJson(QJsonDocument::Indented));
-    file.close();
 
     ltInfo(LT_LOG_PROJECT()) << "Project configuration synchronized to disk successfully:" << configPath;
     return true;

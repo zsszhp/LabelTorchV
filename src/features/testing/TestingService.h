@@ -38,6 +38,51 @@ public:
     Q_INVOKABLE bool updateTestTaskStatus(const QString &taskId, const QString &status);
     Q_INVOKABLE int reconcileStaleTasks();
 
+    /**
+     * @brief 获取逐类指标（P1-18）。
+     *
+     * 从 metrics_json.per_class 解析，字段稳定：
+     * classIndex, className, precision, recall, f1, ap50, ap,
+     * support, fn_count(漏检), fp_count(超检)
+     * 返回按 fn_count 降序（漏检最多在前）。
+     *
+     * @param taskId 测试任务 ID。
+     */
+    Q_INVOKABLE QVariantList getPerClassMetrics(const QString &taskId);
+
+    /**
+     * @brief 获取部署阈值推荐（P1-17）。
+     *
+     * 字段稳定：recommended_conf, method(max_f1|cost_weighted),
+     * f1_at_threshold, precision_at_threshold, recall_at_threshold,
+     * expected_miss_rate, expected_false_alarm_rate
+     *
+     * @param taskId 测试任务 ID。
+     */
+    Q_INVOKABLE QVariantMap getThresholdRecommendation(const QString &taskId);
+
+    /**
+     * @brief 获取 Go/No-Go 结论（P1-17，供 UI 结论卡）。
+     *
+     * 字段稳定：decision(go|no_go), gate_metric, gate_threshold, gate_value,
+     * gate_passed, regression_vs_baseline, baseline_value, current_value, reasons
+     *
+     * @param taskId 测试任务 ID。
+     */
+    Q_INVOKABLE QVariantMap getGoNoGo(const QString &taskId);
+
+    /**
+     * @brief 获取逐类 FP/FN 难例队列（P1-18，接入主动学习队列数据）。
+     *
+     * 从 active_learning_items 表按类别聚合 false-positive / false-negative
+     * 样本，与 getPerClassMetrics 的 classIndex 对齐。
+     *
+     * @param taskId 测试任务 ID（用于解析项目/数据集上下文，可为空）。
+     * @return QVariantList，元素：classIndex, className, fnCount, fpCount,
+     *         fnSamples([{samplePath, reason, confidence}]), fpSamples([...])
+     */
+    Q_INVOKABLE QVariantList getPerClassErrorQueue(const QString &taskId = QString());
+
 signals:
     void testTaskStatusChanged(const QString &taskId, const QString &status);
     void testProgress(const QString &taskId, int current, int total, const QVariantMap &metrics);
@@ -46,6 +91,9 @@ signals:
 private:
     void handleTestingEvent(const QVariantMap &event);
     void onResponseReceived(const QJsonObject &response);
+
+    /// 从 metrics_json 解析嵌套字段（per_class / threshold_recommendation / go_no_go）
+    static QVariantMap parseMetricsJson(const QString &metricsJson);
 
     IpcClient *m_ipcClient = nullptr;
     ModelRegistry *m_modelRegistry = nullptr;

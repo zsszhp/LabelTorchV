@@ -46,6 +46,7 @@ constexpr const char *CMD_DATASET_CONVERT_TO_YOLO = "dataset.convert_to_yolo"; /
 constexpr const char *EVENT_TASK_STARTED = "task.started";
 constexpr const char *EVENT_TASK_PROGRESS = "task.progress";
 constexpr const char *EVENT_TASK_LOG = "task.log";
+constexpr const char *EVENT_TASK_LOG_BATCH = "task.log_batch"; ///< P1-25：批量日志（100ms/50行合并）
 constexpr const char *EVENT_TASK_WARNING = "task.warning";
 constexpr const char *EVENT_TASK_FAILED = "task.failed";
 constexpr const char *EVENT_TASK_SUCCEEDED = "task.succeeded";

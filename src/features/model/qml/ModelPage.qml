@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import LabelTorch.Theme
+import LabelTorch.Components
 import QtQuick.Layouts
 
 Item {
@@ -57,7 +58,7 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }
-            onClicked: appController.currentPageIndex = 0
+            onClicked: appController.currentPage = "project"
         }
     }
 
@@ -180,6 +181,17 @@ Item {
                                 color: Theme.textMuted
                                 font.pixelSize: 14
                                 horizontalAlignment: Text.AlignHCenter
+                            }
+
+                            EmptyState {
+                                anchors.centerIn: parent
+                                width: parent.width - Theme.spacingXLarge * 2
+                                visible: versionList.count === 0
+                                icon: "brain"
+                                title: "暂无模型版本"
+                                description: "完成训练后将自动注册版本，也可在训练页启动首个任务"
+                                actionText: "前往训练"
+                                onActionClicked: appController.currentPage = "training"
                             }
 
                             delegate: Rectangle {

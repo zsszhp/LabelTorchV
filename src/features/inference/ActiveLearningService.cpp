@@ -1,8 +1,13 @@
 #include "ActiveLearningService.h"
+#include "Database.h"
 #include "ipc/IpcClient.h"
 #include "utils/Log.h"
 
 #include <QJsonDocument>
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QCryptographicHash>
+#include <QUuid>
 
 ActiveLearningService::ActiveLearningService(QObject* parent)
     : QObject(parent)
@@ -159,7 +164,10 @@ void ActiveLearningService::onResponseReceived(const QJsonObject& response)
             ltInfo(LT_LOG_INFERENCE()) << "Low conf samples collected:" << totalSamples;
 
             for (int i = 0; i < collectedSamples.size(); ++i) {
-                m_lowConfQueue.append(collectedSamples[i]);
+                QJsonObject sample = collectedSamples[i].toObject();
+                // P1-14：收集结果持久化入库，防止重启丢失
+                persistItem(QStringLiteral("low-confidence"), sample);
+                m_lowConfQueue.append(sample);
             }
 
             emit samplesCollected(collectedSamples, totalSamples);
@@ -189,6 +197,13 @@ void ActiveLearningService::addSampleToQueue(const QString& queueType,
 {
     QJsonArray* queue = getQueueByType(queueType);
     if (queue) {
+        // P1-14：先落库再进内存，失败时不上内存，保证两边一致
+        if (!persistItem(queueType, sample)) {
+            ltError(LT_LOG_INFERENCE()) << "Failed to persist queue item:" << queueType
+                                        << "path:" << sample["path"].toString();
+            emit error(tr("主动学习队列条目写入数据库失败"));
+            return;
+        }
         queue->append(sample);
         ltInfo(LT_LOG_INFERENCE()) << "Added sample to queue:" << queueType
                                    << "path:" << sample["path"].toString()
@@ -199,6 +214,18 @@ void ActiveLearningService::addSampleToQueue(const QString& queueType,
 void ActiveLearningService::removeSampleFromQueue(const QString& queueType,
                                                     const QString& samplePath)
 {
+    auto db = Database::instance().database();
+    if (db.isOpen()) {
+        QSqlQuery query(db);
+        query.prepare("UPDATE active_learning_items SET status = 'discarded', updated_at = CURRENT_TIMESTAMP "
+                      "WHERE queue_type = ? AND sample_path = ? AND status = 'queued'");
+        query.addBindValue(queueType);
+        query.addBindValue(samplePath);
+        if (!query.exec()) {
+            ltError(LT_LOG_INFERENCE()) << "Failed to discard queue item:" << query.lastError().text();
+        }
+    }
+
     QJsonArray* queue = getQueueByType(queueType);
     if (queue) {
         QJsonArray newQueue;
@@ -217,6 +244,17 @@ void ActiveLearningService::removeSampleFromQueue(const QString& queueType,
 
 void ActiveLearningService::clearQueue(const QString& queueType)
 {
+    auto db = Database::instance().database();
+    if (db.isOpen()) {
+        QSqlQuery query(db);
+        query.prepare("UPDATE active_learning_items SET status = 'discarded', updated_at = CURRENT_TIMESTAMP "
+                      "WHERE queue_type = ? AND status = 'queued'");
+        query.addBindValue(queueType);
+        if (!query.exec()) {
+            ltError(LT_LOG_INFERENCE()) << "Failed to clear queue in db:" << query.lastError().text();
+        }
+    }
+
     QJsonArray* queue = getQueueByType(queueType);
     if (queue) {
         *queue = QJsonArray();
@@ -226,6 +264,9 @@ void ActiveLearningService::clearQueue(const QString& queueType)
 
 QJsonArray ActiveLearningService::getQueueSamples(const QString& queueType) const
 {
+    // P1-14：数据库是权威数据源，重启后从此恢复
+    const_cast<ActiveLearningService*>(this)->refreshQueueFromDb(queueType);
+
     const QJsonArray* queue = nullptr;
 
     if (queueType == "low-confidence") {
@@ -243,7 +284,26 @@ QJsonArray ActiveLearningService::getQueueSamples(const QString& queueType) cons
 
 QVariantMap ActiveLearningService::getAllQueueStats() const
 {
+    // 统计以数据库为准，保证重启后数量正确
     QVariantMap stats;
+    auto db = Database::instance().database();
+    if (db.isOpen()) {
+        QSqlQuery query(db);
+        query.prepare("SELECT queue_type, COUNT(*) FROM active_learning_items "
+                      "WHERE status = 'queued' GROUP BY queue_type");
+        if (query.exec()) {
+            int total = 0;
+            while (query.next()) {
+                int count = query.value(1).toInt();
+                stats[query.value(0).toString()] = count;
+                total += count;
+            }
+            stats["total"] = total;
+            return stats;
+        }
+    }
+
+    // 数据库不可用时退回内存统计
     stats["low-confidence"] = m_lowConfQueue.size();
     stats["false-positive"] = m_falsePositiveQueue.size();
     stats["false-negative"] = m_falseNegativeQueue.size();
@@ -265,4 +325,109 @@ QJsonArray* ActiveLearningService::getQueueByType(const QString& queueType)
         return &m_hardCaseQueue;
     }
     return nullptr;
+}
+
+bool ActiveLearningService::persistItem(const QString& queueType, const QJsonObject& sample)
+{
+    auto db = Database::instance().database();
+    if (!db.isOpen()) {
+        ltError(LT_LOG_INFERENCE()) << "Cannot persist active learning item: database not open";
+        return false;
+    }
+
+    QString samplePath = sample.value("path").toString();
+    if (samplePath.isEmpty()) {
+        ltWarning(LT_LOG_INFERENCE()) << "Skip persisting active learning item without path";
+        return false;
+    }
+
+    // 同路径同队列复用确定性主键，重复入队走 UPSERT，避免重复条目堆积
+    // 用 SHA-256 派生稳定 ID，保证同一 (queueType, samplePath) 恒等
+    const QString itemId = QString::fromLatin1(
+        QCryptographicHash::hash((queueType + QChar('|') + samplePath).toUtf8(),
+                                 QCryptographicHash::Sha256).toHex().left(32));
+
+    QSqlQuery query(db);
+    query.prepare(
+        "INSERT INTO active_learning_items "
+        "(id, queue_type, sample_path, sample_id, dataset_id, project_id, reason, priority, "
+        " confidence, class_index, class_name, payload_json, status) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued') "
+        "ON CONFLICT(id) DO UPDATE SET "
+        "  queue_type = excluded.queue_type, payload_json = excluded.payload_json, "
+        "  confidence = excluded.confidence, priority = excluded.priority, "
+        "  status = 'queued', updated_at = CURRENT_TIMESTAMP"
+    );
+    query.addBindValue(itemId);
+    query.addBindValue(queueType);
+    query.addBindValue(samplePath);
+    query.addBindValue(sample.value("sampleId").toString());
+    query.addBindValue(sample.value("datasetId").toString());
+    query.addBindValue(sample.value("projectId").toString());
+    query.addBindValue(sample.value("reason").toString());
+    // QVariant::toInt/toDouble 无默认值参数，缺失时显式回退
+    query.addBindValue(sample.contains("priority") ? sample.value("priority").toInt() : 0);
+    {
+        double conf = 0.0;
+        if (sample.contains("confidence")) {
+            conf = sample.value("confidence").toDouble();
+        } else if (sample.contains("max_confidence")) {
+            conf = sample.value("max_confidence").toDouble();
+        }
+        query.addBindValue(conf);
+    }
+    {
+        int clsIdx = -1;
+        if (sample.contains("classIndex")) {
+            clsIdx = sample.value("classIndex").toInt();
+        } else if (sample.contains("class_id")) {
+            clsIdx = sample.value("class_id").toInt();
+        }
+        query.addBindValue(clsIdx);
+    }
+    query.addBindValue(sample.value("className").toString());
+    query.addBindValue(QString::fromUtf8(QJsonDocument(sample).toJson(QJsonDocument::Compact)));
+
+    if (!query.exec()) {
+        ltError(LT_LOG_INFERENCE()) << "Failed to insert active learning item:"
+                                    << query.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+QJsonArray ActiveLearningService::loadQueueFromDb(const QString& queueType)
+{
+    QJsonArray items;
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return items;
+
+    QSqlQuery query(db);
+    query.prepare("SELECT payload_json FROM active_learning_items "
+                  "WHERE queue_type = ? AND status = 'queued' "
+                  "ORDER BY priority DESC, confidence ASC, created_at ASC");
+    query.addBindValue(queueType);
+    if (!query.exec()) {
+        ltError(LT_LOG_INFERENCE()) << "Failed to load active learning queue:"
+                                    << query.lastError().text();
+        return items;
+    }
+
+    while (query.next()) {
+        QString payloadJson = query.value(0).toString();
+        if (payloadJson.isEmpty()) continue;
+        QJsonDocument doc = QJsonDocument::fromJson(payloadJson.toUtf8());
+        if (doc.isObject()) {
+            items.append(doc.object());
+        }
+    }
+    return items;
+}
+
+void ActiveLearningService::refreshQueueFromDb(const QString& queueType)
+{
+    QJsonArray* queue = getQueueByType(queueType);
+    if (queue) {
+        *queue = loadQueueFromDb(queueType);
+    }
 }

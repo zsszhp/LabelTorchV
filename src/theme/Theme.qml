@@ -55,6 +55,12 @@ QtObject {
     readonly property color glowRed: "#20FF1744"
     readonly property color glowGreen: "#2000E676"
 
+    // === 品牌/发光（顶栏 Logo 等） ===
+    readonly property color logoText: "#C8D4E0"
+    readonly property color logoBgText: "#FFFFFF"
+    readonly property color glowCyanRaw: "#00E5FF"
+    readonly property color overlayMask: "#B3000000"
+
     // === 磨砂玻璃 ===
     readonly property real glassOpacity: 0.92
     readonly property real glassOpacityLight: 0.70
@@ -109,6 +115,29 @@ QtObject {
     // === 动画 ===
     readonly property int animDuration: 200
     readonly property int animDurationSlow: 300
+    readonly property int animDurationFast: 120
+
+    // === Toast 反馈 ===
+    readonly property int toastSuccessDuration: 2000   // 成功提示自动消失
+    readonly property int toastErrorDuration: 0        // 0 = 常驻，需手动关闭
+    readonly property int toastWidth: 320
+    readonly property int toastMaxVisible: 3
+    readonly property color toastSuccessBg: "#1A00E676"
+    readonly property color toastErrorBg: "#1AFF1744"
+    readonly property color toastInfoBg: "#1A00E5FF"
+
+    // === 空态与确认弹窗 ===
+    readonly property int emptyIconSize: 48
+    readonly property int confirmDialogWidth: 440
+    readonly property int overlayMaskAlpha: 179         // 0xB3 的十进制，弹窗遮罩不透明度
+
+    // === 导航分组 ===
+    readonly property int navGroupGap: 14
+    readonly property color navGroupDivider: "#2A3344"
+
+    // === 表单校验 ===
+    readonly property color fieldErrorBorder: danger
+    readonly property color fieldErrorText: "#FF8A9B"
 
     // === 布局尺寸 ===
     readonly property int headerHeight: 50
@@ -140,5 +169,19 @@ QtObject {
 
     function classColor(index) {
         return classColors[index % classColors.length]
+    }
+
+    // 数值兜底：把 NaN / Infinity 归一到 fallback
+    // 用于 QML 绑定表达式，避免非法几何进入布局引擎（Qt 6.11 Debug 会 qFatal）
+    function safeNum(value, fallback) {
+        if (typeof value !== "number") return fallback
+        if (!isFinite(value)) return fallback
+        return value
+    }
+
+    // 非负尺寸兜底：宽高/间距等不允许出现负数或 NaN
+    function safeSize(value, fallback) {
+        var n = safeNum(value, fallback)
+        return n > 0 ? n : fallback
     }
 }

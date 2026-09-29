@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import LabelTorch.Theme
+import LabelTorch.Components
 import QtQuick.Layouts
 
 Item {
@@ -107,7 +108,7 @@ Item {
                 Label {
                     Layout.fillWidth: true
                     text: compareMode === "horizontal"
-                          ? "对比同一数据快照上训练的版本"
+                          ? "对比同一数据冻结版上训练的版本"
                           : "对比同一增量训练链中的版本"
                     color: Theme.textMuted
                     font.pixelSize: 10
@@ -131,6 +132,17 @@ Item {
                         color: Theme.textMuted
                         font.pixelSize: 14
                         horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    EmptyState {
+                        anchors.centerIn: parent
+                        width: parent.width - Theme.spacingXLarge * 2
+                        visible: versionCheckList.count === 0
+                        icon: "flask"
+                        title: "暂无模型版本"
+                        description: "完成训练后注册的版本会出现在此处，可勾选进行指标对比"
+                        actionText: "前往训练"
+                        onActionClicked: appController.currentPage = "training"
                     }
 
                     delegate: Rectangle {

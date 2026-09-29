@@ -26,7 +26,7 @@ Item {
             width: root.small ? Theme.toggleSmallHeight - 4 : Theme.toggleHeight - 4
             height: width
             radius: width / 2
-            color: "#FFFFFF"
+            color: Theme.logoBgText
             y: (parent.height - height) / 2
             x: root.checked ? parent.width - width - 2 : 2
             Behavior on x { NumberAnimation { duration: Theme.animDuration; easing.type: Easing.InOutQuad } }

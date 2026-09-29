@@ -13,7 +13,14 @@ Item {
         id: shape
         width: 24
         height: 24
-        scale: Math.min(control.width / 24, control.height / 24)
+        // 宽高在布局未就绪时可能为 0/NaN，scale 必须兜底
+        // NaN scale 会进入变换矩阵，最终在场景图整数转换时触发 qCheckedFPConversionToInteger
+        scale: {
+            var sx = control.width > 0 ? control.width / 24 : 1.0
+            var sy = control.height > 0 ? control.height / 24 : 1.0
+            var s = Math.min(sx, sy)
+            return isFinite(s) && s > 0 ? s : 1.0
+        }
         transformOrigin: Item.TopLeft
 
         layer.enabled: true

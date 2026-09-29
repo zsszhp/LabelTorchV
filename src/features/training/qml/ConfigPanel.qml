@@ -698,7 +698,7 @@ Rectangle {
                     border.color: ampSwitch.checked ? Theme.primaryGlow : Theme.borderColor
                     border.width: 1
 
-                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
 
                     Rectangle {
                         x: ampSwitch.checked ? parent.width - width - 2 : 2
@@ -708,8 +708,8 @@ Rectangle {
                         radius: 7
                         color: ampSwitch.checked ? Theme.primaryGlow : Theme.textMuted
                         
-                        Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.InOutQuad } }
-                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on x { NumberAnimation { duration: Theme.animDurationFast; easing.type: Easing.InOutQuad } }
+                        Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
                     }
                 }
             }
@@ -742,7 +742,7 @@ Rectangle {
                     border.color: resumeSwitch.checked ? Theme.primaryGlow : Theme.borderColor
                     border.width: 1
 
-                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
 
                     Rectangle {
                         x: resumeSwitch.checked ? parent.width - width - 2 : 2
@@ -752,8 +752,8 @@ Rectangle {
                         radius: 7
                         color: resumeSwitch.checked ? Theme.primaryGlow : Theme.textMuted
                         
-                        Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.InOutQuad } }
-                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on x { NumberAnimation { duration: Theme.animDurationFast; easing.type: Easing.InOutQuad } }
+                        Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
                     }
                 }
             }

@@ -72,17 +72,20 @@ LabelTorchV/
 │   │   └── AppController.h/cpp     # 全局状态：当前页面、当前项目、后端就绪状态
 │   ├── core/                       # 核心基础设施 (labeltorch_core 静态库)
 │   │   ├── cache/
-│   │   │   └── ThumbnailCache      # 内存缩略图缓存 (QCache)
+│   │   │   ├── ThumbnailCache      # 内存缩略图缓存 (QCache，按字节限容)
+│   │   │   ├── ThumbnailProvider   # QQuickImageProvider 缩略图供给
+│   │   │   └── ImageDecodeCache    # 画布单次解码缓存
 │   │   ├── database/
-│   │   │   ├── Database            # SQLite 单例，连接/迁移管理
-│   │   │   └── Schema              # 14张表DDL常量
+│   │   │   ├── Database            # SQLite 单例，连接/迁移管理（schema V4）
+│   │   │   └── Schema              # 核心表DDL + 性能索引常量
 │   │   ├── filesystem/
 │   │   │   └── ProjectFs           # 项目目录结构管理
 │   │   ├── ipc/
-│   │   │   ├── IpcClient           # QProcess管理Python后端，JSON-RPC收发
+│   │   │   ├── IpcClient           # QProcess管理Python后端，JSON-RPC收发，指数退避重启
 │   │   │   └── IpcProtocol         # IPC消息类型、命令常量、事件类型定义
 │   │   ├── utils/
 │   │   │   ├── AppSettings         # QSettings封装（最近项目、Python路径、窗口状态）
+│   │   │   ├── AuditLog            # 统一审计日志（写入 task_events）
 │   │   │   ├── Id                  # UUID生成
 │   │   │   ├── JsonHelper          # JSON序列化工具
 │   │   │   └── Log                 # 分模块日志系统 (lt.core/lt.ipc/lt.db/...)
@@ -90,9 +93,9 @@ LabelTorchV/
 │   │   └── CMakeLists.txt
 │   ├── features/                   # 业务功能模块
 │   │   ├── project/                # 项目管理 + 类别体系
-│   │   │   ├── ProjectService      # 项目CRUD、任务类型管理
+│   │   │   ├── ProjectService      # 项目CRUD、任务类型管理、级联删除+审计
 │   │   │   ├── ProjectModel        # 项目列表QAbstractListModel
-│   │   │   ├── TaxonomyService     # 类别体系版本管理
+│   │   │   ├── TaxonomyService     # 类别体系版本管理（废弃保留id）
 │   │   │   ├── TaxonomyModel       # 类别列表Model
 │   │   │   └── qml/                # ProjectPage, TaxonomyPage, ProjectCard, TaskTypeSwitcher
 │   │   ├── dataset/                # 数据集导入/扫描/统计/异常检测
@@ -133,19 +136,23 @@ LabelTorchV/
 │   │   │   ├── AnomalyService      # 异常检测推理
 │   │   │   ├── AnomalyDetector     # 异常检测器封装
 │   │   │   ├── AssistedLabelService # 辅助标注审核
-│   │   │   ├── ActiveLearningService # 主动学习（低置信/误检/漏检/难例队列）
-│   │   │   └── qml/                # ActiveLearningPage, AnomalyInferPanel, AssistedLabelPanel, ReviewDialog等
+│   │   │   ├── ActiveLearningService # 主动学习（低置信/误检/漏检/难例队列，落库 active_learning_items）
+│   │   │   └── qml/                # AssistPage(智能辅助), ActiveLearningPage, AnomalyInferPanel, VideoInferencePage, ReviewDialog等
+│   │   ├── testing/                # 模型测试评估
+│   │   │   ├── TestingService      # 评估运行、PR曲线/混淆矩阵/逐类指标、阈值推荐
+│   │   │   └── qml/                # TestingPage
 │   │   └── export/                 # 模型导出 (pt/onnx/tflite/engine) + 产物验证
-│   │       ├── ExportService       # 导出生命周期（pending→running→verifying→succeeded/failed）
+│   │       ├── ExportService       # 导出生命周期（pending→running→verifying→succeeded/failed）+ 交付目录
 │   │       └── qml/                # ExportPage, OnnxConfigPanel
+│   ├── components/                 # 通用QML组件（LabelTorch.Components）
+│   │   └── qml/                    # Toast/ToastBus, EmptyState, ConfirmDialog, FormField,
+│   │                               # ModalDialog, Splitter, ToggleSwitch, Stepper, FilterBar 等
+│   ├── theme/                      # Theme.qml 设计系统（颜色/字体/间距/圆角/动画/阴影令牌）
 │   ├── shell/                      # QML Shell层
 │   │   ├── qml/
-│   │   │   ├── Main.qml            # 主窗口：可折叠导航栏 + StackLayout + 日志面板
-│   │   │   ├── NavTree.qml         # 导航项列表
-│   │   │   ├── StatusBar.qml       # 状态栏
-│   │   │   ├── TaskPanel.qml       # 任务面板
-│   │   │   ├── LogPanel.qml        # 日志面板（可折叠）
-│   │   │   └── Theme.qml           # 全局主题/颜色/字体/间距定义（深靛蓝+粉红强调色）
+│   │   │   ├── Main.qml            # 主窗口：可折叠导航栏 + StackLayout + 日志面板 + 快捷键
+│   │   │   ├── SvgIcon.qml         # SVG图标渲染
+│   │   │   └── LogPanel.qml        # 日志面板（可折叠）
 │   │   └── CMakeLists.txt
 │   └── CMakeLists.txt              # 汇总子模块
 ├── backend/                        # Python 后端
@@ -180,10 +187,26 @@ LabelTorchV/
 │   ├── test_model.cpp              # 模型服务测试
 │   ├── test_inference.cpp          # 推理服务测试
 │   ├── test_export.cpp             # 导出服务测试
+│   ├── test_classify.cpp           # 分类端到端测试
+│   ├── test_audit_log.cpp          # 审计落库与指标历史双路测试（P2-12）
+│   ├── test_snapshot_hash.cpp      # 快照哈希冻结测试（P0-1）
+│   ├── test_taxonomy_delete.cpp    # 类别删除防错位测试（P0-2）
+│   ├── test_export_verify.cpp      # 导出验证闭环测试（P0-3）
+│   ├── test_labelio_atomic.cpp     # 标签原子写入测试（P0-4）
+│   ├── test_project_cascade.cpp    # 项目删除级联测试（P0-5）
+│   ├── test_dataset_hash.cpp       # hash落库与去重测试（P0-6）
+│   ├── test_ipc_restart.cpp        # 后端进程治理测试（P0-8）
+│   ├── test_thumbnail_lifecycle.cpp # 缩略图生命周期测试（P0-11）
+│   ├── test_p1_workflow.cpp        # P1主工作流闭环测试
+│   ├── test_thumbnail_cache.cpp    # 缩略图限容测试（P1-21）
+│   ├── test_perf_indexes.cpp       # 数据库索引测试（P1-23）
 │   └── CMakeLists.txt
 ├── scripts/                        # 构建/部署脚本
 ├── docs/                           # 设计文档
+│   └── 用户手册/                    # 终端用户手册（01~06）
 ├── installer/                      # IFW安装包配置
+├── LICENSE                         # MIT 许可证
+├── CHANGELOG.md                    # 版本变更记录
 └── .ai_context.md                  # AI共享记忆（多IDE同步用）
 ```
 
@@ -194,7 +217,7 @@ LabelTorchV/
 ### 5.1 整体架构
 
 ```
-QML UI 层 (Main.qml + 7个功能页面 + Theme.qml)
+QML UI 层 (Main.qml + 8个主导航页 + 6个孤页 + Theme.qml + Components)
   ↓ setContextProperty 注入
 C++ Service 层 (ProjectService / DatasetService / AnnotationService / TrainingService / ...)
   ↓ SQLite / IPC
@@ -209,13 +232,15 @@ Python 后端 (IpcServer + Handlers + Adapters)
 
 | 模块 | 路径 | 核心类 | 职责 |
 |------|------|--------|------|
-| **项目管理** | `src/features/project/` | ProjectService, TaxonomyService | 项目CRUD、任务类型(detect/obb/classify/anomaly)、类别体系版本管理 |
-| **数据集** | `src/features/dataset/` | DatasetService, ImportScanner, ClassMappingService | YOLO/COCO/Anomaly格式导入、样本扫描统计、异常检测、类别映射 |
+| **项目管理** | `src/features/project/` | ProjectService, TaxonomyService | 项目CRUD、任务类型(detect/obb/classify/anomaly)、级联删除+审计、类别体系版本管理 |
+| **数据集** | `src/features/dataset/` | DatasetService, ImportScanner, ClassMappingService, TagService | YOLO/COCO/Anomaly格式导入、样本扫描统计、异常检测、类别映射、数据集标签 |
 | **标注** | `src/features/annotation/` | AnnotationService, AnnotationModel, CanvasController | HBB/OBB/分类/异常标注、YOLO txt读写、修订追踪（undo/audit） |
-| **训练** | `src/features/training/` | TrainingService, SnapshotService | 训练任务生命周期、数据快照（不可变）、train/val划分 |
-| **模型** | `src/features/model/` | ModelRegistry, MetricService | 模型版本注册与血缘追踪、标签(baseline/best/production)、指标对比 |
-| **推理** | `src/features/inference/` | InferenceService, AnomalyService, AssistedLabelService, ActiveLearningService | 批量推理、异常检测推理、辅助标注审核、主动学习 |
-| **导出** | `src/features/export/` | ExportService | 模型导出(pt/onnx/tflite/engine)、产物验证(ONNX Runtime校验) |
+| **训练** | `src/features/training/` | TrainingService, SnapshotService | 训练任务生命周期、数据冻结版（哈希冻结快照）、失败诊断(failure_info_json)、train/val划分 |
+| **模型** | `src/features/model/` | ModelRegistry, MetricService | 模型版本注册与血缘追踪、标签(baseline/best/production)、指标对比、run_metrics 指标历史 |
+| **推理** | `src/features/inference/` | InferenceService, AnomalyService, AssistedLabelService, ActiveLearningService | 批量推理、异常检测推理、辅助标注审核、难例挖掘（active_learning_items 落库） |
+| **测试** | `src/features/testing/` | TestingService | 模型评估运行、PR曲线/混淆矩阵、逐类指标、部署阈值推荐 |
+| **导出** | `src/features/export/` | ExportService | 模型导出(pt/onnx/tflite/engine)、产物验证(ONNX Runtime校验)、交付目录 |
+| **通用组件** | `src/components/` | Toast/ToastBus, EmptyState, ConfirmDialog, FormField 等 | UX反馈体系：Toast通知、空态引导、危险操作确认、表单校验 |
 
 ### 5.3 后端模块功能
 
@@ -308,24 +333,47 @@ TrainingAdapter (抽象基类，7个抽象方法)
 
 ---
 
-## 7. 数据库 Schema（14张核心表）
+## 7. 数据库 Schema（17张核心表，schema V4）
 
 | 表名 | 用途 | 关键字段 |
 |------|------|----------|
 | `projects` | 项目信息 | id, name, root_path, task_type, default_device, default_model_family |
 | `taxonomies` | 类别体系定义 | id, project_id, name, version, class_definitions_json |
 | `datasets` | 数据集元信息 | id, project_id, name, image_root, label_root, format, sample_count, import_status |
-| `dataset_samples` | 样本记录 | id, dataset_id, image_path, label_path, width, height, hash, validation_status, split |
+| `dataset_samples` | 样本记录 | id, dataset_id, image_path, label_path, width, height, hash, validation_status, split, error_code |
 | `imported_label_schemas` | 导入时原始标签schema | id, dataset_id, raw_class_names_json, raw_class_order_json, source_format |
 | `class_mapping_revisions` | 类别映射修订记录 | id, dataset_id, source_schema_id, target_taxonomy_id, mapping_rules_json |
 | `annotation_revisions` | 标注修订记录 | id, dataset_id, sample_id, source_type, before_snapshot_json, after_snapshot_json |
-| `dataset_snapshots` | 数据快照（不可变） | id, dataset_id, sample_manifest_json, split_manifest_json, taxonomy_version |
-| `training_runs` | 训练运行记录 | id, project_id, snapshot_id, config_snapshot_json, status, log_uri |
-| `model_versions` | 模型版本 | id, run_id, parent_model_version_id, best_weight_path, last_weight_path, metrics_snapshot_json |
-| `assisted_label_batches` | 辅助标注批次 | id, model_version_id, dataset_id, target_sample_scope, conf_threshold, candidate_snapshot_json |
-| `export_artifacts` | 导出产物记录 | id, model_version_id, format, options_snapshot_json, output_path, validation_result |
+| `dataset_snapshots` | 数据冻结版（快照，不可变） | id, dataset_id, sample_manifest_json, split_manifest_json, taxonomy_version, annotation_revision_boundary |
+| `training_runs` | 训练运行记录 | id, project_id, snapshot_id, config_snapshot_json, runtime_env_snapshot_json, status, log_uri, **failure_info_json** |
+| `model_versions` | 模型版本（训练产出/外部导入） | id, run_id, parent_model_version_id, best_weight_path, last_weight_path, metrics_snapshot_json, source, project_id, import_source_json |
+| `assisted_label_batches` | 辅助标注批次 | id, model_version_id, dataset_id, target_sample_scope, conf_threshold, iou_threshold, candidate_snapshot_json |
+| `export_artifacts` | 导出产物记录 | id, model_version_id, format, options_snapshot_json, output_path, validation_result, status |
 | `task_events` | 任务事件审计日志 | id, task_type, task_id, event_type, payload_json |
 | `run_metrics` | 训练指标（每epoch） | id, run_id, epoch, metric_name, metric_value |
+| `testing_runs` | 测试运行记录 | id, project_id, model_version_id, snapshot_id, config_json, status, metrics_json, confusion_matrix_json, pr_curve_json |
+| `dataset_tags` | 数据集标签（分类筛选） | id, dataset_id, name, shortcut |
+| `active_learning_items` | 难例挖掘队列（重启不丢） | id, queue_type, sample_path, sample_id, dataset_id, project_id, reason, priority, confidence, class_index, class_name, payload_json, status |
+
+### 7.1 迁移版本
+
+| 版本 | 内容 |
+|------|------|
+| V1 | 基线 schema |
+| V2 | model_versions 新增 source / import_source_json，run_id 放宽为可空（支持外部导入模型） |
+| V3 | training_runs 新增 failure_info_json（训练失败日志尾部 + 结构化诊断） |
+| V4 | 核心查询路径性能索引（dataset_samples / run_metrics / task_events / training_runs / model_versions 等） |
+
+### 7.2 审计（P2-12）
+
+`AuditLog::record(taskType, taskId, eventType, payload)` 统一写入 `task_events`，已接入：
+
+- ProjectService::deleteProject（project/deleted，含删除前级联摘要）
+- DatasetService::deleteDataset（dataset/deleted）、importDataset（dataset/imported）
+- TrainingService::startTraining / stopTraining / deleteRun（train_start / train_stop / deleted）
+- ExportService::exportModel（export/export_start）
+
+`MetricService::getMetricHistory` 双路兼容：优先查 `run_metrics`，无数据时回退 `task_events.epoch_complete`。
 
 ---
 
@@ -357,30 +405,64 @@ TrainingAdapter (抽象基类，7个抽象方法)
 ### 9.1 主窗口布局
 
 `Main.qml` 采用三栏布局：
-1. **左侧可折叠导航栏**（200px展开/64px折叠）：7个导航项 + GPU状态 + Python后端连接状态
-2. **中间内容区**（StackLayout）：7个功能页面通过 Loader 按需加载
-3. **底部日志面板**（可折叠，160px展开/28px折叠）
+1. **左侧可折叠导航栏**（200px展开/64px折叠）：8个主导航项（按任务类型裁剪）+ GPU状态 + Python后端连接状态
+2. **中间内容区**（StackLayout）：主 8 页 + 孤 6 页，共 14 个 Loader 按需加载
+3. **底部日志面板**（可折叠，使用 Theme.logPanelHeight）
 
-### 9.2 页面路由
+### 9.2 主导航页面（8 页）
 
-| 索引 | pageId | QML页面 | 需要项目 |
-|------|--------|---------|----------|
-| 0 | project | ProjectPage.qml | 否 |
-| 1 | taxonomy | TaxonomyPage.qml | 否 |
-| 2 | dataset | ImportPage.qml | 是 |
-| 3 | annotation | AnnotationPage.qml | 是 |
-| 4 | training | TrainingPage.qml | 是 |
-| 5 | model | ModelPage.qml | 是 |
-| 6 | export | ExportPage.qml | 是 |
+| 索引 | pageId | QML页面 | 分组 | 需要项目 |
+|------|--------|---------|------|----------|
+| 0 | project | ProjectPage.qml | 数据 | 否 |
+| 1 | dataset | DatasetPage.qml | 数据 | 是 |
+| 2 | check | CheckPage.qml | 数据 | 是 |
+| 3 | annotation | AnnotationPage.qml | 数据 | 是 |
+| 4 | training | TrainingPage.qml | 训练评估 | 是 |
+| 5 | test | TestingPage.qml | 训练评估 | 是 |
+| 6 | assist | AssistPage.qml | 交付 | 是 |
+| 7 | export | ExportPage.qml | 交付 | 是 |
 
-### 9.3 Theme.qml 设计系统
+### 9.3 孤页入口（不占导航，宿主页面跳转，标题栏显示「返回」面包屑）
+
+| pageId | QML页面 | 宿主 | 中文别名 |
+|--------|---------|------|----------|
+| import | ImportPage.qml | dataset | 数据导入向导 |
+| classmap | ClassMappingPage.qml | dataset | 类别映射 |
+| taxonomy | TaxonomyPage.qml | project | 类别体系 |
+| snapshot | SnapshotPage.qml | training | 数据冻结版 |
+| model | ModelPage.qml | export | 模型中心 |
+| compare | ComparePage.qml | export | 指标对比 |
+
+### 9.4 Theme.qml 设计系统
 
 - **配色**: 深靛蓝背景（#0D0E15 → #1C1F30）+ 粉红强调色（#FF4A70）+ 紫色辅助（#8B5CF6）
 - **字体**: Segoe UI / Microsoft YaHei，等宽字体 Cascadia Code / Consolas
 - **类别配色**: 10色循环数组 classColors
-- **所有颜色/字体/间距/圆角/动画时长**通过 Theme.qml Singleton 统一管理
+- **所有颜色/字体/间距/圆角/动画时长/阴影**通过 Theme.qml Singleton 统一管理
+- **安全数值**: `safeNum` / `safeSize` 钳制 NaN（Qt 6.11 Debug 规避）
 
-### 9.4 QML上下文注入
+### 9.5 通用组件（LabelTorch.Components）
+
+| 组件 | 用途 |
+|------|------|
+| Toast / ToastBus | 全局通知：成功 2s 自动消失，错误常驻 |
+| EmptyState | 空态引导（图标 + 文案 + 主按钮） |
+| ConfirmDialog | 危险操作二次确认，默认焦点「取消」，列明连带项 |
+| FormField | 表单内联校验（红框 + 底部错误文案） |
+| ModalDialog / Splitter / ToggleSwitch / Stepper / FilterBar 等 | 通用交互控件 |
+
+### 9.6 快捷键
+
+| 快捷键 | 作用 |
+|--------|------|
+| F1 | 打开使用帮助 |
+| ? | 快捷键卡片 |
+| Ctrl+1 ~ Ctrl+8 | 切换主导航页面 |
+| Esc | 关闭弹窗 / 取消绘制 |
+| Ctrl+S / Delete / Ctrl+Z / Ctrl+Y | 标注保存 / 删除 / 撤销 / 重做 |
+| 1~9 / [ ] / 方向键 | 标注页类别切换、尺寸微调、选框移动 |
+
+### 9.7 QML上下文注入
 
 `main.cpp` 中通过 `engine.rootContext()->setContextProperty()` 注入所有 Service/Model 实例，QML 中直接通过属性名访问。
 
@@ -414,7 +496,7 @@ ctest --preset msvc2022-release
 cd backend && python -m pytest tests/
 ```
 
-C++ 测试目标：test_database, test_labelio, test_geometry, test_ipc, test_taxonomy, test_snapshot, test_training, test_model, test_inference, test_export
+C++ 测试目标：test_database, test_labelio, test_geometry, test_ipc, test_taxonomy, test_snapshot, test_training, test_model, test_inference, test_export, test_classify, test_audit_log, 以及 P0/P1 回归（test_snapshot_hash, test_taxonomy_delete, test_export_verify, test_labelio_atomic, test_project_cascade, test_dataset_hash, test_ipc_restart, test_thumbnail_lifecycle, test_p1_workflow, test_thumbnail_cache, test_perf_indexes）
 
 ### 10.3 Lint
 
@@ -537,12 +619,15 @@ cd backend && python -m ruff check .
 
 ### 16.1 Qt 6.11 NaN ASSERT 问题
 
-Qt 6.11 Debug模式下 `qCheckedFPConversionToInteger` 检测到 NaN 会调用 `qFatal` 导致程序退出。NaN 来自 Qt Quick 布局引擎内部初始化竞态条件，不影响程序正常运行。
+Qt 6.11 Debug模式下 `qCheckedFPConversionToInteger` 检测到 NaN 会调用 `qFatal` 导致程序退出。NaN 主要来自 Qt Quick 布局引擎初始化竞态（字体度量 / Image sourceSize / 绑定除零 / 缩略图网格 cellWidth 未钳制）。
 
-**处理方式**（`main.cpp`）：
-1. MSVC CRT 报告钩子 `msvcReportHook` 拦截 NaN 相关的 `_CRT_ERROR` / `_CRT_ASSERT`
+**处理方式**（`main.cpp` / `AppController` / QML 规避）：
+1. MSVC CRT 报告钩子 `msvcReportHook` 拦截 NaN 相关的 `_CRT_ERROR` / `_CRT_ASSERT`（保留，否则 Debug 直接崩）
 2. Qt 消息处理器 `customMessageHandler` 将 NaN 相关 `QtFatalMsg` 降级为 `QtWarningMsg`
-3. DPI 缩放策略设为 `PassThrough` 防止字体度量为 NaN
+3. 两路径统一走 `noteNanAssert`：80ms 防抖去重 + 计数 + 队列上报 `AppController::reportNanAssert`；前 5 次打印详情与调用栈，之后静默
+4. 累计 ≥10 次时 `nanRestartRecommended` 为 true，状态栏红条提示「建议保存后重启」（只提示一次）
+5. DPI 缩放策略设为 `PassThrough` 防止字体度量为 NaN
+6. 规避：root contentItem 启动后 120ms 内 `setEnabled(false)`；页面预加载间隔 300→600ms；CheckPage `Image.sourceSize`/网格 `cellWidth`、SvgIcon `scale`、进度条宽度做 `isFinite` 钳制；Theme 提供 `safeNum`/`safeSize`
 
 ### 16.2 QML 模块输出目录
 

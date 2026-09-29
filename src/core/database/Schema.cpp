@@ -105,6 +105,7 @@ QStringList Schema::createTableStatements()
         "  runtime_env_snapshot_json TEXT,"
         "  status TEXT NOT NULL DEFAULT 'draft',"
         "  log_uri TEXT,"
+        "  failure_info_json TEXT,"
         "  started_at DATETIME,"
         "  finished_at DATETIME"
         ")",
@@ -192,6 +193,91 @@ QStringList Schema::createTableStatements()
         "  shortcut TEXT,"
         "  created_at TEXT NOT NULL,"
         "  UNIQUE(dataset_id, name)"
-        ")"
+        ")",
+
+        // 主动学习队列持久化表（P1-14：重启不丢）
+        // queue_type: low-confidence / false-positive / false-negative / hard-case
+        // status: queued / reviewed / discarded
+        "CREATE TABLE IF NOT EXISTS active_learning_items ("
+        "  id TEXT PRIMARY KEY,"
+        "  queue_type TEXT NOT NULL,"
+        "  sample_path TEXT NOT NULL,"
+        "  sample_id TEXT,"
+        "  dataset_id TEXT,"
+        "  project_id TEXT,"
+        "  reason TEXT,"
+        "  priority INTEGER DEFAULT 0,"
+        "  confidence REAL DEFAULT 0.0,"
+        "  class_index INTEGER,"
+        "  class_name TEXT,"
+        "  payload_json TEXT,"
+        "  status TEXT NOT NULL DEFAULT 'queued',"
+        "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+        "  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+        ")",
+        "CREATE INDEX IF NOT EXISTS idx_al_items_queue ON active_learning_items(queue_type, status)"
+    };
+}
+
+QStringList Schema::createIndexStatements()
+{
+    ltTrace(LT_LOG_DB()) << "Generating create index statements";
+
+    // P1-23：按实际查询路径建索引
+    // - listSamples / getSampleStats：WHERE dataset_id = ? ORDER BY image_path
+    // - hash 去重与数据泄漏检测：WHERE dataset_id = ? AND hash ...
+    // - split 划分查询：WHERE dataset_id = ? AND split = ?
+    // - 修订审计：WHERE dataset_id / sample_id
+    // - 任务事件审计：WHERE task_type / task_id
+    // - 训练指标：WHERE run_id（每 epoch 多条）
+    // - 训练列表/血缘：WHERE project_id / snapshot_id / run_id
+    return {
+        "CREATE INDEX IF NOT EXISTS idx_dataset_samples_dataset_id "
+        "ON dataset_samples(dataset_id, image_path)",
+
+        "CREATE INDEX IF NOT EXISTS idx_dataset_samples_hash "
+        "ON dataset_samples(hash)",
+
+        "CREATE INDEX IF NOT EXISTS idx_dataset_samples_split "
+        "ON dataset_samples(dataset_id, split)",
+
+        "CREATE INDEX IF NOT EXISTS idx_annot_rev_dataset "
+        "ON annotation_revisions(dataset_id, created_at)",
+
+        "CREATE INDEX IF NOT EXISTS idx_annot_rev_sample "
+        "ON annotation_revisions(sample_id)",
+
+        "CREATE INDEX IF NOT EXISTS idx_task_events_task "
+        "ON task_events(task_type, task_id)",
+
+        "CREATE INDEX IF NOT EXISTS idx_task_events_created "
+        "ON task_events(created_at)",
+
+        "CREATE INDEX IF NOT EXISTS idx_run_metrics_run "
+        "ON run_metrics(run_id, epoch)",
+
+        "CREATE INDEX IF NOT EXISTS idx_training_runs_project "
+        "ON training_runs(project_id, started_at)",
+
+        "CREATE INDEX IF NOT EXISTS idx_training_runs_snapshot "
+        "ON training_runs(snapshot_id)",
+
+        "CREATE INDEX IF NOT EXISTS idx_model_versions_run "
+        "ON model_versions(run_id)",
+
+        "CREATE INDEX IF NOT EXISTS idx_model_versions_project "
+        "ON model_versions(project_id)",
+
+        "CREATE INDEX IF NOT EXISTS idx_datasets_project "
+        "ON datasets(project_id)",
+
+        "CREATE INDEX IF NOT EXISTS idx_taxonomies_project "
+        "ON taxonomies(project_id)",
+
+        "CREATE INDEX IF NOT EXISTS idx_dataset_snapshots_dataset "
+        "ON dataset_snapshots(dataset_id)",
+
+        "CREATE INDEX IF NOT EXISTS idx_export_artifacts_model "
+        "ON export_artifacts(model_version_id)"
     };
 }

@@ -1,6 +1,7 @@
 #include "AnnotCanvasItem.h"
 #include "CanvasController.h"
 #include "../AnnotationModel.h"
+#include "cache/ImageDecodeCache.h"
 #include "utils/Log.h"
 
 #include <QPainter>
@@ -46,17 +47,14 @@ void AnnotCanvasItem::setController(CanvasController* ctrl)
     if (m_controller) {
         connect(m_controller, &CanvasController::canvasUpdateRequested, this, [this]() { update(); });
         connect(m_controller, &CanvasController::currentImageChanged, this, [this]() {
-            if (m_controller && !m_controller->currentImagePath().isEmpty()) {
-                m_image.load(m_controller->currentImagePath());
-                if (!m_image.isNull()) {
-                    m_imageWidth = m_image.width();
-                    m_imageHeight = m_image.height();
-                }
-            } else {
-                m_image = QImage();
-                m_imageWidth = 0;
-                m_imageHeight = 0;
+            // P1-24：路径未变化时跳过重载（loadImage() 已填充 m_image，
+            // 此信号是 controller->loadImage 内部触发，重复解码纯属浪费）
+            const QString path = m_controller ? m_controller->currentImagePath() : QString();
+            if (!path.isEmpty() && path == m_loadedPath && !m_image.isNull()) {
+                update();
+                return;
             }
+            loadSharedImage(path);
             update();
         });
     }
@@ -107,11 +105,19 @@ void AnnotCanvasItem::setInteractionMode(const QString& mode)
     update();
 }
 
-void AnnotCanvasItem::loadImage(const QString& imagePath, const QString& labelPath)
+void AnnotCanvasItem::loadSharedImage(const QString& imagePath)
 {
-    ltInfo(LT_LOG_ANNOTATION()) << "Loading image:" << imagePath;
+    if (imagePath.isEmpty()) {
+        m_image = QImage();
+        m_loadedPath.clear();
+        m_imageWidth = 0;
+        m_imageHeight = 0;
+        return;
+    }
 
-    m_image.load(imagePath);
+    // P1-24：共享解码缓存——同一图多次进入画布不再重复 QImage::load
+    m_image = ImageDecodeCache::instance().load(imagePath);
+    m_loadedPath = imagePath;
     if (m_image.isNull()) {
         ltError(LT_LOG_ANNOTATION()) << "Failed to load image:" << imagePath;
         m_imageWidth = 0;
@@ -120,6 +126,15 @@ void AnnotCanvasItem::loadImage(const QString& imagePath, const QString& labelPa
         m_imageWidth = m_image.width();
         m_imageHeight = m_image.height();
     }
+}
+
+void AnnotCanvasItem::loadImage(const QString& imagePath, const QString& labelPath)
+{
+    ltInfo(LT_LOG_ANNOTATION()) << "Loading image:" << imagePath;
+
+    // P1-24：只走一次共享解码；controller->loadImage 随后触发的
+    // currentImageChanged 因路径相同会跳过重载
+    loadSharedImage(imagePath);
 
     if (m_controller) {
         m_controller->loadImage(imagePath, labelPath);

@@ -35,11 +35,31 @@ async def handle_collect_low_conf(payload: dict) -> dict:
     iou_match_threshold = payload.get("iou_match_threshold", 0.5)
 
     if not weight_path:
-        return {"status": "failed", "error": "Missing weight_path"}
+        return {"status": "failed", "error": {"code": "MISSING_PARAMS", "message": "Missing weight_path"}}
     if not source:
-        return {"status": "failed", "error": "Missing source"}
-    if not os.path.isfile(weight_path):
-        return {"status": "failed", "error": f"Weight file not found: {weight_path}"}
+        return {"status": "failed", "error": {"code": "MISSING_PARAMS", "message": "Missing source"}}
+
+    # 路径白名单：权重/输入源/GT 标签目录必须落在 projectRoot / snapshotDir / 系统临时目录内
+    from ..tools.path_security import (
+        PathSecurityError,
+        collect_allowed_roots,
+        ensure_within,
+    )
+
+    read_roots = collect_allowed_roots(payload, extra_roots=[source, label_dir] if label_dir else [source])
+
+    checked_weight = ensure_within(weight_path, read_roots, field="weight_path", must_exist=True)
+    if isinstance(checked_weight, dict):
+        return checked_weight
+    checked_source = ensure_within(source, read_roots, field="source", must_exist=False)
+    if isinstance(checked_source, dict):
+        return checked_source
+    source = checked_source
+    if label_dir:
+        checked_label_dir = ensure_within(label_dir, read_roots, field="label_dir", must_exist=False)
+        if isinstance(checked_label_dir, dict):
+            return checked_label_dir
+        label_dir = checked_label_dir
 
     try:
         from ultralytics import YOLO
@@ -51,7 +71,8 @@ async def handle_collect_low_conf(payload: dict) -> dict:
                 logger.warning(f"CUDA is not available. Falling back to CPU for active learning (requested device was: {device}).")
                 device = "cpu"
 
-        model = YOLO(weight_path)
+        # 风险说明：YOLO(pt) 内部经 torch.load 反序列化，路径必须来自项目内训练产物
+        model = YOLO(checked_weight)
 
         loop = asyncio.get_event_loop()
         results = await loop.run_in_executor(
@@ -159,10 +180,12 @@ async def handle_collect_low_conf(payload: dict) -> dict:
         return response
 
     except ImportError:
-        return {"status": "failed", "error": "Ultralytics is not installed"}
+        return {"status": "failed", "error": {"code": "DEPENDENCY_MISSING", "message": "Ultralytics is not installed"}}
+    except PathSecurityError as e:
+        return {"status": "failed", "error": e.to_error_dict()}
     except Exception as e:
         logger.error(f"Low confidence collection failed: {e}")
-        return {"status": "failed", "error": str(e)}
+        return {"status": "failed", "error": {"code": "COLLECT_FAILED", "message": str(e)}}
 
 
 def _load_yolo_gt(label_dir: str, image_path: str):
@@ -364,7 +387,7 @@ async def handle_prioritize_queue(payload: dict) -> dict:
 
     except Exception as e:
         logger.error(f"Queue prioritization failed: {e}")
-        return {"status": "failed", "error": str(e)}
+        return {"status": "failed", "error": {"code": "PRIORITIZE_FAILED", "message": str(e)}}
 
 
 async def handle_queue_stats(payload: dict) -> dict:

@@ -1,7 +1,8 @@
-// SnapshotPage.qml - 数据快照管理
+// SnapshotPage.qml - 数据冻结版管理
 import QtQuick
 import QtQuick.Controls
 import LabelTorch.Theme
+import LabelTorch.Components
 import QtQuick.Layouts
 import QtQuick.Dialogs
 
@@ -126,7 +127,7 @@ Item {
             }
 
             Button {
-                text: "创建快照"
+                text: "创建冻结版"
                 highlighted: true
                 enabled: datasetCombo.currentValue !== undefined
                 onClicked: {
@@ -228,9 +229,10 @@ Item {
                         flat: true
                         palette.buttonText: Theme.danger
                         onClicked: {
-                            if (snapshotService.deleteSnapshot(model.snapshotId)) {
-                                snapshotModel.refresh()
-                            }
+                            // 危险操作二次确认
+                            deleteSnapDialog.targetSnapshotId = model.snapshotId
+                            deleteSnapDialog.impactItems = ["该数据冻结版的样本清单与划分结果", "基于该冻结版的训练任务引用"]
+                            deleteSnapDialog.openConfirm()
                         }
                     }
                 }
@@ -249,7 +251,7 @@ Item {
             Label {
                 anchors.centerIn: parent
                 visible: snapshotList.count === 0
-                text: datasetCombo.currentValue ? "暂无快照，点击\"创建快照\"添加" : "请先选择数据集"
+                text: datasetCombo.currentValue ? "暂无冻结版，点击\"创建冻结版\"添加" : "请先选择数据集"
                 color: Theme.textMuted
                 font.pixelSize: 14
             }
@@ -309,6 +311,28 @@ Item {
                 var trainIds = split.train || []
                 var valIds = split.val || []
                 splitDetailLabel.text = "训练集: " + trainIds.length + " 样本 | 验证集: " + valIds.length + " 样本"
+            }
+        }
+    }
+
+    // === 删除数据冻结版二次确认 ===
+    ConfirmDialog {
+        id: deleteSnapDialog
+        confirmTitle: "确认删除数据冻结版"
+        message: "删除后不可恢复，确认继续？"
+        confirmText: "删除"
+        cancelText: "取消"
+        property string targetSnapshotId: ""
+
+        onConfirmed: {
+            if (targetSnapshotId) {
+                if (snapshotService.deleteSnapshot(targetSnapshotId)) {
+                    snapshotModel.refresh()
+                    ToastBus.success("数据冻结版已删除")
+                } else {
+                    ToastBus.error("删除失败，请查看日志")
+                }
+                targetSnapshotId = ""
             }
         }
     }

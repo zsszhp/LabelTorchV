@@ -3,6 +3,7 @@
 #include "database/Database.h"
 #include "ipc/IpcClient.h"
 #include "ipc/IpcProtocol.h"
+#include "utils/AuditLog.h"
 #include "utils/Id.h"
 #include "utils/Log.h"
 
@@ -17,9 +18,98 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QPointer>
+#include <QThread>
+#include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QUuid>
 #include <algorithm>
 #include <cmath>
 #include <tuple>
+
+/**
+ * @brief 线程感知的数据库连接守卫。
+ *
+ * QSqlDatabase 连接具有线程亲和性：QtConcurrent 工作线程不得复用主线程的
+ * Database::instance().database() 连接，否则会崩溃或损坏 SQLite 库。
+ * 主线程调用时复用全局连接；工作线程调用时建立独立命名连接，析构时自动移除。
+ * 独立连接统一开启 busy_timeout=5000，与主线程并发写入时排队等待而不是立即报错。
+ */
+class ScopedThreadDb {
+public:
+    ScopedThreadDb()
+    {
+        if (QThread::currentThread() == QCoreApplication::instance()->thread()) {
+            // 主线程：复用全局单例连接，避免重复打开
+            m_db = Database::instance().database();
+            m_isWorkerConnection = false;
+            return;
+        }
+
+        // 工作线程：建立本线程专属连接（每个任务独立，避免跨线程共享句柄）
+        m_connectionName = QStringLiteral("lt_ds_worker_")
+                           + QUuid::createUuid().toString(QUuid::WithoutBraces);
+        m_db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connectionName);
+        m_db.setDatabaseName(Database::instance().dbPath());
+        m_isWorkerConnection = true;
+
+        if (!m_db.isOpen() && !m_db.open()) {
+            ltError(LT_LOG_DATASET()) << "ScopedThreadDb: failed to open worker connection:"
+                                      << m_db.lastError().text();
+            return;
+        }
+
+        // 与主线程并发访问同一 SQLite 文件时排队等待，避免 busy 失败
+        QSqlQuery pragma(m_db);
+        pragma.exec(QStringLiteral("PRAGMA busy_timeout=5000"));
+        pragma.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
+        pragma.exec(QStringLiteral("PRAGMA foreign_keys=ON"));
+    }
+
+    ~ScopedThreadDb()
+    {
+        if (!m_isWorkerConnection) return;
+        if (m_db.isOpen()) m_db.close();
+        // 必须先释放 QSqlDatabase 值再 removeDatabase，否则会打印连接仍在使用的警告
+        m_db = QSqlDatabase();
+        QSqlDatabase::removeDatabase(m_connectionName);
+    }
+
+    ScopedThreadDb(const ScopedThreadDb &) = delete;
+    ScopedThreadDb &operator=(const ScopedThreadDb &) = delete;
+
+    QSqlDatabase db() const { return m_db; }
+    bool isOpen() const { return m_db.isOpen(); }
+
+private:
+    QSqlDatabase m_db;
+    QString m_connectionName;
+    bool m_isWorkerConnection = false;
+};
+
+/**
+ * @brief 计算文件内容哈希（分块读取，避免大文件一次性载入内存）。
+ * @param filePath 文件路径
+ * @return 十六进制哈希字符串；文件不可读时返回空串
+ */
+static QString computeFileContentHash(const QString &filePath)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    // 1MB 分块，兼顾吞吐与内存占用
+    constexpr qint64 kChunkSize = 1024 * 1024;
+    while (!file.atEnd()) {
+        QByteArray chunk = file.read(kChunkSize);
+        if (chunk.isEmpty() && file.error() != QFile::NoError) {
+            ltWarning(LT_LOG_DATASET()) << "computeFileContentHash: read error on" << filePath;
+            return {};
+        }
+        hash.addData(chunk);
+    }
+    return QString::fromLatin1(hash.result().toHex());
+}
 
 DatasetService::DatasetService(QObject *parent)
     : QObject(parent)
@@ -360,6 +450,19 @@ QString DatasetService::importDataset(const QString &projectId, const QString &n
 
     ltInfo(LT_LOG_DATASET()) << "导入完成:" << datasetId
                              << "共" << matchedSamples.size() << "个样本";
+
+    // 审计：数据集导入落库留痕
+    {
+        QVariantMap auditPayload;
+        auditPayload[QStringLiteral("datasetName")] = name;
+        auditPayload[QStringLiteral("projectId")] = projectId;
+        auditPayload[QStringLiteral("imageDir")] = imageDir;
+        auditPayload[QStringLiteral("labelDir")] = labelDir;
+        auditPayload[QStringLiteral("format")] = format;
+        auditPayload[QStringLiteral("sampleCount")] = matchedSamples.size();
+        AuditLog::record(QStringLiteral("dataset"), datasetId,
+                         QStringLiteral("imported"), auditPayload);
+    }
     return datasetId;
 }
 
@@ -452,6 +555,19 @@ bool DatasetService::deleteDataset(const QString &datasetId)
     ltTrace(LT_LOG_DATASET()) << "deleteDataset datasetId=" << datasetId;
 
     QSqlDatabase db = Database::instance().database();
+
+    // 0. 删除前取出名称与项目 ID（审计留痕需要，删除后记录已不存在）
+    QString datasetName;
+    QString projectId;
+    {
+        QSqlQuery infoQuery(db);
+        infoQuery.prepare("SELECT name, project_id FROM datasets WHERE id = ?");
+        infoQuery.addBindValue(datasetId);
+        if (infoQuery.exec() && infoQuery.next()) {
+            datasetName = infoQuery.value(0).toString();
+            projectId = infoQuery.value(1).toString();
+        }
+    }
 
     // 1. 临时禁用外键约束（在事务外执行）
     QSqlQuery pragmaQuery(db);
@@ -620,6 +736,15 @@ bool DatasetService::deleteDataset(const QString &datasetId)
     pragmaQuery.exec("PRAGMA foreign_keys = ON");
 
     ltInfo(LT_LOG_DATASET()) << "Deleted dataset and all associated records:" << datasetId;
+
+    // 审计：数据集删除为不可逆操作，落库留痕
+    {
+        QVariantMap auditPayload;
+        auditPayload[QStringLiteral("datasetName")] = datasetName;
+        auditPayload[QStringLiteral("projectId")] = projectId;
+        AuditLog::record(QStringLiteral("dataset"), datasetId,
+                         QStringLiteral("deleted"), auditPayload);
+    }
     return true;
 }
 
@@ -640,7 +765,13 @@ QVariantMap DatasetService::getSampleStats(const QString &datasetId)
         return result;
     }
 
-    QSqlDatabase db = Database::instance().database();
+    // 线程安全访问：工作线程走独立连接，主线程复用全局连接
+    ScopedThreadDb scopedDb;
+    if (!scopedDb.isOpen()) {
+        ltError(LT_LOG_DATASET()) << "getSampleStats: database not available";
+        return result;
+    }
+    QSqlDatabase db = scopedDb.db();
 
     // Get sample counts
     QSqlQuery countQuery(db);
@@ -762,6 +893,7 @@ QVariantMap DatasetService::detectAnomalies(const QString &datasetId)
     QVariantList classErrors;
     QVariantList sizeAnomalies;
     QVariantList duplicateImages;
+    QVariantList splitLeaks;
 
     if (datasetId.isEmpty()) {
         ltWarning(LT_LOG_DATASET()) << "detectAnomalies: datasetId is empty";
@@ -769,11 +901,24 @@ QVariantMap DatasetService::detectAnomalies(const QString &datasetId)
         result["classErrors"] = classErrors;
         result["sizeAnomalies"] = sizeAnomalies;
         result["duplicateImages"] = duplicateImages;
+        result["splitLeaks"] = splitLeaks;
         result["totalAnomalies"] = 0;
         return result;
     }
 
-    QSqlDatabase db = Database::instance().database();
+    // 线程安全访问：工作线程走独立连接，主线程复用全局连接
+    ScopedThreadDb scopedDb;
+    if (!scopedDb.isOpen()) {
+        ltError(LT_LOG_DATASET()) << "detectAnomalies: database not available";
+        result["emptyLabels"] = emptyLabels;
+        result["classErrors"] = classErrors;
+        result["sizeAnomalies"] = sizeAnomalies;
+        result["duplicateImages"] = duplicateImages;
+        result["splitLeaks"] = splitLeaks;
+        result["totalAnomalies"] = 0;
+        return result;
+    }
+    QSqlDatabase db = scopedDb.db();
 
     // Determine valid class range from imported_label_schemas
     int maxClassId = -1;
@@ -789,17 +934,24 @@ QVariantMap DatasetService::detectAnomalies(const QString &datasetId)
         }
     }
 
-    // Check for duplicate hashes
+    // Check for duplicate hashes（依赖导入时落库的 hash 字段）
     QSqlQuery hashQuery(db);
-    hashQuery.prepare("SELECT id, hash FROM dataset_samples WHERE dataset_id = ? AND hash IS NOT NULL AND hash != ''");
+    hashQuery.prepare("SELECT id, hash, split FROM dataset_samples "
+                      "WHERE dataset_id = ? AND hash IS NOT NULL AND hash != ''");
     hashQuery.addBindValue(datasetId);
 
     QMap<QString, QStringList> hashToIds;
+    // hash → 出现过的 split 集合，用于跨 split 数据泄漏检测
+    QMap<QString, QSet<QString>> hashToSplits;
     if (hashQuery.exec()) {
         while (hashQuery.next()) {
             QString sampleId = hashQuery.value(0).toString();
             QString hash = hashQuery.value(1).toString();
+            QString split = hashQuery.value(2).toString();
             hashToIds[hash].append(sampleId);
+            if (!split.isEmpty()) {
+                hashToSplits[hash].insert(split);
+            }
         }
     }
 
@@ -808,6 +960,20 @@ QVariantMap DatasetService::detectAnomalies(const QString &datasetId)
             for (const auto &sid : it.value()) {
                 duplicateImages.append(sid);
             }
+        }
+    }
+
+    // 跨 split 同 hash 泄漏：同一内容图片同时出现在 train/val/test 中，
+    // 会导致评估指标虚高，必须告警
+    for (auto it = hashToSplits.constBegin(); it != hashToSplits.constEnd(); ++it) {
+        if (it.value().size() > 1) {
+            QVariantMap leak;
+            leak["hash"] = it.key();
+            // QSet 无序，转为 QStringList 存入结果
+            QStringList splitsList(it.value().begin(), it.value().end());
+            leak["splits"] = splitsList;
+            leak["sampleIds"] = hashToIds.value(it.key());
+            splitLeaks.append(leak);
         }
     }
 
@@ -822,7 +988,9 @@ QVariantMap DatasetService::detectAnomalies(const QString &datasetId)
         result["classErrors"] = classErrors;
         result["sizeAnomalies"] = sizeAnomalies;
         result["duplicateImages"] = duplicateImages;
-        result["totalAnomalies"] = emptyLabels.size() + classErrors.size() + sizeAnomalies.size() + duplicateImages.size();
+        result["splitLeaks"] = splitLeaks;
+        result["totalAnomalies"] = emptyLabels.size() + classErrors.size() + sizeAnomalies.size()
+                                   + duplicateImages.size() + splitLeaks.size();
         return result;
     }
 
@@ -943,12 +1111,15 @@ QVariantMap DatasetService::detectAnomalies(const QString &datasetId)
     result["classErrors"] = classErrors;
     result["sizeAnomalies"] = sizeAnomalies;
     result["duplicateImages"] = duplicateImages;
-    result["totalAnomalies"] = emptyLabels.size() + classErrors.size() + sizeAnomalies.size() + duplicateImages.size();
+    result["splitLeaks"] = splitLeaks;
+    result["totalAnomalies"] = emptyLabels.size() + classErrors.size() + sizeAnomalies.size()
+                               + duplicateImages.size() + splitLeaks.size();
 
     ltDebug(LT_LOG_DATASET()) << "detectAnomalies: dataset" << datasetId
                               << "emptyLabels:" << emptyLabels.size()
                               << "classErrors:" << classErrors.size()
                               << "duplicateImages:" << duplicateImages.size()
+                              << "splitLeaks:" << splitLeaks.size()
                               << "total:" << result["totalAnomalies"];
 
     return result;
@@ -965,8 +1136,15 @@ QVariantList DatasetService::getClassDistribution(const QString &datasetId)
         return result;
     }
 
+    // 线程安全访问：工作线程走独立连接，主线程复用全局连接
+    ScopedThreadDb scopedDb;
+    if (!scopedDb.isOpen()) {
+        ltError(LT_LOG_DATASET()) << "getClassDistribution: database not available";
+        return result;
+    }
+
     // Get class names from imported_label_schemas
-    QSqlDatabase db = Database::instance().database();
+    QSqlDatabase db = scopedDb.db();
     QMap<int, QString> classNames;
     int maxClassId = -1;
 
@@ -1189,14 +1367,21 @@ bool DatasetService::insertSamples(const QString &datasetId, const QVariantList 
     for (const auto &s : samples) {
         QVariantMap sample = s.toMap();
         QString sampleId = Id::generate();
+        QString imagePath = sample["imagePath"].toString();
+
+        // 计算图片内容哈希并落库，供 detectAnomalies 重复检测与数据泄漏检查使用
+        QString contentHash = computeFileContentHash(imagePath);
+        if (contentHash.isEmpty()) {
+            ltWarning(LT_LOG_DATASET()) << "insertSamples: failed to hash image:" << imagePath;
+        }
 
         QSqlQuery query(db);
         query.prepare("INSERT INTO dataset_samples "
-                      "(id, dataset_id, image_path, label_path, validation_status, error_code) "
-                      "VALUES (?, ?, ?, ?, ?, ?)");
+                      "(id, dataset_id, image_path, label_path, validation_status, error_code, hash) "
+                      "VALUES (?, ?, ?, ?, ?, ?, ?)");
         query.addBindValue(sampleId);
         query.addBindValue(datasetId);
-        query.addBindValue(sample["imagePath"].toString());
+        query.addBindValue(imagePath);
         query.addBindValue(sample["labelPath"].toString());
 
         bool valid = sample["valid"].toBool();
@@ -1213,6 +1398,7 @@ bool DatasetService::insertSamples(const QString &datasetId, const QVariantList 
         } else {
             query.addBindValue(QVariant());
         }
+        query.addBindValue(contentHash.isEmpty() ? QVariant() : QVariant(contentHash));
 
         if (!query.exec()) {
             ltError(LT_LOG_DATASET()) << "Failed to insert sample:" << query.lastError().text();
@@ -2216,13 +2402,20 @@ bool DatasetService::importAnomalyDataset(const QString &datasetId, const QStrin
             QString imagePath = trainGoodDir.absoluteFilePath(imgName);
             QString sampleId = Id::generate();
 
+            // 计算图片内容哈希，供重复检测与数据泄漏检查使用
+            QString contentHash = computeFileContentHash(imagePath);
+            if (contentHash.isEmpty()) {
+                ltWarning(LT_LOG_DATASET()) << "importAnomalyDataset: failed to hash image:" << imagePath;
+            }
+
             QSqlQuery query(db);
             query.prepare("INSERT INTO dataset_samples "
-                          "(id, dataset_id, image_path, label_path, validation_status, split) "
-                          "VALUES (?, ?, ?, NULL, 'good', 'train')");
+                          "(id, dataset_id, image_path, label_path, validation_status, split, hash) "
+                          "VALUES (?, ?, ?, NULL, 'good', 'train', ?)");
             query.addBindValue(sampleId);
             query.addBindValue(datasetId);
             query.addBindValue(imagePath);
+            query.addBindValue(contentHash.isEmpty() ? QVariant() : QVariant(contentHash));
 
             if (!query.exec()) {
                 ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 插入 train/good 样本失败:"
@@ -2255,14 +2448,21 @@ bool DatasetService::importAnomalyDataset(const QString &datasetId, const QStrin
                 QString imagePath = catDir.absoluteFilePath(imgName);
                 QString sampleId = Id::generate();
 
+                // 计算图片内容哈希，供重复检测与数据泄漏检查使用
+                QString contentHash = computeFileContentHash(imagePath);
+                if (contentHash.isEmpty()) {
+                    ltWarning(LT_LOG_DATASET()) << "importAnomalyDataset: failed to hash image:" << imagePath;
+                }
+
                 QSqlQuery query(db);
                 query.prepare("INSERT INTO dataset_samples "
-                              "(id, dataset_id, image_path, label_path, validation_status, split) "
-                              "VALUES (?, ?, ?, NULL, ?, 'test')");
+                              "(id, dataset_id, image_path, label_path, validation_status, split, hash) "
+                              "VALUES (?, ?, ?, NULL, ?, 'test', ?)");
                 query.addBindValue(sampleId);
                 query.addBindValue(datasetId);
                 query.addBindValue(imagePath);
                 query.addBindValue(validationStatus);
+                query.addBindValue(contentHash.isEmpty() ? QVariant() : QVariant(contentHash));
 
                 if (!query.exec()) {
                     ltError(LT_LOG_DATASET()) << "importAnomalyDataset: 插入 test/" << category
@@ -2396,16 +2596,23 @@ bool DatasetService::importClassifyFolderDataset(const QString &datasetId, const
             QString imagePath = imgInfo.absoluteFilePath();
             QString sampleId = Id::generate();
 
+            // 计算图片内容哈希，供重复检测与数据泄漏检查使用
+            QString contentHash = computeFileContentHash(imagePath);
+            if (contentHash.isEmpty()) {
+                ltWarning(LT_LOG_DATASET()) << "importClassifyFolderDataset: failed to hash image:" << imagePath;
+            }
+
             QSqlQuery query(db);
             // label_path 字段存储类别名（分类数据集的类别由目录结构隐含）
             query.prepare("INSERT INTO dataset_samples "
-                          "(id, dataset_id, image_path, label_path, validation_status, split) "
-                          "VALUES (?, ?, ?, ?, 'valid', ?)");
+                          "(id, dataset_id, image_path, label_path, validation_status, split, hash) "
+                          "VALUES (?, ?, ?, ?, 'valid', ?, ?)");
             query.addBindValue(sampleId);
             query.addBindValue(datasetId);
             query.addBindValue(imagePath);
             query.addBindValue(className); // 复用 label_path 存类别名
             query.addBindValue(QString()); // split 由后续 resplitDataset 设置
+            query.addBindValue(contentHash.isEmpty() ? QVariant() : QVariant(contentHash));
 
             if (!query.exec()) {
                 ltError(LT_LOG_DATASET()) << "importClassifyFolderDataset: 插入样本失败:"

@@ -533,17 +533,30 @@ QString AnnotationService::createRevision(const QString &datasetId, const QStrin
     return revisionId;
 }
 
-QVariantList AnnotationService::listSamples(const QString &datasetId)
+QVariantList AnnotationService::listSamples(const QString &datasetId, int offset, int limit)
 {
-    ltTrace(LT_LOG_ANNOTATION()) << "datasetId=" << datasetId;
+    ltTrace(LT_LOG_ANNOTATION()) << "datasetId=" << datasetId
+                                  << "offset=" << offset << "limit=" << limit;
 
     QVariantList result;
+    if (datasetId.isEmpty()) return result;
 
+    // P1-22：分页查询——limit<=0 时保持旧行为返回全量，调用方应优先传分页参数
     QSqlQuery query(Database::instance().database());
-    query.prepare("SELECT id, dataset_id, image_path, label_path, width, height, "
-                  "hash, validation_status, error_code, split "
-                  "FROM dataset_samples WHERE dataset_id = ? ORDER BY image_path");
-    query.addBindValue(datasetId);
+    if (limit > 0) {
+        query.prepare("SELECT id, dataset_id, image_path, label_path, width, height, "
+                      "hash, validation_status, error_code, split "
+                      "FROM dataset_samples WHERE dataset_id = ? "
+                      "ORDER BY image_path LIMIT ? OFFSET ?");
+        query.addBindValue(datasetId);
+        query.addBindValue(limit);
+        query.addBindValue(offset > 0 ? offset : 0);
+    } else {
+        query.prepare("SELECT id, dataset_id, image_path, label_path, width, height, "
+                      "hash, validation_status, error_code, split "
+                      "FROM dataset_samples WHERE dataset_id = ? ORDER BY image_path");
+        query.addBindValue(datasetId);
+    }
 
     if (!query.exec()) {
         ltError(LT_LOG_ANNOTATION()) << "listSamples failed:" << query.lastError().text();
@@ -567,6 +580,21 @@ QVariantList AnnotationService::listSamples(const QString &datasetId)
 
     ltDebug(LT_LOG_ANNOTATION()) << "Listed" << result.size() << "samples for dataset" << datasetId;
     return result;
+}
+
+int AnnotationService::countSamples(const QString &datasetId)
+{
+    ltTrace(LT_LOG_ANNOTATION()) << "datasetId=" << datasetId;
+    if (datasetId.isEmpty()) return 0;
+
+    QSqlQuery query(Database::instance().database());
+    query.prepare("SELECT COUNT(*) FROM dataset_samples WHERE dataset_id = ?");
+    query.addBindValue(datasetId);
+    if (query.exec() && query.next()) {
+        return query.value(0).toInt();
+    }
+    ltError(LT_LOG_ANNOTATION()) << "countSamples failed:" << query.lastError().text();
+    return 0;
 }
 
 QVariantMap AnnotationService::getSample(const QString &sampleId)

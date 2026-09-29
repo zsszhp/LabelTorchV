@@ -25,6 +25,19 @@ public:
                                       const QString &taskType = QStringLiteral("detect"));
     Q_INVOKABLE QString importProject(const QString &rootPath);
     Q_INVOKABLE QVariantList listProjects();
+    /**
+     * @brief 预览删除项目的影响范围（供 UI 确认框展示）。
+     * @param projectId 项目 ID
+     * @return QVariantMap: { datasetCount, sampleCount, snapshotCount, trainingRunCount,
+     *                       modelCount, taxonomyCount, rootPath, projectName }
+     */
+    Q_INVOKABLE QVariantMap previewProjectDeletion(const QString &projectId);
+    /**
+     * @brief 删除项目：事务内级联删除所有子表记录，并清理项目磁盘目录。
+     * 磁盘清理仅删除已注册的项目根目录树，拒绝空路径/盘符根等危险路径。
+     * @param projectId 项目 ID
+     * @return true=删除成功
+     */
     Q_INVOKABLE bool deleteProject(const QString &projectId);
     Q_INVOKABLE bool openProject(const QString &projectId);
     Q_INVOKABLE void closeProject();
@@ -53,6 +66,13 @@ public:
      * @param taskType One of: "detect", "obb", "classify", "anomaly"
      */
     Q_INVOKABLE bool setTaskType(const QString &projectId, const QString &taskType);
+
+    /**
+     * @brief 获取项目缩略图缓存目录（cache/thumbnails）。
+     * @param projectId 项目 ID；空串时返回空
+     * @return 绝对路径（已确保目录存在），失败返回空串
+     */
+    Q_INVOKABLE QString thumbnailCacheDir(const QString &projectId);
 
 signals:
     void currentProjectChanged();

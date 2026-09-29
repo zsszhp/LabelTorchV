@@ -261,7 +261,7 @@ Item {
                                         color: barColor(index)
 
                                         Behavior on width {
-                                            NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+                                            NumberAnimation { duration: Theme.animDurationSlow; easing.type: Easing.OutCubic }
                                         }
                                     }
                                 }

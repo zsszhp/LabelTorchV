@@ -4,4 +4,4 @@
 通过stdin/stdout JSON-RPC与Qt主进程通信
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

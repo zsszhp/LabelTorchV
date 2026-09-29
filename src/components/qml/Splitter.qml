@@ -38,8 +38,8 @@ MouseArea {
 
         color: root.pressed ? Theme.primaryGlow : (root.containsMouse ? Theme.primaryGlow : Theme.borderColor)
         
-        Behavior on width { NumberAnimation { duration: 150 } }
-        Behavior on height { NumberAnimation { duration: 150 } }
-        Behavior on color { ColorAnimation { duration: 150 } }
+        Behavior on width { NumberAnimation { duration: Theme.animDurationFast } }
+        Behavior on height { NumberAnimation { duration: Theme.animDurationFast } }
+        Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
     }
 }

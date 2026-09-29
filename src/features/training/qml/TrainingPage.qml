@@ -212,6 +212,39 @@ Item {
         return {"ok": true, "message": ""}
     }
 
+    // === 表单内联校验状态 ===
+    // fieldErrors: 字段名 → 错误文案；非空即红框 + 底部红字
+    property var fieldErrors: ({})
+
+    function setFieldError(fieldName, message) {
+        var errs = Object.assign({}, fieldErrors)
+        if (message)
+            errs[fieldName] = message
+        else
+            delete errs[fieldName]
+        fieldErrors = errs
+    }
+
+    function clearFieldErrors() {
+        fieldErrors = {}
+    }
+
+    function fieldError(fieldName) {
+        return fieldErrors[fieldName] || ""
+    }
+
+    // 校验并填充 fieldErrors（启动训练前调用）
+    function validateTrainingForm() {
+        clearFieldErrors()
+        if (snapshotCombo.currentIndex < 0)
+            setFieldError("snapshot", "请选择数据冻结版")
+        if (batchStepper.value >= 16 && environmentInfo && environmentInfo.gpu_memory_total_mb
+                && environmentInfo.gpu_memory_total_mb < 8192)
+            setFieldError("batch", "显存不足，batch size 建议降至 8 或更小")
+        var keys = Object.keys(fieldErrors)
+        return keys.length === 0
+    }
+
     // 保存配置模板
     function saveTrainingTemplate(templateName) {
         var config = {
@@ -572,45 +605,14 @@ Item {
     }
 
     // === 未打开项目时的空状态提示 ===
-    ColumnLayout {
+    EmptyState {
         anchors.centerIn: parent
         visible: currentProjectId === ""
-        spacing: Theme.spacingLarge
-
-        Text {
-            text: "请先打开一个项目"
-            color: Theme.textMuted
-            font.pixelSize: Theme.fontSizeTitle
-            font.bold: true
-            Layout.alignment: Qt.AlignHCenter
-        }
-        Text {
-            text: "在左侧项目中心创建或打开项目后，即可开始训练"
-            color: Theme.textMuted
-            font.pixelSize: Theme.fontSizeNormal
-            Layout.alignment: Qt.AlignHCenter
-        }
-        Button {
-            text: "前往项目中心"
-            font.family: Theme.fontFamily
-            Layout.alignment: Qt.AlignHCenter
-            background: Rectangle {
-                color: parent.hovered ? Theme.primary : Theme.bgCard
-                radius: Theme.radiusSmall
-                border.color: Theme.primary
-                border.width: 1
-                implicitWidth: 140
-                implicitHeight: 36
-            }
-            contentItem: Text {
-                text: parent.text
-                color: Theme.primary
-                font.pixelSize: Theme.fontSizeNormal
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-            onClicked: appController.currentPageIndex = 0
-        }
+        icon: "brain"
+        title: "请先打开一个项目"
+        description: "在项目管理中创建或打开项目后，即可基于数据冻结版开始训练"
+        actionText: "前往项目管理"
+        onActionClicked: appController.currentPage = "project"
     }
 
     // === 主布局：左侧模型列表 + 右侧内容区 ===
@@ -621,7 +623,7 @@ Item {
         handle: Rectangle {
             implicitWidth: 4
             color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
-            Behavior on color { ColorAnimation { duration: 150 } }
+            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
         }
 
         // 左侧模型列表
@@ -764,22 +766,25 @@ Item {
                         }
                     }
 
-                    // 空状态
-                    Text {
+                    // 空状态：给出下一步引导
+                    EmptyState {
                         anchors.centerIn: parent
                         visible: modelListView.count === 0
-                        text: "暂无训练任务"
-                        color: Theme.textMuted
-                        font.pixelSize: Theme.fontSizeNormal
+                        icon: "brain"
+                        title: "暂无训练任务"
+                        description: "在右侧选择数据冻结版并配置参数后，点击「开始训练」"
+                        actionText: "前往数据集导入"
+                        onActionClicked: appController.currentPage = "dataset"
                     }
                 }
 
-                // 底部"开始训练"按钮
+                // 底部"开始训练"按钮（启动中显示 spinner）
                 Button {
                     id: startTrainingBtn
                     Layout.fillWidth: true
                     Layout.preferredHeight: 36
                     enabled: snapshotCombo.currentIndex >= 0 && currentRunStatus !== "running" && currentRunStatus !== "preparing"
+                    property bool starting: false
 
                     background: Rectangle {
                         radius: Theme.radiusSmall
@@ -790,17 +795,33 @@ Item {
                         }
                     }
 
-                    contentItem: Text {
-                        text: "开始训练"
-                        color: parent.enabled ? "#FFFFFF" : Theme.textMuted
-                        font.pixelSize: Theme.fontSizeNormal
-                        font.bold: true
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                    contentItem: RowLayout {
+                        spacing: Theme.spacingNormal
+                        // 启动中的加载指示
+                        BusyIndicator {
+                            Layout.preferredWidth: 16
+                            Layout.preferredHeight: 16
+                            running: startTrainingBtn.starting
+                            visible: running
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: startTrainingBtn.starting ? "启动中..." : "开始训练"
+                            color: parent.parent.parent.enabled ? Theme.logoBgText : Theme.textMuted
+                            font.pixelSize: Theme.fontSizeNormal
+                            font.bold: true
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
                     }
 
                     onClicked: {
                         if (currentProjectId === "") return
+                        // 表单内联校验：字段错误红框 + 底部文案
+                        if (!validateTrainingForm()) {
+                            ToastBus.error("表单存在错误，请检查标红字段")
+                            return
+                        }
                         var snapshotId = snapshotCombo.currentValue
                         if (!snapshotId) return
                         var validationResult = validateTrainingStart()
@@ -808,9 +829,11 @@ Item {
                             statusMainLabel.text = validationResult.message
                             statusBannerTone = "warning"
                             logView.appendLog("[LabelTorch] WARNING: " + validationResult.message)
+                            ToastBus.error(validationResult.message)
                             return
                         }
                         var configJson = getConfigJson()
+                        startTrainingBtn.starting = true
                         var runId = trainingService.createRun(currentProjectId, snapshotId, configJson)
                         if (runId !== "") {
                             currentRunId = runId
@@ -832,15 +855,19 @@ Item {
                                 trainingModel.refresh()
                                 statusMainLabel.text = "训练已启动"
                                 statusBannerTone = "info"
+                                ToastBus.success("训练任务已启动")
                             } else {
                                 statusMainLabel.text = "训练启动失败"
                                 statusBannerTone = "danger"
                                 logView.appendLog("[LabelTorch] ERROR: Failed to start training")
+                                ToastBus.error("训练启动失败，请查看日志面板")
                             }
                         } else {
                             statusMainLabel.text = "创建训练任务失败"
                             statusBannerTone = "danger"
+                            ToastBus.error("创建训练任务失败")
                         }
+                        startTrainingBtn.starting = false
                     }
                 }
 
@@ -1017,7 +1044,7 @@ Item {
                                             Layout.fillWidth: true
                                         }
 
-                                        // 训练集（数据快照）选择
+                                        // 训练集（数据冻结版）选择
                                         ParamRow {
                                             label: "训练集"
                                             labelWidth: 80
@@ -1030,7 +1057,7 @@ Item {
                                                 textRole: "snapshotId"
                                                 valueRole: "snapshotId"
                                                 displayText: currentIndex >= 0 && currentValue ?
-                                                    currentValue.substring(0, 8) + "..." : "选择数据快照"
+                                                    currentValue.substring(0, 8) + "..." : "选择数据冻结版"
 
                                                 contentItem: Text {
                                                     text: snapshotCombo.displayText
@@ -1044,7 +1071,11 @@ Item {
                                                 background: Rectangle {
                                                     color: Theme.bgInput
                                                     radius: Theme.radiusSmall
-                                                    border.color: snapshotCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                                                    // 内联校验：错误时红框
+                                                    border.color: {
+                                                        if (root.fieldError("snapshot") !== "") return Theme.fieldErrorBorder
+                                                        return snapshotCombo.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                                                    }
                                                     border.width: 1
                                                 }
 
@@ -1065,16 +1096,18 @@ Item {
                                             }
                                         }
 
-                                        // 快照信息
+                                        // 快照信息 + 内联错误文案
                                         Text {
                                             id: snapshotInfoLabel
                                             Layout.fillWidth: true
-                                            color: Theme.textMuted
+                                            color: root.fieldError("snapshot") !== "" ? Theme.fieldErrorText : Theme.textMuted
                                             font.pixelSize: Theme.fontSizeCaption
                                             wrapMode: Text.WordWrap
                                             visible: text !== ""
 
                                             text: {
+                                                if (root.fieldError("snapshot") !== "")
+                                                    return root.fieldError("snapshot")
                                                 if (snapshotCombo.currentIndex < 0) return ""
                                                 var idx = snapshotCombo.currentIndex
                                                 var trainCount = snapshotModel.data(snapshotModel.index(idx, 0), Qt.UserRole + 3)
@@ -1160,9 +1193,9 @@ Item {
                                             }
                                         }
 
-                                        // 创建快照按钮
+                                        // 创建冻结版按钮
                                         Button {
-                                            text: "+ 创建快照"
+                                            text: "+ 创建冻结版"
                                             font.family: Theme.fontFamily
                                             Layout.fillWidth: true
                                             Layout.preferredHeight: 28
@@ -1180,6 +1213,28 @@ Item {
                                                 verticalAlignment: Text.AlignVCenter
                                             }
                                             onClicked: createSnapshotDialog.open()
+                                        }
+
+                                        // 冻结版管理入口（打开数据冻结版子页）
+                                        Button {
+                                            text: "管理数据冻结版"
+                                            font.family: Theme.fontFamily
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: 26
+                                            background: Rectangle {
+                                                color: parent.hovered ? Theme.bgHover : Theme.bgInput
+                                                radius: Theme.radiusSmall
+                                                border.color: Theme.borderColor
+                                                border.width: 1
+                                            }
+                                            contentItem: Text {
+                                                text: parent.text
+                                                color: Theme.textMuted
+                                                font.pixelSize: Theme.fontSizeCaption
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                            }
+                                            onClicked: appController.currentPage = "snapshot"
                                         }
 
                                         // 验证集（与训练集同快照，只读显示）
@@ -2314,18 +2369,10 @@ Item {
                                                         hoverEnabled: true
                                                         cursorShape: Qt.PointingHandCursor
                                                         onClicked: {
-                                                            if (trainingService.deleteRun(model.runId)) {
-                                                                trainingModel.refresh()
-                                                                if (model.runId === currentRunId) {
-                                                                    currentRunId = ""
-                                                                    currentRunStatus = ""
-                                                                    logView.clear()
-                                                                    lossModel.clear()
-                                                                    metricModel.clear()
-                                                                    recallModel.clear()
-                                                                    precisionModel.clear()
-                                                                }
-                                                            }
+                                                            // 危险操作二次确认
+                                                            deleteRunDialog.targetRunId = model.runId
+                                                            deleteRunDialog.impactItems = ["该训练任务的日志与指标记录", "任务产生的模型版本注册信息"]
+                                                            deleteRunDialog.openConfirm()
                                                         }
                                                     }
                                                 }
@@ -2574,10 +2621,10 @@ Item {
         }
     }
 
-    // === 创建数据快照对话框 ===
+    // === 创建数据冻结版对话框 ===
     Dialog {
         id: createSnapshotDialog
-        title: "创建数据快照"
+        title: "创建数据冻结版"
         modal: true
         anchors.centerIn: parent
         width: 420
@@ -2730,7 +2777,7 @@ Item {
                 }
 
                 Button {
-                    text: "创建快照"
+                    text: "创建冻结版"
                     font.family: Theme.fontFamily
                     background: Rectangle {
                         color: parent.hovered ? Theme.primary : Theme.bgInput
@@ -2749,14 +2796,20 @@ Item {
                     }
                     onClicked: {
                         var dsId = snapshotDatasetCombo.currentValue
-                        if (!dsId || dsId === "") return
+                        if (!dsId || dsId === "") {
+                            ToastBus.error("请先选择数据集")
+                            return
+                        }
                         var ratio = trainRatioStepper.value / 100.0
                         var strategy = splitStrategyCombo.currentText
+                        // 创建中按钮置为忙碌态，避免重复点击
+                        parent.enabled = false
                         var snapId = snapshotService.createSnapshot(dsId, ratio, strategy)
+                        parent.enabled = true
                         if (snapId !== "") {
                             snapshotModel.setProjectId(currentProjectId)
                             snapshotModel.refresh()
-                            // 尝试选中新创建的快照
+                            // 尝试选中新创建的冻结版
                             for (var i = 0; i < snapshotModel.rowCount(); i++) {
                                 var sid = snapshotModel.data(snapshotModel.index(i, 0), Qt.UserRole + 1)
                                 if (sid === snapId) {
@@ -2765,6 +2818,9 @@ Item {
                                 }
                             }
                             createSnapshotDialog.accept()
+                            ToastBus.success("数据冻结版创建成功")
+                        } else {
+                            ToastBus.error("数据冻结版创建失败，请查看日志")
                         }
                     }
                 }
@@ -2942,6 +2998,37 @@ Item {
                         addModelDialog.accept()
                     }
                 }
+            }
+        }
+    }
+
+    // === 删除训练任务二次确认（列明连带项） ===
+    ConfirmDialog {
+        id: deleteRunDialog
+        confirmTitle: "确认删除训练任务"
+        message: "删除后不可恢复，确认继续？"
+        confirmText: "删除"
+        cancelText: "取消"
+        property string targetRunId: ""
+
+        onConfirmed: {
+            if (targetRunId) {
+                if (trainingService.deleteRun(targetRunId)) {
+                    trainingModel.refresh()
+                    if (targetRunId === currentRunId) {
+                        currentRunId = ""
+                        currentRunStatus = ""
+                        logView.clear()
+                        lossModel.clear()
+                        metricModel.clear()
+                        recallModel.clear()
+                        precisionModel.clear()
+                    }
+                    ToastBus.success("训练任务已删除")
+                } else {
+                    ToastBus.error("删除失败，请查看日志")
+                }
+                targetRunId = ""
             }
         }
     }

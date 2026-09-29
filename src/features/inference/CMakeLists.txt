@@ -6,6 +6,7 @@ qt_add_qml_module(labeltorch_inference
     STATIC
     RESOURCE_PREFIX /qt/qml
     QML_FILES
+        qml/AssistPage.qml
         qml/AssistedLabelPanel.qml
         qml/ReviewDialog.qml
         qml/LowConfQueue.qml
@@ -34,5 +35,7 @@ target_include_directories(labeltorch_inference PUBLIC
 target_link_libraries(labeltorch_inference PUBLIC
     labeltorch_core
     labeltorch_theme
+    labeltorch_annotation
+    labeltorch_training
     Qt6::Quick
 )

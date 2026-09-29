@@ -6,12 +6,15 @@
 /**
  * @brief 数据库DDL常量定义
  *
- * 定义15张核心表的建表语句
+ * 定义17张核心表的建表语句
  */
 class Schema
 {
 public:
     static QStringList createTableStatements();
+
+    /// P1-23：核心查询路径索引（幂等创建，随 initializeSchema 一并执行）
+    static QStringList createIndexStatements();
 
     // 表名常量
     static constexpr const char *PROJECTS = "projects";
@@ -30,6 +33,7 @@ public:
     static constexpr const char *RUN_METRICS = "run_metrics";
     static constexpr const char *TESTING_RUNS = "testing_runs";
     static constexpr const char *DATASET_TAGS = "dataset_tags";  ///< 数据集标签表（A6）
+    static constexpr const char *ACTIVE_LEARNING_ITEMS = "active_learning_items";  ///< 主动学习队列持久化表（P1-14）
 };
 
 #endif // SCHEMA_H

@@ -12,13 +12,29 @@ Rectangle {
     property int totalSamples: 0
     property int currentPage: 0
     property int pageSize: 60
+    // P1-21：当前项目缩略图缓存目录（cache/thumbnails）
+    property string thumbCacheDir: ""
 
     function loadDataset(datasetId, datasetName) {
         root.currentDatasetId = datasetId
         root.currentDatasetName = datasetName
         root.currentPage = 0
         root.totalSamples = datasetService.getSampleCount(datasetId)
+        root.thumbCacheDir = projectService.thumbnailCacheDir(appController.currentProjectId)
         refreshSamples()
+    }
+
+    // P1-21：解析缩略图路径——已生成则走缩略图，否则回退原图并靠 sourceSize 限解码
+    function resolveThumbSource(imagePath) {
+        if (!imagePath) return ""
+        var raw = String(imagePath).replace(/^file:\/\/\//, "").replace(/\\/g, "/")
+        if (root.thumbCacheDir) {
+            var thumb = thumbnailGenerator.resolve(raw, root.thumbCacheDir)
+            if (thumb && thumb.length > 0) {
+                return "file:///" + thumb.replace(/\\/g, "/")
+            }
+        }
+        return "file:///" + raw
     }
 
     function refreshSamples() {
@@ -26,8 +42,15 @@ Rectangle {
         var offset = currentPage * pageSize
         var samples = datasetService.listSamples(root.currentDatasetId, offset, pageSize)
         sampleModel.clear()
+        var rawPaths = []
         for (var i = 0; i < samples.length; i++) {
-            sampleModel.append(samples[i])
+            var s = samples[i]
+            sampleModel.append(s)
+            if (s.imagePath) rawPaths.push(String(s.imagePath).replace(/\\/g, "/"))
+        }
+        // P1-21：后台补齐本页缩略图，已存在的会快速跳过
+        if (root.thumbCacheDir && rawPaths.length > 0) {
+            thumbnailGenerator.generate(rawPaths, root.thumbCacheDir)
         }
     }
 
@@ -190,7 +213,10 @@ Rectangle {
                                 width: parent.width - 8
                                 height: parent.height - 30
                                 fillMode: Image.PreserveAspectCrop
-                                source: model.imagePath || ""
+                                // P1-21：优先缩略图，回退原图；sourceSize 限制解码像素，避免 4K 全图入内存
+                                source: resolveThumbSource(model.imagePath)
+                                sourceSize.width: 256
+                                sourceSize.height: 256
                                 cache: true
                                 asynchronous: true
 

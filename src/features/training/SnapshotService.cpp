@@ -11,6 +11,7 @@
 #include <QJsonObject>
 #include <QUuid>
 #include <QRandomGenerator>
+#include <QCryptographicHash>
 #include <algorithm>
 #include <QDateTime>
 #include <QFile>
@@ -50,6 +51,103 @@ static bool writeFileAtomically(const QString &targetPath, const QString &conten
     return true;
 }
 
+// ============================================================================
+// P0-1: 快照哈希冻结 —— 内部工具
+// ============================================================================
+
+QString SnapshotService::computeFileSha256(const QString &filePath)
+{
+    // 文件不存在时返回空串，由调用方决定降级策略（分类数据集 label_path 存的是类别名而非路径）
+    if (filePath.isEmpty() || !QFile::exists(filePath)) {
+        return {};
+    }
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        ltWarning(LT_LOG_TRAINING()) << "Cannot open file for hashing:" << filePath;
+        return {};
+    }
+
+    // 分块哈希（1MB），避免大图片一次性读入内存
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    constexpr int kChunkSize = 1024 * 1024;
+    while (!file.atEnd()) {
+        QByteArray chunk = file.read(kChunkSize);
+        if (chunk.isEmpty() && !file.atEnd()) {
+            ltWarning(LT_LOG_TRAINING()) << "Read error while hashing:" << filePath;
+            return {};
+        }
+        hash.addData(chunk);
+    }
+    return QString::fromLatin1(hash.result().toHex());
+}
+
+void SnapshotService::setLastError(const QString &code, const QString &message)
+{
+    m_lastErrorCode = code;
+    m_lastError = message;
+    ltError(LT_LOG_TRAINING()) << "Snapshot error [" << code << "]:" << message;
+}
+
+void SnapshotService::clearLastError()
+{
+    m_lastErrorCode = QStringLiteral("OK");
+    m_lastError.clear();
+}
+
+QString SnapshotService::lastError() const
+{
+    return m_lastError;
+}
+
+QString SnapshotService::lastErrorCode() const
+{
+    return m_lastErrorCode;
+}
+
+QMap<QString, QJsonObject> SnapshotService::parseManifestHashes(const QString &manifestJson)
+{
+    QMap<QString, QJsonObject> result;
+    QJsonDocument doc = QJsonDocument::fromJson(manifestJson.toUtf8());
+    if (!doc.isArray()) return result;
+
+    for (const auto &val : doc.array()) {
+        if (val.isObject()) {
+            // 新格式：对象含 id / imageHash / labelHash
+            QJsonObject obj = val.toObject();
+            QString id = obj.value(QStringLiteral("id")).toString();
+            if (!id.isEmpty()) {
+                result.insert(id, obj);
+            }
+        }
+        // 旧格式为纯字符串 ID，无哈希信息——不入 map，调用方按无哈希降级
+    }
+    return result;
+}
+
+bool SnapshotService::writeFreezeMarker(const QString &snapshotDir, const QString &manifestJson)
+{
+    // 冻结标记记录创建时间与 manifest 原文摘要，供离线审计与二次校验
+    QJsonObject marker;
+    marker[QStringLiteral("frozenAt")] = QDateTime::currentDateTime().toString(Qt::ISODate);
+    {
+        // manifest 是字符串不是文件，直接对字符串内容做 SHA256
+        QCryptographicHash h(QCryptographicHash::Sha256);
+        h.addData(manifestJson.toUtf8());
+        marker[QStringLiteral("manifestSha256")] = QString::fromLatin1(h.result().toHex());
+    }
+    marker[QStringLiteral("manifestJson")] = manifestJson;
+
+    QString markerPath = snapshotDir + QStringLiteral("/.frozen.json");
+    QString markerJson = QString::fromUtf8(QJsonDocument(marker).toJson(QJsonDocument::Compact));
+    return writeFileAtomically(markerPath, markerJson);
+}
+
+bool SnapshotService::isFrozenCopyPresent(const QString &snapshotDir)
+{
+    return QFile::exists(snapshotDir + QStringLiteral("/.frozen.json"));
+}
+
 SnapshotService::SnapshotService(QObject *parent) : QObject(parent)
 {
     ltTrace(LT_LOG_TRAINING()) << "parent=" << parent;
@@ -64,15 +162,22 @@ QString SnapshotService::createSnapshot(const QString &datasetId,
     auto db = Database::instance().database();
     if (!db.isOpen()) return {};
 
-    // 1. Collect all valid sample IDs from the dataset
+    clearLastError();
+
+    // 1. 收集所有有效样本 ID 及其文件路径（路径用于计算内容哈希）
     QSqlQuery sampleQuery(db);
-    sampleQuery.prepare("SELECT id FROM dataset_samples WHERE dataset_id = ? AND validation_status IN ('valid', 'good', 'defective') ORDER BY id");
+    sampleQuery.prepare("SELECT id, image_path, label_path FROM dataset_samples "
+                        "WHERE dataset_id = ? AND validation_status IN ('valid', 'good', 'defective') ORDER BY id");
     sampleQuery.addBindValue(datasetId);
     if (!sampleQuery.exec()) return {};
 
     QStringList allSampleIds;
+    // 样本 ID → [imagePath, labelPath]，后续计算哈希用
+    QMap<QString, QStringList> samplePaths;
     while (sampleQuery.next()) {
-        allSampleIds.append(sampleQuery.value(0).toString());
+        QString sid = sampleQuery.value(0).toString();
+        allSampleIds.append(sid);
+        samplePaths.insert(sid, {sampleQuery.value(1).toString(), sampleQuery.value(2).toString()});
     }
 
     if (allSampleIds.isEmpty()) return {};
@@ -105,13 +210,35 @@ QString SnapshotService::createSnapshot(const QString &datasetId,
         revisionBoundary = "none";
     }
 
-    // 5. Build sample manifest JSON
+    // 5. 构建样本 manifest JSON（P0-1：含每个样本的图片/标签内容哈希）
+    // 新格式：[{"id":"...","imageHash":"sha256...","labelHash":"sha256..."}, ...]
+    // 旧格式（纯 ID 字符串数组）仍可被 getSampleManifest 兼容读取
     QJsonArray manifestArray;
+    int hashedCount = 0;
     for (const auto &id : allSampleIds) {
-        manifestArray.append(id);
+        QJsonObject entry;
+        entry[QStringLiteral("id")] = id;
+
+        QStringList paths = samplePaths.value(id);
+        QString imagePath = paths.value(0);
+        QString labelPath = paths.value(1);
+
+        // 图片哈希：文件存在则计算；不存在（异常样本）置空串，后续校验会报缺失
+        QString imageHash = computeFileSha256(imagePath);
+        entry[QStringLiteral("imageHash")] = imageHash;
+        if (!imageHash.isEmpty()) hashedCount++;
+
+        // 标签哈希：分类任务的 label_path 存的是类别名而非文件路径，此时置空串跳过校验
+        QString labelHash = computeFileSha256(labelPath);
+        entry[QStringLiteral("labelHash")] = labelHash;
+
+        manifestArray.append(entry);
     }
     QJsonDocument manifestDoc(manifestArray);
     QString manifestJson = QString::fromUtf8(manifestDoc.toJson(QJsonDocument::Compact));
+
+    ltInfo(LT_LOG_TRAINING()) << "Snapshot manifest hashed:" << hashedCount << "/" << allSampleIds.size()
+                              << "samples with content hash";
 
     // 6. Build train/val split
     QStringList trainIds;
@@ -302,7 +429,12 @@ QVariantList SnapshotService::getSampleManifest(const QString &snapshotId)
 
     QJsonDocument doc = QJsonDocument::fromJson(query.value(0).toString().toUtf8());
     for (const auto &item : doc.array()) {
-        result.append(item.toString());
+        // 兼容旧格式（纯字符串 ID）与新格式（含哈希的对象）
+        if (item.isObject()) {
+            result.append(item.toObject().value(QStringLiteral("id")).toString());
+        } else {
+            result.append(item.toString());
+        }
     }
 
     return result;
@@ -344,11 +476,53 @@ bool SnapshotService::isImmutable(const QString &snapshotId)
 
     auto db = Database::instance().database();
 
+    // 1. 记录必须存在
     QSqlQuery query(db);
-    query.prepare("SELECT COUNT(*) FROM dataset_snapshots WHERE id = ?");
+    query.prepare("SELECT dataset_id, sample_manifest_json FROM dataset_snapshots WHERE id = ?");
     query.addBindValue(snapshotId);
 
-    return query.exec() && query.next() && query.value(0).toInt() > 0;
+    if (!query.exec() || !query.next()) return false;
+
+    QString datasetId = query.value(0).toString();
+    QString manifestJson = query.value(1).toString();
+    if (manifestJson.isEmpty()) return false;
+
+    // 2. 冻结标记已存在 → 物理副本已冻结，视为不可变
+    // 解析项目根目录以定位冻结目录
+    QSqlQuery dsQuery(db);
+    dsQuery.prepare("SELECT project_id FROM datasets WHERE id = ?");
+    dsQuery.addBindValue(datasetId);
+    if (dsQuery.exec() && dsQuery.next()) {
+        QString projectId = dsQuery.value(0).toString();
+        QSqlQuery projQuery(db);
+        projQuery.prepare("SELECT root_path FROM projects WHERE id = ?");
+        projQuery.addBindValue(projectId);
+        if (projQuery.exec() && projQuery.next()) {
+            QString snapshotDir = projQuery.value(0).toString()
+                                  + QStringLiteral("/cache/snapshots/") + snapshotId;
+            if (isFrozenCopyPresent(snapshotDir)) {
+                return true;
+            }
+        }
+    }
+
+    // 3. 无冻结目录时，校验 manifest 哈希清单完整性：
+    //    每个样本条目都必须含非空 imageHash（labelHash 允许为空——分类任务无标签文件）
+    QJsonDocument doc = QJsonDocument::fromJson(manifestJson.toUtf8());
+    if (!doc.isArray() || doc.array().isEmpty()) return false;
+
+    for (const auto &val : doc.array()) {
+        if (!val.isObject()) {
+            // 旧格式纯字符串 ID → 无哈希，不满足完整性要求
+            return false;
+        }
+        QJsonObject obj = val.toObject();
+        if (obj.value(QStringLiteral("imageHash")).toString().isEmpty()) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool SnapshotService::isOBBDataset(const QString &datasetId)
@@ -421,9 +595,12 @@ bool SnapshotService::isOBBDataset(const QString &datasetId)
     return isOBB;
 }
 
-QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
+QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId, bool materializeFrozenCopy)
 {
-    ltInfo(LT_LOG_TRAINING()) << "Preparing snapshot physical directory for" << snapshotId;
+    ltInfo(LT_LOG_TRAINING()) << "Preparing snapshot physical directory for" << snapshotId
+                              << "materializeFrozenCopy=" << materializeFrozenCopy;
+    clearLastError();
+
     QString dbPath = Database::instance().dbPath();
     QString connectionName = QStringLiteral("thread_snap_") + QUuid::createUuid().toString(QUuid::WithoutBraces);
     ThreadDbGuard guard{connectionName};
@@ -431,29 +608,34 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
     QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
     db.setDatabaseName(dbPath);
     if (!db.open()) {
-        ltError(LT_LOG_TRAINING()) << "Failed to open thread database:" << db.lastError().text();
+        setLastError(QStringLiteral("E_DB_ERROR"),
+                     QStringLiteral("无法打开数据库连接"));
         return {};
     }
 
-    // 1. Get snapshot details
+    // 1. Get snapshot details（含 sample_manifest_json 用于哈希校验）
     QSqlQuery snapQuery(db);
-    snapQuery.prepare("SELECT dataset_id, split_manifest_json, taxonomy_version FROM dataset_snapshots WHERE id = ?");
+    snapQuery.prepare("SELECT dataset_id, sample_manifest_json, split_manifest_json, taxonomy_version "
+                      "FROM dataset_snapshots WHERE id = ?");
     snapQuery.addBindValue(snapshotId);
     if (!snapQuery.exec() || !snapQuery.next()) {
-        ltError(LT_LOG_TRAINING()) << "Snapshot not found in database:" << snapshotId;
+        setLastError(QStringLiteral("E_SNAPSHOT_NOT_FOUND"),
+                     QStringLiteral("快照不存在：%1").arg(snapshotId));
         return {};
     }
 
     QString datasetId = snapQuery.value(0).toString();
-    QString splitManifestJson = snapQuery.value(1).toString();
-    QString taxonomyVersion = snapQuery.value(2).toString();
+    QString sampleManifestJson = snapQuery.value(1).toString();
+    QString splitManifestJson = snapQuery.value(2).toString();
+    QString taxonomyVersion = snapQuery.value(3).toString();
 
     // 2. Get project root path
     QSqlQuery datasetQuery(db);
     datasetQuery.prepare("SELECT project_id FROM datasets WHERE id = ?");
     datasetQuery.addBindValue(datasetId);
     if (!datasetQuery.exec() || !datasetQuery.next()) {
-        ltError(LT_LOG_TRAINING()) << "Dataset not found for snapshot:" << datasetId;
+        setLastError(QStringLiteral("E_DB_ERROR"),
+                     QStringLiteral("找不到数据集：%1").arg(datasetId));
         return {};
     }
     QString projectId = datasetQuery.value(0).toString();
@@ -462,7 +644,8 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
     projectQuery.prepare("SELECT root_path, task_type FROM projects WHERE id = ?");
     projectQuery.addBindValue(projectId);
     if (!projectQuery.exec() || !projectQuery.next()) {
-        ltError(LT_LOG_TRAINING()) << "Project not found for dataset:" << projectId;
+        setLastError(QStringLiteral("E_DB_ERROR"),
+                     QStringLiteral("找不到项目：%1").arg(projectId));
         return {};
     }
     QString projectRoot = projectQuery.value(0).toString();
@@ -476,20 +659,128 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
     QString cacheDir = projectRoot + QStringLiteral("/cache/snapshots");
     QString snapshotDir = cacheDir + QStringLiteral("/") + snapshotId;
 
+    // 3a. P0-1：若冻结副本已存在，直接使用冻结副本，不再回源校验/拷贝
+    if (isFrozenCopyPresent(snapshotDir)) {
+        ltInfo(LT_LOG_TRAINING()) << "Frozen copy already present, reusing:" << snapshotDir;
+        QString existingYaml = snapshotDir + QStringLiteral("/data.yaml");
+        if (QFile::exists(existingYaml)) {
+            return existingYaml;
+        }
+        // data.yaml 缺失（历史中断）——继续走生成流程，但跳过哈希校验（数据已冻结）
+        // 通过 parseManifestHashes 返回空并设置特殊标记来跳过，下面拷贝逻辑不会执行
+        // 直接跳到生成 data.yaml 阶段：走拷贝会覆盖冻结文件，因此只补生成配置
+    } else {
+        // 3b. 冻结副本不存在 → 校验源文件哈希与 manifest 一致（P0-1 核心防线）
+        QMap<QString, QJsonObject> manifestHashes = parseManifestHashes(sampleManifestJson);
+        if (manifestHashes.isEmpty() && !sampleManifestJson.isEmpty()) {
+            // 旧格式 manifest（无哈希）：无法校验完整性，拒绝以防源数据漂移
+            setLastError(QStringLiteral("E_MANIFEST_INVALID"),
+                         QStringLiteral("快照 manifest 缺少内容哈希，无法验证数据完整性。"
+                                        "请删除此快照后重新创建。"));
+            return {};
+        }
+
+        // 解析 split manifest 获取所有样本 ID
+        QJsonParseError parseError;
+        QJsonDocument splitDoc = QJsonDocument::fromJson(splitManifestJson.toUtf8(), &parseError);
+        if (parseError.error != QJsonParseError::NoError) {
+            setLastError(QStringLiteral("E_MANIFEST_INVALID"),
+                         QStringLiteral("split manifest 解析失败：%1").arg(parseError.errorString()));
+            return {};
+        }
+        QJsonObject splitObj = splitDoc.object();
+        QJsonArray allSamples = splitObj[QStringLiteral("train")].toArray();
+        // 注意：QJsonArray::append(const QJsonArray&) 会把数组作为单个嵌套元素追加，
+        // 必须逐元素展开 val 数组，否则会产生空字符串样本 ID 导致误判漂移
+        QJsonArray valArray = splitObj[QStringLiteral("val")].toArray();
+        for (const auto &v : valArray) {
+            allSamples.append(v);
+        }
+
+        // 逐样本校验当前文件哈希与 manifest 冻结哈希
+        QStringList driftedSamples;
+        QStringList missingFiles;
+        for (const auto &val : allSamples) {
+            QString sampleId = val.toString();
+            QJsonObject expected = manifestHashes.value(sampleId);
+            if (expected.isEmpty()) {
+                // manifest 中找不到该样本——数据不一致
+                driftedSamples.append(sampleId);
+                continue;
+            }
+
+            QSqlQuery sampleQuery(db);
+            sampleQuery.prepare("SELECT image_path, label_path FROM dataset_samples WHERE id = ?");
+            sampleQuery.addBindValue(sampleId);
+            if (!sampleQuery.exec() || !sampleQuery.next()) {
+                missingFiles.append(sampleId);
+                continue;
+            }
+            QString srcImg = sampleQuery.value(0).toString();
+            QString srcLbl = sampleQuery.value(1).toString();
+
+            // 校验图片哈希
+            QString expectedImgHash = expected.value(QStringLiteral("imageHash")).toString();
+            QString actualImgHash = computeFileSha256(srcImg);
+            if (actualImgHash.isEmpty()) {
+                missingFiles.append(sampleId);
+                continue;
+            }
+            if (actualImgHash != expectedImgHash) {
+                driftedSamples.append(sampleId);
+                continue;
+            }
+
+            // 校验标签哈希（labelHash 为空表示该样本无标签文件，跳过）
+            QString expectedLblHash = expected.value(QStringLiteral("labelHash")).toString();
+            if (!expectedLblHash.isEmpty()) {
+                QString actualLblHash = computeFileSha256(srcLbl);
+                if (actualLblHash != expectedLblHash) {
+                    driftedSamples.append(sampleId);
+                    continue;
+                }
+            }
+        }
+
+        if (!missingFiles.isEmpty()) {
+            setLastError(QStringLiteral("E_FILE_MISSING"),
+                         QStringLiteral("快照源文件缺失（%1 个样本），无法准备训练数据")
+                             .arg(missingFiles.size()));
+            return {};
+        }
+
+        if (!driftedSamples.isEmpty()) {
+            if (!materializeFrozenCopy) {
+                // 默认拒绝：源数据已变更，不能悄悄用漂移后的数据训练
+                setLastError(QStringLiteral("E_SOURCE_DRIFT"),
+                             QStringLiteral("快照源数据已变更（%1 个样本哈希不一致）。"
+                                            "如需继续，请选择「物化冻结副本」以当前数据重新冻结。")
+                                 .arg(driftedSamples.size()));
+                return {};
+            }
+            // 用户显式选择物化冻结副本：记录漂移警告，继续用当前数据物化
+            ltWarning(LT_LOG_TRAINING()) << "Source drift detected for" << driftedSamples.size()
+                                         << "samples; materializing frozen copy from current state as requested";
+        }
+    }
+
+    // 4. 创建物理目录结构
     QDir dir;
     if (isAnomaly) {
         // Anomalib 目录结构: train/good + test/good + test/defective
         if (!dir.mkpath(snapshotDir + QStringLiteral("/train/good")) ||
             !dir.mkpath(snapshotDir + QStringLiteral("/test/good")) ||
             !dir.mkpath(snapshotDir + QStringLiteral("/test/defective"))) {
-            ltError(LT_LOG_TRAINING()) << "Failed to create anomaly physical folders for snapshot:" << snapshotDir;
+            setLastError(QStringLiteral("E_COPY_FAILED"),
+                         QStringLiteral("无法创建 anomaly 物理目录：%1").arg(snapshotDir));
             return {};
         }
     } else if (isClassify) {
         // 分类目录结构: train/ + val/（子目录在拷贝样本时按类别创建）
         if (!dir.mkpath(snapshotDir + QStringLiteral("/train")) ||
             !dir.mkpath(snapshotDir + QStringLiteral("/val"))) {
-            ltError(LT_LOG_TRAINING()) << "Failed to create classify physical folders for snapshot:" << snapshotDir;
+            setLastError(QStringLiteral("E_COPY_FAILED"),
+                         QStringLiteral("无法创建分类物理目录：%1").arg(snapshotDir));
             return {};
         }
     } else {
@@ -498,16 +789,18 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
             !dir.mkpath(snapshotDir + QStringLiteral("/images/val")) ||
             !dir.mkpath(snapshotDir + QStringLiteral("/labels/train")) ||
             !dir.mkpath(snapshotDir + QStringLiteral("/labels/val"))) {
-            ltError(LT_LOG_TRAINING()) << "Failed to create physical folders for snapshot:" << snapshotDir;
+            setLastError(QStringLiteral("E_COPY_FAILED"),
+                         QStringLiteral("无法创建 YOLO 物理目录：%1").arg(snapshotDir));
             return {};
         }
     }
 
-    // 4. Parse split manifest
+    // 5. Parse split manifest（用于拷贝阶段）
     QJsonParseError parseError;
     QJsonDocument splitDoc = QJsonDocument::fromJson(splitManifestJson.toUtf8(), &parseError);
     if (parseError.error != QJsonParseError::NoError) {
-        ltError(LT_LOG_TRAINING()) << "Failed to parse split manifest JSON:" << parseError.errorString();
+        setLastError(QStringLiteral("E_MANIFEST_INVALID"),
+                     QStringLiteral("split manifest 解析失败：%1").arg(parseError.errorString()));
         return {};
     }
 
@@ -597,12 +890,18 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
         return true;
     };
 
-    if (!copySamples(trainSamples, QStringLiteral("train")) ||
-        !copySamples(valSamples, QStringLiteral("val"))) {
-        return {};
+    // 若冻结副本已存在但 data.yaml 缺失，只补配置不覆盖冻结数据文件
+    bool frozenAlready = isFrozenCopyPresent(snapshotDir);
+    if (!frozenAlready) {
+        if (!copySamples(trainSamples, QStringLiteral("train")) ||
+            !copySamples(valSamples, QStringLiteral("val"))) {
+            setLastError(QStringLiteral("E_COPY_FAILED"),
+                         QStringLiteral("拷贝样本文件到快照目录失败"));
+            return {};
+        }
     }
 
-    // 5. Query taxonomy classes
+    // 6. Query taxonomy classes
     QStringList classes;
     QStringList parts = taxonomyVersion.split(QChar(':'));
     if (parts.size() >= 2) {
@@ -622,7 +921,23 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
         classes.append(QStringLiteral("defect"));
     }
 
-    // 6. 生成配置文件
+    // 7. 生成配置文件 + 写入冻结标记
+    // 冻结标记在数据拷贝完成后写入，之后再调用本接口将直接复用冻结副本
+    auto finalizeWithYaml = [&](const QString &yamlPath, const QString &content) -> QString {
+        if (!writeFileAtomically(yamlPath, content)) {
+            setLastError(QStringLiteral("E_COPY_FAILED"),
+                         QStringLiteral("写入 data.yaml 失败：%1").arg(yamlPath));
+            return {};
+        }
+        if (!frozenAlready) {
+            if (!writeFreezeMarker(snapshotDir, sampleManifestJson)) {
+                ltWarning(LT_LOG_TRAINING()) << "Failed to write freeze marker for" << snapshotDir;
+                // 冻结标记写入失败不阻断训练，但记录警告——下次会重新校验哈希
+            }
+        }
+        return yamlPath;
+    };
+
     if (isAnomaly) {
         // Anomaly 类型：生成 data.yaml 指向目录结构，Anomalib 适配器会自动识别
         QString yamlPath = snapshotDir + QStringLiteral("/data.yaml");
@@ -634,12 +949,11 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
         stream << "abnormal_dir: test/defective\n";
         stream << "normal_test_dir: test/good\n";
 
-        if (!writeFileAtomically(yamlPath, content)) {
-            return {};
+        QString result = finalizeWithYaml(yamlPath, content);
+        if (!result.isEmpty()) {
+            ltInfo(LT_LOG_TRAINING()) << "Anomaly snapshot prepared at:" << snapshotDir;
         }
-
-        ltInfo(LT_LOG_TRAINING()) << "Anomaly snapshot prepared at:" << snapshotDir;
-        return yamlPath;
+        return result;
     } else if (isClassify) {
         // 分类类型：生成简洁的 data.yaml（Ultralytics 从目录结构自动推断类别）
         QString yamlPath = snapshotDir + QStringLiteral("/data.yaml");
@@ -649,12 +963,11 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
         stream << "train: train\n";
         stream << "val: val\n";
 
-        if (!writeFileAtomically(yamlPath, content)) {
-            return {};
+        QString result = finalizeWithYaml(yamlPath, content);
+        if (!result.isEmpty()) {
+            ltInfo(LT_LOG_TRAINING()) << "Classify snapshot prepared at:" << snapshotDir;
         }
-
-        ltInfo(LT_LOG_TRAINING()) << "Classify snapshot prepared at:" << snapshotDir;
-        return yamlPath;
+        return result;
     } else {
         // YOLO 类型：生成标准 data.yaml
         QString yamlPath = snapshotDir + QStringLiteral("/data.yaml");
@@ -669,12 +982,11 @@ QString SnapshotService::prepareSnapshotPhysicalDir(const QString &snapshotId)
             stream << "  " << i << ": " << classes[i] << "\n";
         }
 
-        if (!writeFileAtomically(yamlPath, content)) {
-            return {};
+        QString result = finalizeWithYaml(yamlPath, content);
+        if (!result.isEmpty()) {
+            ltInfo(LT_LOG_TRAINING()) << "YOLO snapshot prepared at:" << snapshotDir;
         }
-
-        ltInfo(LT_LOG_TRAINING()) << "YOLO snapshot prepared at:" << snapshotDir;
-        return yamlPath;
+        return result;
     }
 }
 

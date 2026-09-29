@@ -56,7 +56,9 @@ void TestDatabase::testSchemaVersion()
     QSqlQuery query(Database::instance().database());
     QVERIFY(query.exec("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1"));
     QVERIFY(query.next());
-    QCOMPARE(query.value(0).toInt(), 2);
+    // 与 Database::migrate 的最高迁移版本保持一致：
+    // V2 model_versions 字段扩充 / V3 training_runs.failure_info_json / V4 性能索引
+    QCOMPARE(query.value(0).toInt(), 4);
 }
 
 void TestDatabase::testImportLabelMeUser()
@@ -161,7 +163,17 @@ void TestDatabase::testProjectSerializationAndMigration()
     deleteRefQuery.addBindValue(projId);
     QVERIFY(deleteRefQuery.exec());
 
-    // 从数据库中删除项目，模拟迁移或数据库清空场景
+    // 先备份 project.json：deleteProject 会级联清理项目磁盘目录
+    QString jsonBackup;
+    {
+        QFile src(rootPath + "/project.json");
+        QVERIFY(src.open(QIODevice::ReadOnly));
+        jsonBackup = QString::fromUtf8(src.readAll());
+        src.close();
+        QVERIFY(!jsonBackup.isEmpty());
+    }
+
+    // 从数据库中删除项目，级联清理子表并移除项目磁盘目录
     QVERIFY(projService.deleteProject(projId));
 
     // 验证项目记录已在数据库中清除
@@ -171,7 +183,17 @@ void TestDatabase::testProjectSerializationAndMigration()
     QVERIFY(query.exec());
     QVERIFY(!query.next());
 
-    // 通过项目目录重新导入，恢复项目状态
+    // P0-5：删除项目后磁盘目录应被清理
+    QVERIFY(!QFileInfo::exists(rootPath));
+
+    // 恢复 project.json 后通过项目目录重新导入，验证序列化/迁移保真度
+    QVERIFY(QDir().mkpath(rootPath));
+    {
+        QFile dst(rootPath + "/project.json");
+        QVERIFY(dst.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        dst.write(jsonBackup.toUtf8());
+        dst.close();
+    }
     QString importedId = projService.importProject(rootPath);
     QCOMPARE(importedId, projId);
 
@@ -204,7 +226,7 @@ void TestDatabase::testDuplicateProjectCreation()
     QString projId2 = projService.createProject("项目2", rootPath);
     QCOMPARE(projId1, projId2);
 
-    // 3. 从数据库删除项目记录，保留物理上的 project.json
+    // 3. 删除项目：级联清理数据库记录与磁盘目录（P0-5）
     // 清除外键关联
     QSqlQuery deleteRefQuery(Database::instance().database());
     deleteRefQuery.prepare("DELETE FROM taxonomies WHERE project_id = ?");
@@ -213,10 +235,13 @@ void TestDatabase::testDuplicateProjectCreation()
 
     QVERIFY(projService.deleteProject(projId1));
 
-    // 此时数据库中无此项目，但物理上有 project.json。
-    // 再次调用 createProject 应触发自动 import 并返回正确的 ID 恢复项目
+    // 删除后数据库无记录且磁盘目录已被清理
+    QVERIFY(!QFileInfo::exists(rootPath));
+
+    // 同一路径重新创建应生成全新项目 ID（路径已不在数据库中，不再命中"已存在"分支）
     QString projId3 = projService.createProject("项目3", rootPath);
-    QCOMPARE(projId3, projId1);
+    QVERIFY(!projId3.isEmpty());
+    QVERIFY(projId3 != projId1);
 
     // 4. 清理临时文件
     QDir(rootPath).removeRecursively();

@@ -28,15 +28,9 @@ bool ProjectFs::createProjectJson(const QString &rootPath, const QString &projec
     ltTrace(LT_LOG_FS()) << "createProjectJson rootPath=" << rootPath << "name=" << projectName;
 
     QString filePath = rootPath + QStringLiteral("/project.json");
-    QFile file(filePath);
-    if (file.exists()) {
+    if (QFile::exists(filePath)) {
         ltWarning(LT_LOG_FS()) << "project.json already exists:" << filePath;
         return true;
-    }
-
-    if (!file.open(QIODevice::WriteOnly)) {
-        ltError(LT_LOG_FS()) << "Failed to create project.json:" << filePath;
-        return false;
     }
 
     QJsonObject json;
@@ -48,8 +42,28 @@ bool ProjectFs::createProjectJson(const QString &rootPath, const QString &projec
     json[QStringLiteral("labeltorch_version")] = QStringLiteral("0.1.0");
 
     QJsonDocument doc(json);
-    file.write(doc.toJson());
-    file.close();
+    QByteArray content = doc.toJson();
+
+    // 原子写入：先写 .tmp 再 rename，防止崩溃/断电留下半写 project.json
+    QString tmpPath = filePath + QStringLiteral(".tmp");
+    QFile tmpFile(tmpPath);
+    if (!tmpFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        ltError(LT_LOG_FS()) << "Failed to create temp project.json:" << tmpPath;
+        return false;
+    }
+    qint64 written = tmpFile.write(content);
+    tmpFile.flush();
+    tmpFile.close();
+    if (written != content.size()) {
+        ltError(LT_LOG_FS()) << "Incomplete write to temp project.json:" << tmpPath;
+        QFile::remove(tmpPath);
+        return false;
+    }
+    if (!tmpFile.rename(filePath)) {
+        ltError(LT_LOG_FS()) << "Failed to rename temp project.json to:" << filePath;
+        QFile::remove(tmpPath);
+        return false;
+    }
 
     ltInfo(LT_LOG_FS()) << "project.json created:" << filePath;
     return true;

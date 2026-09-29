@@ -2,6 +2,8 @@
 
 Industrial defect detection desktop software — an integrated platform for annotation, training, inference, and export.
 
+**Current version**: 0.2.0
+
 ## Features
 
 - **Project Management**: Create/open projects, recent project list, task type switching (detect/obb/classify/anomaly)

@@ -12,7 +12,8 @@ class TaxonomyModel : public QAbstractListModel
 public:
     explicit TaxonomyModel(QObject *parent = nullptr);
 
-    enum Roles { ClassNameRole = Qt::UserRole + 1, IndexRole };
+    // DeprecatedRole：该 class_id 是否已废弃（类名为空的占位）
+    enum Roles { ClassNameRole = Qt::UserRole + 1, IndexRole, DeprecatedRole };
 
     int rowCount(const QModelIndex &parent = {}) const override;
     QVariant data(const QModelIndex &index, int role) const override;
@@ -23,7 +24,22 @@ public:
 
     Q_INVOKABLE void refresh();
     Q_INVOKABLE bool addClass(const QString &className);
+
+    /**
+     * @brief 删除类别（废弃语义，与 TaxonomyService::removeClass 默认路径一致）。
+     *
+     * 不做物理删除：YOLO 标签按 class_id（即本列表下标）引用类别，
+     * 物理删除会使后续 class_id 整体前移，导致已有标签全部错类。
+     * 此处将该索引位置为废弃占位（类名清空），数组长度不变，后续 class_id 不变。
+     *
+     * @param index 类别索引（class_id）。
+     * @return true 成功；false 索引越界或该位已废弃。
+     */
     Q_INVOKABLE bool removeClass(int index);
+
+    /**
+     * @brief 重命名类别。对废弃占位调用等价于复活该 class_id。
+     */
     Q_INVOKABLE bool renameClass(int index, const QString &newName);
 
 signals:

@@ -36,11 +36,33 @@ async def handle_run(payload: dict) -> dict:
     annotated_dir = payload.get("annotated_dir", "")
 
     if not weight_path:
-        return {"status": "failed", "error": "Missing weight_path"}
+        return {"status": "failed", "error": {"code": "MISSING_PARAMS", "message": "Missing weight_path"}}
     if not source:
-        return {"status": "failed", "error": "Missing source"}
-    if not os.path.isfile(weight_path):
-        return {"status": "failed", "error": f"Weight file not found: {weight_path}"}
+        return {"status": "failed", "error": {"code": "MISSING_PARAMS", "message": "Missing source"}}
+
+    # 路径白名单：权重/输入源/可视化输出必须落在 projectRoot / snapshotDir / 系统临时目录内
+    from ..tools.path_security import (
+        PathSecurityError,
+        collect_allowed_roots,
+        ensure_within,
+    )
+
+    read_roots = collect_allowed_roots(payload, extra_roots=[source])
+    write_roots = collect_allowed_roots(payload, include_data_dirs=False)
+
+    checked_weight = ensure_within(weight_path, read_roots, field="weight_path", must_exist=True)
+    if isinstance(checked_weight, dict):
+        return checked_weight
+    checked_source = ensure_within(source, read_roots, field="source", must_exist=False)
+    if isinstance(checked_source, dict):
+        return checked_source
+    source = checked_source
+    if annotated_dir:
+        checked_annotated = ensure_within(annotated_dir, write_roots, field="annotated_dir", must_exist=False)
+        if isinstance(checked_annotated, dict):
+            return checked_annotated
+        annotated_dir = checked_annotated
+
     try:
         from ultralytics import YOLO
         import torch
@@ -53,7 +75,8 @@ async def handle_run(payload: dict) -> dict:
                 logger.warning(f"CUDA is not available. Falling back to CPU for inference (requested device was: {device}).")
                 device = "cpu"
 
-        model = YOLO(weight_path)
+        # 风险说明：YOLO(pt) 内部经 torch.load 反序列化，路径必须来自项目内训练产物
+        model = YOLO(checked_weight)
 
         loop = asyncio.get_event_loop()
         results = await loop.run_in_executor(
@@ -84,6 +107,14 @@ async def handle_run(payload: dict) -> dict:
                     annotated_dir = os.path.join(source, ".labeltorch_annotated")
                 else:
                     annotated_dir = os.path.join(os.path.dirname(source), ".labeltorch_annotated")
+                # 派生目录也必须落在写白名单内，外部数据集旁不可写时回退临时目录
+                checked_default = ensure_within(annotated_dir, write_roots, field="annotated_dir", must_exist=False)
+                if isinstance(checked_default, dict):
+                    import tempfile
+                    logger.warning(f"默认可视化目录越界，改用临时目录: {annotated_dir}")
+                    annotated_dir = os.path.join(tempfile.gettempdir(), "labeltorch", "annotated")
+                else:
+                    annotated_dir = checked_default
             os.makedirs(annotated_dir, exist_ok=True)
 
         predictions = []
@@ -146,10 +177,12 @@ async def handle_run(payload: dict) -> dict:
         }
 
     except ImportError:
-        return {"status": "failed", "error": "Ultralytics or Supervision is not installed"}
+        return {"status": "failed", "error": {"code": "DEPENDENCY_MISSING", "message": "Ultralytics or Supervision is not installed"}}
+    except PathSecurityError as e:
+        return {"status": "failed", "error": e.to_error_dict()}
     except Exception as e:
         logger.error(f"Inference failed: {e}")
-        return {"status": "failed", "error": str(e)}
+        return {"status": "failed", "error": {"code": "INFER_FAILED", "message": str(e)}}
 
 
 async def handle_run_video(payload: dict) -> dict:
@@ -173,12 +206,34 @@ async def handle_run_video(payload: dict) -> dict:
     imgsz = payload.get("imgsz", 640)
     device = payload.get("device", "auto")
 
-    if not weight_path or not os.path.isfile(weight_path):
-        return {"status": "failed", "error": "Invalid weight_path"}
-    if not video_path or not os.path.isfile(video_path):
-        return {"status": "failed", "error": "Invalid video_path"}
+    if not weight_path:
+        return {"status": "failed", "error": {"code": "MISSING_PARAMS", "message": "Missing weight_path"}}
+    if not video_path:
+        return {"status": "failed", "error": {"code": "MISSING_PARAMS", "message": "Missing video_path"}}
     if not output_path:
-        return {"status": "failed", "error": "Missing output_path"}
+        return {"status": "failed", "error": {"code": "MISSING_PARAMS", "message": "Missing output_path"}}
+
+    # 路径白名单：权重/视频输入/输出视频均需落在 projectRoot / snapshotDir / 系统临时目录内
+    from ..tools.path_security import (
+        PathSecurityError,
+        collect_allowed_roots,
+        ensure_within,
+    )
+
+    read_roots = collect_allowed_roots(payload, extra_roots=[video_path])
+    write_roots = collect_allowed_roots(payload, include_data_dirs=False)
+
+    checked_weight = ensure_within(weight_path, read_roots, field="weight_path", must_exist=True)
+    if isinstance(checked_weight, dict):
+        return checked_weight
+    checked_video = ensure_within(video_path, read_roots, field="video_path", must_exist=True)
+    if isinstance(checked_video, dict):
+        return checked_video
+    checked_output = ensure_within(output_path, write_roots, field="output_path", must_exist=False)
+    if isinstance(checked_output, dict):
+        return checked_output
+    video_path = checked_video
+    output_path = checked_output
 
     try:
         from ultralytics import YOLO
@@ -190,7 +245,8 @@ async def handle_run_video(payload: dict) -> dict:
                 logger.warning("CUDA unavailable, falling back to CPU for video inference.")
                 device = "cpu"
 
-        model = YOLO(weight_path)
+        # 风险说明：YOLO(pt) 内部经 torch.load 反序列化，路径必须来自项目内训练产物
+        model = YOLO(checked_weight)
         color_palette = sv.ColorPalette.default()
         box_annotator = sv.BoxAnnotator(color=color_palette, thickness=2)
         label_annotator = sv.LabelAnnotator(color=color_palette, text_thickness=1, text_scale=0.5)
@@ -228,7 +284,9 @@ async def handle_run_video(payload: dict) -> dict:
             "total_detections": total_detections,
         }
     except ImportError:
-        return {"status": "failed", "error": "Ultralytics or Supervision is not installed"}
+        return {"status": "failed", "error": {"code": "DEPENDENCY_MISSING", "message": "Ultralytics or Supervision is not installed"}}
+    except PathSecurityError as e:
+        return {"status": "failed", "error": e.to_error_dict()}
     except Exception as e:
         logger.error(f"Video inference failed: {e}")
-        return {"status": "failed", "error": str(e)}
+        return {"status": "failed", "error": {"code": "INFER_FAILED", "message": str(e)}}

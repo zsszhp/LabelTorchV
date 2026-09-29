@@ -1,4 +1,4 @@
-// ActiveLearningPage.qml - 主动学习主页面
+// ActiveLearningPage.qml - 难例挖掘主页面
 // 提供低置信样本收集、队列管理、优先级排序功能
 // 对接 ActiveLearningService（C++）和 active_learning handler（Python）
 import QtQuick
@@ -6,8 +6,9 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import LabelTorch.Theme
+import LabelTorch.Components
 
-/// 主动学习主页面
+/// 难例挖掘主页面
 Rectangle {
     id: root
 
@@ -54,7 +55,7 @@ Rectangle {
                 spacing: Theme.spacingNormal
 
                 Label {
-                    text: "主动学习中心"
+                    text: "难例挖掘中心"
                     color: Theme.textMain
                     font.pixelSize: Theme.fontSizeSubheading
                     font.bold: true
@@ -415,7 +416,7 @@ Rectangle {
                         Item { Layout.fillHeight: true }
 
                         Button {
-                            text: "生成训练快照"
+                            text: "生成训练冻结版"
                             Layout.fillWidth: true
                             Layout.preferredHeight: 36
                             enabled: sampleListModel.count > 0
@@ -1076,10 +1077,10 @@ Rectangle {
         }
     }
 
-    // 创建训练快照对话框
+    // 创建训练冻结版对话框
     Dialog {
         id: createSnapshotDialog
-        title: "生成训练快照"
+        title: "生成训练冻结版"
         modal: true
         anchors.centerIn: parent
         width: 420
@@ -1106,7 +1107,7 @@ Rectangle {
 
             Label {
                 anchors.centerIn: parent
-                text: "生成训练快照"
+                text: "生成训练冻结版"
                 color: Theme.primary
                 font.pixelSize: Theme.fontSizeSubheading
                 font.bold: true
@@ -1207,7 +1208,7 @@ Rectangle {
                 }
 
                 Button {
-                    text: "创建快照"
+                    text: "创建冻结版"
                     Layout.fillWidth: true
                     Layout.preferredHeight: 34
                     enabled: snapshotDatasetCombo.currentValue !== undefined && snapshotDatasetCombo.currentValue !== ""
@@ -1233,6 +1234,9 @@ Rectangle {
                             )
                             if (snapshotId && snapshotId !== "") {
                                 createSnapshotDialog.accept()
+                                ToastBus.success("数据冻结版创建成功")
+                            } else {
+                                ToastBus.error("数据冻结版创建失败")
                             }
                         }
                     }
@@ -1282,7 +1286,7 @@ Rectangle {
         batchOperationDialog.open()
     }
 
-    // 从主动学习队列生成训练快照 - 打开创建快照对话框
+    // 从难例挖掘队列生成训练冻结版 - 打开创建冻结版对话框
     function createTrainingSnapshot() {
         if (root.currentProjectId === "") {
             return

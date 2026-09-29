@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import LabelTorch.Theme
+import LabelTorch.Components
 import QtQuick.Dialogs
 import QtQuick.Effects
 
@@ -119,7 +120,7 @@ Item {
         handle: Rectangle {
             implicitWidth: 4
             color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
-            Behavior on color { ColorAnimation { duration: 150 } }
+            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
         }
 
         // 左侧数据集列表 Sidebar (240px)
@@ -342,8 +343,14 @@ Item {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                datasetService.deleteDataset(model.datasetId)
-                                                datasetModel.refresh()
+                                                // 危险操作二次确认
+                                                deleteDsDialog.targetDatasetId = model.datasetId
+                                                deleteDsDialog.impactItems = [
+                                                    "该数据集下的全部样本记录",
+                                                    "关联的标签文件引用",
+                                                    "基于该数据集创建的数据冻结版"
+                                                ]
+                                                deleteDsDialog.openConfirm()
                                             }
                                         }
                                     }
@@ -447,8 +454,8 @@ Item {
                                         shadowBlur: 0.15
                                     }
 
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                    Behavior on border.color { ColorAnimation { duration: 150 } }
+                                    Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
+                                    Behavior on border.color { ColorAnimation { duration: Theme.animDurationFast } }
                                 }
                                 contentItem: Label {
                                     text: autoBtn.text
@@ -456,7 +463,7 @@ Item {
                                     font: autoBtn.font
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
-                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
                                 }
                                 onClicked: {
                                     root.importMode = "auto"
@@ -485,8 +492,8 @@ Item {
                                         shadowBlur: 0.15
                                     }
 
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                    Behavior on border.color { ColorAnimation { duration: 150 } }
+                                    Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
+                                    Behavior on border.color { ColorAnimation { duration: Theme.animDurationFast } }
                                 }
                                 contentItem: Label {
                                     text: sepBtn.text
@@ -494,7 +501,7 @@ Item {
                                     font: sepBtn.font
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
-                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
                                 }
                                 onClicked: {
                                     root.importMode = "separate"
@@ -542,8 +549,8 @@ Item {
                                     border.color: dropAreaDrag.containsDrag ? Theme.primaryGlow : (dropAreaMouse.containsMouse ? Theme.primary : Theme.borderColor)
                                     border.width: 1
 
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                    Behavior on border.color { ColorAnimation { duration: 150 } }
+                                    Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
+                                    Behavior on border.color { ColorAnimation { duration: Theme.animDurationFast } }
 
                                     layer.enabled: dropAreaDrag.containsDrag || dropAreaMouse.containsMouse
                                     layer.effect: MultiEffect {
@@ -577,7 +584,7 @@ Item {
                                             color: Theme.textMuted
                                             Layout.alignment: Qt.AlignHCenter
                                             scale: dropAreaMouse.containsMouse || dropAreaDrag.containsDrag ? 1.15 : 1.0
-                                            Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
+                                            Behavior on scale { NumberAnimation { duration: Theme.animDurationFast; easing.type: Easing.OutBack } }
                                         }
 
                                         Label {
@@ -586,7 +593,7 @@ Item {
                                             font.family: Theme.fontFamily
                                             color: dropAreaMouse.containsMouse || dropAreaDrag.containsDrag ? Theme.primaryGlow : Theme.textMuted
                                             Layout.alignment: Qt.AlignHCenter
-                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
 
                                         Label {
@@ -643,8 +650,8 @@ Item {
                                             radius: Theme.radiusSmall
                                             border.color: browseAutoBtn.hovered ? Theme.primaryGlow : Theme.borderColor
                                             border.width: 1
-                                            Behavior on color { ColorAnimation { duration: 150 } }
-                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
+                                            Behavior on border.color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         contentItem: Label {
                                             text: browseAutoBtn.text
@@ -652,7 +659,7 @@ Item {
                                             font: browseAutoBtn.font
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
-                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         onClicked: folderDialog.open()
                                     }
@@ -676,8 +683,8 @@ Item {
                                                 shadowBlur: 0.15
                                             }
 
-                                            Behavior on color { ColorAnimation { duration: 150 } }
-                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
+                                            Behavior on border.color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         contentItem: Label {
                                             text: analyzeAutoBtn.text
@@ -685,7 +692,7 @@ Item {
                                             font: analyzeAutoBtn.font
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
-                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         onClicked: startScanAuto()
                                     }
@@ -760,8 +767,8 @@ Item {
                                             radius: Theme.radiusSmall
                                             border.color: browseImgBtn.hovered ? Theme.primaryGlow : Theme.borderColor
                                             border.width: 1
-                                            Behavior on color { ColorAnimation { duration: 150 } }
-                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
+                                            Behavior on border.color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         contentItem: Label {
                                             text: browseImgBtn.text
@@ -769,7 +776,7 @@ Item {
                                             font: browseImgBtn.font
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
-                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         onClicked: imageFolderDialog.open()
                                     }
@@ -820,8 +827,8 @@ Item {
                                             radius: Theme.radiusSmall
                                             border.color: browseLabelBtn.hovered ? Theme.primaryGlow : Theme.borderColor
                                             border.width: 1
-                                            Behavior on color { ColorAnimation { duration: 150 } }
-                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
+                                            Behavior on border.color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         contentItem: Label {
                                             text: browseLabelBtn.text
@@ -829,7 +836,7 @@ Item {
                                             font: browseLabelBtn.font
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
-                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         onClicked: labelFolderDialog.open()
                                     }
@@ -843,8 +850,8 @@ Item {
                                             radius: Theme.radiusSmall
                                             border.color: clearLabelBtn.hovered ? Theme.primaryGlow : Theme.borderColor
                                             border.width: 1
-                                            Behavior on color { ColorAnimation { duration: 150 } }
-                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
+                                            Behavior on border.color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         contentItem: Label {
                                             text: clearLabelBtn.text
@@ -852,7 +859,7 @@ Item {
                                             font: clearLabelBtn.font
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
-                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         onClicked: {
                                             labelPathField.clear()
@@ -886,8 +893,8 @@ Item {
                                                 shadowBlur: 0.15
                                             }
 
-                                            Behavior on color { ColorAnimation { duration: 150 } }
-                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
+                                            Behavior on border.color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         contentItem: Label {
                                             text: analyzeBtn.text
@@ -895,7 +902,7 @@ Item {
                                             font: analyzeBtn.font
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
-                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         onClicked: startScanSeparate()
                                     }
@@ -952,9 +959,9 @@ Item {
                                         // 格式徽章
                                         Rectangle {
                                             Layout.alignment: Qt.AlignVCenter
-                                            Layout.preferredWidth: formatBadgeText.implicitWidth + 16
+                                            Layout.preferredWidth: scanFormatBadgeText.implicitWidth + 16
                                             Layout.preferredHeight: 28
-                                            implicitWidth: formatBadgeText.implicitWidth + 16
+                                            implicitWidth: scanFormatBadgeText.implicitWidth + 16
                                             implicitHeight: 28
                                             radius: Theme.radiusSmall
                                             color: {
@@ -969,7 +976,7 @@ Item {
                                             }
 
                                             Label {
-                                                id: formatBadgeText
+                                                id: scanFormatBadgeText
                                                 anchors.centerIn: parent
                                                 text: {
                                                     var fmt = root.scanResult ? root.scanResult.detectedFormat : ""
@@ -1236,16 +1243,16 @@ Item {
                                                 shadowBlur: 0.15
                                             }
 
-                                            Behavior on color { ColorAnimation { duration: 150 } }
-                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
+                                            Behavior on border.color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         contentItem: Label {
                                             text: confirmImportBtn.text
-                                            color: confirmImportBtn.enabled ? (confirmImportBtn.hovered ? Theme.bgMain : "#ffffff") : Theme.textDisabled
+                                            color: confirmImportBtn.enabled ? (confirmImportBtn.hovered ? Theme.bgMain : Theme.logoBgText) : Theme.textDisabled
                                             font: confirmImportBtn.font
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
-                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
                                         }
                                         onClicked: {
                                             var dsId = ""
@@ -1284,6 +1291,7 @@ Item {
 
                                                 importSuccessMsg.text = "数据集: " + name + "\n格式: " + formatStr + "\n样本数量: " + count + " 张图片"
                                                 importSuccessDialog.open()
+                                                ToastBus.success("导入成功：" + name + "（" + count + " 张）")
 
                                                 root.scanResult = null
                                                 folderPathField.clear()
@@ -1296,6 +1304,7 @@ Item {
                                                 // 导入失败，显示错误提示
                                                 importErrorLabel.visible = true
                                                 importErrorLabel.text = "导入失败，请检查路径和格式是否正确"
+                                                ToastBus.error("导入失败，请检查路径和格式是否正确")
                                             }
                                         }
                                     }
@@ -1465,6 +1474,24 @@ Item {
                         appController.currentPage = "dataset"
                     }
                 }
+            }
+        }
+    }
+
+    // === 删除数据集二次确认（列明连带项） ===
+    ConfirmDialog {
+        id: deleteDsDialog
+        confirmTitle: "确认删除数据集"
+        message: "删除后不可恢复，确认继续？"
+        confirmText: "删除"
+        cancelText: "取消"
+        property string targetDatasetId: ""
+
+        onConfirmed: {
+            if (targetDatasetId) {
+                datasetService.deleteDataset(targetDatasetId)
+                datasetModel.refresh()
+                targetDatasetId = ""
             }
         }
     }

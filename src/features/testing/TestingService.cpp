@@ -11,7 +11,9 @@
 #include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMap>
 #include <QtConcurrent>
+#include <algorithm>
 
 TestingService::TestingService(QObject *parent)
     : QObject(parent)
@@ -116,7 +118,7 @@ bool TestingService::startTestTask(const QString &taskId)
 
     // 根据配置选择权重（0=最佳权重，1=最末权重）
     QJsonObject configObj = QJsonDocument::fromJson(configJson.toUtf8()).object();
-    int weightIndex = configObj.value("weight_index").toInt(0);
+    int weightIndex = configObj.value("weight_index").toInt();
     QString weightPath = (weightIndex == 1) ? lastWeightPath : bestWeightPath;
 
     if (weightPath.isEmpty()) {
@@ -229,6 +231,176 @@ QVariantList TestingService::getPRCurveData(const QString &taskId)
         }
     }
     return {};
+}
+
+// ============================================================================
+// P1-16 / P1-17 / P1-18：曲线、阈值推荐、Go/No-Go、逐类指标透传
+// ============================================================================
+
+QVariantMap TestingService::parseMetricsJson(const QString &metricsJson)
+{
+    if (metricsJson.isEmpty()) return {};
+    QJsonDocument doc = QJsonDocument::fromJson(metricsJson.toUtf8());
+    return doc.isObject() ? doc.object().toVariantMap() : QVariantMap{};
+}
+
+QVariantList TestingService::getPerClassMetrics(const QString &taskId)
+{
+    ltTrace(LT_LOG_TESTING()) << "taskId=" << taskId;
+
+    auto db = Database::instance().database();
+    QSqlQuery query(db);
+    query.prepare("SELECT metrics_json FROM testing_runs WHERE id = ?");
+    query.addBindValue(taskId);
+    if (!query.exec() || !query.next()) return {};
+
+    QVariantMap metrics = parseMetricsJson(query.value(0).toString());
+    QVariantList perClass = metrics.value(QStringLiteral("per_class")).toList();
+    // Python 侧已按 fn_count 降序排序；此处再排一次保证历史数据一致
+    std::sort(perClass.begin(), perClass.end(), [](const QVariant &a, const QVariant &b) {
+        const QVariantMap ma = a.toMap();
+        const QVariantMap mb = b.toMap();
+        if (ma.value("fn_count").toInt() != mb.value("fn_count").toInt()) {
+            return ma.value("fn_count").toInt() > mb.value("fn_count").toInt();
+        }
+        return ma.value("fp_count").toInt() > mb.value("fp_count").toInt();
+    });
+    return perClass;
+}
+
+QVariantMap TestingService::getThresholdRecommendation(const QString &taskId)
+{
+    ltTrace(LT_LOG_TESTING()) << "taskId=" << taskId;
+
+    auto db = Database::instance().database();
+    QSqlQuery query(db);
+    query.prepare("SELECT metrics_json FROM testing_runs WHERE id = ?");
+    query.addBindValue(taskId);
+    if (!query.exec() || !query.next()) return {};
+
+    QVariantMap metrics = parseMetricsJson(query.value(0).toString());
+    return metrics.value(QStringLiteral("threshold_recommendation")).toMap();
+}
+
+QVariantMap TestingService::getGoNoGo(const QString &taskId)
+{
+    ltTrace(LT_LOG_TESTING()) << "taskId=" << taskId;
+
+    auto db = Database::instance().database();
+    QSqlQuery query(db);
+    query.prepare("SELECT metrics_json FROM testing_runs WHERE id = ?");
+    query.addBindValue(taskId);
+    if (!query.exec() || !query.next()) return {};
+
+    QVariantMap metrics = parseMetricsJson(query.value(0).toString());
+    return metrics.value(QStringLiteral("go_no_go")).toMap();
+}
+
+QVariantList TestingService::getPerClassErrorQueue(const QString &taskId)
+{
+    ltTrace(LT_LOG_TESTING()) << "taskId=" << taskId;
+
+    // 先取逐类指标建立 classIndex → className 映射
+    QMap<int, QString> classNames;
+    QList<int> classOrder;
+    if (!taskId.isEmpty()) {
+        const QVariantList perClass = getPerClassMetrics(taskId);
+        for (const QVariant &item : perClass) {
+            const QVariantMap m = item.toMap();
+            // QVariant::toInt 不接受默认值，缺失时显式回退 -1
+            int idx = m.contains(QStringLiteral("classIndex"))
+                          ? m.value(QStringLiteral("classIndex")).toInt() : -1;
+            if (idx >= 0) {
+                classNames[idx] = m.value("className").toString();
+                classOrder.append(idx);
+            }
+        }
+    }
+
+    // 从主动学习队列表聚合 FP/FN 样本（P1-18：接入 FP/FN 队列数据）
+    struct ClassErrors {
+        QList<QVariantMap> fnSamples;
+        QList<QVariantMap> fpSamples;
+    };
+    QMap<int, ClassErrors> errorsByClass;
+
+    auto db = Database::instance().database();
+    if (db.isOpen()) {
+        QSqlQuery query(db);
+        query.prepare("SELECT sample_path, reason, confidence, class_index, class_name "
+                      "FROM active_learning_items "
+                      "WHERE status = 'queued' AND reason IN ('false_negative', 'false_positive', 'low_confidence') "
+                      "ORDER BY priority DESC, confidence ASC");
+        if (query.exec()) {
+            while (query.next()) {
+                QVariantMap sample;
+                sample[QStringLiteral("samplePath")] = query.value(0).toString();
+                const QString reason = query.value(1).toString();
+                sample[QStringLiteral("reason")] = reason;
+                sample[QStringLiteral("confidence")] = query.value(2).toDouble();
+                int classIndex = query.value(3).isNull() ? -1 : query.value(3).toInt();
+                const QString className = query.value(4).toString();
+                sample[QStringLiteral("classIndex")] = classIndex;
+                sample[QStringLiteral("className")] = className;
+
+                if (classIndex < 0 && !className.isEmpty()) {
+                    // 仅有类别名时反查 index
+                    for (auto it = classNames.constBegin(); it != classNames.constEnd(); ++it) {
+                        if (it.value() == className) {
+                            classIndex = it.key();
+                            break;
+                        }
+                    }
+                }
+                if (!classNames.contains(classIndex) && classIndex >= 0) {
+                    classNames[classIndex] = className.isEmpty()
+                        ? QStringLiteral("class_%1").arg(classIndex) : className;
+                    classOrder.append(classIndex);
+                }
+
+                if (reason == QLatin1String("false_negative")) {
+                    errorsByClass[classIndex].fnSamples.append(sample);
+                } else {
+                    // false_positive 与 low_confidence 均计入超检侧队列
+                    errorsByClass[classIndex].fpSamples.append(sample);
+                }
+            }
+        }
+    }
+
+    // 保证逐类指标里出现过的类别都有条目（即使队列为空）
+    for (int idx : classNames.keys()) {
+        if (!errorsByClass.contains(idx)) {
+            errorsByClass[idx] = ClassErrors{};
+        }
+    }
+
+    QVariantList result;
+    // 按漏检队列长度降序，漏检多的类别优先展示
+    QList<int> sortedKeys = errorsByClass.keys();
+    std::sort(sortedKeys.begin(), sortedKeys.end(), [&](int a, int b) {
+        return errorsByClass[a].fnSamples.size() > errorsByClass[b].fnSamples.size();
+    });
+
+    for (int idx : sortedKeys) {
+        const ClassErrors &errs = errorsByClass[idx];
+        QVariantMap entry;
+        entry[QStringLiteral("classIndex")] = idx;
+        entry[QStringLiteral("className")] = classNames.value(idx, QStringLiteral("class_%1").arg(idx));
+        entry[QStringLiteral("fnCount")] = errs.fnSamples.size();
+        entry[QStringLiteral("fpCount")] = errs.fpSamples.size();
+
+        QVariantList fnList;
+        for (const QVariantMap &s : errs.fnSamples) fnList.append(s);
+        QVariantList fpList;
+        for (const QVariantMap &s : errs.fpSamples) fpList.append(s);
+        entry[QStringLiteral("fnSamples")] = fnList;
+        entry[QStringLiteral("fpSamples")] = fpList;
+        result.append(entry);
+    }
+
+    ltDebug(LT_LOG_TESTING()) << "Per-class error queue entries:" << result.size();
+    return result;
 }
 
 bool TestingService::deleteTestTask(const QString &taskId)

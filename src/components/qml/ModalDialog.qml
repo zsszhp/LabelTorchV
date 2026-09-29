@@ -132,7 +132,7 @@ Popup {
     }
 
     Overlay.modeless: Rectangle {
-        color: "#B3000000"
+        color: Theme.overlayMask
     }
 
     enter: Transition {

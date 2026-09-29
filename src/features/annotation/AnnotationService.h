@@ -199,11 +199,20 @@ public:
                                        const QVariantList &afterSnapshot);
 
     /**
-     * @brief List all samples for a dataset.
+     * @brief List samples for a dataset（支持分页）。
      * @param datasetId The dataset ID.
+     * @param offset    起始偏移（>=0）
+     * @param limit     最大返回条数（<=0 表示不限制，兼容旧调用）
      * @return QVariantList of QVariantMap entries with sample fields.
      */
-    Q_INVOKABLE QVariantList listSamples(const QString &datasetId);
+    Q_INVOKABLE QVariantList listSamples(const QString &datasetId, int offset = 0, int limit = -1);
+
+    /**
+     * @brief 统计数据集样本总数（供分页控件计算页数）。
+     * @param datasetId The dataset ID.
+     * @return 样本条数
+     */
+    Q_INVOKABLE int countSamples(const QString &datasetId);
 
     /**
      * @brief Get details of a specific sample.

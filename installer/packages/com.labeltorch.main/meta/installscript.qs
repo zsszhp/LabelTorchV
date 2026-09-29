@@ -1,6 +1,6 @@
 function Component()
 {
-    // 构造函数
+    // 构造函数：保持标准向导页面可见
     installer.setDefaultPageVisible(QInstaller.Introduction, true);
     installer.setDefaultPageVisible(QInstaller.TargetDirectory, true);
     installer.setDefaultPageVisible(QInstaller.ComponentSelection, true);
@@ -11,10 +11,11 @@ function Component()
 
 Component.prototype.createOperations = function()
 {
-    // 创建默认操作（提取数据）
+    // 创建默认操作（提取数据）。卸载策略：RemoveTargetDir=true 只移除安装目录，
+    // 不触碰用户 AppData 中的项目数据库与数据集，避免误删用户数据。
     component.createOperations();
 
-    // 添加桌面快捷方式（Windows）
+    // Windows：桌面 / 开始菜单快捷方式指向主程序
     if (systemInfo.productType === "windows") {
         component.addOperation("CreateShortcut",
             "@TargetDir@/LabelTorchV.exe",
@@ -23,19 +24,12 @@ Component.prototype.createOperations = function()
             "iconPath=@TargetDir@/LabelTorchV.exe",
             "description=标炬工业缺陷检测软件");
 
-        // 添加开始菜单快捷方式
         component.addOperation("CreateShortcut",
             "@TargetDir@/LabelTorchV.exe",
             "@StartMenuDir@/标炬/标炬.lnk",
             "workingDirectory=@TargetDir@",
             "iconPath=@TargetDir@/LabelTorchV.exe",
             "description=标炬工业缺陷检测软件");
-
-        // 创建启动脚本
-        component.addOperation("CreateShortcut",
-            "@TargetDir@/LabelTorchV.exe",
-            "@TargetDir@/启动标炬.bat",
-            "workingDirectory=@TargetDir@");
     }
 
     // macOS

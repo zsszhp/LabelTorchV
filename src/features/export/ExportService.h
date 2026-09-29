@@ -104,6 +104,26 @@ public:
                                       const QString &reportType,
                                       const QString &reportDataJson);
 
+    /**
+     * @brief 生成导出交付目录（P1-20）。
+     *
+     * 在项目 exports/ 下生成 delivery_<artifactId>/ 目录，包含：
+     * 模型文件(onnx/pt) + classes.yaml + thresholds.json + warmup.py
+     * + infer_sample.py 推理样例 + eval_summary.json 评估摘要。
+     * 所有文本文件采用原子写入（临时文件 + rename）。
+     *
+     * @param artifactId 导出产物 ID。
+     * @return 交付目录绝对路径，失败返回空串。
+     */
+    Q_INVOKABLE QString generateDeliveryPackage(const QString &artifactId);
+
+    /**
+     * @brief 查询导出产物对应的交付目录路径（若已生成）。
+     * @param artifactId 导出产物 ID。
+     * @return 交付目录绝对路径，未生成返回空串。
+     */
+    Q_INVOKABLE QString getDeliveryDir(const QString &artifactId) const;
+
 signals:
     /**
      * @brief Emitted when an export artifact's status changes.
@@ -117,6 +137,29 @@ private slots:
 
 private:
     bool ensureStatusColumn();
+
+    /// 原子写入文本文件（临时文件 + rename）
+    static bool writeFileAtomically(const QString &targetPath, const QString &content);
+
+    /// 为交付目录写入 classes.yaml（类别清单）
+    static bool writeClassesYaml(const QString &deliveryDir,
+                                 const QString &modelVersionId);
+
+    /// 为交付目录写入 thresholds.json（推荐阈值）
+    static bool writeThresholdsJson(const QString &deliveryDir,
+                                    const QString &modelVersionId);
+
+    /// 为交付目录写入 eval_summary.json（评估摘要）
+    static bool writeEvalSummaryJson(const QString &deliveryDir,
+                                     const QString &modelVersionId);
+
+    /// 为交付目录写入 warmup.py 预热脚本
+    static bool writeWarmupScript(const QString &deliveryDir, const QString &modelFileName);
+
+    /// 为交付目录写入 infer_sample.py 推理样例脚本
+    static bool writeInferSampleScript(const QString &deliveryDir,
+                                       const QString &modelFileName,
+                                       const QString &format);
 
     IpcClient *m_ipcClient = nullptr;
 };

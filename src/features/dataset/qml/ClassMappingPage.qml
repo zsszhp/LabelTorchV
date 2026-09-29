@@ -455,7 +455,7 @@ Item {
                                 font.pixelSize: Theme.fontSizeNormal
                                 font.weight: Font.DemiBold
                                 font.family: Theme.fontFamily
-                                color: "#FFFFFF"
+                                color: Theme.logoBgText
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -490,7 +490,7 @@ Item {
                                 font.pixelSize: Theme.fontSizeNormal
                                 font.weight: Font.DemiBold
                                 font.family: Theme.fontFamily
-                                color: "#FFFFFF"
+                                color: Theme.logoBgText
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }

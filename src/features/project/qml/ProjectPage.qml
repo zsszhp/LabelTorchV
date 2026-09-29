@@ -32,7 +32,7 @@ Item {
         handle: Rectangle {
             implicitWidth: 4
             color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
-            Behavior on color { ColorAnimation { duration: 150 } }
+            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
         }
 
         // === 左侧边栏 ===
@@ -182,6 +182,30 @@ Item {
                                 font.pixelSize: Theme.fontSizeSmall
                                 font.family: Theme.fontFamily
                                 color: Theme.textMuted
+                            }
+
+                            // 完整类别体系管理入口
+                            RowLayout {
+                                visible: appController.projectOpen
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingSmall
+
+                                Text {
+                                    text: "完整管理类别体系 →"
+                                    color: taxonomyHubMouse.containsMouse ? Theme.primaryGlow : Theme.textMuted
+                                    font.pixelSize: Theme.fontSizeCaption
+                                    font.family: Theme.fontFamily
+                                    MouseArea {
+                                        id: taxonomyHubMouse
+                                        anchors.fill: parent
+                                        anchors.margins: -4
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: appController.currentPage = "taxonomy"
+                                    }
+                                }
+
+                                Item { Layout.fillWidth: true }
                             }
 
                             // 添加类别输入行
@@ -476,7 +500,7 @@ Item {
                                 radius: Theme.radiusSmall
 
                                 scale: cardMouseArea.containsMouse ? 1.1 : 1.0
-                                Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
+                                Behavior on scale { NumberAnimation { duration: Theme.animDurationFast; easing.type: Easing.OutBack } }
 
                                 gradient: Gradient {
                                     GradientStop { position: 0.0; color: Theme.primary }
@@ -600,8 +624,7 @@ Item {
                                 }
 
                                 onClicked: {
-                                    deleteConfirmDialog.projectId = model.projectId
-                                    deleteConfirmDialog.open()
+                                    deleteConfirmDialog.previewAndOpen(model.projectId)
                                 }
                             }
                         }
@@ -1052,109 +1075,44 @@ Item {
     }
 
     // === 删除项目确认对话框 ===
-    Dialog {
+    // 危险操作统一二次确认：默认焦点「取消」，列明连带删除项
+    ConfirmDialog {
         id: deleteConfirmDialog
-        title: "确认删除项目"
-        modal: true
-        anchors.centerIn: parent
-        width: 400
-        standardButtons: Dialog.NoButton
+        confirmTitle: "确认删除项目"
+        message: "确定要彻底删除此项目吗？"
+        confirmText: "删除"
+        cancelText: "取消"
+        // 连带影响项：由 previewProjectDeletion 填充
+        impactItems: []
+
+        function previewAndOpen(projectId) {
+            deleteConfirmDialog.projectId = projectId
+            var summary = projectService.previewProjectDeletion(projectId)
+            var items = []
+            if (summary) {
+                if (summary.datasetCount > 0) items.push("数据集 " + summary.datasetCount + " 个")
+                if (summary.sampleCount > 0) items.push("样本 " + summary.sampleCount + " 条")
+                if (summary.snapshotCount > 0) items.push("数据冻结版 " + summary.snapshotCount + " 个")
+                if (summary.trainingRunCount > 0) items.push("训练任务 " + summary.trainingRunCount + " 个")
+                if (summary.modelCount > 0) items.push("模型版本 " + summary.modelCount + " 个")
+                if (summary.taxonomyCount > 0) items.push("类别体系 " + summary.taxonomyCount + " 份")
+            }
+            if (items.length === 0)
+                items.push("本地工程目录（如存在）")
+            deleteConfirmDialog.impactItems = items
+            openConfirm()
+        }
 
         property string projectId: ""
 
-        background: Rectangle {
-            color: Theme.bgCard
-            border.color: Theme.borderColor
-            border.width: 1
-            radius: Theme.radiusLarge
-        }
-
-        ColumnLayout {
-            width: parent.width
-            spacing: Theme.spacingLarge
-
-            Text {
-                text: "确定要彻底删除此项目吗？"
-                font.bold: true
-                font.pixelSize: Theme.fontSizeSubheading
-                font.family: Theme.fontFamily
-                color: Theme.danger
-            }
-
-            Text {
-                text: "警告：此操作不可撤销。对应的本地工程数据将不再受管辖。"
-                font.pixelSize: Theme.fontSizeNormal
-                font.family: Theme.fontFamily
-                color: Theme.textMuted
-                wrapMode: Text.WordWrap
-                Layout.fillWidth: true
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Theme.spacingNormal
-
-                Item { Layout.fillWidth: true }
-
-                Button {
-                    Layout.preferredHeight: 36
-                    Layout.preferredWidth: 80
-                    text: "取消"
-                    font.pixelSize: Theme.fontSizeNormal
-                    font.family: Theme.fontFamily
-
-                    background: Rectangle {
-                        color: parent.hovered ? Theme.bgHover : Theme.bgCard
-                        border.color: Theme.borderColor
-                        border.width: 1
-                        radius: Theme.radiusSmall
-                    }
-
-                    contentItem: Text {
-                        text: parent.text
-                        color: Theme.textMain
-                        font: parent.font
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-
-                    onClicked: deleteConfirmDialog.reject()
-                }
-
-                Button {
-                    Layout.preferredHeight: 36
-                    Layout.preferredWidth: 80
-                    text: "删除"
-                    font.pixelSize: Theme.fontSizeNormal
-                    font.bold: true
-                    font.family: Theme.fontFamily
-
-                    background: Rectangle {
-                        color: parent.hovered ? Qt.lighter(Theme.danger, 1.1) : Theme.danger
-                        radius: Theme.radiusSmall
-                    }
-
-                    contentItem: Text {
-                        text: parent.text
-                        color: Theme.textMain
-                        font: parent.font
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-
-                    onClicked: deleteConfirmDialog.accept()
-                }
-            }
-        }
-
-        onAccepted: {
+        onConfirmed: {
             if (projectId) {
                 projectService.deleteProject(projectId)
                 projectModel.refresh()
                 projectId = ""
             }
         }
-        onRejected: projectId = ""
+        onCancelled: projectId = ""
     }
 
     // === 工具函数：URL转本地路径 ===

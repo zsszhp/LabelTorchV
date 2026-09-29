@@ -6,6 +6,8 @@
 #include <QStringList>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QMap>
+#include <QJsonObject>
 
 #include "MetricService.h"
 
@@ -94,6 +96,21 @@ public:
      */
     int reconcileStaleRuns();
 
+    /**
+     * @brief 获取训练失败诊断信息（P1-19）。
+     *
+     * 返回结构化信息：
+     *   - error: 错误消息
+     *   - logTail: 日志尾部字符串列表（最后 N 行）
+     *   - diagnosisCode: OOM / DATA_ERROR / CONFIG_ERROR / ENV_ERROR / UNKNOWN
+     *   - diagnosisMessage: 中文摘要
+     *   - suggestions: 中文建议列表
+     * 未失败或无记录时返回空 map。
+     *
+     * @param runId 训练运行 ID。
+     */
+    Q_INVOKABLE QVariantMap getFailureInfo(const QString &runId);
+
 signals:
     /**
      * @brief 训练运行状态变更信号
@@ -130,11 +147,36 @@ signals:
 private:
     void onResponseReceived(const QJsonObject &response);
 
+    /**
+     * @brief 记录一行训练日志到环形缓冲（P1-19）。
+     */
+    void appendLogTail(const QString &runId, const QString &line);
+
+    /**
+     * @brief 读取并清空某任务的日志尾部缓冲。
+     */
+    QStringList takeLogTail(const QString &runId);
+
+    /**
+     * @brief 写入失败诊断信息到 training_runs.failure_info_json（P1-19）。
+     */
+    bool storeFailureInfo(const QString &runId,
+                          const QString &error,
+                          const QStringList &logTail,
+                          const QVariantMap &diagnosis);
+
+    /**
+     * @brief 本地兜底诊断（后端未返回 diagnosis 时使用）。
+     */
+    static QVariantMap diagnoseLocally(const QString &error);
+
     IpcClient *m_ipcClient = nullptr;
     ModelRegistry *m_modelRegistry = nullptr;
     MetricService *m_metricService = nullptr;
     QStringList m_adapters = { QStringLiteral("ultralytics"), QStringLiteral("anomalib") };
     QVariantMap m_latestEnvironment;
+    /// 任务日志环形缓冲：runId → 最近 N 行（P1-19）
+    QMap<QString, QStringList> m_logTails;
 };
 
 #endif // TRAININGSERVICE_H

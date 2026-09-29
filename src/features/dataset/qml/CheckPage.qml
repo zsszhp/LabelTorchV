@@ -47,7 +47,8 @@ Item {
         var annotated = 0
         for (var d = 0; d < datasets.length; d++) {
             var ds = datasets[d]
-            var samples = annotationService.listSamples(ds.id)
+            // P1-22：单数据集最多拉 2000 条做质量抽检，避免万张级全量进内存
+            var samples = annotationService.listSamples(ds.id, 0, 2000)
             for (var s = 0; s < samples.length; s++) {
                 var sample = samples[s]
                 sample.datasetName = ds.name
@@ -96,35 +97,52 @@ Item {
         classCounts = counts
     }
 
-    // === 按类别过滤 ===
+    // === 按数据集/类别过滤 ===
     function applyClassFilter() {
-        if (selectedClassIds.length === 0) {
-            filteredSamples = sampleListData
-        } else {
-            var filtered = []
-            for (var i = 0; i < sampleListData.length; i++) {
-                var sample = sampleListData[i]
-                // 保留包含任意选中类别的样本
+        var filtered = []
+        for (var i = 0; i < sampleListData.length; i++) {
+            var sample = sampleListData[i]
+            // 数据集过滤：选中数据集后仅保留该数据集样本
+            if (selectedDatasetId !== "" && sample.datasetId !== selectedDatasetId)
+                continue
+            // 类别过滤：未选类别时保留全部，选中后保留包含任意选中类别的样本
+            if (selectedClassIds.length > 0) {
+                var matched = false
                 if (sample.classIndices && sample.classIndices.length > 0) {
                     for (var j = 0; j < sample.classIndices.length; j++) {
                         if (selectedClassIds.indexOf(sample.classIndices[j]) >= 0) {
-                            filtered.push(sample)
+                            matched = true
                             break
                         }
                     }
                 }
+                if (!matched)
+                    continue
             }
-            filteredSamples = filtered
+            filtered.push(sample)
         }
+        filteredSamples = filtered
+    }
+
+    // === 全局筛选接口：数据集过滤 ===
+    function setDatasetFilter(dsId) {
+        selectedDatasetId = dsId || ""
+        applyClassFilter()
+    }
+
+    // === 全局筛选接口：标签类别过滤（classIndex < 0 表示不过滤） ===
+    function setClassFilter(clsIndex) {
+        selectedClassIds = (clsIndex !== undefined && clsIndex !== null && Number(clsIndex) >= 0)
+            ? [Number(clsIndex)] : []
+        applyClassFilter()
     }
 
     // === 获取类别名 ===
     function getClassName(classIndex) {
-        for (var i = 0; i < taxonomyModel.rowCount(); i++) {
-            var idx = taxonomyModel.index(i, 0)
-            if (taxonomyModel.data(idx, 0) === classIndex) {
-                return taxonomyModel.data(idx, 1) || ("class_" + classIndex)
-            }
+        // IndexRole = Qt.UserRole + 2，返回值即行号（与 classIndex 对应）
+        if (classIndex >= 0 && classIndex < taxonomyModel.rowCount()) {
+            var idx = taxonomyModel.index(classIndex, 0)
+            return taxonomyModel.data(idx, Qt.UserRole + 1) || ("class_" + classIndex)
         }
         return "class_" + classIndex
     }
@@ -373,8 +391,9 @@ Item {
                                             anchors.fill: parent
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                // 定位到该数据集
+                                                // 定位到该数据集并应用过滤
                                                 selectedDatasetId = dsData ? dsData.id : ""
+                                                applyClassFilter()
                                             }
                                         }
                                     }
@@ -610,7 +629,7 @@ Item {
                                         Layout.preferredWidth: 12
                                         Layout.preferredHeight: 12
                                         radius: 2
-                                        color: "#000000"
+                                        color: Theme.bgChart
                                         border.color: Theme.borderColor
                                         border.width: 1
                                     }
@@ -682,8 +701,18 @@ Item {
                 visible: filteredSamples.length > 0
 
                 // 动态调整cellWidth以实现auto-fill效果
-                property int columns: Math.max(1, Math.floor(width / 142))
+                // columns/cellWidth 钳制：width 未就绪时 Math.floor(NaN) 会把 NaN 写进 cellWidth，
+                // 进而污染整个 GridView 的布局几何（Qt 6.11 Debug 下触发 NaN ASSERT）
+                property int columns: {
+                    if (!isFinite(width) || width <= 0) return 1
+                    return Math.max(1, Math.floor(width / 142))
+                }
                 onWidthChanged: {
+                    if (!isFinite(width) || width <= 0) {
+                        cellWidth = 142
+                        cellHeight = 154
+                        return
+                    }
                     cellWidth = width / columns
                     cellHeight = cellWidth * 1.08  // 近似正方形+底部空间
                 }
@@ -699,7 +728,7 @@ Item {
                     Rectangle {
                         anchors.fill: parent
                         anchors.margins: Theme.spacingSmall + Theme.spacingTiny  // 6px间距
-                        color: "#000000"
+                        color: Theme.bgChart
                         radius: Theme.radiusNormal  // 6px
                         border.color: thumbMouse.containsMouse ? Theme.primaryGlow : Theme.borderColor
                         border.width: thumbMouse.containsMouse ? 2 : 1
@@ -717,9 +746,17 @@ Item {
                             layer.enabled: true
                             layer.mipmap: true
                             // 模拟140%缩放+居中裁切效果，向上偏移20%实现top:-20%
-                            y: -height * 0.2
-                            sourceSize.width: width * 1.4
-                            sourceSize.height: height * 1.4
+                            y: isFinite(height) ? -height * 0.2 : 0
+                            // sourceSize 必须是有限正数：width/height 在布局未就绪时可能为 0/NaN，
+                            // NaN 进入图像缩放管线会在 qCheckedFPConversionToInteger 处触发 Debug ASSERT
+                            sourceSize.width: {
+                                var w = width * 1.4
+                                return (isFinite(w) && w > 0) ? Math.round(w) : 256
+                            }
+                            sourceSize.height: {
+                                var h = height * 1.4
+                                return (isFinite(h) && h > 0) ? Math.round(h) : 256
+                            }
 
                             // 加载中占位
                             Rectangle {
@@ -754,7 +791,7 @@ Item {
                                 anchors.centerIn: parent
                                 text: getClassName(sampleData.classIndex || 0)
                                 font.pixelSize: 10
-                                color: "#FFFFFF"
+                                color: Theme.logoBgText
                             }
                         }
 

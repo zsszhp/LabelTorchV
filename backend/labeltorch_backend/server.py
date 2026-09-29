@@ -18,6 +18,10 @@ training = None
 inference = None
 export = None
 
+# P1-25：日志批量推送阈值——100ms 或 50 行触发合并发送
+LOG_BATCH_INTERVAL = 0.1
+LOG_BATCH_MAX_LINES = 50
+
 
 def _import_handlers():
     """延迟导入处理器模块"""
@@ -79,6 +83,9 @@ class IpcServer:
         self.running = True
         # A14：活跃任务集合，用于 shutdown 时等待完成
         self._active_tasks = set()
+        # P1-25: log batch buffer {task_id: [line, ...]}, merge by time/count
+        self._log_buffer = {}
+        self._log_flush_handle = None
 
     async def start(self):
         """启动服务端主循环"""
@@ -124,6 +131,7 @@ class IpcServer:
             except Exception as e:
                 logger.error(f"Error handling message: {e}")
 
+        self.flush_logs_now()
         logger.info("LabelTorch Python backend shutting down")
 
     async def _handle_message(self, message: dict):
@@ -158,9 +166,21 @@ class IpcServer:
             result = await handler(payload)
             # 检查handler返回的status字段，将业务层错误转换为IPC层失败响应
             if isinstance(result, dict) and result.get("status") == "failed":
+                raw_error = result.get("error", "Unknown error")
+                # 结构化错误 {code, message} 保留语义；字符串错误退化为 HANDLER_ERROR
+                if isinstance(raw_error, dict):
+                    error_obj = {
+                        "code": raw_error.get("code", "HANDLER_ERROR"),
+                        "message": raw_error.get("message", str(raw_error)),
+                        "recoverable": True,
+                    }
+                    if "details" in raw_error:
+                        error_obj["details"] = raw_error["details"]
+                else:
+                    error_obj = {"code": "HANDLER_ERROR", "message": str(raw_error), "recoverable": True}
                 response = create_response(
                     request_id, False,
-                    error={"code": "HANDLER_ERROR", "message": result.get("error", "Unknown error"), "recoverable": True},
+                    error=error_obj,
                     command=command
                 )
             else:
@@ -208,8 +228,45 @@ class IpcServer:
 
     def send_event(self, event_type: str, task_id: str, payload: dict = None):
         """发送事件到Qt前端"""
+        # P1-25: task.log 按 100ms/50 行合并推送，避免日志刷爆前端
+        if event_type == "task.log":
+            self._enqueue_log(task_id, payload or {})
+            return
         event = create_event(event_type, task_id, payload)
         self._send(event)
+
+    def _enqueue_log(self, task_id: str, payload: dict):
+        """缓存日志行，满 50 行或 100ms 合并发送"""
+        buf = self._log_buffer.setdefault(task_id, [])
+        buf.append(payload)
+        if len(buf) >= LOG_BATCH_MAX_LINES:
+            self._flush_logs()
+            return
+        if self._log_flush_handle is None:
+            try:
+                loop = asyncio.get_event_loop()
+                self._log_flush_handle = loop.call_later(LOG_BATCH_INTERVAL, self._flush_logs)
+            except RuntimeError:
+                # 无事件循环时直接发送，保证不丢日志
+                self._flush_logs()
+
+    def _flush_logs(self):
+        """把缓存的日志批量发出（task.log_batch）"""
+        if self._log_flush_handle is not None:
+            self._log_flush_handle.cancel()
+            self._log_flush_handle = None
+        if not self._log_buffer:
+            return
+        buffer = self._log_buffer
+        self._log_buffer = {}
+        for task_id, lines in buffer.items():
+            if not lines:
+                continue
+            self._send(create_event("task.log_batch", task_id, {"lines": lines}))
+
+    def flush_logs_now(self):
+        """关闭前强制刷新，避免丢尾"""
+        self._flush_logs()
 
 
 _server_instance = None

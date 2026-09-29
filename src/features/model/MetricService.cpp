@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QMap>
 #include <QUuid>
 
 MetricService::MetricService(QObject *parent) : QObject(parent)
@@ -77,27 +78,59 @@ QVariantList MetricService::getMetricHistory(const QString &runId)
     auto db = Database::instance().database();
     if (!db.isOpen()) return result;
 
-    // Query task_events for epoch-level metrics logged during training
-    QSqlQuery query(db);
-    query.prepare(
-        "SELECT payload_json FROM task_events "
-        "WHERE task_type = 'training' AND task_id = ? AND event_type = 'epoch_complete' "
-        "ORDER BY created_at ASC"
-    );
-    query.addBindValue(runId);
+    // 双路兼容：优先读 run_metrics（训练进度事件按 epoch 落库的真实数据源），
+    // 空结果时回退 task_events.epoch_complete（历史兼容路径）。
+    {
+        QSqlQuery metricQuery(db);
+        metricQuery.prepare(
+            "SELECT epoch, metric_name, metric_value FROM run_metrics "
+            "WHERE run_id = ? ORDER BY epoch ASC, metric_name ASC"
+        );
+        metricQuery.addBindValue(runId);
 
-    if (!query.exec()) {
-        ltError(LT_LOG_MODEL()) << "Failed to get metric history:" << query.lastError().text();
-        return result;
+        if (!metricQuery.exec()) {
+            ltError(LT_LOG_MODEL()) << "Failed to get metric history from run_metrics:"
+                                    << metricQuery.lastError().text();
+        } else {
+            // 按 epoch 聚合成每条 {epoch, <metricName>: value, ...}
+            QMap<int, QVariantMap> byEpoch;
+            while (metricQuery.next()) {
+                int epoch = metricQuery.value(0).toInt();
+                QString name = metricQuery.value(1).toString();
+                double value = metricQuery.value(2).toDouble();
+                QVariantMap entry = byEpoch.value(epoch);
+                entry[QStringLiteral("epoch")] = epoch;
+                entry[name] = value;
+                byEpoch.insert(epoch, entry);
+            }
+            for (auto it = byEpoch.constBegin(); it != byEpoch.constEnd(); ++it) {
+                result.append(it.value());
+            }
+        }
     }
 
-    while (query.next()) {
-        QString payloadStr = query.value(0).toString();
-        if (payloadStr.isEmpty()) continue;
+    if (result.isEmpty()) {
+        QSqlQuery query(db);
+        query.prepare(
+            "SELECT payload_json FROM task_events "
+            "WHERE task_type = 'training' AND task_id = ? AND event_type = 'epoch_complete' "
+            "ORDER BY created_at ASC"
+        );
+        query.addBindValue(runId);
 
-        QJsonDocument doc = QJsonDocument::fromJson(payloadStr.toUtf8());
-        if (doc.isObject()) {
-            result.append(doc.object().toVariantMap());
+        if (!query.exec()) {
+            ltError(LT_LOG_MODEL()) << "Failed to get metric history:" << query.lastError().text();
+            return result;
+        }
+
+        while (query.next()) {
+            QString payloadStr = query.value(0).toString();
+            if (payloadStr.isEmpty()) continue;
+
+            QJsonDocument doc = QJsonDocument::fromJson(payloadStr.toUtf8());
+            if (doc.isObject()) {
+                result.append(doc.object().toVariantMap());
+            }
         }
     }
 

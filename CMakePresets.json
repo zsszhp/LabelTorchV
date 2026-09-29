@@ -10,7 +10,8 @@
             "name": "msvc-base",
             "hidden": true,
             "cacheVariables": {
-                "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/msvc2022_64"
+                "CMAKE_PREFIX_PATH": "$env{QT_ROOT}",
+                "LABELTORCH_PYTHON_ENV": "$env{LABELTORCH_PYTHON_ENV}"
             },
             "environment": {
                 "VSCMD_ARG_TGT_ARCH": "x64",
@@ -50,10 +51,10 @@
             "binaryDir": "${sourceDir}/out/build/mingw-debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/mingw_64",
-                "CMAKE_C_COMPILER": "C:/Qt/Tools/mingw1310_64/bin/gcc.exe",
-                "CMAKE_CXX_COMPILER": "C:/Qt/Tools/mingw1310_64/bin/g++.exe",
-                "CMAKE_MAKE_PROGRAM": "C:/Qt/Tools/mingw1310_64/bin/mingw32-make.exe"
+                "CMAKE_PREFIX_PATH": "$env{QT_MINGW_ROOT}",
+                "CMAKE_C_COMPILER": "$env{MINGW_ROOT}/bin/gcc.exe",
+                "CMAKE_CXX_COMPILER": "$env{MINGW_ROOT}/bin/g++.exe",
+                "CMAKE_MAKE_PROGRAM": "$env{MINGW_ROOT}/bin/mingw32-make.exe"
             }
         },
         {
@@ -63,10 +64,10 @@
             "binaryDir": "${sourceDir}/out/build/mingw-release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/mingw_64",
-                "CMAKE_C_COMPILER": "C:/Qt/Tools/mingw1310_64/bin/gcc.exe",
-                "CMAKE_CXX_COMPILER": "C:/Qt/Tools/mingw1310_64/bin/g++.exe",
-                "CMAKE_MAKE_PROGRAM": "C:/Qt/Tools/mingw1310_64/bin/mingw32-make.exe"
+                "CMAKE_PREFIX_PATH": "$env{QT_MINGW_ROOT}",
+                "CMAKE_C_COMPILER": "$env{MINGW_ROOT}/bin/gcc.exe",
+                "CMAKE_CXX_COMPILER": "$env{MINGW_ROOT}/bin/g++.exe",
+                "CMAKE_MAKE_PROGRAM": "$env{MINGW_ROOT}/bin/mingw32-make.exe"
             }
         }
     ],

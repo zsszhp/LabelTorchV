@@ -1,6 +1,12 @@
 #include "AssistedLabelService.h"
 #include "Database.h"
 #include "utils/Log.h"
+#include "utils/Id.h"
+#include "geometry/AxisAlignedBox.h"
+#include "labelio/YoloTxtReader.h"
+#include "labelio/YoloTxtWriter.h"
+#include "SnapshotService.h"
+#include "TrainingService.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -8,6 +14,10 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QSet>
+#include <QMap>
+#include <QFile>
+#include <QFileInfo>
+#include <QDateTime>
 #include <algorithm>
 
 AssistedLabelService::AssistedLabelService(QObject *parent) : QObject(parent)
@@ -393,6 +403,371 @@ QVariantList AssistedLabelService::getHardCaseQueue(const QString &batchId, cons
     });
 
     ltDebug(LT_LOG_INFERENCE()) << "Built hard case queue with" << result.size() << "entries for batch:" << batchId;
+    return result;
+}
+
+void AssistedLabelService::setSnapshotService(SnapshotService *service)
+{
+    ltTrace(LT_LOG_INFERENCE()) << "service=" << service;
+    m_snapshotService = service;
+}
+
+void AssistedLabelService::setTrainingService(TrainingService *service)
+{
+    ltTrace(LT_LOG_INFERENCE()) << "service=" << service;
+    m_trainingService = service;
+}
+
+QString AssistedLabelService::batchDatasetId(const QString &batchId)
+{
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return {};
+
+    QSqlQuery query(db);
+    query.prepare("SELECT dataset_id FROM assisted_label_batches WHERE id = ?");
+    query.addBindValue(batchId);
+    if (!query.exec() || !query.next()) {
+        ltWarning(LT_LOG_INFERENCE()) << "Batch not found for dataset lookup:" << batchId;
+        return {};
+    }
+    return query.value(0).toString();
+}
+
+AxisAlignedBox AssistedLabelService::boxFromCandidate(const QJsonObject &cand)
+{
+    AxisAlignedBox box;
+    box.classIndex = cand.value("classIndex").toInt(-1);
+    box.className = cand.value("className").toString();
+    box.cx = static_cast<float>(cand.value("cx").toDouble());
+    box.cy = static_cast<float>(cand.value("cy").toDouble());
+    box.w = static_cast<float>(cand.value("w").toDouble());
+    box.h = static_cast<float>(cand.value("h").toDouble());
+    box.confidence = static_cast<float>(cand.value("confidence").toDouble());
+    box.sourceType = QStringLiteral("assisted");
+    box.isConfirmed = true;
+    return box;
+}
+
+QString AssistedLabelService::serializeBoxesJson(const QVector<AxisAlignedBox> &boxes)
+{
+    // 字段与 AnnotationService::createRevision 保持一致，便于统一审计/回放
+    QJsonArray arr;
+    for (const AxisAlignedBox &box : boxes) {
+        QJsonObject obj;
+        obj[QStringLiteral("id")]          = box.id;
+        obj[QStringLiteral("classIndex")]  = box.classIndex;
+        obj[QStringLiteral("className")]   = box.className;
+        obj[QStringLiteral("cx")]          = box.cx;
+        obj[QStringLiteral("cy")]          = box.cy;
+        obj[QStringLiteral("w")]           = box.w;
+        obj[QStringLiteral("h")]           = box.h;
+        obj[QStringLiteral("angle")]       = 0.0;
+        obj[QStringLiteral("confidence")]  = box.confidence;
+        obj[QStringLiteral("sourceType")]  = box.sourceType;
+        obj[QStringLiteral("isConfirmed")] = box.isConfirmed;
+        arr.append(obj);
+    }
+    return QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact));
+}
+
+QString AssistedLabelService::createAssistedRevision(const QString &datasetId,
+                                                     const QString &sampleId,
+                                                     const QString &beforeJson,
+                                                     const QString &afterJson)
+{
+    auto db = Database::instance().database();
+    if (!db.isOpen()) return {};
+
+    QString revisionId = Id::generate();
+    QSqlQuery query(db);
+    query.prepare("INSERT INTO annotation_revisions "
+                  "(id, dataset_id, sample_id, source_type, before_snapshot_json, after_snapshot_json) "
+                  "VALUES (?, ?, ?, ?, ?, ?)");
+    query.addBindValue(revisionId);
+    query.addBindValue(datasetId);
+    query.addBindValue(sampleId);
+    query.addBindValue(QStringLiteral("assisted_confirm"));
+    query.addBindValue(beforeJson.isEmpty() ? QVariant() : beforeJson);
+    query.addBindValue(afterJson);
+
+    if (!query.exec()) {
+        ltError(LT_LOG_INFERENCE()) << "Failed to create assisted revision:" << query.lastError().text();
+        return {};
+    }
+    return revisionId;
+}
+
+QVariantMap AssistedLabelService::commitConfirmedLabels(const QString &batchId)
+{
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId;
+
+    QVariantMap result;
+    result[QStringLiteral("success")] = false;
+    result[QStringLiteral("batchId")] = batchId;
+    result[QStringLiteral("samplesWritten")] = 0;
+    result[QStringLiteral("revisionsCreated")] = 0;
+    result[QStringLiteral("skipped")] = 0;
+    result[QStringLiteral("errors")] = QVariantList();
+    result[QStringLiteral("sampleResults")] = QVariantList();
+
+    QJsonObject snapshotObj;
+    if (!readSnapshot(batchId, snapshotObj)) {
+        result[QStringLiteral("error")] = QVariantMap{
+            {QStringLiteral("code"), QStringLiteral("E_BATCH_NOT_FOUND")},
+            {QStringLiteral("message"), QStringLiteral("辅助标注批次不存在或快照损坏")}
+        };
+        return result;
+    }
+
+    QString datasetId = batchDatasetId(batchId);
+    if (datasetId.isEmpty()) {
+        result[QStringLiteral("error")] = QVariantMap{
+            {QStringLiteral("code"), QStringLiteral("E_DATASET_NOT_FOUND")},
+            {QStringLiteral("message"), QStringLiteral("批次未关联数据集")}
+        };
+        return result;
+    }
+
+    auto db = Database::instance().database();
+    if (!db.isOpen()) {
+        result[QStringLiteral("error")] = QVariantMap{
+            {QStringLiteral("code"), QStringLiteral("E_DB_ERROR")},
+            {QStringLiteral("message"), QStringLiteral("数据库未打开")}
+        };
+        return result;
+    }
+
+    // 按 sampleId 分组收集确认框（confirmed / edited 均视为用户已确认）
+    QJsonArray candidates = snapshotObj.value("candidates").toArray();
+    QMap<QString, QVector<AxisAlignedBox>> boxesBySample;
+    QVariantList errors = result[QStringLiteral("errors")].toList();
+    int skipped = 0;
+
+    for (const auto &candVal : candidates) {
+        QJsonObject cand = candVal.toObject();
+        QString state = cand.value("state").toString("pending");
+        if (state != "confirmed" && state != "edited") continue;
+
+        QString sampleId = cand.value("sampleId").toString();
+        if (sampleId.isEmpty()) {
+            ++skipped;
+            errors.append(QVariantMap{
+                {QStringLiteral("sampleId"), QString()},
+                {QStringLiteral("message"), QStringLiteral("候选框缺少 sampleId，无法定位标签文件")}
+            });
+            continue;
+        }
+
+        AxisAlignedBox box = boxFromCandidate(cand);
+        if (!box.isValid() || box.classIndex < 0) {
+            ++skipped;
+            errors.append(QVariantMap{
+                {QStringLiteral("sampleId"), sampleId},
+                {QStringLiteral("message"), QStringLiteral("候选框几何非法或缺少类别索引")}
+            });
+            continue;
+        }
+        boxesBySample[sampleId].append(box);
+    }
+
+    QVariantList sampleResults;
+    int samplesWritten = 0;
+    int revisionsCreated = 0;
+
+    for (auto it = boxesBySample.constBegin(); it != boxesBySample.constEnd(); ++it) {
+        const QString &sampleId = it.key();
+        const QVector<AxisAlignedBox> &newBoxes = it.value();
+
+        // 解析样本标签路径
+        QSqlQuery sampleQuery(db);
+        sampleQuery.prepare("SELECT label_path FROM dataset_samples WHERE id = ? AND dataset_id = ?");
+        sampleQuery.addBindValue(sampleId);
+        sampleQuery.addBindValue(datasetId);
+        if (!sampleQuery.exec() || !sampleQuery.next()) {
+            errors.append(QVariantMap{
+                {QStringLiteral("sampleId"), sampleId},
+                {QStringLiteral("message"), QStringLiteral("样本不存在或不属于该数据集")}
+            });
+            continue;
+        }
+        QString labelPath = sampleQuery.value(0).toString();
+        if (labelPath.isEmpty()) {
+            errors.append(QVariantMap{
+                {QStringLiteral("sampleId"), sampleId},
+                {QStringLiteral("message"), QStringLiteral("样本缺少标签文件路径")}
+            });
+            continue;
+        }
+
+        // 读取既有标注作为 before 快照
+        QVector<AxisAlignedBox> beforeBoxes = YoloTxtReader::read(labelPath);
+        QString beforeJson = serializeBoxesJson(beforeBoxes);
+
+        // 合并策略：保留既有标注，追加确认框；与既有框高 IoU 同类的确认框视为重复，跳过
+        QVector<AxisAlignedBox> afterBoxes = beforeBoxes;
+        int appended = 0;
+        for (const AxisAlignedBox &candBox : newBoxes) {
+            bool duplicate = false;
+            for (const AxisAlignedBox &exist : beforeBoxes) {
+                if (exist.classIndex == candBox.classIndex && exist.iou(candBox) >= 0.5f) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (!duplicate) {
+                AxisAlignedBox writeBox = candBox;
+                writeBox.id = Id::generate();
+                afterBoxes.append(writeBox);
+                ++appended;
+            }
+        }
+
+        if (!YoloTxtWriter::write(labelPath, afterBoxes)) {
+            errors.append(QVariantMap{
+                {QStringLiteral("sampleId"), sampleId},
+                {QStringLiteral("message"), QStringLiteral("标签文件写入失败：%1").arg(labelPath)}
+            });
+            continue;
+        }
+
+        QString afterJson = serializeBoxesJson(afterBoxes);
+        QString revisionId = createAssistedRevision(datasetId, sampleId, beforeJson, afterJson);
+        if (!revisionId.isEmpty()) ++revisionsCreated;
+
+        QVariantMap sampleResult;
+        sampleResult[QStringLiteral("sampleId")] = sampleId;
+        sampleResult[QStringLiteral("labelPath")] = labelPath;
+        sampleResult[QStringLiteral("boxesWritten")] = appended;
+        sampleResult[QStringLiteral("boxesTotal")] = afterBoxes.size();
+        sampleResult[QStringLiteral("revisionId")] = revisionId;
+        sampleResults.append(sampleResult);
+        ++samplesWritten;
+
+        ltInfo(LT_LOG_INFERENCE()) << "Committed assisted labels for sample:" << sampleId
+                                   << "appended:" << appended << "total:" << afterBoxes.size();
+    }
+
+    result[QStringLiteral("samplesWritten")] = samplesWritten;
+    result[QStringLiteral("revisionsCreated")] = revisionsCreated;
+    result[QStringLiteral("skipped")] = skipped;
+    result[QStringLiteral("errors")] = errors;
+    result[QStringLiteral("sampleResults")] = sampleResults;
+    // 至少成功写回一个样本即视为成功；空批次（无确认框）也视为成功
+    result[QStringLiteral("success")] = (samplesWritten > 0) || boxesBySample.isEmpty();
+
+    // 回写完成后在快照中记录提交信息，便于审计
+    snapshotObj[QStringLiteral("committedAt")] = QDateTime::currentDateTime().toString(Qt::ISODate);
+    snapshotObj[QStringLiteral("committedSamples")] = samplesWritten;
+    writeSnapshot(batchId, snapshotObj);
+
+    ltInfo(LT_LOG_INFERENCE()) << "commitConfirmedLabels finished for batch:" << batchId
+                               << "samplesWritten:" << samplesWritten
+                               << "revisions:" << revisionsCreated
+                               << "skipped:" << skipped;
+    return result;
+}
+
+QVariantMap AssistedLabelService::retrainFromBatch(const QString &batchId,
+                                                   double trainRatio,
+                                                   const QString &splitStrategy,
+                                                   const QString &trainConfigJson)
+{
+    ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId
+                                << "trainRatio=" << trainRatio
+                                << "splitStrategy=" << splitStrategy;
+
+    QVariantMap result;
+    result[QStringLiteral("success")] = false;
+    result[QStringLiteral("batchId")] = batchId;
+
+    // 第一步：回写已确认标签
+    QVariantMap commitResult = commitConfirmedLabels(batchId);
+    result[QStringLiteral("commit")] = commitResult;
+    if (!commitResult.value("success").toBool()) {
+        result[QStringLiteral("status")] = QStringLiteral("commit_failed");
+        result[QStringLiteral("error")] = commitResult.contains("error")
+            ? commitResult.value("error")
+            : QVariantMap{{QStringLiteral("code"), QStringLiteral("E_COMMIT_FAILED")},
+                          {QStringLiteral("message"), QStringLiteral("标签回写失败")}};
+        return result;
+    }
+
+    QString datasetId = batchDatasetId(batchId);
+    if (datasetId.isEmpty()) {
+        result[QStringLiteral("status")] = QStringLiteral("commit_failed");
+        result[QStringLiteral("error")] = QVariantMap{
+            {QStringLiteral("code"), QStringLiteral("E_DATASET_NOT_FOUND")},
+            {QStringLiteral("message"), QStringLiteral("批次未关联数据集")}
+        };
+        return result;
+    }
+    result[QStringLiteral("datasetId")] = datasetId;
+
+    // 查询项目 ID（训练任务需要）
+    auto db = Database::instance().database();
+    QSqlQuery dsQuery(db);
+    dsQuery.prepare("SELECT project_id FROM datasets WHERE id = ?");
+    dsQuery.addBindValue(datasetId);
+    if (!dsQuery.exec() || !dsQuery.next()) {
+        result[QStringLiteral("status")] = QStringLiteral("commit_failed");
+        result[QStringLiteral("error")] = QVariantMap{
+            {QStringLiteral("code"), QStringLiteral("E_DATASET_NOT_FOUND")},
+            {QStringLiteral("message"), QStringLiteral("数据集记录不存在")}
+        };
+        return result;
+    }
+    QString projectId = dsQuery.value(0).toString();
+    result[QStringLiteral("projectId")] = projectId;
+
+    if (!m_snapshotService || !m_trainingService) {
+        result[QStringLiteral("status")] = QStringLiteral("snapshot_failed");
+        result[QStringLiteral("error")] = QVariantMap{
+            {QStringLiteral("code"), QStringLiteral("E_SERVICE_NOT_READY")},
+            {QStringLiteral("message"), QStringLiteral("快照/训练服务未注入，无法启动增量训练")}
+        };
+        return result;
+    }
+
+    // 第二步：创建不可变数据快照
+    QString snapshotId = m_snapshotService->createSnapshot(datasetId, trainRatio, splitStrategy);
+    if (snapshotId.isEmpty()) {
+        result[QStringLiteral("status")] = QStringLiteral("snapshot_failed");
+        result[QStringLiteral("error")] = QVariantMap{
+            {QStringLiteral("code"), QStringLiteral("E_SNAPSHOT_FAILED")},
+            {QStringLiteral("message"), m_snapshotService->lastError().isEmpty()
+                ? QStringLiteral("创建数据快照失败")
+                : m_snapshotService->lastError()}
+        };
+        return result;
+    }
+    result[QStringLiteral("snapshotId")] = snapshotId;
+
+    // 第三步：创建训练运行
+    QString runId = m_trainingService->createRun(projectId, snapshotId, trainConfigJson);
+    if (runId.isEmpty()) {
+        result[QStringLiteral("status")] = QStringLiteral("run_failed");
+        result[QStringLiteral("error")] = QVariantMap{
+            {QStringLiteral("code"), QStringLiteral("E_RUN_CREATE_FAILED")},
+            {QStringLiteral("message"), QStringLiteral("创建训练任务失败（请检查训练配置 JSON）")}
+        };
+        return result;
+    }
+    result[QStringLiteral("runId")] = runId;
+
+    // 第四步：启动训练（内部异步准备快照物理目录并派发 train.start）
+    if (!m_trainingService->startTraining(runId)) {
+        result[QStringLiteral("status")] = QStringLiteral("run_failed");
+        result[QStringLiteral("error")] = QVariantMap{
+            {QStringLiteral("code"), QStringLiteral("E_RUN_START_FAILED")},
+            {QStringLiteral("message"), QStringLiteral("启动训练失败（任务须处于 draft 状态且后端已连接）")}
+        };
+        return result;
+    }
+
+    result[QStringLiteral("success")] = true;
+    result[QStringLiteral("status")] = QStringLiteral("retrain_started");
+    ltInfo(LT_LOG_INFERENCE()) << "Retrain from batch started:" << batchId
+                               << "snapshot:" << snapshotId << "run:" << runId;
     return result;
 }
 

@@ -1,6 +1,7 @@
 #include "CanvasController.h"
 #include "utils/Log.h"
 #include <QImage>
+#include <QImageReader>
 
 CanvasController::CanvasController(QObject *parent) : QObject(parent)
 {
@@ -51,15 +52,18 @@ void CanvasController::loadImage(const QString &imagePath, const QString &labelP
     m_currentImagePath = imagePath;
     m_currentLabelPath = labelPath;
 
-    // Get image dimensions
-    QImage img(imagePath);
-    if (!img.isNull()) {
-        m_imageWidth = img.width();
-        m_imageHeight = img.height();
+    // P1-24：只读图像头拿宽高，避免整图解码（4K 图解码耗时且占内存，
+    // 像素数据由 AnnotCanvasItem 通过 ImageDecodeCache 共享缓存持有）
+    QImageReader reader(imagePath);
+    const QSize sz = reader.size();
+    if (sz.isValid()) {
+        m_imageWidth = sz.width();
+        m_imageHeight = sz.height();
     } else {
         m_imageWidth = 0;
         m_imageHeight = 0;
-        ltError(LT_LOG_ANNOTATION()) << "cannot load image:" << imagePath;
+        ltError(LT_LOG_ANNOTATION()) << "cannot read image size:" << imagePath
+                                     << reader.errorString();
     }
 
     m_dirty = false;

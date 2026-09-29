@@ -5,9 +5,12 @@ add_library(labeltorch_core STATIC
     ipc/IpcClient.cpp
     ipc/IpcProtocol.cpp
     cache/ThumbnailCache.cpp
+    cache/ThumbnailProvider.cpp
+    cache/ImageDecodeCache.cpp
     ThumbnailGenerator.cpp
     utils/Log.cpp
     utils/AppSettings.cpp
+    utils/AuditLog.cpp
 )
 
 target_include_directories(labeltorch_core PUBLIC
@@ -22,6 +25,7 @@ target_include_directories(labeltorch_core PUBLIC
 target_link_libraries(labeltorch_core PUBLIC
     Qt6::Core
     Qt6::Gui
+    Qt6::Quick
     Qt6::Sql
     Qt6::Concurrent
 )

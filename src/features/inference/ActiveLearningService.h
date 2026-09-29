@@ -125,4 +125,21 @@ private:
     /// 根据队列类型获取对应的队列引用
     /// </summary>
     QJsonArray* getQueueByType(const QString& queueType);
+
+    /// <summary>
+    /// 将样本持久化到 active_learning_items 表（P1-14：重启不丢）。
+    /// 样本内可选携带 sampleId / datasetId / projectId / reason / priority / confidence。
+    /// </summary>
+    bool persistItem(const QString& queueType, const QJsonObject& sample);
+
+    /// <summary>
+    /// 从 active_learning_items 表加载指定队列（status=queued）。
+    /// 数据库是队列的权威数据源，内存仅作缓存。
+    /// </summary>
+    QJsonArray loadQueueFromDb(const QString& queueType);
+
+    /// <summary>
+    /// 内存队列与数据库同步刷新（add/remove/clear 后调用）。
+    /// </summary>
+    void refreshQueueFromDb(const QString& queueType);
 };

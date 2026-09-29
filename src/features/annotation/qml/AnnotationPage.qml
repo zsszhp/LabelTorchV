@@ -22,6 +22,14 @@ Item {
     property var tagListData: []       // [{name, color}]
     property int currentSampleIndex: -1
     property int editLabelTargetIndex: -1  // 双击编辑标签的目标标注索引
+    property string filterDatasetId: ""    // 全局数据集过滤（空 = 全部）
+    property int filterClassIndex: -1      // 全局类别过滤（-1 = 不限）
+
+    // P1-22：样本分页加载——避免万张级数据集一次拉全量
+    property int samplePageSize: 500       // 每批拉取条数
+    property int sampleTotalCount: 0       // 全量样本数（未过滤时）
+    property var sampleLoadCursors: []     // 各数据集游标 [{dsId, name, offset}]
+    property bool sampleHasMore: false
 
     // === 生命周期 ===
     Component.onCompleted: {
@@ -58,24 +66,88 @@ Item {
         }
     }
 
-    // === 刷新样本列表 ===
+    // === 刷新样本列表（受全局数据集/类别筛选约束，分页加载） ===
     function refreshSampleList() {
         if (!appController.projectOpen) {
             sampleListData = []
+            sampleLoadCursors = []
+            sampleTotalCount = 0
+            sampleHasMore = false
             return
         }
         var datasets = datasetService.listDatasets(appController.currentProjectId)
-        var allSamples = []
+        var cursors = []
+        var total = 0
         for (var d = 0; d < datasets.length; d++) {
             var ds = datasets[d]
-            var samples = annotationService.listSamples(ds.id)
-            for (var s = 0; s < samples.length; s++) {
-                var sample = samples[s]
-                sample.datasetName = ds.name
-                allSamples.push(sample)
+            // 数据集过滤
+            if (filterDatasetId !== "" && ds.id !== filterDatasetId)
+                continue
+            cursors.push({ dsId: ds.id, name: ds.name, offset: 0 })
+            total += annotationService.countSamples(ds.id)
+        }
+        sampleLoadCursors = cursors
+        sampleTotalCount = total
+        sampleListData = []
+        currentSampleIndex = -1
+        loadMoreSamples()
+    }
+
+    // P1-22：按游标追加下一批样本（每批 samplePageSize 条）
+    function loadMoreSamples() {
+        if (sampleLoadCursors.length === 0) {
+            sampleHasMore = false
+            return
+        }
+        var appended = []
+        var nextCursors = []
+        for (var i = 0; i < sampleLoadCursors.length; i++) {
+            var cur = sampleLoadCursors[i]
+            var batch = annotationService.listSamples(cur.dsId, cur.offset, samplePageSize)
+            for (var s = 0; s < batch.length; s++) {
+                var sample = batch[s]
+                sample.datasetName = cur.name
+                // 类别过滤：仅保留包含目标类别的样本
+                if (filterClassIndex >= 0) {
+                    if (!sampleContainsClass(sample, filterClassIndex))
+                        continue
+                }
+                appended.push(sample)
+            }
+            // 本批拉满说明可能还有后续，保留游标
+            if (batch.length >= samplePageSize) {
+                nextCursors.push({ dsId: cur.dsId, name: cur.name, offset: cur.offset + batch.length })
             }
         }
-        sampleListData = allSamples
+        sampleListData = sampleListData.concat(appended)
+        sampleLoadCursors = nextCursors
+        sampleHasMore = nextCursors.length > 0
+    }
+
+    // 判断样本标注中是否包含指定类别
+    function sampleContainsClass(sample, clsIndex) {
+        if (!sample || !sample.labelPath)
+            return false
+        var annotations = annotationService.loadAnnotations(sample.labelPath)
+        for (var i = 0; i < annotations.length; i++) {
+            if (annotations[i].classIndex === clsIndex)
+                return true
+        }
+        return false
+    }
+
+    // === 全局筛选接口：数据集过滤 ===
+    function setDatasetFilter(dsId) {
+        filterDatasetId = dsId || ""
+        refreshSampleList()
+    }
+
+    // === 全局筛选接口：标签类别过滤（classIndex < 0 表示不过滤） ===
+    function setClassFilter(clsIndex) {
+        filterClassIndex = (clsIndex !== undefined && clsIndex !== null) ? Number(clsIndex) : -1
+        if (filterClassIndex < 0)
+            filterClassIndex = -1
+        refreshSampleList()
     }
 
     // === 加载样本 ===
@@ -106,11 +178,10 @@ Item {
 
     // === 获取类别名 ===
     function getClassName(classIndex) {
-        for (var i = 0; i < taxonomyModel.rowCount(); i++) {
-            var idx = taxonomyModel.index(i, 0)
-            if (taxonomyModel.data(idx, 0) === classIndex) {
-                return taxonomyModel.data(idx, 1) || ("class_" + classIndex)
-            }
+        // IndexRole = Qt.UserRole + 2，返回值即行号（与 classIndex 对应）
+        if (classIndex >= 0 && classIndex < taxonomyModel.rowCount()) {
+            var idx = taxonomyModel.index(classIndex, 0)
+            return taxonomyModel.data(idx, Qt.UserRole + 1) || ("class_" + classIndex)
         }
         return "class_" + classIndex
     }
@@ -143,6 +214,7 @@ Item {
                     annotationModel.toVariantList()
                 )
                 canvasController.clearDirty()
+                ToastBus.success("标注已保存")
             }
         }
     }
@@ -154,6 +226,10 @@ Item {
         }
     }
     function navigateToNext() {
+        // P1-22：接近已加载末尾时自动追加下一批，保证跨页导航连续
+        if (sampleHasMore && currentSampleIndex >= sampleListData.length - 2) {
+            loadMoreSamples()
+        }
         if (currentSampleIndex < sampleListData.length - 1) {
             loadSample(sampleListData[currentSampleIndex + 1])
         }
@@ -195,7 +271,7 @@ Item {
         handle: Rectangle {
             implicitWidth: 4
             color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
-            Behavior on color { ColorAnimation { duration: 150 } }
+            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
         }
 
         // === 左侧栏 (240px, padding:12px, gap:16px) ===
@@ -450,7 +526,7 @@ Item {
                             }
 
                             Text {
-                                text: (currentSampleIndex >= 0 ? (currentSampleIndex + 1) : 0) + " / " + sampleListData.length
+                                text: (currentSampleIndex >= 0 ? (currentSampleIndex + 1) : 0) + " / " + (sampleHasMore ? sampleListData.length + "+" : sampleListData.length)
                                 font.pixelSize: 12
                                 font.family: Theme.fontFamilyMono
                                 color: Theme.textMain
@@ -463,7 +539,7 @@ Item {
                                 Layout.preferredHeight: 26
                                 text: ">"
                                 font.pixelSize: 14
-                                enabled: currentSampleIndex < sampleListData.length - 1
+                                enabled: currentSampleIndex < sampleListData.length - 1 || sampleHasMore
 
                                 background: Rectangle {
                                     color: parent.enabled ? (parent.hovered ? Theme.bgHover : Theme.bgCard) : Theme.bgCard
@@ -724,11 +800,12 @@ Item {
                 anchors.fill: parent
                 spacing: 0
 
-                // === 顶部筛选栏 (38px) ===
+                // === 顶部筛选栏（隐藏：由 Main.qml 全局筛选栏统一提供，避免重复假下拉） ===
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 38
                     color: Theme.bgMain
+                    visible: false
 
                     Rectangle {
                         anchors.left: parent.left

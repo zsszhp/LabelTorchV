@@ -2,6 +2,8 @@
 #include <QCoreApplication>
 #include <QSqlQuery>
 #include <QFile>
+#include <QTemporaryDir>
+#include <QDir>
 #include "Database.h"
 #include "SnapshotService.h"
 
@@ -33,6 +35,7 @@ private:
     QString m_projectId;
     QString m_datasetId;
     QString m_taxonomyId;
+    QTemporaryDir m_tempDir;  // 存放真实样本文件，供 SHA-256 哈希计算
 };
 
 void TestSnapshot::initTestCase()
@@ -48,13 +51,20 @@ void TestSnapshot::initTestCase()
 
     auto db = Database::instance().database();
 
+    // 创建真实临时文件目录，样本需要实际文件才能计算 SHA-256 哈希
+    QVERIFY(m_tempDir.isValid());
+    QString imgDir = m_tempDir.path() + "/images";
+    QString lblDir = m_tempDir.path() + "/labels";
+    QDir().mkpath(imgDir);
+    QDir().mkpath(lblDir);
+
     // Create a project
     m_projectId = "proj-snap-test";
     QSqlQuery q(db);
     q.prepare("INSERT INTO projects (id, name, root_path) VALUES (?, ?, ?)");
     q.addBindValue(m_projectId);
     q.addBindValue("SnapshotTestProject");
-    q.addBindValue("/tmp/snaptest");
+    q.addBindValue(m_tempDir.path());
     QVERIFY(q.exec());
 
     // Create a taxonomy for the project (using auto-increment ID to avoid conflicts)
@@ -74,20 +84,33 @@ void TestSnapshot::initTestCase()
     q.addBindValue(m_datasetId);
     q.addBindValue(m_projectId);
     q.addBindValue("TestDataset");
-    q.addBindValue("/tmp/images");
-    q.addBindValue("/tmp/labels");
+    q.addBindValue(imgDir);
+    q.addBindValue(lblDir);
     q.addBindValue("yolo_txt");
     q.addBindValue(10);
     q.addBindValue("completed");
     QVERIFY(q.exec());
 
-    // Insert 10 sample records
+    // Insert 10 sample records（含真实文件，供 createSnapshot 计算内容哈希）
     for (int i = 0; i < 10; ++i) {
-        q.prepare("INSERT INTO dataset_samples (id, dataset_id, image_path, label_path, validation_status) VALUES (?, ?, ?, ?, ?)");
+        // 创建真实图片/标签文件
+        QString imgPath = QString("%1/%2.jpg").arg(imgDir).arg(i);
+        QString lblPath = QString("%1/%2.txt").arg(lblDir).arg(i);
+        QFile imgFile(imgPath);
+        imgFile.open(QIODevice::WriteOnly);
+        imgFile.write(QString("image-data-%1").arg(i).toUtf8());
+        imgFile.close();
+        QFile lblFile(lblPath);
+        lblFile.open(QIODevice::WriteOnly);
+        lblFile.write(QString("0 0.5 0.5 0.1 0.1\n").toUtf8());
+        lblFile.close();
+
+        q.prepare("INSERT INTO dataset_samples (id, dataset_id, image_path, label_path, hash, validation_status) VALUES (?, ?, ?, ?, ?, ?)");
         q.addBindValue(QString("sample-%1").arg(i));
         q.addBindValue(m_datasetId);
-        q.addBindValue(QString("/tmp/images/%1.jpg").arg(i));
-        q.addBindValue(QString("/tmp/labels/%1.txt").arg(i));
+        q.addBindValue(imgPath);
+        q.addBindValue(lblPath);
+        q.addBindValue(QString("hash-%1").arg(i));  // 记录初始哈希标记
         q.addBindValue("valid");
         QVERIFY(q.exec());
     }

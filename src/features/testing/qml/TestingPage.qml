@@ -210,8 +210,8 @@ Item {
         var snapshotData = snapshotService.getSnapshot(snapshotId)
         if (!snapshotData || !snapshotData.datasetId) return
 
-        // 从数据集获取测试集样本
-        var samples = annotationService.listSamples(snapshotData.datasetId)
+        // 从数据集获取测试集样本（P1-22：限制单次拉取条数）
+        var samples = annotationService.listSamples(snapshotData.datasetId, 0, 500)
         var testSamples = []
         for (var i = 0; i < samples.length; i++) {
             var sample = samples[i]
@@ -256,7 +256,7 @@ Item {
         if (!root.selectedModelVersionId)
             return {"ok": false, "message": "请先选择一个模型版本"}
         if (!snapshotCombo.currentValue)
-            return {"ok": false, "message": "请先选择用于测试的数据快照"}
+            return {"ok": false, "message": "请先选择用于测试的数据冻结版"}
         if (Object.keys(environmentInfo).length === 0)
             return {"ok": false, "message": "运行环境尚未检测完成，请稍后再启动测试"}
         if (deviceCombo.currentText !== "auto" && deviceCombo.currentText !== "cpu" && environmentInfo.cuda_available !== true)
@@ -302,7 +302,7 @@ Item {
         handle: Rectangle {
             implicitWidth: 4
             color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
-            Behavior on color { ColorAnimation { duration: 150 } }
+            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
         }
 
         // ========================================
@@ -715,7 +715,7 @@ Item {
 
                                     // 快照状态提示
                                     Text {
-                                        text: snapshotCombo.currentValue ? "快照已选择" : "请选择数据快照"
+                                        text: snapshotCombo.currentValue ? "冻结版已选择" : "请选择数据冻结版"
                                         font.pixelSize: Theme.fontSizeCaption
                                         font.family: Theme.fontFamily
                                         color: snapshotCombo.currentValue ? Theme.success : Theme.textMuted

@@ -48,3 +48,23 @@ void AppController::setPythonBackendReady(bool ready)
     }
 }
 
+void AppController::reportNanAssert(const QString &detail)
+{
+    // 累计 NaN ASSERT 次数：hook 降级后布局/几何可能已脏，必须让上层可见
+    ++m_nanAssertCount;
+    emit nanAssertCountChanged();
+
+    // 前几次打印详情便于定位；之后仅计数，避免日志刷屏
+    if (m_nanAssertCount <= 5) {
+        ltWarning(LT_LOG_APP()) << "NaN ASSERT #" << m_nanAssertCount << ":" << detail;
+    }
+
+    // 首次越过阈值时提示建议重启（只提示一次，不重复打扰）
+    if (!m_nanRestartAdvised && m_nanAssertCount >= nanRestartThreshold()) {
+        m_nanRestartAdvised = true;
+        ltError(LT_LOG_APP()) << "NaN ASSERT 累计已达" << m_nanAssertCount
+                              << "次，几何状态可能已脏，建议保存工作后重启应用";
+        emit nanRestartAdvised(m_nanAssertCount);
+    }
+}
+

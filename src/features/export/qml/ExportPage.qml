@@ -92,15 +92,48 @@ Item {
         }
     }
 
+    // === 表单内联校验状态 ===
+    property var fieldErrors: ({})
+
+    function setFieldError(fieldName, message) {
+        var errs = Object.assign({}, fieldErrors)
+        if (message)
+            errs[fieldName] = message
+        else
+            delete errs[fieldName]
+        fieldErrors = errs
+    }
+
+    function clearFieldErrors() {
+        fieldErrors = {}
+    }
+
+    function fieldError(fieldName) {
+        return fieldErrors[fieldName] || ""
+    }
+
     function validateExportStart() {
-        if (!root.selectedVersionId)
+        clearFieldErrors()
+        if (!root.selectedVersionId) {
+            setFieldError("version", "请先选择一个模型版本")
             return {"ok": false, "message": "请先选择一个模型版本"}
-        if (formatCombo.currentText === "onnx" && opsetStepper.value < 11)
+        }
+        if (formatCombo.currentText === "onnx" && opsetStepper.value < 11) {
+            setFieldError("opset", "ONNX opset 版本不能低于 11")
             return {"ok": false, "message": "ONNX opset 版本不能低于 11"}
-        if (formatCombo.currentText === "engine" && !(environmentInfo && environmentInfo.tensorrt_available))
+        }
+        if (formatCombo.currentText === "onnx" && outputPathField.text.trim() === "") {
+            setFieldError("outputPath", "请填写导出输出路径")
+            return {"ok": false, "message": "请填写导出输出路径"}
+        }
+        if (formatCombo.currentText === "engine" && !(environmentInfo && environmentInfo.tensorrt_available)) {
+            setFieldError("format", "导出 TensorRT 需要当前环境支持 TensorRT")
             return {"ok": false, "message": "导出 TensorRT 需要当前环境支持 TensorRT"}
-        if (formatCombo.currentText === "tflite" && currentTaskType !== "detect")
+        }
+        if (formatCombo.currentText === "tflite" && currentTaskType !== "detect") {
+            setFieldError("format", "TFLite 导出仅支持检测任务")
             return {"ok": false, "message": "TFLite 导出仅支持检测任务"}
+        }
         return {"ok": true, "message": ""}
     }
 
@@ -109,6 +142,7 @@ Item {
         if (!validation.ok) {
             exportActionMessage = validation.message
             exportActionTone = "warning"
+            ToastBus.error(validation.message)
             return
         }
         var format = formatCombo.currentText
@@ -125,7 +159,12 @@ Item {
             exportStatus = "running"
             exportActionMessage = "导出任务已启动"
             exportActionTone = "info"
+            ToastBus.success("导出任务已启动（" + format + "）")
             refreshExports()
+        } else {
+            exportActionMessage = "导出任务启动失败"
+            exportActionTone = "danger"
+            ToastBus.error("导出任务启动失败")
         }
     }
 
@@ -157,7 +196,7 @@ Item {
         handle: Rectangle {
             implicitWidth: 4
             color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
-            Behavior on color { ColorAnimation { duration: 150 } }
+            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
         }
 
         // 左侧模型列表 Sidebar (240px, padding:0)
@@ -187,16 +226,55 @@ Item {
                     width: parent.width - 1
                     spacing: 0
 
-                // 区块标题 "模型列表"
-                Text {
-                    text: "模型列表"
-                    font.pixelSize: Theme.fontSizeNormal
-                    font.weight: Font.DemiBold
-                    font.family: Theme.fontFamily
-                    color: Theme.textMain
+                // 区块标题 "模型列表" + 模型中心/对比入口
+                RowLayout {
+                    Layout.fillWidth: true
                     Layout.topMargin: 16
                     Layout.leftMargin: 16
                     Layout.bottomMargin: 8
+                    spacing: Theme.spacingNormal
+
+                    Text {
+                        text: "模型列表"
+                        font.pixelSize: Theme.fontSizeNormal
+                        font.weight: Font.DemiBold
+                        font.family: Theme.fontFamily
+                        color: Theme.textMain
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    // 模型中心入口
+                    Text {
+                        text: "模型中心"
+                        color: modelHubMouse.containsMouse ? Theme.primaryGlow : Theme.textMuted
+                        font.pixelSize: Theme.fontSizeCaption
+                        font.family: Theme.fontFamily
+                        MouseArea {
+                            id: modelHubMouse
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: appController.currentPage = "model"
+                        }
+                    }
+
+                    // 指标对比入口
+                    Text {
+                        text: "指标对比"
+                        color: compareMouse.containsMouse ? Theme.primaryGlow : Theme.textMuted
+                        font.pixelSize: Theme.fontSizeCaption
+                        font.family: Theme.fontFamily
+                        MouseArea {
+                            id: compareMouse
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: appController.currentPage = "compare"
+                        }
+                    }
                 }
 
                 // 模型版本列表
@@ -294,7 +372,7 @@ Item {
             handle: Rectangle {
                 implicitWidth: 4
                 color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
             }
 
             // 左侧参数面板 (280px, bgSide, border-right 1px borderColor)
@@ -438,10 +516,23 @@ Item {
                                             font.family: Theme.fontFamilyMono
                                             background: Rectangle {
                                                 color: Theme.bgInput
-                                                border.color: Theme.borderColor
+                                                // 内联校验：错误时红框
+                                                border.color: {
+                                                    if (root.fieldError("outputPath") !== "") return Theme.fieldErrorBorder
+                                                    return outputPathField.activeFocus ? Theme.primary : Theme.borderColor
+                                                }
                                                 border.width: 1
                                                 radius: Theme.radiusSmall
                                             }
+                                        }
+
+                                        // 输出路径错误文案
+                                        Text {
+                                            visible: root.fieldError("outputPath") !== ""
+                                            text: root.fieldError("outputPath")
+                                            color: Theme.fieldErrorText
+                                            font.pixelSize: Theme.fontSizeCaption
+                                            font.family: Theme.fontFamily
                                         }
 
                                         // "选择"按钮
@@ -503,6 +594,15 @@ Item {
                                             maxValue: 17
                                             stepSize: 1
                                         }
+                                    }
+
+                                    // opset 内联错误文案
+                                    Text {
+                                        visible: root.fieldError("opset") !== ""
+                                        text: root.fieldError("opset")
+                                        color: Theme.fieldErrorText
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.family: Theme.fontFamily
                                     }
 
                                     // 简化模型
@@ -734,28 +834,17 @@ Item {
                             // 未选择模型时的空状态提示
                             Item {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 200
+                                Layout.preferredHeight: 220
                                 visible: root.selectedVersionId === ""
 
-                                Column {
+                                EmptyState {
                                     anchors.centerIn: parent
-                                    spacing: Theme.spacingNormal
-
-                                    Text {
-                                        text: "← 请从左侧选择模型版本"
-                                        font.pixelSize: Theme.fontSizeSubheading
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textMuted
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                    }
-
-                                    Text {
-                                        text: "选择模型后可查看导出历史与版本信息"
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        font.family: Theme.fontFamily
-                                        color: Theme.textDisabled
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                    }
+                                    width: parent.width - Theme.spacingXLarge * 2
+                                    icon: "export"
+                                    title: "请从左侧选择模型版本"
+                                    description: "选择模型后可查看导出历史与版本信息"
+                                    actionText: "前往模型中心"
+                                    onActionClicked: appController.currentPage = "model"
                                 }
                             }
 
@@ -818,13 +907,13 @@ Item {
                                         }
                                     }
 
-                                    // 数据快照ID
+                                    // 数据冻结版ID
                                     RowLayout {
                                         Layout.fillWidth: true
                                         spacing: Theme.spacingNormal
 
                                         Text {
-                                            text: "数据快照"
+                                            text: "数据冻结版"
                                             font.pixelSize: Theme.fontSizeSmall
                                             font.family: Theme.fontFamily
                                             color: Theme.textMuted

@@ -141,7 +141,7 @@ Rectangle {
                         color: Theme.textMain
 
                         Behavior on x {
-                            NumberAnimation { duration: 150 }
+                            NumberAnimation { duration: Theme.animDurationFast }
                         }
                     }
                 }
@@ -192,7 +192,7 @@ Rectangle {
                         color: Theme.textMain
 
                         Behavior on x {
-                            NumberAnimation { duration: 150 }
+                            NumberAnimation { duration: Theme.animDurationFast }
                         }
                     }
                 }

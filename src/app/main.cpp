@@ -6,6 +6,16 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QWindow>
+#include <QQuickWindow>
+#include <QQuickItem>
+#include <QFile>
+#include <QTimer>
+#include <QDateTime>
+#include <QMetaObject>
+#include <atomic>
+#include <exception>
+#include <cstdio>
+#include <string>
 
 #include <windows.h>
 #include <dbghelp.h>
@@ -44,30 +54,114 @@
 #include "TestingService.h"
 #include "TestingModel.h"
 #include "Database.h"
+#include "ThumbnailGenerator.h"
+#include "cache/ThumbnailCache.h"
+#include "cache/ThumbnailProvider.h"
 #include "utils/Log.h"
 #include "utils/AppSettings.h"
-#include <QFile>
 
 // 自定义消息处理器：将NaN ASSERT从FatalMsg降级为WarningMsg，防止程序abort
 // Qt 6.11 Debug模式下qCheckedFPConversionToInteger检测到NaN会调用qFatal导致程序退出
 // 但NaN来自Qt Quick布局引擎内部初始化竞态条件，不影响程序正常运行
+//
+// 注意：降级只是「保命」，几何状态可能已脏。因此这里做三件事：
+//   1) 保留 hook/降级保护（移除会导致 Debug 构建直接崩）
+//   2) 累计次数并通知 AppController，超阈值在状态栏建议重启
+//   3) 防抖：CRT hook 与 Qt 消息处理器可能对同一次触发各响一次
 #if defined(Q_OS_WIN) && defined(_DEBUG)
 #include <crtdbg.h>
 #include <string.h>
+#endif
 
+// ---- NaN ASSERT 计数与上报（Release 下也保留计数，只是不触发 CRT hook）----
+namespace {
+
+// 主线程 AppController 指针，由 main() 在构造后赋值；未就绪时仅本地计数
+AppController *g_nanObserver = nullptr;
+
+// 防抖窗口：同一毫秒级窗口内的重复触发视为同一次（hook 与消息处理器双路径）
+std::atomic<qint64> g_lastNanMs{0};
+// 累计次数（跨 hook / 消息处理器共享）
+std::atomic<int> g_nanTotal{0};
+
+bool claimNanOccurrence()
+{
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    qint64 last = g_lastNanMs.load(std::memory_order_relaxed);
+    // 80ms 内的连续触发视为同一次 ASSERT（CRT 报告钩子 + qFatal 会各走一遍）
+    while (now - last > 80) {
+        if (g_lastNanMs.compare_exchange_weak(last, now, std::memory_order_relaxed))
+            return true;
+    }
+    return false;
+}
+
+// 记录一次 NaN ASSERT：计数 + 尽快上报 UI；detail 仅用于日志
+void noteNanAssert(const QString &detail)
+{
+    if (!claimNanOccurrence())
+        return;
+
+    const int total = ++g_nanTotal;
+    // 前几次输出详情便于定位；之后静默计数，避免刷屏拖慢布局
+    if (total <= 5) {
+        fprintf(stderr, "\n=== NaN ASSERT #%d (suppressed, geometry may be dirty) ===\n", total);
+        fprintf(stderr, "%s\n", detail.toUtf8().constData());
+        fprintf(stderr, "=== END NaN ASSERT ===\n\n");
+        fflush(stderr);
+    }
+
+    // 队列化到主线程：hook/消息处理器可能来自任意线程，不能直接改 QObject
+    if (g_nanObserver) {
+        QMetaObject::invokeMethod(g_nanObserver, "reportNanAssert",
+                                  Qt::QueuedConnection,
+                                  Q_ARG(QString, detail));
+    }
+}
+
+// 仅前几次打印调用栈，帮助定位真因；后续省略以降低开销
+void dumpCallStackIfNeeded()
+{
+    static std::atomic<int> s_stackDumped{0};
+    if (s_stackDumped.fetch_add(1) >= 3)
+        return;
+
+    void *stack[32];
+    USHORT frames = CaptureStackBackTrace(2, 32, stack, nullptr);
+    SymInitialize(GetCurrentProcess(), nullptr, TRUE);
+    fprintf(stderr, "Call stack (%u frames):\n", frames);
+    for (USHORT i = 0; i < frames; i++) {
+        DWORD64 addr = (DWORD64)stack[i];
+        char symbolBuffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
+        SYMBOL_INFO *symbol = (SYMBOL_INFO *)symbolBuffer;
+        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+        symbol->MaxNameLen = MAX_SYM_NAME;
+        DWORD64 displacement = 0;
+        if (SymFromAddr(GetCurrentProcess(), addr, &displacement, symbol)) {
+            fprintf(stderr, "  [%u] %s+0x%llx (0x%llx)\n", i, symbol->Name,
+                    (unsigned long long)displacement, (unsigned long long)addr);
+        } else {
+            fprintf(stderr, "  [%u] 0x%llx\n", i, (unsigned long long)addr);
+        }
+    }
+    SymCleanup(GetCurrentProcess());
+    fflush(stderr);
+}
+
+} // namespace
+
+#if defined(Q_OS_WIN) && defined(_DEBUG)
 static int __cdecl msvcReportHook(int reportType, char *message, int *returnValue)
 {
     if (message && (reportType == _CRT_ERROR || reportType == _CRT_ASSERT)) {
-        if (strstr(message, "isnan") || 
-            strstr(message, "qnumeric.h") || 
-            strstr(message, "FP(minimal)") || 
+        if (strstr(message, "isnan") ||
+            strstr(message, "qnumeric.h") ||
+            strstr(message, "FP(minimal)") ||
             strstr(message, "maximalPlusOne")) {
-            
-            fprintf(stderr, "\n=== NaN/Float ASSERT (suppressed via hook) ===\n");
-            fprintf(stderr, "Message: %s\n", message);
-            fprintf(stderr, "=== END NaN/Float ASSERT (suppressed via hook) ===\n\n");
-            fflush(stderr);
-            
+
+            // 保留抑制行为，但计入次数并上报，超阈值由状态栏提示重启
+            noteNanAssert(QString::fromLocal8Bit(message));
+
             if (returnValue) {
                 *returnValue = 0; // Tell caller not to break/abort
             }
@@ -90,38 +184,18 @@ static void customMessageHandler(QtMsgType type, const QMessageLogContext &conte
         }
     }
 
-    if (type == QtFatalMsg && (msg.contains("isnan") || 
-                               msg.contains("qnumeric.h") || 
-                               msg.contains("FP(minimal)") || 
+    if (type == QtFatalMsg && (msg.contains("isnan") ||
+                               msg.contains("qnumeric.h") ||
+                               msg.contains("FP(minimal)") ||
                                msg.contains("maximalPlusOne"))) {
         // 将NaN相关的FatalMsg降级为WarningMsg，让程序继续运行
-        fprintf(stderr, "\n=== NaN ASSERT (suppressed) ===\n");
-        fprintf(stderr, "Message: %s\n", msg.toUtf8().constData());
-        fprintf(stderr, "File: %s:%d\n", context.file ? context.file : "", context.line);
-        fprintf(stderr, "Function: %s\n", context.function ? context.function : "");
-
-        // 打印调用栈帮助定位问题
-        void *stack[32];
-        USHORT frames = CaptureStackBackTrace(2, 32, stack, nullptr);
-        SymInitialize(GetCurrentProcess(), nullptr, TRUE);
-        fprintf(stderr, "Call stack (%u frames):\n", frames);
-        for (USHORT i = 0; i < frames; i++) {
-            DWORD64 addr = (DWORD64)stack[i];
-            char symbolBuffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
-            SYMBOL_INFO *symbol = (SYMBOL_INFO *)symbolBuffer;
-            symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-            symbol->MaxNameLen = MAX_SYM_NAME;
-            DWORD64 displacement = 0;
-            if (SymFromAddr(GetCurrentProcess(), addr, &displacement, symbol)) {
-                fprintf(stderr, "  [%u] %s+0x%llx (0x%llx)\n", i, symbol->Name,
-                        (unsigned long long)displacement, (unsigned long long)addr);
-            } else {
-                fprintf(stderr, "  [%u] 0x%llx\n", i, (unsigned long long)addr);
-            }
-        }
-        SymCleanup(GetCurrentProcess());
-        fprintf(stderr, "=== END NaN ASSERT (suppressed) ===\n\n");
-        fflush(stderr);
+        const QString detail = QStringLiteral("%1  [%2:%3] %4")
+                                   .arg(msg,
+                                        context.file ? QString::fromUtf8(context.file) : QString(),
+                                        QString::number(context.line),
+                                        context.function ? QString::fromUtf8(context.function) : QString());
+        noteNanAssert(detail);
+        dumpCallStackIfNeeded();
 
         // 降级为WarningMsg转发给原始处理器，避免程序abort
         if (originalHandler) {
@@ -132,6 +206,110 @@ static void customMessageHandler(QtMsgType type, const QMessageLogContext &conte
     if (originalHandler) {
         originalHandler(type, context, msg);
     }
+}
+
+// ============================================================================
+// 崩溃捕获：未处理异常写 minidump，terminate 写错误摘要
+// 路径基于 QStandardPaths::AppDataLocation 下的 logs/crash/，禁止硬编码绝对路径
+// ============================================================================
+
+/// 崩溃目录（应用名就绪后由 installCrashHandlers 写入；异常过滤器只读）
+static QString g_crashDir;
+
+/// 获取崩溃产物目录，不存在则创建
+static QString crashDirPath()
+{
+    if (!g_crashDir.isEmpty()) return g_crashDir;
+    // 应用名尚未就绪时的兜底：退回 AppDataLocation（此时可能无组织名，但仍非硬编码）
+    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+           + QStringLiteral("/logs/crash");
+}
+
+/// 组装带时间戳的崩溃文件路径（dump / 文本共用命名规则）
+static QString crashFilePath(const QString &suffix)
+{
+    QString dir = crashDirPath();
+    QDir().mkpath(dir);
+    QString stamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_HHmmss_zzz"));
+    return dir + QStringLiteral("/crash_") + stamp + suffix;
+}
+
+/// 未处理异常过滤器：写 minidump 后交还系统默认处理
+static LONG WINAPI unhandledExceptionFilter(EXCEPTION_POINTERS *info)
+{
+    // 崩溃路径上避免复杂对象：直接用 Win32 宽字符 API 写文件（路径可能含中文）
+    QString dumpPath = crashFilePath(QStringLiteral(".dmp"));
+    QString notePath = crashFilePath(QStringLiteral(".txt"));
+    std::wstring dumpPathW = dumpPath.toStdWString();
+    std::wstring notePathW = notePath.toStdWString();
+
+    HANDLE hFile = CreateFileW(dumpPathW.c_str(), GENERIC_WRITE, 0, nullptr,
+                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile != INVALID_HANDLE_VALUE) {
+        MINIDUMP_EXCEPTION_INFORMATION mei;
+        mei.ThreadId = GetCurrentThreadId();
+        mei.ExceptionPointers = info;
+        mei.ClientPointers = FALSE;
+        // MiniDumpNormal 足够定位崩溃点；完整内存转储体积过大不适合默认开启
+        MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile,
+                          MiniDumpNormal, &mei, nullptr, nullptr);
+        CloseHandle(hFile);
+    }
+
+    // 同步写一份可读摘要，便于不依赖调试器时快速定位
+    FILE *fp = _wfopen(notePathW.c_str(), L"w");
+    if (fp) {
+        fprintf(fp, "Unhandled exception\n");
+        if (info && info->ExceptionRecord) {
+            fprintf(fp, "ExceptionCode: 0x%08lX\n",
+                    info->ExceptionRecord->ExceptionCode);
+            fprintf(fp, "ExceptionAddress: %p\n",
+                    info->ExceptionRecord->ExceptionAddress);
+            // 浮点异常码与既有 NaN 抑制逻辑同源，这里仅记录不干预
+            if (info->ExceptionRecord->ExceptionCode == EXCEPTION_FLT_INVALID_OPERATION
+                || info->ExceptionRecord->ExceptionCode == EXCEPTION_FLT_DIVIDE_BY_ZERO
+                || info->ExceptionRecord->ExceptionCode == EXCEPTION_FLT_OVERFLOW
+                || info->ExceptionRecord->ExceptionCode == EXCEPTION_FLT_UNDERFLOW) {
+                fprintf(fp, "Note: floating-point exception (NaN/Inf path may be related)\n");
+            }
+        }
+        fprintf(fp, "DumpFile: %s\n", qUtf8Printable(dumpPath));
+        fclose(fp);
+    }
+
+    fprintf(stderr, "[Crash] minidump written: %s\n", qUtf8Printable(dumpPath));
+    fflush(stderr);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+/// std::terminate 处理器：写简单错误信息后中止，避免无声退出
+static void terminateHandler()
+{
+    QString notePath = crashFilePath(QStringLiteral("_terminate.txt"));
+    std::wstring notePathW = notePath.toStdWString();
+
+    FILE *fp = _wfopen(notePathW.c_str(), L"w");
+    if (fp) {
+        fprintf(fp, "std::terminate called (unhandled exception in noexcept context or no matching handler)\n");
+        fprintf(fp, "Time: %s\n",
+                qUtf8Printable(QDateTime::currentDateTime().toString(Qt::ISODate)));
+        fclose(fp);
+    }
+    fprintf(stderr, "[Terminate] error info written: %s\n", qUtf8Printable(notePath));
+    fflush(stderr);
+    std::abort();
+}
+
+/// 安装崩溃捕获（须在应用名就绪后调用，保证崩溃目录落在 AppDataLocation）
+static void installCrashHandlers()
+{
+    g_crashDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+                 + QStringLiteral("/logs/crash");
+    QDir().mkpath(g_crashDir);
+
+    SetUnhandledExceptionFilter(unhandledExceptionFilter);
+    std::set_terminate(terminateHandler);
+    ltInfo(LT_LOG_APP()) << "Crash handlers installed, dump dir:" << g_crashDir;
 }
 
 int main(int argc, char *argv[])
@@ -173,6 +351,9 @@ int main(int argc, char *argv[])
     ltInfo(LT_LOG_APP()) << "Application starting" << "version" << app.applicationVersion()
                          << "Qt" << QT_VERSION_STR;
 
+    // 应用名/日志就绪后安装崩溃捕获，minidump 写入 logs/crash/
+    installCrashHandlers();
+
     QQuickStyle::setStyle("Basic");
 
     qmlRegisterType<AnnotCanvasItem>("LabelTorch.Annotation", 1, 0, "AnnotCanvasItem");
@@ -204,6 +385,10 @@ int main(int argc, char *argv[])
     AnnotationService annotationService;
     AnnotationModel annotationModel;
     CanvasController canvasController;
+    // P1-21：缩略图管线——内存缓存(字节限容) + 后台生成器
+    ThumbnailCache thumbnailCache;
+    ThumbnailGenerator thumbnailGenerator;
+    thumbnailCache.setCapacityBytes(ThumbnailCache::kDefaultCapacityBytes);
     IpcClient ipcClient;
     SnapshotService snapshotService;
     SnapshotModel snapshotModel;
@@ -246,6 +431,9 @@ int main(int argc, char *argv[])
     activeLearningService.setIpcClient(&ipcClient);
     testingService.setIpcClient(&ipcClient);
     testingService.setModelRegistry(&modelRegistry);
+    // P1-14：辅助标注确认回写后，可直接编排「建快照 + 增量训练」
+    assistedLabelService.setSnapshotService(&snapshotService);
+    assistedLabelService.setTrainingService(&trainingService);
 
     // 冷启动自检：修正上次异常退出遗留的 running / preparing / verifying 状态
     int trainingFixed = trainingService.reconcileStaleRuns();
@@ -268,7 +456,15 @@ int main(int argc, char *argv[])
         controller.setPythonBackendReady(ipcClient.connected());
     });
 
+    // 将 NaN 计数上报目标挂到 hook/消息处理器可见的全局指针
+    // （此前 hook 只能 fprintf，现在可累计并驱动状态栏告警）
+    g_nanObserver = &controller;
+
     QQmlApplicationEngine engine;
+
+    // P1-21：注册缩略图 ImageProvider（image://thumb/<url编码路径>）
+    engine.addImageProvider(QStringLiteral("thumb"),
+                            new ThumbnailProvider(&thumbnailCache));
 
     engine.rootContext()->setContextProperty("appSettings", &appSettings);
     engine.rootContext()->setContextProperty("appController", &controller);
@@ -284,6 +480,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("annotationService", &annotationService);
     engine.rootContext()->setContextProperty("annotationModel", &annotationModel);
     engine.rootContext()->setContextProperty("canvasController", &canvasController);
+    engine.rootContext()->setContextProperty("thumbnailGenerator", &thumbnailGenerator);
+    engine.rootContext()->setContextProperty("thumbnailCache", &thumbnailCache);
     engine.rootContext()->setContextProperty("ipcClient", &ipcClient);
     engine.rootContext()->setContextProperty("snapshotService", &snapshotService);
     engine.rootContext()->setContextProperty("snapshotModel", &snapshotModel);
@@ -311,8 +509,22 @@ int main(int argc, char *argv[])
         } else if (obj && url == objUrl) {
             ltInfo(LT_LOG_APP()) << "Main.qml loaded successfully";
             // 窗口创建后显式设置图标，确保Windows任务栏显示
-            if (auto *window = qobject_cast<QWindow *>(obj)) {
+            if (auto *window = qobject_cast<QQuickWindow *>(obj)) {
                 window->setIcon(appIcon);
+
+                // 规避：窗口 show 前禁用根 Item 交互与布局刷新，避免布局引擎在半初始化
+                // 状态下用 NaN 字体度量/几何做整数转换（qCheckedFPConversionToInteger）。
+                // QQuickWindow 的 contentItem 可禁用整棵场景树的交互。
+                // 等首帧布局与字体度量稳定后再放开。
+                if (auto *rootItem = window->contentItem()) {
+                    rootItem->setEnabled(false);
+                    QTimer::singleShot(120, rootItem, [rootItem]() {
+                        if (rootItem) {
+                            rootItem->setEnabled(true);
+                            ltInfo(LT_LOG_APP()) << "Root item re-enabled after layout warm-up";
+                        }
+                    });
+                }
             }
         }
     }, Qt::QueuedConnection);
