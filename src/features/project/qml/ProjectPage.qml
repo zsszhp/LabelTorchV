@@ -85,7 +85,7 @@ Item {
                         Layout.fillWidth: true
                         text: "新建项目"
                         variant: "primary"
-                        icon: "plus"
+                        iconName: "plus"
                         onClicked: newProjectDialog.open()
                     }
 
@@ -95,7 +95,7 @@ Item {
                         Layout.fillWidth: true
                         text: "打开项目"
                         variant: "secondary"
-                        icon: "folder"
+                        iconName: "folder"
                         onClicked: importFolderDialog.open()
                     }
 
@@ -268,7 +268,7 @@ Item {
                                                 anchors.fill: parent
                                                 cursorShape: Qt.PointingHandCursor
                                                 hoverEnabled: true
-                                                onClicked: taxonomyModel.renameClass(model.classIndex, model.className + "_new")
+                                                onClicked: appController.currentPage = "taxonomy"
                                             }
                                         }
 

@@ -16,7 +16,8 @@ Button {
     // 加载中：内容降权 + 转圈 + 吞掉点击，防止重复提交
     property bool loading: false
     // 可选前置图标（SvgIcon 图标名，空串则不显示）
-    property string icon: ""
+    // 禁止命名为 icon：Qt Quick Controls Button 的 icon 为 FINAL 属性，覆盖会导致组件不可用
+    property string iconName: ""
 
     // 统一高度，避免业务侧各写各的
     readonly property int controlHeight: compact ? Theme.buttonHeightCompact : Theme.buttonHeight
@@ -128,14 +129,14 @@ Button {
 
         // 可选前置图标：经 qrc 加载 Shell 的 SvgIcon，保持图标风格统一
         Loader {
-            visible: root.icon !== ""
+            visible: root.iconName !== ""
             Layout.preferredWidth: 14
             Layout.preferredHeight: 14
             Layout.alignment: Qt.AlignVCenter
-            source: root.icon !== "" ? "qrc:/qt/qml/LabelTorch/Shell/qml/SvgIcon.qml" : ""
+            source: root.iconName !== "" ? "qrc:/qt/qml/LabelTorch/Shell/qml/SvgIcon.qml" : ""
             onLoaded: {
                 if (item) {
-                    item.icon = Qt.binding(function () { return root.icon })
+                    item.icon = Qt.binding(function () { return root.iconName })
                     item.color = Qt.binding(function () { return root.textColor })
                     item.width = Qt.binding(function () { return 14 })
                     item.height = Qt.binding(function () { return 14 })
