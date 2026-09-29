@@ -762,11 +762,13 @@ ApplicationWindow {
                             width: 40
                             height: Theme.headerHeight
                             color: closeBtnMouse.containsMouse ? "#E81123" : "transparent"
-                            Text {
+                            SvgIcon {
                                 anchors.centerIn: parent
-                                text: "✕"
+                                icon: "close"
+                                width: 11
+                                height: 11
                                 color: closeBtnMouse.containsMouse ? "#FFFFFF" : Theme.textSecondary
-                                font.pixelSize: 12
+                                accent: closeBtnMouse.containsMouse ? "#FFFFFF" : Theme.textSecondary
                             }
                             MouseArea {
                                 id: closeBtnMouse
@@ -1306,8 +1308,7 @@ ApplicationWindow {
 
     ModalDialog {
         id: closeConfirmDialog
-        title: "退出标炬"
-        subtitle: "确认关闭当前工作区？"
+        title: "退出标炬？"
         dialogWidth: 420
 
         ColumnLayout {
@@ -1382,12 +1383,13 @@ ApplicationWindow {
 
             Button {
                 id: confirmCloseBtn
-                text: "退出程序"
-                width: 110
+                text: "退出"
+                width: 96
                 height: 34
+                // 主操作用 primary 色，不整块铺红；危险语义由标题问句与说明文案承担
                 background: Rectangle {
-                    color: confirmCloseBtn.pressed ? Qt.darker(Theme.danger, 1.15)
-                         : (confirmCloseBtn.hovered ? Qt.lighter(Theme.danger, 1.08) : Theme.danger)
+                    color: confirmCloseBtn.pressed ? Qt.darker(Theme.primary, 1.15)
+                         : (confirmCloseBtn.hovered ? Qt.lighter(Theme.primary, 1.08) : Theme.primary)
                     radius: Theme.radiusNormal
                 }
                 contentItem: Text {
@@ -1408,98 +1410,80 @@ ApplicationWindow {
         }
     }
 
-    // 连接状态详情对话框
-    Dialog {
+    // 连接状态详情弹窗：统一走 ModalDialog，高度随内容 implicitHeight 自适应，避免固定高度截断
+    ModalDialog {
         id: connectionInfoDialog
         title: "连接状态"
-        modal: true
-        anchors.centerIn: parent
-        width: 360
-        height: 200
+        subtitle: "运行环境与后端链路"
+        dialogWidth: 380
 
-        palette.window: Theme.bgMain
-        palette.windowText: Theme.textMain
-        palette.base: Theme.bgInput
-        palette.text: Theme.textMain
-        palette.button: Theme.bgCard
-        palette.buttonText: Theme.textMain
+        ColumnLayout {
+            width: parent.width - Theme.spacingLarge * 2
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: Theme.spacingNormal
 
-        background: Rectangle {
-            color: Theme.bgMain
-            radius: Theme.radiusLarge
-            border.color: Theme.borderColor
-            border.width: 1
-        }
-
-        header: Rectangle {
-            color: Theme.bgInput
-            height: 44
-            radius: Theme.radiusLarge
-
-            Label {
-                anchors.centerIn: parent
-                text: "连接状态"
-                color: Theme.primary
-                font.pixelSize: Theme.fontSizeSubheading
-                font.bold: true
-            }
-        }
-
-        contentItem: Rectangle {
-            color: Theme.bgMain
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: Theme.spacingLarge
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: Theme.spacingNormal
                 spacing: Theme.spacingNormal
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    Label {
-                        text: "Python 后端："
-                        color: Theme.textMuted
-                        font.pixelSize: Theme.fontSizeNormal
-                    }
-                    Label {
-                        text: ipcClient.connected ? "已连接" : "未连接"
-                        color: ipcClient.connected ? Theme.success : Theme.danger
-                        font.pixelSize: Theme.fontSizeNormal
-                        font.bold: true
-                    }
+                Label {
+                    text: "Python 后端："
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.family: Theme.fontFamily
                 }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    Label {
-                        text: "GPU 状态："
-                        color: Theme.textMuted
-                        font.pixelSize: Theme.fontSizeNormal
-                    }
-                    Label {
-                        text: gpuStatusText
-                        color: gpuStatusColor
-                        font.pixelSize: Theme.fontSizeNormal
-                        font.bold: true
-                    }
+                Label {
+                    text: ipcClient.connected ? "已连接" : "未连接"
+                    color: ipcClient.connected ? Theme.success : Theme.danger
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.family: Theme.fontFamily
+                    font.bold: true
                 }
+                Item { Layout.fillWidth: true }
+            }
 
-                Item { Layout.fillHeight: true }
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.bottomMargin: Theme.spacingNormal
+                spacing: Theme.spacingNormal
+
+                Label {
+                    text: "GPU 状态："
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.family: Theme.fontFamily
+                }
+                Label {
+                    text: gpuStatusText
+                    color: gpuStatusColor
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.family: Theme.fontFamily
+                    font.bold: true
+                }
+                Item { Layout.fillWidth: true }
             }
         }
 
-        footer: Rectangle {
-            color: Theme.bgInput
-            height: 48
-            radius: Theme.radiusLarge
+        footerContent: Row {
+            spacing: Theme.spacingLarge
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
 
             Button {
-                anchors.centerIn: parent
                 text: "关闭"
-                flat: true
-                contentItem: Label {
+                width: 90
+                background: Rectangle {
+                    color: parent.pressed ? Qt.darker(Theme.primary, 1.2) : Theme.primary
+                    radius: Theme.radiusSmall
+                    implicitHeight: 32
+                }
+                contentItem: Text {
                     text: parent.text
-                    color: Theme.textMain
+                    color: Theme.bgMain
                     font.pixelSize: Theme.fontSizeNormal
+                    font.bold: true
+                    font.family: Theme.fontFamily
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -1704,265 +1688,212 @@ ApplicationWindow {
         }
     }
 
-    // 设置对话框
-    Dialog {
+    // 设置弹窗：统一走 ModalDialog；日志级别选项使用中文，禁全大写英文
+    ModalDialog {
         id: settingsDialog
         title: "设置"
-        modal: true
-        anchors.centerIn: parent
-        width: 420
-        height: 280
+        subtitle: "运行环境与日志偏好"
+        dialogWidth: 420
 
-        palette.window: Theme.bgMain
-        palette.windowText: Theme.textMain
-        palette.base: Theme.bgInput
-        palette.text: Theme.textMain
-        palette.button: Theme.bgCard
-        palette.buttonText: Theme.textMain
-
-        background: Rectangle {
-            color: Theme.bgMain
-            radius: Theme.radiusLarge
-            border.color: Theme.borderColor
-            border.width: 1
-        }
-
-        header: Rectangle {
-            color: Theme.bgInput
-            height: 44
-            radius: Theme.radiusLarge
+        ColumnLayout {
+            width: parent.width - Theme.spacingLarge * 2
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: Theme.spacingNormal
 
             Label {
-                anchors.centerIn: parent
-                text: "设置"
-                color: Theme.primary
-                font.pixelSize: Theme.fontSizeSubheading
-                font.bold: true
+                Layout.topMargin: Theme.spacingNormal
+                text: "Python 路径："
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSizeNormal
+                font.family: Theme.fontFamily
             }
-        }
 
-        contentItem: Rectangle {
-            color: Theme.bgMain
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: Theme.spacingLarge
-                spacing: Theme.spacingNormal
-
-                Label {
-                    text: "Python 路径："
-                    color: Theme.textMuted
-                    font.pixelSize: Theme.fontSizeNormal
+            TextField {
+                id: pythonPathField
+                Layout.fillWidth: true
+                text: typeof appSettings !== "undefined" ? (appSettings.pythonPath || "C:/A/anaconda/envs/labeltorch/python.exe") : "C:/A/anaconda/envs/labeltorch/python.exe"
+                color: Theme.textMain
+                font.pixelSize: Theme.fontSizeNormal
+                background: Rectangle {
+                    color: Theme.bgInput
+                    radius: Theme.radiusSmall
+                    border.color: pythonPathField.activeFocus ? Theme.primary : Theme.borderColor
+                    border.width: 1
+                    implicitHeight: 32
                 }
+            }
 
-                TextField {
-                    id: pythonPathField
-                    Layout.fillWidth: true
-                    text: typeof appSettings !== "undefined" ? (appSettings.pythonPath || "C:/A/anaconda/envs/labeltorch/python.exe") : "C:/A/anaconda/envs/labeltorch/python.exe"
+            Label {
+                text: "日志级别："
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSizeNormal
+                font.family: Theme.fontFamily
+            }
+
+            ComboBox {
+                id: logLevelCombo
+                Layout.fillWidth: true
+                // 中文级别名；下标 0~3 与 LogPanel.minLevel 阈值一一对应
+                model: ["调试", "信息", "警告", "错误"]
+                currentIndex: 1
+
+                contentItem: Label {
+                    text: logLevelCombo.displayText
                     color: Theme.textMain
                     font.pixelSize: Theme.fontSizeNormal
-                    background: Rectangle {
-                        color: Theme.bgInput
-                        radius: Theme.radiusSmall
-                        border.color: pythonPathField.activeFocus ? Theme.primary : Theme.borderColor
-                        border.width: 1
-                        implicitHeight: 32
-                    }
+                    font.family: Theme.fontFamily
+                    verticalAlignment: Text.AlignVCenter
+                    leftPadding: Theme.spacingSmall
                 }
 
-                Label {
-                    text: "日志级别："
-                    color: Theme.textMuted
-                    font.pixelSize: Theme.fontSizeNormal
+                background: Rectangle {
+                    color: Theme.bgCard
+                    radius: Theme.radiusSmall
+                    border.color: logLevelCombo.activeFocus ? Theme.primary : Theme.borderColor
+                    border.width: 1
+                    implicitHeight: 32
                 }
-
-                ComboBox {
-                    id: logLevelCombo
-                    Layout.fillWidth: true
-                    model: ["DEBUG", "INFO", "WARNING", "ERROR"]
-                    currentIndex: 1
-
-                    contentItem: Label {
-                        text: logLevelCombo.displayText
-                        color: Theme.textMain
-                        font.pixelSize: Theme.fontSizeNormal
-                        verticalAlignment: Text.AlignVCenter
-                        leftPadding: Theme.spacingSmall
-                    }
-
-                    background: Rectangle {
-                        color: Theme.bgCard
-                        radius: Theme.radiusSmall
-                        border.color: logLevelCombo.activeFocus ? Theme.primary : Theme.borderColor
-                        border.width: 1
-                        implicitHeight: 32
-                    }
-                }
-
-                Item { Layout.fillHeight: true }
             }
+
+            Item { Layout.preferredHeight: Theme.spacingSmall }
         }
 
-        footer: Rectangle {
-            color: Theme.bgInput
-            height: 52
-            radius: Theme.radiusLarge
+        footerContent: Row {
+            spacing: Theme.spacingLarge
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
 
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: Theme.spacingLarge
-                anchors.rightMargin: Theme.spacingLarge
-                spacing: Theme.spacingNormal
-
-                Button {
-                    text: "取消"
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 34
-                    flat: true
-                    contentItem: Label {
-                        text: parent.text
-                        color: Theme.textMain
-                        font.pixelSize: Theme.fontSizeNormal
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                    onClicked: settingsDialog.reject()
+            Button {
+                text: "取消"
+                width: 90
+                background: Rectangle {
+                    color: parent.hovered ? Theme.bgHover : Theme.bgCard
+                    border.color: Theme.borderColor
+                    border.width: 1
+                    radius: Theme.radiusSmall
+                    implicitHeight: 32
                 }
+                contentItem: Text {
+                    text: parent.text
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.family: Theme.fontFamily
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                onClicked: settingsDialog.close()
+            }
 
-                Button {
-                    text: "保存"
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 34
-                    contentItem: Label {
-                        text: parent.text
-                        color: Theme.bgMain
-                        font.pixelSize: Theme.fontSizeNormal
-                        font.bold: true
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+            Button {
+                text: "保存"
+                width: 90
+                background: Rectangle {
+                    color: parent.pressed ? Qt.darker(Theme.primary, 1.2) : Theme.primary
+                    radius: Theme.radiusSmall
+                    implicitHeight: 32
+                }
+                contentItem: Text {
+                    text: parent.text
+                    color: Theme.bgMain
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.bold: true
+                    font.family: Theme.fontFamily
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                onClicked: {
+                    if (typeof appSettings !== "undefined") {
+                        appSettings.pythonPath = pythonPathField.text
                     }
-                    background: Rectangle {
-                        color: parent.pressed ? Qt.darker(Theme.primary, 1.2) : Theme.primary
-                        radius: Theme.radiusSmall
-                    }
-                    onClicked: {
-                        if (typeof appSettings !== "undefined") {
-                            appSettings.pythonPath = pythonPathField.text
-                        }
-                        // 日志级别立即生效：按级别过滤日志面板已显示内容的展示阈值
-                        // C++ 侧 Log::setLevel 未暴露给 QML，这里先作用于日志面板显示层
-                        logPanel.minLevel = logLevelCombo.currentIndex
-                        // Python 路径需重启后端才生效，明确提示用户
-                        ToastBus.success("设置已保存：日志级别 = " + logLevelCombo.currentText + "（立即生效）")
-                        ToastBus.info("Python 路径将在重启 Python 后端后生效")
-                        settingsDialog.accept()
-                    }
+                    // 日志级别立即生效：按级别过滤日志面板已显示内容的展示阈值
+                    // C++ 侧 Log::setLevel 未暴露给 QML，这里先作用于日志面板显示层
+                    logPanel.minLevel = logLevelCombo.currentIndex
+                    // Python 路径需重启后端才生效，明确提示用户
+                    ToastBus.success("设置已保存：日志级别 = " + logLevelCombo.currentText + "（立即生效）")
+                    ToastBus.info("Python 路径将在重启 Python 后端后生效")
+                    settingsDialog.close()
                 }
             }
         }
     }
 
-    // 关于对话框
-    Dialog {
+    // 关于弹窗：统一走 ModalDialog，标题左对齐 + 副标题，footer 右对齐主操作
+    ModalDialog {
         id: aboutDialog
         title: "关于"
-        modal: true
-        anchors.centerIn: parent
-        width: 380
-        height: 260
+        subtitle: "标炬 LabelTorch 产品信息"
+        dialogWidth: 400
 
-        palette.window: Theme.bgMain
-        palette.windowText: Theme.textMain
-        palette.base: Theme.bgInput
-        palette.text: Theme.textMain
-        palette.button: Theme.bgCard
-        palette.buttonText: Theme.textMain
-
-        background: Rectangle {
-            color: Theme.bgMain
-            radius: Theme.radiusLarge
-            border.color: Theme.borderColor
-            border.width: 1
-        }
-
-        header: Rectangle {
-            color: Theme.bgInput
-            height: 44
-            radius: Theme.radiusLarge
+        ColumnLayout {
+            width: parent.width - Theme.spacingLarge * 2
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: Theme.spacingNormal
 
             Label {
-                anchors.centerIn: parent
-                text: "关于"
-                color: Theme.primary
-                font.pixelSize: Theme.fontSizeSubheading
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: Theme.spacingNormal
+                text: "标炬 LabelTorch"
+                color: Theme.textMain
+                font.pixelSize: Theme.fontSizeLarge
                 font.bold: true
+                font.family: Theme.fontFamily
+            }
+
+            Label {
+                Layout.alignment: Qt.AlignHCenter
+                text: "版本 0.1.0"
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSizeNormal
+                font.family: Theme.fontFamily
+            }
+
+            Label {
+                Layout.alignment: Qt.AlignHCenter
+                text: "工业缺陷检测智能一体化平台"
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSizeCaption
+                font.family: Theme.fontFamily
+                wrapMode: Text.WordWrap
+            }
+
+            Label {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: Theme.spacingLarge
+                text: "Qt 6.11 + QML + C++17 + Python 3.11"
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSizeCaption
+                font.family: Theme.fontFamilyMono
+            }
+
+            Label {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.bottomMargin: Theme.spacingNormal
+                text: "Ultralytics + Anomalib"
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSizeCaption
+                font.family: Theme.fontFamilyMono
             }
         }
 
-        contentItem: Rectangle {
-            color: Theme.bgMain
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: Theme.spacingLarge
-                spacing: Theme.spacingNormal
-
-                Label {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "标炬 LabelTorch"
-                    color: Theme.textMain
-                    font.pixelSize: Theme.fontSizeLarge
-                    font.bold: true
-                }
-
-                Label {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "版本 0.1.0"
-                    color: Theme.textMuted
-                    font.pixelSize: Theme.fontSizeNormal
-                }
-
-                Label {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "工业缺陷检测智能一体化平台"
-                    color: Theme.textMuted
-                    font.pixelSize: Theme.fontSizeCaption
-                    wrapMode: Text.WordWrap
-                }
-
-                Item { Layout.fillHeight: true }
-
-                Label {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "Qt 6.11 + QML + C++17 + Python 3.11"
-                    color: Theme.textMuted
-                    font.pixelSize: Theme.fontSizeCaption
-                    font.family: Theme.fontFamilyMono
-                }
-
-                Label {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "Ultralytics + Anomalib"
-                    color: Theme.textMuted
-                    font.pixelSize: Theme.fontSizeCaption
-                    font.family: Theme.fontFamilyMono
-                }
-            }
-        }
-
-        footer: Rectangle {
-            color: Theme.bgInput
-            height: 48
-            radius: Theme.radiusLarge
+        footerContent: Row {
+            spacing: Theme.spacingLarge
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
 
             Button {
-                anchors.centerIn: parent
                 text: "关闭"
-                flat: true
-                contentItem: Label {
+                width: 90
+                background: Rectangle {
+                    color: parent.pressed ? Qt.darker(Theme.primary, 1.2) : Theme.primary
+                    radius: Theme.radiusSmall
+                    implicitHeight: 32
+                }
+                contentItem: Text {
                     text: parent.text
-                    color: Theme.textMain
+                    color: Theme.bgMain
                     font.pixelSize: Theme.fontSizeNormal
+                    font.bold: true
+                    font.family: Theme.fontFamily
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }

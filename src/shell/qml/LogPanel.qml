@@ -16,7 +16,7 @@ Rectangle {
     // 默认收起：仅保留底部薄条，点「日志面板」才展开
     property bool collapsed: true
 
-    // 日志级别显示阈值：0=DEBUG 1=INFO 2=WARNING 3=ERROR（与设置页下标对齐）
+    // 日志级别显示阈值：0=调试 1=信息 2=警告 3=错误（与设置页下标对齐）
     // 低于阈值的行不进入展示缓冲，设置改动即时生效
     property int minLevel: 1
 
