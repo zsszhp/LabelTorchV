@@ -393,7 +393,8 @@ ApplicationWindow {
                     }
                 }
 
-                // 导航标签：8 项分三组，组间用分隔线 + 小标题弱分组
+                // 导航标签：8 项分三组，组间仅用细线分隔
+                // 不放「训练评估/交付」等组标题：看起来像可点 Tab 却无响应，用户会当成 bug
                 Row {
                     Layout.alignment: Qt.AlignVCenter
                     spacing: 0
@@ -417,26 +418,22 @@ ApplicationWindow {
                                 return false
                             }
 
-                            // 组前分隔线（首组不加）
+                            // 组间分隔线：更明显，替代伪标题做视觉分组
                             Rectangle {
                                 visible: groupRow.index > 0
                                 width: 1
-                                height: Theme.headerHeight * 0.4
+                                height: Theme.headerHeight * 0.36
+                                radius: 0.5
                                 color: Theme.navGroupDivider
                                 anchors.verticalCenter: parent.verticalCenter
-                                anchors.verticalCenterOffset: 0
+                                // 两侧留白，避免和 Tab 贴太近
+                                opacity: 1.0
                             }
-
-                            // 组标题（弱化显示，点击无效）
-                            Text {
+                            // 分隔线前的呼吸间距
+                            Item {
                                 visible: groupRow.index > 0
-                                text: groupRow.modelData.title
-                                color: Theme.textDisabled
-                                font.pixelSize: 10
-                                font.family: Theme.fontFamily
-                                leftPadding: Theme.navGroupGap
-                                rightPadding: Theme.spacingSmall
-                                anchors.verticalCenter: parent.verticalCenter
+                                width: 10
+                                height: 1
                             }
 
                             // 组内导航项
@@ -458,16 +455,12 @@ ApplicationWindow {
 
                                         SvgIcon {
                                             icon: model.icon
-                                            width: 16
-                                            height: 16
+                                            width: 18
+                                            height: 18
                                             anchors.verticalCenter: parent.verticalCenter
-                                            color: {
-                                                if (!navDelegate.enabled) return Theme.textDisabled
-                                                if (appController.currentPage === model.pageId) return Theme.primaryGlow
-                                                if (navDelegate.hovered) return Theme.textMain
-                                                return Theme.textMuted
-                                            }
-                                            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
+                                            // 选中时用语义色 + 发光，未选中略降饱和
+                                            glowing: appController.currentPage === model.pageId && navDelegate.enabled
+                                            opacity: navDelegate.enabled ? 1.0 : 0.45
                                         }
 
                                         Text {

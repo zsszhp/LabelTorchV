@@ -1,20 +1,171 @@
+// SvgIcon.qml - 鲜活双色图标（年轻化视觉）
+// 主体色 + 强调色双路径，默认按图标语义配色，也可外部覆盖 color/accent
 import QtQuick
 import QtQuick.Shapes
+import QtQuick.Effects
 
 Item {
     id: control
     implicitWidth: 16
     implicitHeight: 16
 
-    property string icon: "folder" // folder, images, edit, check, brain, flask, export, plus, eye, marker, trash, close, arrow-down, signal, gear, user, alert, scan, refresh
-    property color color: "#64748B"
+    // folder, images, edit, check, brain, flask, export, plus, eye, marker, trash,
+    // close, arrow-down, signal, gear, user, alert, scan, refresh, video,
+    // cursor, rect, polygon, rotate, hand, zoom-in, zoom-out
+    property string icon: "folder"
+    // 外部强制主色（空则用语义色）
+    property color color: "transparent"
+    // 外部强制强调色（空则用语义色）
+    property color accent: "transparent"
+    // 高亮/选中时加发光
+    property bool glowing: false
+
+    // 语义双色调色板：主体更亮、强调点缀
+    readonly property var palette: ({
+        "folder":     { main: "#FBBF24", accent: "#F59E0B" },   // 琥珀
+        "images":     { main: "#38BDF8", accent: "#0EA5E9" },   // 天蓝
+        "edit":       { main: "#F472B6", accent: "#EC4899" },   // 粉
+        "check":      { main: "#34D399", accent: "#10B981" },   // 翠绿
+        "brain":      { main: "#A78BFA", accent: "#8B5CF6" },   // 紫
+        "flask":      { main: "#22D3EE", accent: "#06B6D4" },   // 青
+        "export":     { main: "#A3E635", accent: "#84CC16" },   // 黄绿
+        "scan":       { main: "#FB923C", accent: "#F97316" },   // 橙
+        "alert":      { main: "#F87171", accent: "#EF4444" },   // 红
+        "refresh":    { main: "#60A5FA", accent: "#3B82F6" },   // 蓝
+        "video":      { main: "#E879F9", accent: "#D946EF" },   // 品红
+        "plus":       { main: "#22D3EE", accent: "#06B6D4" },
+        "eye":        { main: "#67E8F9", accent: "#22D3EE" },
+        "marker":     { main: "#F472B6", accent: "#EC4899" },
+        "trash":      { main: "#FCA5A5", accent: "#F87171" },
+        "close":      { main: "#FDA4AF", accent: "#FB7185" },
+        "arrow-down": { main: "#94A3B8", accent: "#64748B" },
+        "signal":     { main: "#4ADE80", accent: "#22C55E" },
+        "gear":       { main: "#94A3B8", accent: "#64748B" },
+        "user":       { main: "#C4B5FD", accent: "#A78BFA" },
+        "cursor":     { main: "#E2E8F0", accent: "#94A3B8" },
+        "rect":       { main: "#38BDF8", accent: "#0EA5E9" },
+        "polygon":    { main: "#A78BFA", accent: "#8B5CF6" },
+        "rotate":     { main: "#FB923C", accent: "#F97316" },
+        "hand":       { main: "#FBBF24", accent: "#F59E0B" },
+        "zoom-in":    { main: "#67E8F9", accent: "#22D3EE" },
+        "zoom-out":   { main: "#94A3B8", accent: "#64748B" }
+    })
+
+    readonly property color mainColor: {
+        if (control.color.a > 0.01) return control.color
+        var p = palette[control.icon]
+        return p ? p.main : "#22D3EE"
+    }
+    readonly property color accentColor: {
+        if (control.accent.a > 0.01) return control.accent
+        var p = palette[control.icon]
+        return p ? p.accent : "#06B6D4"
+    }
+
+    // 主体路径（大面积）
+    function pathMain(icon) {
+        switch (icon) {
+        case "folder":
+            return "M 2 4 C 2 2.9 2.9 2 4 2 L 8.5 2 C 9 2 9.5 2.2 9.9 2.6 L 11.4 4.1 C 11.8 4.5 12.3 4.7 12.8 4.7 L 20 4.7 C 21.1 4.7 22 5.6 22 6.7 L 22 18 C 22 19.1 21.1 20 20 20 L 4 20 C 2.9 20 2 19.1 2 18 Z"
+        case "images":
+            return "M 19 3 L 5 3 C 3.9 3 3 3.9 3 5 L 3 19 C 3 20.1 3.9 21 5 21 L 19 21 C 20.1 21 21 20.1 21 19 L 21 5 C 21 3.9 20.1 3 19 3 Z"
+        case "edit":
+            return "M 3 17.25 V 21 H 6.75 L 17.81 9.94 L 14.06 6.19 Z M 20.71 7.04 C 21.1 6.65 21.1 6.02 20.71 5.63 L 18.37 3.29 C 17.98 2.9 17.35 2.9 16.96 3.29 L 15.13 5.12 L 18.88 8.87 Z"
+        case "check":
+            return "M 19 3 H 5 C 3.9 3 3 3.9 3 5 V 19 C 3 20.1 3.9 21 5 21 H 19 C 20.1 21 21 20.1 21 19 V 5 C 21 3.9 20.1 3 19 3 Z"
+        case "brain":
+            return "M 19 9 H 17 V 7 C 17 5.9 16.1 5 15 5 H 13 V 3 H 11 V 5 H 9 V 3 H 7 V 5 H 5 C 3.9 5 3 5.9 3 7 V 9 H 1 V 11 H 3 V 13 H 1 V 15 H 3 V 17 C 3 18.1 3.9 19 5 19 H 7 V 21 H 9 V 19 H 11 V 21 H 13 V 19 H 15 C 16.1 19 17 18.1 17 17 V 15 H 19 V 13 H 17 V 11 H 19 Z"
+        case "flask":
+            return "M 19 19 L 16 11 V 5 H 17 V 3 H 7 V 5 H 8 V 11 L 5 19 C 4.5 20 5.2 21 6.2 21 H 17.8 C 18.8 21 19.5 20 19 19 Z"
+        case "export":
+            return "M 19 9 H 15 V 3 H 9 V 9 H 5 L 12 16 Z M 5 18 V 20 H 19 V 18 H 5 Z"
+        case "plus":
+            return "M 19 13 H 13 V 19 H 11 V 13 H 5 V 11 H 11 V 5 H 13 V 11 H 19 Z"
+        case "eye":
+            return "M 12 4.5 C 7 4.5 2.73 7.61 1 12 C 2.73 16.39 7 19.5 12 19.5 C 17 19.5 21.27 16.39 23 12 C 21.27 7.61 17 4.5 12 4.5 Z"
+        case "marker":
+            return "M 12 2 C 8.13 2 5 5.13 5 9 C 5 14.25 12 22 12 22 C 12 22 19 14.25 19 9 C 19 5.13 15.87 2 12 2 Z"
+        case "trash":
+            return "M 6 19 C 6 20.1 6.9 21 8 21 H 16 C 17.1 21 18 20.1 18 19 V 7 H 6 Z M 19 4 H 15.5 L 14.5 3 H 9.5 L 8.5 4 H 5 V 6 H 19 Z"
+        case "close":
+            return "M 19 6.41 L 17.59 5 L 12 10.59 L 6.41 5 L 5 6.41 L 10.59 12 L 5 17.59 L 6.41 19 L 12 13.41 L 17.59 19 L 19 17.59 L 13.41 12 Z"
+        case "arrow-down":
+            return "M 7 10 L 12 15 L 17 10 Z"
+        case "signal":
+            return "M 2 17 h 2 v 4 H 2 z M 6 12 h 2 v 9 H 6 z M 10 8 h 2 v 13 h -2 z M 14 4 h 2 v 17 h -2 z M 18 0 h 2 v 21 h -2 z"
+        case "gear":
+            return "M 19.43 12.98 c .04-.32 .07-.64 .07-.98 s-.03-.66-.07-.98 l 2.11-1.65 c .19-.15 .24-.42 .12-.64 l-2-3.46 c-.12-.22-.39-.3-.61-.22 l-2.49 1 c-.52-.4-1.08-.73-1.69-.98 l-.38-2.65 C 14.46 2.18 14.25 2 14 2 h-4 c-.25 0-.46 .18-.49 .42 l-.38 2.65 c-.61 .25-1.17 .59-1.69 .98 l-2.49-1 c-.23-.09-.49 0-.61 .22 l-2 3.46 c-.13 .22-.07 .49 .12 .64 l 2.11 1.65 c-.04 .32-.07 .65-.07 .98 s .03 .66 .07 .98 l-2.11 1.65 c-.19 .15-.24 .42-.12 .64 l 2 3.46 c .12 .22 .39 .3 .61 .22 l 2.49-1 c .52 .4 1.08 .73 1.69 .98 l .38 2.65 c .03 .24 .24 .42 .49 .42 h 4 c .25 0 .46-.18 .49-.42 l .38-2.65 c .61-.25 1.17-.59 1.69-.98 l 2.49 1 c .23 .09 .49 0 .61-.22 l 2-3.46 c .12-.22 .07-.49-.12-.64 Z"
+        case "user":
+            return "M 12 2 C 6.48 2 2 6.48 2 12 s 4.48 10 10 10 s 10-4.48 10-10 S 17.52 2 12 2 Z"
+        case "cursor":
+            return "M 7 2 L 19 13.2 L 13.2 13.7 L 16.5 21 L 14.3 22.1 L 11.1 14.7 L 6.7 19.2 Z"
+        case "rect":
+            return "M 3 3 h 18 v 18 h -18 z"
+        case "polygon":
+            return "M 12 2 L 22 8 L 18 20 L 6 20 L 2 8 Z"
+        case "rotate":
+            return "M 15.55 5.55 L 11 1 V 4 C 6.03 4 2 8.03 2 13 C 2 17.97 6.03 22 11 22 C 15.97 22 20 17.97 20 13 H 18 C 18 16.87 14.87 20 11 20 C 7.13 20 4 16.87 4 13 C 4 9.13 7.13 6 11 6 V 9 L 15.55 5.55 Z"
+        case "hand":
+            return "M 21 10.5 C 21 15.2 17.2 19 12.5 19 C 7.8 19 4 15.2 4 10.5 V 4.5 C 4 3.7 4.7 3 5.5 3 C 6.3 3 7 3.7 7 4.5 V 10.5 C 7 11.3 8.3 11.3 8.3 10.5 V 2.5 C 8.3 1.7 9 1 9.8 1 C 10.6 1 11.3 1.7 11.3 2.5 V 10.5 C 11.3 11.3 12.6 11.3 12.6 10.5 V 3.5 C 12.6 2.7 13.3 2 14.1 2 C 14.9 2 15.6 2.7 15.6 3.5 V 10.5 C 15.6 11.3 16.9 11.3 16.9 10.5 V 5.5 C 16.9 4.7 17.6 4 18.4 4 C 19.2 4 19.9 4.7 19.9 5.5 V 10.5 Z"
+        case "zoom-in":
+        case "zoom-out":
+            return "M 15.5 14 h -.8 l -.3-.3 C 15.4 12.6 16 11.1 16 9.5 16 5.9 13.1 3 9.5 3 S 3 5.9 3 9.5 5.9 16 9.5 16 c 1.6 0 3.1-.6 4.2-1.6 l .3 .3 v .8 l 5 5 1.5-1.5-5-5 z"
+        case "alert":
+            return "M 1 21 H 23 L 12 2 Z"
+        case "scan":
+            return "M 4 4 H 8 V 2 H 2 V 8 H 4 Z M 16 2 V 4 H 20 V 8 H 22 V 2 Z M 20 16 V 20 H 16 V 22 H 22 V 16 Z M 4 20 H 8 V 22 H 2 V 16 H 4 Z"
+        case "refresh":
+            return "M 17.65 6.35 C 16.2 4.9 14.21 4 12 4 C 7.58 4 4.01 7.58 4.01 12 C 4.01 16.42 7.58 20 12 20 C 15.73 20 18.84 17.45 19.73 14 H 17.65 C 16.83 16.33 14.61 18 12 18 C 8.69 18 6 15.31 6 12 C 6 8.69 8.69 6 12 6 C 13.66 6 15.14 6.69 16.22 7.78 L 13 11 H 20 V 4 Z"
+        case "video":
+            return "M 17 10.5 V 7 C 17 6.45 16.55 6 16 6 H 4 C 3.45 6 3 6.45 3 7 V 17 C 3 17.55 3.45 18 4 18 H 16 C 16.55 18 17 17.55 17 17 V 13.5 L 21 17.5 V 6.5 L 17 10.5 Z"
+        default:
+            return ""
+        }
+    }
+
+    // 强调细节路径（镂空/点缀）
+    function pathAccent(icon) {
+        switch (icon) {
+        case "folder":
+            return "M 2 7 L 22 7 L 22 6.7 C 22 5.6 21.1 4.7 20 4.7 L 12.8 4.7 C 12.3 4.7 11.8 4.5 11.4 4.1 L 9.9 2.6 C 9.5 2.2 9 2 8.5 2 L 4 2 C 2.9 2 2 2.9 2 4 Z"
+        case "images":
+            return "M 5 17 L 9 12 L 12 15 L 16 10 L 19 17 Z M 7.5 9 C 7.5 8.17 6.83 7.5 6 7.5 C 5.17 7.5 4.5 8.17 4.5 9 C 4.5 9.83 5.17 10.5 6 10.5 C 6.83 10.5 7.5 9.83 7.5 9 Z"
+        case "check":
+            return "M 10 17 L 5 12 L 6.41 10.59 L 10 14.17 L 17.59 6.58 L 19 8 Z"
+        case "brain":
+            return "M 15 15 H 9 V 9 H 15 Z"
+        case "flask":
+            return "M 9.8 11 L 10.2 10 V 5 H 13.8 V 10 L 14.2 11 L 17.2 19 H 6.8 Z"
+        case "eye":
+            return "M 12 17 C 9.24 17 7 14.76 7 12 C 7 9.24 9.24 7 12 7 C 14.76 7 17 9.24 17 12 C 17 14.76 14.76 17 12 17 Z M 12 9 C 10.34 9 9 10.34 9 12 C 9 13.66 10.34 15 12 15 C 13.66 15 15 13.66 15 12 C 15 10.34 13.66 9 12 9 Z"
+        case "marker":
+            return "M 12 11.5 C 10.62 11.5 9.5 10.38 9.5 9 C 9.5 7.62 10.62 6.5 12 6.5 C 13.38 6.5 14.5 7.62 14.5 9 C 14.5 10.38 13.38 11.5 12 11.5 Z"
+        case "user":
+            return "M 12 6 c 1.93 0 3.5 1.57 3.5 3.5 S 13.93 13 12 13 s-3.5-1.57-3.5-3.5 S 10.07 6 12 6 Z M 12 20 c-2.03 0-4.43-.82-6.14-2.88 C 7.55 15.8 9.68 15 12 15 s 4.45 .8 6.14 2.12 C 16.43 19.18 14.03 20 12 20 Z"
+        case "gear":
+            return "M 12 15.5 c-1.93 0-3.5-1.57-3.5-3.5 s 1.57-3.5 3.5-3.5 s 3.5 1.57 3.5 3.5 s-1.57 3.5-3.5 3.5 Z"
+        case "rect":
+            return "M 5 5 v 14 h 14 v -14 z"
+        case "polygon":
+            return "M 12 4.5 L 4.5 9.5 L 7.5 18 L 16.5 18 L 19.5 9.5 Z"
+        case "alert":
+            return "M 13 18 H 11 V 14 H 13 Z M 13 12 H 11 V 8 H 13 Z"
+        case "scan":
+            return "M 12 7 C 9.24 7 7 9.24 7 12 C 7 14.76 9.24 17 12 17 C 14.76 17 17 14.76 17 12 C 17 9.24 14.76 7 12 7 Z"
+        case "zoom-in":
+            return "M 9.5 14 C 7 14 5 12 5 9.5 S 7 5 9.5 5 14 7 14 9.5 12 14 9.5 14 z M 9 6 h 1 v 3 h 3 v 1 h-3 v 3 h-1 v-3 h-3 v-1 h 3 z"
+        case "zoom-out":
+            return "M 9.5 14 C 7 14 5 12 5 9.5 S 7 5 9.5 5 14 7 14 9.5 12 14 9.5 14 z M 6 9 h 7 v 1 H 6 Z"
+        default:
+            return ""
+        }
+    }
 
     Shape {
         id: shape
         width: 24
         height: 24
-        // 宽高在布局未就绪时可能为 0/NaN，scale 必须兜底
-        // NaN scale 会进入变换矩阵，最终在场景图整数转换时触发 qCheckedFPConversionToInteger
+        // 宽高未就绪时钳制，防止 NaN 进变换矩阵
         scale: {
             var sx = control.width > 0 ? control.width / 24 : 1.0
             var sy = control.height > 0 ? control.height / 24 : 1.0
@@ -25,77 +176,32 @@ Item {
 
         layer.enabled: true
         layer.samples: 4
+        // 选中发光
+        layer.effect: control.glowing ? glowEffect : null
 
+        // 主体
         ShapePath {
-            fillColor: control.color
+            fillColor: control.mainColor
             strokeColor: "transparent"
+            PathSvg { path: pathMain(control.icon) }
+        }
+        // 强调细节
+        ShapePath {
+            fillColor: control.accentColor
+            strokeColor: "transparent"
+            PathSvg { path: pathAccent(control.icon) }
+        }
+    }
 
-            PathSvg {
-                path: {
-                    switch (control.icon) {
-                        case "folder":
-                            return "M 2 4 C 2 2.9 2.9 2 4 2 L 8.5 2 C 9 2 9.5 2.2 9.9 2.6 L 11.4 4.1 C 11.8 4.5 12.3 4.7 12.8 4.7 L 20 4.7 C 21.1 4.7 22 5.6 22 6.7 L 22 18 C 22 19.1 21.1 20 20 20 L 4 20 C 2.9 20 2 19.1 2 18 Z"
-                        case "images":
-                            return "M 19 3 L 5 3 C 3.9 3 3 3.9 3 5 L 3 19 C 3 20.1 3.9 21 5 21 L 19 21 C 20.1 21 21 20.1 21 19 L 21 5 C 21 3.9 20.1 3 19 3 Z M 5 17 L 9 12 L 12 15 L 16 10 L 19 17 Z M 7.5 9 C 7.5 8.17 6.83 7.5 6 7.5 C 5.17 7.5 4.5 8.17 4.5 9 C 4.5 9.83 5.17 10.5 6 10.5 C 6.83 10.5 7.5 9.83 7.5 9 Z"
-                        case "edit":
-                            return "M 3 17.25 V 21 H 6.75 L 17.81 9.94 L 14.06 6.19 Z M 20.71 7.04 C 21.1 6.65 21.1 6.02 20.71 5.63 L 18.37 3.29 C 17.98 2.9 17.35 2.9 16.96 3.29 L 15.13 5.12 L 18.88 8.87 Z"
-                        case "check":
-                            return "M 19 3 H 5 C 3.9 3 3 3.9 3 5 V 19 C 3 20.1 3.9 21 5 21 H 19 C 20.1 21 21 20.1 21 19 V 5 C 21 3.9 20.1 3 19 3 Z M 10 17 L 5 12 L 6.41 10.59 L 10 14.17 L 17.59 6.58 L 19 8 L 10 17 Z"
-                        case "brain":
-                            return "M 19 9 H 17 V 7 C 17 5.9 16.1 5 15 5 H 13 V 3 H 11 V 5 H 9 V 3 H 7 V 5 H 5 C 3.9 5 3 5.9 3 7 V 9 H 1 V 11 H 3 V 13 H 1 V 15 H 3 V 17 C 3 18.1 3.9 19 5 19 H 7 V 21 H 9 V 19 H 11 V 21 H 13 V 19 H 15 C 16.1 19 17 18.1 17 17 V 15 H 19 V 13 H 17 V 11 H 19 Z M 15 15 H 9 V 9 H 15 Z"
-                        case "flask":
-                            return "M 19 19 L 16 11 V 5 H 17 V 3 H 7 V 5 H 8 V 11 L 5 19 C 4.5 20 5.2 21 6.2 21 H 17.8 C 18.8 21 19.5 20 19 19 Z M 9.8 11 L 10.2 10 V 5 H 13.8 V 10 L 14.2 11 L 17.2 19 H 6.8 Z"
-                        case "export":
-                            return "M 19 9 H 15 V 3 H 9 V 9 H 5 L 12 16 Z M 5 18 V 20 H 19 V 18 H 5 Z"
-                        case "plus":
-                            return "M 19 13 H 13 V 19 H 11 V 13 H 5 V 11 H 11 V 5 H 13 V 11 H 19 Z"
-                        case "eye":
-                            return "M 12 4.5 C 7 4.5 2.73 7.61 1 12 C 2.73 16.39 7 19.5 12 19.5 C 17 19.5 21.27 16.39 23 12 C 21.27 7.61 17 4.5 12 4.5 Z M 12 17 C 9.24 17 7 14.76 7 12 C 7 9.24 9.24 7 12 7 C 14.76 7 17 9.24 17 12 C 17 14.76 14.76 17 12 17 Z M 12 9 C 10.34 9 9 10.34 9 12 C 9 13.66 10.34 15 12 15 C 13.66 15 15 13.66 15 12 C 15 10.34 13.66 9 12 9 Z"
-                        case "marker":
-                            return "M 12 2 C 8.13 2 5 5.13 5 9 C 5 14.25 12 22 12 22 C 12 22 19 14.25 19 9 C 19 5.13 15.87 2 12 2 Z M 12 11.5 C 10.62 11.5 9.5 10.38 9.5 9 C 9.5 7.62 10.62 6.5 12 6.5 C 13.38 6.5 14.5 7.62 14.5 9 C 14.5 10.38 13.38 11.5 12 11.5 Z"
-                        case "trash":
-                            return "M 6 19 C 6 20.1 6.9 21 8 21 H 16 C 17.1 21 18 20.1 18 19 V 7 H 6 Z M 19 4 H 15.5 L 14.5 3 H 9.5 L 8.5 4 H 5 V 6 H 19 Z"
-                        case "close":
-                            return "M 19 6.41 L 17.59 5 L 12 10.59 L 6.41 5 L 5 6.41 L 10.59 12 L 5 17.59 L 6.41 19 L 12 13.41 L 17.59 19 L 19 17.59 L 13.41 12 Z"
-                        case "arrow-down":
-                            return "M 7 10 L 12 15 L 17 10 Z"
-                        case "signal":
-                            return "M 2 17 h 2 v 4 H 2 z M 6 12 h 2 v 9 H 6 z M 10 8 h 2 v 13 h -2 z M 14 4 h 2 v 17 h -2 z M 18 0 h 2 v 21 h -2 z"
-                        case "gear":
-                            return "M 19.43 12.98 c .04-.32 .07-.64 .07-.98 s-.03-.66-.07-.98 l 2.11-1.65 c .19-.15 .24-.42 .12-.64 l-2-3.46 c-.12-.22-.39-.3-.61-.22 l-2.49 1 c-.52-.4-1.08-.73-1.69-.98 l-.38-2.65 C 14.46 2.18 14.25 2 14 2 h-4 c-.25 0-.46 .18-.49 .42 l-.38 2.65 c-.61 .25-1.17 .59-1.69 .98 l-2.49-1 c-.23-.09-.49 0-.61 .22 l-2 3.46 c-.13 .22-.07 .49 .12 .64 l 2.11 1.65 c-.04 .32-.07 .65-.07 .98 s .03 .66 .07 .98 l-2.11 1.65 c-.19 .15-.24 .42-.12 .64 l 2 3.46 c .12 .22 .39 .3 .61 .22 l 2.49-1 c .52 .4 1.08 .73 1.69 .98 l .38 2.65 c .03 .24 .24 .42 .49 .42 h 4 c .25 0 .46-.18 .49-.42 l .38-2.65 c .61-.25 1.17-.59 1.69-.98 l 2.49 1 c .23 .09 .49 0 .61-.22 l 2-3.46 c .12-.22 .07-.49-.12-.64 Z M 12 15.5 c-1.93 0-3.5-1.57-3.5-3.5 s 1.57-3.5 3.5-3.5 s 3.5 1.57 3.5 3.5 s-1.57 3.5-3.5 3.5 Z"
-                        case "user":
-                            return "M 12 2 C 6.48 2 2 6.48 2 12 s 4.48 10 10 10 s 10-4.48 10-10 S 17.52 2 12 2 Z M 12 6 c 1.93 0 3.5 1.57 3.5 3.5 S 13.93 13 12 13 s-3.5-1.57-3.5-3.5 S 10.07 6 12 6 Z M 12 20 c-2.03 0-4.43-.82-6.14-2.88 C 7.55 15.8 9.68 15 12 15 s 4.45 .8 6.14 2.12 C 16.43 19.18 14.03 20 12 20 Z"
-                        case "cursor":
-                            return "M 7 2 L 19 13.2 L 13.2 13.7 L 16.5 21 L 14.3 22.1 L 11.1 14.7 L 6.7 19.2 Z"
-                        case "rect":
-                            return "M 3 3 h 18 v 18 h -18 z M 5 5 v 14 h 14 v -14 z"
-                        case "polygon":
-                            return "M 12 2 L 22 8 L 18 20 L 6 20 L 2 8 Z M 12 4.5 L 4.5 9.5 L 7.5 18 L 16.5 18 L 19.5 9.5 Z"
-                        case "rotate":
-                            return "M 15.55 5.55 L 11 1 V 4 C 6.03 4 2 8.03 2 13 C 2 17.97 6.03 22 11 22 C 15.97 22 20 17.97 20 13 H 18 C 18 16.87 14.87 20 11 20 C 7.13 20 4 16.87 4 13 C 4 9.13 7.13 6 11 6 V 9 L 15.55 5.55 Z"
-                        case "hand":
-                            return "M 21 10.5 C 21 15.2 17.2 19 12.5 19 C 7.8 19 4 15.2 4 10.5 V 4.5 C 4 3.7 4.7 3 5.5 3 C 6.3 3 7 3.7 7 4.5 V 10.5 C 7 11.3 8.3 11.3 8.3 10.5 V 2.5 C 8.3 1.7 9 1 9.8 1 C 10.6 1 11.3 1.7 11.3 2.5 V 10.5 C 11.3 11.3 12.6 11.3 12.6 10.5 V 3.5 C 12.6 2.7 13.3 2 14.1 2 C 14.9 2 15.6 2.7 15.6 3.5 V 10.5 C 15.6 11.3 16.9 11.3 16.9 10.5 V 5.5 C 16.9 4.7 17.6 4 18.4 4 C 19.2 4 19.9 4.7 19.9 5.5 V 10.5 Z"
-                        case "zoom-in":
-                            return "M 15.5 14 h -.8 l -.3-.3 C 15.4 12.6 16 11.1 16 9.5 16 5.9 13.1 3 9.5 3 S 3 5.9 3 9.5 5.9 16 9.5 16 c 1.6 0 3.1-.6 4.2-1.6 l .3 .3 v .8 l 5 5 1.5-1.5-5-5 z M 9.5 14 C 7 14 5 12 5 9.5 S 7 5 9.5 5 14 7 14 9.5 12 14 9.5 14 z M 9 6 h 1 v 3 h 3 v 1 h-3 v 3 h-1 v-3 h-3 v-1 h 3 z"
-                        case "zoom-out":
-                            return "M 15.5 14 h -.8 l -.3-.3 C 15.4 12.6 16 11.1 16 9.5 16 5.9 13.1 3 9.5 3 S 3 5.9 3 9.5 5.9 16 9.5 16 c 1.6 0 3.1-.6 4.2-1.6 l .3 .3 v .8 l 5 5 1.5-1.5-5-5 z M 9.5 14 C 7 14 5 12 5 9.5 S 7 5 9.5 5 14 7 14 9.5 12 14 9.5 14 z M 6 9 h 7 v 1 H 6 Z"
-                        case "alert":
-                            // 异常检测：三角警告图标
-                            return "M 1 21 H 23 L 12 2 Z M 13 18 H 11 V 14 H 13 Z M 13 12 H 11 V 8 H 13 Z"
-                        case "scan":
-                            // 推理：扫描框图标
-                            return "M 4 4 H 8 V 2 H 2 V 8 H 4 Z M 16 2 V 4 H 20 V 8 H 22 V 2 Z M 20 16 V 20 H 16 V 22 H 22 V 16 Z M 4 20 H 8 V 22 H 2 V 16 H 4 Z M 12 7 C 9.24 7 7 9.24 7 12 C 7 14.76 9.24 17 12 17 C 14.76 17 17 14.76 17 12 C 17 9.24 14.76 7 12 7 Z"
-                        case "refresh":
-                            // 主动学习：循环刷新图标
-                            return "M 17.65 6.35 C 16.2 4.9 14.21 4 12 4 C 7.58 4 4.01 7.58 4.01 12 C 4.01 16.42 7.58 20 12 20 C 15.73 20 18.84 17.45 19.73 14 H 17.65 C 16.83 16.33 14.61 18 12 18 C 8.69 18 6 15.31 6 12 C 6 8.69 8.69 6 12 6 C 13.66 6 15.14 6.69 16.22 7.78 L 13 11 H 20 V 4 Z"
-                        case "video":
-                            // 视频推理：摄像机图标
-                            return "M 17 10.5 V 7 C 17 6.45 16.55 6 16 6 H 4 C 3.45 6 3 6.45 3 7 V 17 C 3 17.55 3.45 18 4 18 H 16 C 16.55 18 17 17.55 17 17 V 13.5 L 21 17.5 V 6.5 L 17 10.5 Z"
-                        default:
-                            return ""
-                    }
-                }
-            }
+    // 发光组件（延迟创建，避免未启用时开销）
+    Component {
+        id: glowEffect
+        MultiEffect {
+            shadowEnabled: true
+            shadowColor: control.mainColor
+            shadowBlur: 0.45
+            shadowHorizontalOffset: 0
+            shadowVerticalOffset: 0
         }
     }
 }
