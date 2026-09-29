@@ -315,19 +315,17 @@ ApplicationWindow {
             Layout.preferredHeight: Theme.headerHeight
             color: Theme.bgSide
 
-            // 顶栏空白区拖拽窗口；双击最大化/还原
+            // 仅顶栏空白条可拖拽窗口；双击空白切换最大化
+            // 禁止在按下时 showNormal：否则点到 Tab 也会把最大化的窗口拽回窗口态
             MouseArea {
                 anchors.fill: parent
                 z: -1
+                // 只响应未被子控件消费的按下（z:-1 + 子控件 MouseArea/Control 优先）
                 onPressed: function(mouse) {
-                    if (root.visibility === Window.Maximized) {
-                        // 最大化下拖拽还原并跟随
-                        root.showNormal()
-                    }
                     root.startSystemMove()
                 }
                 onDoubleClicked: {
-                    if (root.visibility === Window.Maximized)
+                    if (root.visibility === Window.Maximized || root.visibility === Window.FullScreen)
                         root.showNormal()
                     else
                         root.showMaximized()
@@ -458,8 +456,8 @@ ApplicationWindow {
                                             width: 18
                                             height: 18
                                             anchors.verticalCenter: parent.verticalCenter
-                                            // 选中时用语义色 + 发光，未选中略降饱和
-                                            glowing: appController.currentPage === model.pageId && navDelegate.enabled
+                                            // 不叠发光，保持清晰锐利
+                                            glowing: false
                                             opacity: navDelegate.enabled ? 1.0 : 0.45
                                         }
 
@@ -497,36 +495,23 @@ ApplicationWindow {
                                             }
                                         }
 
-                                        // 选中的标签文字外发光效果
-                                        layer.enabled: navDelegate.enabled && appController.currentPage === model.pageId
-                                        layer.effect: MultiEffect {
-                                            shadowEnabled: true
-                                            shadowColor: Theme.primaryGlow
-                                            shadowBlur: 0.3
-                                        }
                                     }
 
                                     background: Rectangle {
+                                        // 选中用干净实色轻底，禁止 color+gradient 同时设（gradient 会盖掉 color 导致发雾）
                                         color: {
                                             if (!navDelegate.enabled) return "transparent"
                                             if (appController.currentPage === model.pageId)
-                                                return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.12)
-                                            return navDelegate.hovered ? Qt.rgba(1, 1, 1, 0.04) : "transparent"
+                                                return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18)
+                                            return navDelegate.hovered ? Qt.rgba(255, 255, 255, 0.06) : "transparent"
                                         }
 
-                                        // 激活状态下：垂直亮青渐变背景
-                                        gradient: Gradient {
-                                            GradientStop { position: 0.0; color: "transparent" }
-                                            GradientStop { position: 0.7; color: "transparent" }
-                                            GradientStop { position: 1.0; color: (navDelegate.enabled && appController.currentPage === model.pageId) ? Qt.rgba(0, 0.898, 1, 0.05) : "transparent" }
-                                        }
-
-                                        // 激活标签底部指示线（加粗，强化一级导航）
+                                        // 激活标签底部指示线
                                         Rectangle {
                                             visible: navDelegate.enabled && appController.currentPage === model.pageId
-                                            height: 2.5
-                                            radius: 1
-                                            width: parent.width * 0.7
+                                            height: 3
+                                            radius: 1.5
+                                            width: parent.width * 0.72
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             anchors.bottom: parent.bottom
                                             color: Theme.primaryGlow
