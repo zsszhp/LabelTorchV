@@ -13,7 +13,8 @@ Rectangle {
 
     property alias logText: logArea.text
     property bool autoScroll: true
-    property bool collapsed: false
+    // 默认收起：仅保留底部薄条，点「日志面板」才展开
+    property bool collapsed: true
 
     // 日志级别显示阈值：0=DEBUG 1=INFO 2=WARNING 3=ERROR（与设置页下标对齐）
     // 低于阈值的行不进入展示缓冲，设置改动即时生效
@@ -122,6 +123,13 @@ Rectangle {
                     font.pixelSize: Theme.fontSizeSmall
                     font.bold: true
                     font.family: Theme.fontFamily
+                    // 点标题展开/收起（与右下按钮一致）
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -8
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: collapsed = !collapsed
+                    }
                 }
 
                 Item { Layout.fillWidth: true }
