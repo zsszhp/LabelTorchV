@@ -657,7 +657,20 @@ Item {
                                 }
                             }
 
-                            // 2列grid按钮: 默认(primary填充), 良品/漏检/误检/待定/重要(bgCard+border)
+                            // 2列grid按钮：优先展示库内 Tag，无数据时回退内置默认标签
+                            // 避免写死列表导致「添加 Tag 后看不见」
+                            property var fallbackTags: ["默认", "良品", "漏检", "误检", "待定", "重要"]
+                            property var displayTags: {
+                                var names = []
+                                if (typeof tagModel !== "undefined") {
+                                    for (var i = 0; i < tagModel.rowCount(); i++) {
+                                        var idx = tagModel.index(i, 0)
+                                        var n = tagModel.data(idx, Qt.UserRole + 2) // NameRole
+                                        if (n && names.indexOf(n) < 0) names.push(n)
+                                    }
+                                }
+                                return names.length > 0 ? names : fallbackTags
+                            }
                             GridLayout {
                                 Layout.fillWidth: true
                                 columns: 2
@@ -665,19 +678,15 @@ Item {
                                 columnSpacing: Theme.spacingTiny
 
                                 Repeater {
-                                    model: ["默认", "良品", "漏检", "误检", "待定", "重要"]
+                                    model: displayTags
 
                                     Rectangle {
+                                        required property var modelData
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 26
                                         radius: Theme.radiusSmall
-                                        // 默认tag用primary填充，其他用bgCard+border
-                                        color: selectedTag === modelData
-                                               ? Theme.primary
-                                               : (modelData === "默认" ? Theme.bgCard : Theme.bgCard)
-                                        border.color: selectedTag === modelData
-                                                      ? Theme.primary
-                                                      : Theme.borderColor
+                                        color: selectedTag === modelData ? Theme.primary : Theme.bgCard
+                                        border.color: selectedTag === modelData ? Theme.primary : Theme.borderColor
                                         border.width: 1
 
                                         Text {
@@ -1061,6 +1070,8 @@ Item {
         id: addTagDialog
         title: "添加Tag"
         modal: true
+        // 挂到 Overlay 才能稳定居中显示，否则点 + 看起来“没反应”
+        parent: Overlay.overlay
         anchors.centerIn: parent
         width: 440
         standardButtons: Dialog.NoButton
@@ -1211,11 +1222,25 @@ Item {
         }
 
         onAccepted: {
-            // A6：调用 TagService 持久化标签
+            // 持久化标签并刷新列表，给出明确成功/失败反馈
             var name = tagNameField.text.trim()
             var shortcut = tagShortcutField.text.trim()
-            if (name && currentDatasetId) {
-                tagService.addTag(currentDatasetId, name, shortcut)
+            if (!name) {
+                if (typeof ToastBus !== "undefined") ToastBus.error("请输入 Tag 名称")
+                return
+            }
+            if (!currentDatasetId) {
+                if (typeof ToastBus !== "undefined") ToastBus.error("请先选择数据集")
+                return
+            }
+            var tagId = tagService.addTag(currentDatasetId, name, shortcut)
+            if (tagId) {
+                tagModel.setDatasetId(currentDatasetId)
+                tagModel.refresh()
+                root.updateTagSummary && root.updateTagSummary()
+                if (typeof ToastBus !== "undefined") ToastBus.success("已添加 Tag：" + name)
+            } else {
+                if (typeof ToastBus !== "undefined") ToastBus.error("添加失败：标签可能已存在")
             }
             tagNameField.clear()
             tagShortcutField.clear()
