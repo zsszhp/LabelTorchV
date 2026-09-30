@@ -1,5 +1,5 @@
-// SvgIcon.qml - 鲜活双色图标（年轻化视觉）
-// 主体色 + 强调色双路径，默认按图标语义配色，也可外部覆盖 color/accent
+// SvgIcon.qml - Apple 风格图标（单色中性灰，选中态由调用方传入强调色）
+// 主体色 + 强调色双路径结构保留；彩色仅用于承载状态语义（alert/危险操作）
 import QtQuick
 import QtQuick.Shapes
 import QtQuick.Effects
@@ -20,42 +20,43 @@ Item {
     // 高亮/选中时加发光
     property bool glowing: false
 
-    // 语义双色调色板：主体更亮、强调点缀
+    // Apple 中性调色板：图标默认继承界面灰阶，不与内容争抢注意力；
+    // 仅 alert（红）/ signal（绿）/ trash·close（危险操作淡红）保留语义色
     // 注意：禁止命名为 palette，会遮蔽 QQuickItem::palette 导致控件异常
     readonly property var iconPalette: ({
-        "folder":     { main: "#FBBF24", accent: "#F59E0B" },   // 琥珀
-        "images":     { main: "#38BDF8", accent: "#0EA5E9" },   // 天蓝
-        "edit":       { main: "#F472B6", accent: "#EC4899" },   // 粉
-        "check":      { main: "#34D399", accent: "#10B981" },   // 翠绿
-        "brain":      { main: "#A78BFA", accent: "#8B5CF6" },   // 紫
-        "flask":      { main: "#22D3EE", accent: "#06B6D4" },   // 青
-        "export":     { main: "#A3E635", accent: "#84CC16" },   // 黄绿
-        "scan":       { main: "#FB923C", accent: "#F97316" },   // 橙
-        "alert":      { main: "#F87171", accent: "#EF4444" },   // 红
-        "refresh":    { main: "#60A5FA", accent: "#3B82F6" },   // 蓝
-        "video":      { main: "#E879F9", accent: "#D946EF" },   // 品红
-        "plus":       { main: "#22D3EE", accent: "#06B6D4" },
-        "eye":        { main: "#67E8F9", accent: "#22D3EE" },
-        "marker":     { main: "#F472B6", accent: "#EC4899" },
-        "trash":      { main: "#FCA5A5", accent: "#F87171" },
-        "close":      { main: "#FDA4AF", accent: "#FB7185" },
-        "arrow-down": { main: "#94A3B8", accent: "#64748B" },
-        "signal":     { main: "#4ADE80", accent: "#22C55E" },
-        "gear":       { main: "#94A3B8", accent: "#64748B" },
-        "user":       { main: "#C4B5FD", accent: "#A78BFA" },
-        "cursor":     { main: "#E2E8F0", accent: "#94A3B8" },
-        "rect":       { main: "#38BDF8", accent: "#0EA5E9" },
-        "polygon":    { main: "#A78BFA", accent: "#8B5CF6" },
-        "rotate":     { main: "#FB923C", accent: "#F97316" },
-        "hand":       { main: "#FBBF24", accent: "#F59E0B" },
-        "zoom-in":    { main: "#67E8F9", accent: "#22D3EE" },
-        "zoom-out":   { main: "#94A3B8", accent: "#64748B" }
+        "folder":     { main: "#D6D6DA", accent: "#8E8E93" },
+        "images":     { main: "#D6D6DA", accent: "#8E8E93" },
+        "edit":       { main: "#D6D6DA", accent: "#8E8E93" },
+        "check":      { main: "#D6D6DA", accent: "#8E8E93" },
+        "brain":      { main: "#D6D6DA", accent: "#8E8E93" },
+        "flask":      { main: "#D6D6DA", accent: "#8E8E93" },
+        "export":     { main: "#D6D6DA", accent: "#8E8E93" },
+        "scan":       { main: "#D6D6DA", accent: "#8E8E93" },
+        "alert":      { main: "#FF453A", accent: "#FF6961" },   // Apple 红（语义：告警）
+        "refresh":    { main: "#D6D6DA", accent: "#8E8E93" },
+        "video":      { main: "#D6D6DA", accent: "#8E8E93" },
+        "plus":       { main: "#D6D6DA", accent: "#8E8E93" },
+        "eye":        { main: "#D6D6DA", accent: "#8E8E93" },
+        "marker":     { main: "#D6D6DA", accent: "#8E8E93" },
+        "trash":      { main: "#FF6961", accent: "#FF453A" },   // Apple 红（语义：删除）
+        "close":      { main: "#98989D", accent: "#6E6E73" },
+        "arrow-down": { main: "#98989D", accent: "#6E6E73" },
+        "signal":     { main: "#30D158", accent: "#25A244" },   // Apple 绿（语义：运行中）
+        "gear":       { main: "#98989D", accent: "#6E6E73" },
+        "user":       { main: "#D6D6DA", accent: "#8E8E93" },
+        "cursor":     { main: "#ECECF0", accent: "#98989D" },
+        "rect":       { main: "#D6D6DA", accent: "#8E8E93" },
+        "polygon":    { main: "#D6D6DA", accent: "#8E8E93" },
+        "rotate":     { main: "#D6D6DA", accent: "#8E8E93" },
+        "hand":       { main: "#D6D6DA", accent: "#8E8E93" },
+        "zoom-in":    { main: "#D6D6DA", accent: "#8E8E93" },
+        "zoom-out":   { main: "#D6D6DA", accent: "#8E8E93" }
     })
 
     readonly property color mainColor: {
         if (control.color.a > 0.01) return control.color
         var p = iconPalette[control.icon]
-        return p ? p.main : "#22D3EE"
+        return p ? p.main : "#D6D6DA"
     }
     readonly property color accentColor: {
         if (control.accent.a > 0.01) return control.accent

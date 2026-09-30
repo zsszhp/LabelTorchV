@@ -971,16 +971,13 @@ Item {
                     font.family: Theme.fontFamily
 
                     background: Rectangle {
-                        gradient: Gradient {
-                            GradientStop { position: 0.0; color: Theme.primary }
-                            GradientStop { position: 1.0; color: Theme.primaryDark }
-                        }
+                        color: confirmCreateBtn.hovered ? Theme.primaryGlow : Theme.primary
                         radius: Theme.radiusSmall
                     }
 
                     contentItem: Text {
                         text: parent.text
-                        color: Theme.textMain
+                        color: "#FFFFFF"
                         font: parent.font
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter

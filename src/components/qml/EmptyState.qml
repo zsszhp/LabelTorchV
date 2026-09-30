@@ -21,8 +21,8 @@ Item {
     property string secondaryText: ""
     // 按钮是否可用（例如未打开项目时禁用）
     property bool actionEnabled: true
-    // 图标与光晕主色（默认主色系）
-    property color iconColor: Theme.primaryGlow
+    // 图标与光晕主色（Apple 风格：空态默认中性灰，不与主操作争抢注意力）
+    property color iconColor: Theme.textMuted
 
     signal actionClicked()
     signal secondaryClicked()

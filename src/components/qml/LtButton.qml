@@ -40,10 +40,10 @@ Button {
         if (!enabled)
             return Theme.textDisabled
         if (variant === "primary")
-            // 主色为亮青，配深色字对比更清晰
-            return Theme.bgMain
+            // Apple 风格：系统蓝底配白字
+            return "#FFFFFF"
         if (variant === "danger")
-            return Theme.bgMain
+            return "#FFFFFF"
         if (variant === "secondary")
             return Theme.textMain
         // ghost

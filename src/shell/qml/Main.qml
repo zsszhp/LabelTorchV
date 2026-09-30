@@ -198,6 +198,30 @@ ApplicationWindow {
         return hiddenPageInfo(pageId) !== null
     }
 
+    // === 启动页防护：未打开项目时，不允许停留在依赖项目的页面，强制回「项目」页 ===
+    // 孤页（导入向导/类别体系/冻结版等）均依赖项目上下文，一并视为需要项目
+    function pageNeedsProject(pageId) {
+        if (pageId === "project") return false
+        if (isHiddenPage(pageId)) return true
+        for (var i = 0; i < navModel.count; i++) {
+            var it = navModel.get(i)
+            if (it.pageId === pageId) return it.needsProject === true
+        }
+        return false
+    }
+
+    function clampPageToProject() {
+        if (!appController.projectOpen && pageNeedsProject(appController.currentPage))
+            appController.currentPage = "project"
+    }
+
+    Connections {
+        target: appController
+        // currentPageChanged() 信号无参数，处理器保持无参
+        function onCurrentPageChanged() { root.clampPageToProject() }
+        function onCurrentProjectIdChanged() { root.clampPageToProject() }
+    }
+
     // 数据集筛选下拉模型（首项为全部）
     ListModel { id: dsFilterModel }
 
@@ -431,7 +455,9 @@ ApplicationWindow {
                                             width: 18
                                             height: 18
                                             anchors.verticalCenter: parent.verticalCenter
-                                            // 不叠发光，保持清晰锐利
+                                            // Apple 风格：图标单色，仅选中态使用系统蓝
+                                            color: !navDelegate.enabled ? Theme.textDisabled
+                                                  : (appController.currentPage === model.pageId ? Theme.primary : Theme.textSecondary)
                                             glowing: false
                                             opacity: navDelegate.enabled ? 1.0 : 0.45
                                         }
@@ -444,7 +470,7 @@ ApplicationWindow {
                                             font.family: Theme.fontFamily
                                             color: {
                                                 if (!navDelegate.enabled) return Theme.textDisabled
-                                                if (appController.currentPage === model.pageId) return Theme.primaryGlow
+                                                if (appController.currentPage === model.pageId) return Theme.primary
                                                 if (navDelegate.hovered) return Theme.textMain
                                                 return Theme.textSecondary
                                             }
@@ -473,23 +499,13 @@ ApplicationWindow {
                                     }
 
                                     background: Rectangle {
-                                        // 选中用干净实色轻底，禁止 color+gradient 同时设（gradient 会盖掉 color 导致发雾）
+                                        // Apple 分段控件式选中：蓝色淡染胶囊，无下划线
+                                        radius: Theme.radiusSmall
                                         color: {
                                             if (!navDelegate.enabled) return "transparent"
                                             if (appController.currentPage === model.pageId)
-                                                return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18)
+                                                return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.16)
                                             return navDelegate.hovered ? Qt.rgba(255, 255, 255, 0.06) : "transparent"
-                                        }
-
-                                        // 激活标签底部指示线
-                                        Rectangle {
-                                            visible: navDelegate.enabled && appController.currentPage === model.pageId
-                                            height: 3
-                                            radius: 1.5
-                                            width: parent.width * 0.72
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                            anchors.bottom: parent.bottom
-                                            color: Theme.primaryGlow
                                         }
                                     }
 
@@ -1115,7 +1131,7 @@ ApplicationWindow {
                 // 右侧：标注进度条 + 百分比（对标参考UI: "标注进度:" + progress bar + percentage）
                 Row {
                     spacing: Theme.spacingSmall
-                    anchors.verticalCenter: parent.verticalCenter
+                    Layout.alignment: Qt.AlignVCenter
 
                     Text {
                         text: "标注进度:"

@@ -1,4 +1,4 @@
-// SectionTitle.qml - 区块标题（青色左边框，对标参考UI）
+// SectionTitle.qml - 区块标题（Apple 风格：中性文字，左侧淡强调条仅作层级提示）
 import QtQuick
 import LabelTorch.Theme
 
@@ -16,8 +16,9 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: 3
         height: parent.height - 4
-        color: Theme.primaryGlow
-        radius: 1
+        color: Theme.primary
+        opacity: 0.55
+        radius: 1.5
     }
 
     Text {
@@ -27,8 +28,8 @@ Item {
         text: root.text
         font.pixelSize: Theme.fontSizeSmall
         font.weight: Font.DemiBold
-        color: Theme.textMuted
-        font.letterSpacing: 0.5
+        color: Theme.textSecondary
+        font.letterSpacing: 0.3
     }
 
     Item {
