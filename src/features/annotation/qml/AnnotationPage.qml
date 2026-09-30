@@ -93,6 +93,10 @@ Item {
         sampleListData = []
         currentSampleIndex = -1
         loadMoreSamples()
+        // 进入页面即选中第一张样本：画布不留白，用户可直接开始标注
+        if (currentSampleIndex === -1 && sampleListData.length > 0) {
+            loadSample(sampleListData[0])
+        }
     }
 
     // P1-22：按游标追加下一批样本（每批 samplePageSize 条）
@@ -1195,7 +1199,7 @@ Item {
                     Rectangle {
                         id: classificationPanel
                         visible: annotationMode === "classify"
-                        anchors.bottom: statusBar.top
+                        anchors.bottom: parent.bottom
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.margins: Theme.spacingNormal
@@ -1346,7 +1350,7 @@ Item {
                     Rectangle {
                         id: anomalyPanel
                         visible: annotationMode === "anomaly"
-                        anchors.bottom: statusBar.top
+                        anchors.bottom: parent.bottom
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.margins: Theme.spacingNormal
@@ -1460,7 +1464,7 @@ Item {
                     Rectangle {
                         id: rotationPanel
                         visible: annotationMode === "detect" && shapeMode === 1
-                        anchors.bottom: statusBar.top
+                        anchors.bottom: parent.bottom
                         anchors.right: parent.right
                         anchors.margins: Theme.spacingNormal
                         width: 200

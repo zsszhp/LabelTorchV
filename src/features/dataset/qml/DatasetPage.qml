@@ -612,6 +612,7 @@ Item {
                         expanded: true
 
                         ColumnLayout {
+                            id: tagsSection
                             anchors.left: parent.left
                             anchors.right: parent.right
                             spacing: Theme.spacingSmall
@@ -678,7 +679,7 @@ Item {
                                 columnSpacing: Theme.spacingTiny
 
                                 Repeater {
-                                    model: displayTags
+                                    model: tagsSection.displayTags
 
                                     Rectangle {
                                         required property var modelData

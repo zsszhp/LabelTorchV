@@ -22,22 +22,26 @@ Item {
     property string currentTaskType: currentProjectId !== "" ? projectService.getTaskType(currentProjectId) : "detect"
     property bool isAnomalyProject: currentTaskType === "anomaly"
     property var environmentInfo: null
+    // 空对象兜底：环境/指标异步返回前为 null，所有读取走安全别名
+    readonly property var envSafe: environmentInfo || {}
+    readonly property var metricsSafe: testMetrics || {}
+    readonly property var confusionSafe: confusionMatrix || {}
     property var availableDeviceOptions: {
         var options = ["auto", "cpu"]
-        var gpuCount = environmentInfo.gpu_count || 0
+        var gpuCount = envSafe.gpu_count || 0
         for (var index = 0; index < gpuCount; ++index) {
             options.push(String(index))
         }
         return options
     }
     property string primaryMetricLabel: isAnomalyProject ? "AUROC" : "mAP50"
-    property real primaryMetricValue: isAnomalyProject ? (testMetrics.auroc || testMetrics.image_auroc || 0) : (testMetrics.mAP50 || 0)
+    property real primaryMetricValue: isAnomalyProject ? (metricsSafe.auroc || metricsSafe.image_auroc || 0) : (metricsSafe.mAP50 || 0)
     property string secondaryMetricLabel: isAnomalyProject ? "像素AUROC" : "mAP50-95"
-    property real secondaryMetricValue: isAnomalyProject ? (testMetrics.pixel_auroc || 0) : (testMetrics["mAP50-95"] || 0)
+    property real secondaryMetricValue: isAnomalyProject ? (metricsSafe.pixel_auroc || 0) : (metricsSafe["mAP50-95"] || 0)
     property string recallLikeLabel: isAnomalyProject ? "图像AUROC" : "召回率"
-    property real recallLikeValue: isAnomalyProject ? (testMetrics.image_auroc || testMetrics.auroc || 0) : (testMetrics.recall || 0)
+    property real recallLikeValue: isAnomalyProject ? (metricsSafe.image_auroc || metricsSafe.auroc || 0) : (metricsSafe.recall || 0)
     property string precisionLikeLabel: isAnomalyProject ? "像素AUROC" : "精确率"
-    property real precisionLikeValue: isAnomalyProject ? (testMetrics.pixel_auroc || 0) : (testMetrics.precision || 0)
+    property real precisionLikeValue: isAnomalyProject ? (metricsSafe.pixel_auroc || 0) : (metricsSafe.precision || 0)
     property string testStatusText: {
         switch (root.testStatus) {
             case "draft": return "草稿"
@@ -61,9 +65,9 @@ Item {
         }
     }
     property string deviceHintText: {
-        var hasCuda = environmentInfo.cuda_available === true
-        var gpuName = environmentInfo.gpu_name || "GPU 信息未知"
-        var gpuMemory = environmentInfo.gpu_memory_total_mb ? ("，显存约 " + environmentInfo.gpu_memory_total_mb + " MB") : ""
+        var hasCuda = envSafe.cuda_available === true
+        var gpuName = envSafe.gpu_name || "GPU 信息未知"
+        var gpuMemory = envSafe.gpu_memory_total_mb ? ("，显存约 " + envSafe.gpu_memory_total_mb + " MB") : ""
         if (deviceCombo.currentText === "cpu") return "当前使用 CPU 评估，耗时会明显增加"
         if (deviceCombo.currentText === "auto") {
             return hasCuda ? ("设备自动选择，当前环境可使用 " + gpuName + gpuMemory) : "设备自动选择，当前环境将回退到 CPU 评估"
@@ -71,20 +75,20 @@ Item {
         return hasCuda ? ("当前优先使用 GPU " + deviceCombo.currentText + "，设备为 " + gpuName + gpuMemory) : ("当前指定 GPU " + deviceCombo.currentText + "，环境未检测到可用 CUDA，评估将回退到 CPU")
     }
     property string environmentSummaryText: {
-        if (Object.keys(environmentInfo).length === 0)
+        if (Object.keys(envSafe).length === 0)
             return "运行环境检测中..."
-        if (environmentInfo.cuda_available === true) {
-            var cudaVer = environmentInfo.torch_cuda || "?"
-            var providerText = environmentInfo.onnxruntime_providers && environmentInfo.onnxruntime_providers.length > 0
-                ? environmentInfo.onnxruntime_providers.join(", ") : "未检测到 ONNX Runtime Provider"
-            return "CUDA " + cudaVer + " | " + (environmentInfo.gpu_name || "GPU 信息未知") + " | ONNX Runtime: " + providerText
+        if (envSafe.cuda_available === true) {
+            var cudaVer = envSafe.torch_cuda || "?"
+            var providerText = envSafe.onnxruntime_providers && envSafe.onnxruntime_providers.length > 0
+                ? envSafe.onnxruntime_providers.join(", ") : "未检测到 ONNX Runtime Provider"
+            return "CUDA " + cudaVer + " | " + (envSafe.gpu_name || "GPU 信息未知") + " | ONNX Runtime: " + providerText
         }
         return "当前未检测到可用 CUDA，评估将使用 CPU 执行"
     }
     property string memorySuggestionText: {
-        if (environmentInfo.cuda_available !== true)
+        if (envSafe.cuda_available !== true)
             return "CPU 路径下建议优先降低批量大小，避免评估耗时过长"
-        var memoryMb = environmentInfo.gpu_memory_total_mb || 0
+        var memoryMb = envSafe.gpu_memory_total_mb || 0
         if (memoryMb > 0 && memoryMb < 8192)
             return "当前显存偏小，建议先用较小 batch 进行评估"
         if (memoryMb > 0 && memoryMb < 12288)
@@ -257,13 +261,13 @@ Item {
             return {"ok": false, "message": "请先选择一个模型版本"}
         if (!snapshotCombo.currentValue)
             return {"ok": false, "message": "请先选择用于测试的数据冻结版"}
-        if (Object.keys(environmentInfo).length === 0)
+        if (Object.keys(envSafe).length === 0)
             return {"ok": false, "message": "运行环境尚未检测完成，请稍后再启动测试"}
-        if (deviceCombo.currentText !== "auto" && deviceCombo.currentText !== "cpu" && environmentInfo.cuda_available !== true)
+        if (deviceCombo.currentText !== "auto" && deviceCombo.currentText !== "cpu" && envSafe.cuda_available !== true)
             return {"ok": false, "message": "当前选择了 GPU 设备，但运行环境未检测到可用 CUDA"}
 
-        var memoryMb = environmentInfo.gpu_memory_total_mb || 0
-        if (environmentInfo.cuda_available === true && memoryMb > 0 && batchSizeStepper.value >= 32 && memoryMb < 8192)
+        var memoryMb = envSafe.gpu_memory_total_mb || 0
+        if (envSafe.cuda_available === true && memoryMb > 0 && batchSizeStepper.value >= 32 && memoryMb < 8192)
             return {"ok": false, "message": "当前显存较小，评估 batch 过高，建议降到 16 或更小"}
 
         return {"ok": true, "message": ""}
@@ -555,7 +559,7 @@ Item {
                             color: Theme.textMain
                         }
 
-                        ComboBox {
+                        LtComboBox {
                             id: taskCombo
                             Layout.preferredWidth: 160
                             Layout.alignment: Qt.AlignVCenter
@@ -682,7 +686,7 @@ Item {
                                         labelWidth: 100
                                         Layout.fillWidth: true
 
-                                        ComboBox {
+                                        LtComboBox {
                                             id: snapshotCombo
                                             model: snapshotModel
                                             textRole: "snapshotId"
@@ -772,7 +776,7 @@ Item {
                                         label: "设备"
                                         labelWidth: 100
                                         Layout.fillWidth: true
-                                        ComboBox {
+                                        LtComboBox {
                                             id: deviceCombo
                                             model: root.availableDeviceOptions
                                             Layout.fillWidth: true
@@ -810,7 +814,7 @@ Item {
                                         label: "测试权重"
                                         labelWidth: 100
                                         Layout.fillWidth: true
-                                        ComboBox {
+                                        LtComboBox {
                                             id: weightCombo
                                             model: ["最佳权重", "最末权重"]
                                             Layout.fillWidth: true
@@ -861,7 +865,7 @@ Item {
                                         label: "输出置信度轮廓"
                                         labelWidth: 100
                                         Layout.fillWidth: true
-                                        ComboBox {
+                                        LtComboBox {
                                             model: ["关闭", "开启"]
                                             Layout.fillWidth: true
                                         }
@@ -918,17 +922,17 @@ Item {
 
                                         // 漏检率
                                         RingProgress {
-                                            value: root.isAnomalyProject ? root.primaryMetricValue * 100 : (1 - (root.testMetrics.recall || 0)) * 100
+                                            value: root.isAnomalyProject ? root.primaryMetricValue * 100 : (1 - (root.metricsSafe.recall || 0)) * 100
                                             ringColor: Theme.danger
-                                            centerText: (root.isAnomalyProject ? root.primaryMetricValue * 100 : (1 - (root.testMetrics.recall || 0)) * 100).toFixed(1) + "%"
+                                            centerText: (root.isAnomalyProject ? root.primaryMetricValue * 100 : (1 - (root.metricsSafe.recall || 0)) * 100).toFixed(1) + "%"
                                             labelText: root.isAnomalyProject ? root.primaryMetricLabel : "漏检率"
                                         }
 
                                         // 误检率
                                         RingProgress {
-                                            value: root.isAnomalyProject ? root.secondaryMetricValue * 100 : (1 - (root.testMetrics.precision || 0)) * 100
+                                            value: root.isAnomalyProject ? root.secondaryMetricValue * 100 : (1 - (root.metricsSafe.precision || 0)) * 100
                                             ringColor: Theme.warning
-                                            centerText: (root.isAnomalyProject ? root.secondaryMetricValue * 100 : (1 - (root.testMetrics.precision || 0)) * 100).toFixed(1) + "%"
+                                            centerText: (root.isAnomalyProject ? root.secondaryMetricValue * 100 : (1 - (root.metricsSafe.precision || 0)) * 100).toFixed(1) + "%"
                                             labelText: root.isAnomalyProject ? root.secondaryMetricLabel : "误检率"
                                         }
                                     }
@@ -946,7 +950,7 @@ Item {
                                         }
 
                                         Text {
-                                            text: ((root.testMetrics.f1 || 0) * 100).toFixed(2) + "%"
+                                            text: ((root.metricsSafe.f1 || 0) * 100).toFixed(2) + "%"
                                             font.pixelSize: Theme.fontSizeNormal
                                             font.family: Theme.fontFamilyMono
                                             font.weight: Font.Bold
@@ -1009,7 +1013,7 @@ Item {
                                             color: Theme.textMuted
                                         }
                                         Text {
-                                            text: (root.isAnomalyProject ? (root.precisionLikeValue * 100) : ((1 - (root.testMetrics.precision || 0)) * 100)).toFixed(2) + "%"
+                                            text: (root.isAnomalyProject ? (root.precisionLikeValue * 100) : ((1 - (root.metricsSafe.precision || 0)) * 100)).toFixed(2) + "%"
                                             font.pixelSize: Theme.fontSizeSmall
                                             font.family: Theme.fontFamilyMono
                                             color: Theme.textMain
@@ -1048,7 +1052,7 @@ Item {
                                             color: Theme.textMuted
                                         }
                                         Text {
-                                            text: root.testMetrics.speed_inference ? root.testMetrics.speed_inference.toFixed(1) + "ms" : "N/A"
+                                            text: root.metricsSafe.speed_inference ? root.metricsSafe.speed_inference.toFixed(1) + "ms" : "N/A"
                                             font.pixelSize: Theme.fontSizeSmall
                                             font.family: Theme.fontFamilyMono
                                             color: Theme.textMain
@@ -1060,7 +1064,7 @@ Item {
                                             color: Theme.textMuted
                                         }
                                         Text {
-                                            text: root.testMetrics.speed_total ? root.testMetrics.speed_total.toFixed(1) + "ms" : "N/A"
+                                            text: root.metricsSafe.speed_total ? root.metricsSafe.speed_total.toFixed(1) + "ms" : "N/A"
                                             font.pixelSize: Theme.fontSizeSmall
                                             font.family: Theme.fontFamilyMono
                                             color: Theme.textMain
@@ -1072,7 +1076,7 @@ Item {
                                             color: Theme.textMuted
                                         }
                                         Text {
-                                            text: root.testMetrics.elapsed_time ? root.testMetrics.elapsed_time : "N/A"
+                                            text: root.metricsSafe.elapsed_time ? root.metricsSafe.elapsed_time : "N/A"
                                             font.pixelSize: Theme.fontSizeSmall
                                             font.family: Theme.fontFamilyMono
                                             color: Theme.textMain
@@ -1385,7 +1389,7 @@ Item {
 
                                                             var w = width
                                                             var h = height
-                                                            var cm = root.confusionMatrix
+                                                            var cm = root.confusionSafe || {}
                                                             var matrix = cm.matrix || []
                                                             var names = cm.names || []
 
@@ -1694,7 +1698,7 @@ Item {
                         color: Theme.textMuted
                     }
                     Text {
-                        text: ((root.testMetrics.precision || 0) * 100).toFixed(2) + "%"
+                        text: ((root.metricsSafe.precision || 0) * 100).toFixed(2) + "%"
                         font.pixelSize: Theme.fontSizeSmall
                         font.family: Theme.fontFamilyMono
                         color: Theme.textMain
@@ -1706,7 +1710,7 @@ Item {
                         color: Theme.textMuted
                     }
                     Text {
-                        text: ((root.testMetrics.recall || 0) * 100).toFixed(2) + "%"
+                        text: ((root.metricsSafe.recall || 0) * 100).toFixed(2) + "%"
                         font.pixelSize: Theme.fontSizeSmall
                         font.family: Theme.fontFamilyMono
                         color: Theme.textMain
@@ -1882,7 +1886,7 @@ Item {
                     color: Theme.textMuted
                 }
 
-                ComboBox {
+                LtComboBox {
                     id: importFormatCombo
                     Layout.fillWidth: true
                     model: [
@@ -1929,7 +1933,7 @@ Item {
                     color: Theme.textMuted
                 }
 
-                ComboBox {
+                LtComboBox {
                     id: importTaskTypeCombo
                     Layout.fillWidth: true
                     model: [
@@ -2140,7 +2144,7 @@ Item {
 
                 model: {
                     // 从混淆矩阵获取类别名
-                    var names = root.confusionMatrix.names || []
+                    var names = (root.confusionSafe && root.confusionSafe.names) || []
                     if (names.length > 0) return names
                     // 从taxonomy获取类别（listTaxonomies 解析项目默认体系，getClasses 取类名）
                     if (root.currentProjectId) {

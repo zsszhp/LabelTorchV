@@ -19,7 +19,8 @@ Popup {
     property int dialogWidth: 480
     property alias content: contentArea.children
     property alias footerContent: footerArea.children
-    default property alias contentData: contentArea.data
+    // 命名避开 Popup.contentData（基类已有同名成员），默认属性子项仍落入内容区
+    default property alias dialogContent: contentArea.data
 
     background: Item {
         // 外层只做阴影容器，圆角由 contentItem 绘制

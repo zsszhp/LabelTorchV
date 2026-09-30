@@ -43,18 +43,20 @@ Item {
     property var ultralyticsModelFamilies: ["yolov5", "yolov8", "yolov8_obb", "yolov8_cls", "yolov10", "yolov11"]
     property var anomalibModelFamilies: ["patchcore", "padim", "efficient_ad", "stfpm"]
     property var environmentInfo: null
+    // 环境异步返回前为 null：所有读取统一走 envSafe，避免 "Cannot read property of null"
+    readonly property var envSafe: environmentInfo || {}
     property var availableDeviceOptions: {
         var options = ["auto", "cpu"]
-        var gpuCount = environmentInfo.gpu_count || 0
+        var gpuCount = envSafe.gpu_count || 0
         for (var index = 0; index < gpuCount; ++index) {
             options.push(String(index))
         }
         return options
     }
     property string deviceHintText: {
-        var hasCuda = environmentInfo.cuda_available === true
-        var gpuName = environmentInfo.gpu_name || "GPU 信息未知"
-        var gpuMemory = environmentInfo.gpu_memory_total_mb ? ("，显存约 " + environmentInfo.gpu_memory_total_mb + " MB") : ""
+        var hasCuda = envSafe.cuda_available === true
+        var gpuName = envSafe.gpu_name || "GPU 信息未知"
+        var gpuMemory = envSafe.gpu_memory_total_mb ? ("，显存约 " + envSafe.gpu_memory_total_mb + " MB") : ""
         if (deviceCombo.currentText === "cpu") return "当前使用 CPU 训练，速度较慢但链路可继续执行"
         if (deviceCombo.currentText === "auto") {
             return hasCuda ? ("设备自动选择，当前环境可使用 " + gpuName + gpuMemory) : "设备自动选择，当前环境将回退到 CPU 训练"
@@ -62,20 +64,20 @@ Item {
         return hasCuda ? ("当前优先使用 GPU " + deviceCombo.currentText + "，设备为 " + gpuName + gpuMemory) : ("当前指定 GPU " + deviceCombo.currentText + "，环境未检测到可用 CUDA，训练将回退到 CPU")
     }
     property string environmentSummaryText: {
-        if (Object.keys(environmentInfo).length === 0)
+        if (Object.keys(envSafe).length === 0)
             return "运行环境检测中..."
-        if (environmentInfo.cuda_available === true) {
-            var cudaVer = environmentInfo.torch_cuda || "?"
-            var providerText = environmentInfo.onnxruntime_providers && environmentInfo.onnxruntime_providers.length > 0
-                ? environmentInfo.onnxruntime_providers.join(", ") : "未检测到 ONNX Runtime Provider"
-            return "CUDA " + cudaVer + " | " + (environmentInfo.gpu_name || "GPU 信息未知") + " | ONNX Runtime: " + providerText
+        if (envSafe.cuda_available === true) {
+            var cudaVer = envSafe.torch_cuda || "?"
+            var providerText = envSafe.onnxruntime_providers && envSafe.onnxruntime_providers.length > 0
+                ? envSafe.onnxruntime_providers.join(", ") : "未检测到 ONNX Runtime Provider"
+            return "CUDA " + cudaVer + " | " + (envSafe.gpu_name || "GPU 信息未知") + " | ONNX Runtime: " + providerText
         }
         return "当前未检测到可用 CUDA，训练将使用 CPU 执行"
     }
     property string memorySuggestionText: {
-        if (environmentInfo.cuda_available !== true)
+        if (envSafe.cuda_available !== true)
             return "CPU 路径下建议优先降低图像尺寸与训练轮次"
-        var memoryMb = environmentInfo.gpu_memory_total_mb || 0
+        var memoryMb = envSafe.gpu_memory_total_mb || 0
         if (memoryMb > 0 && memoryMb < 8192)
             return "当前显存偏小，建议优先降低 batch size、图像尺寸或关闭部分增强"
         if (memoryMb > 0 && memoryMb < 12288)
@@ -191,16 +193,16 @@ Item {
     }
 
     function validateTrainingStart() {
-        if (Object.keys(environmentInfo).length === 0) {
+        if (Object.keys(envSafe).length === 0) {
             return {"ok": false, "message": "运行环境尚未检测完成，请稍后再启动训练"}
         }
 
-        if (deviceCombo.currentText !== "auto" && deviceCombo.currentText !== "cpu" && environmentInfo.cuda_available !== true) {
+        if (deviceCombo.currentText !== "auto" && deviceCombo.currentText !== "cpu" && envSafe.cuda_available !== true) {
             return {"ok": false, "message": "当前选择了 GPU 设备，但运行环境未检测到可用 CUDA"}
         }
 
-        var memoryMb = environmentInfo.gpu_memory_total_mb || 0
-        if (environmentInfo.cuda_available === true && memoryMb > 0) {
+        var memoryMb = envSafe.gpu_memory_total_mb || 0
+        if (envSafe.cuda_available === true && memoryMb > 0) {
             if (batchStepper.value >= 16 && memoryMb < 8192) {
                 return {"ok": false, "message": "当前显存较小，batch size 过高，建议降到 8 或更小后再启动"}
             }
@@ -238,8 +240,8 @@ Item {
         clearFieldErrors()
         if (snapshotCombo.currentIndex < 0)
             setFieldError("snapshot", "请选择数据冻结版")
-        if (batchStepper.value >= 16 && environmentInfo && environmentInfo.gpu_memory_total_mb
-                && environmentInfo.gpu_memory_total_mb < 8192)
+        if (batchStepper.value >= 16 && environmentInfo && envSafe.gpu_memory_total_mb
+                && envSafe.gpu_memory_total_mb < 8192)
             setFieldError("batch", "显存不足，batch size 建议降至 8 或更小")
         var keys = Object.keys(fieldErrors)
         return keys.length === 0

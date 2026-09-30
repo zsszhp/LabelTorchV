@@ -42,7 +42,7 @@ Item {
                 font.pixelSize: 13
             }
 
-            ComboBox {
+            LtComboBox {
                 id: datasetCombo
                 Layout.preferredWidth: 240
                 model: datasetModel
@@ -141,7 +141,7 @@ Item {
                 font.pixelSize: 13
             }
 
-            ComboBox {
+            LtComboBox {
                 id: splitStrategyCombo
                 model: ["random", "sequential"]
                 currentIndex: 0

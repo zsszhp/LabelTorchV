@@ -60,6 +60,12 @@ if(WIN32)
     target_compile_definitions(${EXECUTABLE_NAME} PRIVATE NOMINMAX)
     target_compile_options(${EXECUTABLE_NAME} PRIVATE /FS /MP)
 
+    # 版本单一源：以根 CMakeLists project(VERSION) 为准注入 main.cpp
+    target_compile_definitions(${EXECUTABLE_NAME} PRIVATE
+        APP_VERSION_STR="${PROJECT_VERSION}"
+        APP_VERSION_WSTR=L"${PROJECT_VERSION}"
+    )
+
     # Release构建使用WIN32子系统（无控制台窗口），Debug构建保留控制台以便调试
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
         set_target_properties(${EXECUTABLE_NAME} PROPERTIES

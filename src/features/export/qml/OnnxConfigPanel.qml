@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import LabelTorch.Theme
+import LabelTorch.Components
 import QtQuick.Layouts
 
 Rectangle {

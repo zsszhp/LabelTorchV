@@ -20,13 +20,15 @@ Item {
     property bool isAnomalyProject: currentTaskType === "anomaly"
     property string selectedArtifactId: ""
     property var selectedArtifactDetails: null
+    // 空对象兜底：产物详情异步返回前为 null，读取统一走安全别名
+    readonly property var artifactSafe: selectedArtifactDetails || {}
     property var parsedValidationDetails: {
-        if (!selectedArtifactDetails || !selectedArtifactDetails.validationResult)
+        if (!artifactSafe.validationResult)
             return ({})
         try {
-            return JSON.parse(selectedArtifactDetails.validationResult)
+            return JSON.parse(artifactSafe.validationResult)
         } catch (error) {
-            return ({ "rawText": selectedArtifactDetails.validationResult })
+            return ({ "rawText": artifactSafe.validationResult })
         }
     }
 
@@ -438,7 +440,7 @@ Item {
                                     label: "设备"
                                     labelWidth: 100
 
-                                    ComboBox {
+                                    LtComboBox {
                                         id: deviceCombo
                                         // 显示中文设备名，导出时映射回后端设备串
                                         model: ["自动", "CPU", "GPU 0"]
@@ -452,7 +454,7 @@ Item {
                                     label: "测试权重"
                                     labelWidth: 100
 
-                                    ComboBox {
+                                    LtComboBox {
                                         id: weightCombo
                                         model: ["最佳权重", "最末权重"]
                                     }
@@ -463,7 +465,7 @@ Item {
                                     label: "导出格式"
                                     labelWidth: 100
 
-                                    ComboBox {
+                                    LtComboBox {
                                         id: formatCombo
                                         model: root.isAnomalyProject ? ["pt", "onnx"] : ["pt", "onnx"]
                                         currentIndex: 1
@@ -618,16 +620,16 @@ Item {
                                         font.pixelSize: Theme.fontSizeNormal
                                         font.weight: Font.DemiBold
                                         font.family: Theme.fontFamily
-                                        color: btnDisabled ? Theme.textDisabled : "#FFFFFF"
+                                        color: exportBtnRect.btnDisabled ? Theme.textDisabled : "#FFFFFF"
                                     }
 
                                     MouseArea {
                                         id: exportBtnMouse
                                         anchors.fill: parent
                                         hoverEnabled: true
-                                        cursorShape: btnDisabled ? Qt.ForbiddenCursor : Qt.PointingHandCursor
+                                        cursorShape: exportBtnRect.btnDisabled ? Qt.ForbiddenCursor : Qt.PointingHandCursor
                                         onClicked: {
-                                            if (btnDisabled) return
+                                            if (exportBtnRect.btnDisabled) return
                                             root.startExportWithValidation()
                                         }
                                     }
@@ -686,7 +688,7 @@ Item {
                                         color: Theme.textMuted
                                     }
 
-                                    ComboBox {
+                                    LtComboBox {
                                         id: reportTypeCombo
                                         Layout.fillWidth: true
                                         model: ["训练报告", "评估报告", "对比报告"]
@@ -726,7 +728,7 @@ Item {
                                             var reportData = {
                                                 "modelVersion": root.selectedVersionId,
                                                 "exportFormat": formatCombo.currentText,
-                                                "validationResult": root.selectedArtifactDetails.validationResult || "未验证"
+                                                "validationResult": root.artifactSafe.validationResult || "未验证"
                                             }
                                             var reportJson = JSON.stringify(reportData)
                                             var reportPath = exportService.exportReport(
@@ -1082,7 +1084,7 @@ Item {
                                                 }
 
                                                 Text {
-                                                    text: selectedArtifactDetails.format ? selectedArtifactDetails.format.toUpperCase() : "N/A"
+                                                    text: artifactSafe.format ? artifactSafe.format.toUpperCase() : "N/A"
                                                     font.pixelSize: Theme.fontSizeCaption
                                                     font.family: Theme.fontFamilyMono
                                                     color: Theme.textMuted
@@ -1090,8 +1092,8 @@ Item {
                                             }
 
                                             Text {
-                                                visible: !!selectedArtifactDetails.outputPath
-                                                text: "产物路径：" + selectedArtifactDetails.outputPath
+                                                visible: !!artifactSafe.outputPath
+                                                text: "产物路径：" + artifactSafe.outputPath
                                                 wrapMode: Text.WrapAnywhere
                                                 font.pixelSize: Theme.fontSizeCaption
                                                 font.family: Theme.fontFamilyMono

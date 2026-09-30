@@ -1165,7 +1165,10 @@ Rectangle {
                     to: 90
                     value: 80
                     stepSize: 5
-                    suffix: "%"
+                    // Quick Controls SpinBox 无 suffix 属性，用 textFromValue 追加百分号
+                    textFromValue: function(value, locale) {
+                        return value + " %"
+                    }
 
                     palette.base: Theme.bgInput
                     palette.text: Theme.textMain

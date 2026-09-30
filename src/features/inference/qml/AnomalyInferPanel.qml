@@ -239,9 +239,11 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.minimumHeight: 300
+            // NG 告警闪烁开关（边框红/透明交替），由下方动画驱动
+            property bool ngFlash: false
             color: Theme.bgSide
             radius: Theme.radiusNormal
-            border.color: root.isAnomalous === 1 ? (root.ngFlash ? Theme.danger : "transparent") : Theme.borderColor
+            border.color: root.isAnomalous === 1 ? (imageArea.ngFlash ? Theme.danger : "transparent") : Theme.borderColor
             border.width: root.isAnomalous === 1 ? 3 : 1
 
             // NG 闪烁动画

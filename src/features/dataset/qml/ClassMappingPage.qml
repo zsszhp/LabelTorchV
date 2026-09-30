@@ -24,7 +24,8 @@ Item {
         datasetModel.refresh()
         if (datasetCombo && datasetCombo.count > 0) {
             datasetCombo.currentIndex = 0
-            root.currentDatasetId = datasetCombo.currentValue
+            // currentIndex 刚设置时 currentValue 可能尚未就绪（undefined），兜底空串
+            root.currentDatasetId = datasetCombo.currentValue || ""
             root.loadSourceClasses()
             root.loadTargetClasses()
             root.mappingRules = root.generateMappingSuggestions()

@@ -316,7 +316,7 @@ int main(int argc, char *argv[])
 {
 #ifdef Q_OS_WIN
     // 强制设置 AppUserModelID 保证在 VS2026 Debug 模式（控制台子系统）下也能正常显示窗口/任务栏图标
-    SetCurrentProcessExplicitAppUserModelID(L"LabelTorch.LabelTorch.0.1.0");
+    SetCurrentProcessExplicitAppUserModelID(L"LabelTorch.LabelTorch." APP_VERSION_WSTR);
 #endif
 
 #if defined(Q_OS_WIN) && defined(_DEBUG)
@@ -333,7 +333,7 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     app.setOrganizationName("LabelTorch");
     app.setApplicationName("LabelTorch");
-    app.setApplicationVersion("0.1.0");
+    app.setApplicationVersion(APP_VERSION_STR);
 
     // 设置应用图标，任务栏和窗口标题栏显示
     // 使用多尺寸图标确保在不同DPI下都能正确显示
@@ -531,6 +531,30 @@ int main(int argc, char *argv[])
 
     ltInfo(LT_LOG_APP()) << "Loading main QML";
     engine.load(url);
+
+    // 自动化验收钩子（默认无操作，仅本地自动化截图/回归验证用）：
+    //   LT_DEBUG_OPEN_PROJECT=<项目名>  启动后按名称打开项目
+    //   LT_DEBUG_PAGE=<pageId>          启动后切换到指定页面（dataset/check/annotation/...）
+    {
+        const QString autoOpen = qEnvironmentVariable("LT_DEBUG_OPEN_PROJECT");
+        const QString autoPage = qEnvironmentVariable("LT_DEBUG_PAGE");
+        if (!autoOpen.isEmpty()) {
+            const QVariantList all = projectService.listProjects();
+            for (const QVariant &entry : all) {
+                const QVariantMap m = entry.toMap();
+                if (m.value("name").toString() == autoOpen) {
+                    const QString pid = m.value("id").toString();
+                    projectService.openProject(pid);
+                    controller.openProject(pid, autoOpen);
+                    ltInfo(LT_LOG_APP()) << "Auto-opened project for verification:" << autoOpen;
+                    break;
+                }
+            }
+        }
+        if (!autoPage.isEmpty()) {
+            controller.setCurrentPage(autoPage);
+        }
+    }
 
     int ret = app.exec();
     ltInfo(LT_LOG_APP()) << "Application exiting with code" << ret;
