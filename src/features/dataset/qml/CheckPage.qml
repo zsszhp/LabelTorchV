@@ -744,6 +744,13 @@ Item {
                     property var sampleData: modelData
                     property string fileName: sampleData.imagePath ? sampleData.imagePath.split('/').pop().split('\\').pop() : ""
 
+                    // 程度模式：读取样本的分类标注（程度分级存为 classification label）
+                    property int sevClassId: {
+                        if (!severityMode || !sampleData.labelPath) return -1
+                        var labels = annotationService.loadClassificationLabels(sampleData.labelPath || "")
+                        return labels.classId !== undefined ? labels.classId : -1
+                    }
+
                     // 缩略图卡片：黑色背景, borderColor, 6px圆角
                     Rectangle {
                         anchors.fill: parent
@@ -793,7 +800,7 @@ Item {
                             }
                         }
 
-                        // 底部缺陷类别标签：bg rgba(255,23,68,0.8), 2px 4px padding, 3px圆角, 10px字体
+                        // 底部徽章：程度模式显示程度分级（轻微/中等/严重），否则显示缺陷类别
                         Rectangle {
                             anchors.left: parent.left
                             anchors.bottom: parent.bottom
@@ -801,15 +808,22 @@ Item {
                             height: 16
                             width: badgeText.implicitWidth + Theme.spacingNormal
                             radius: Theme.radiusSmall - 1  // 3px
-                            color: sampleData.classIndex !== undefined
-                                   ? Qt.alpha(Theme.classColors[sampleData.classIndex % Theme.classColors.length], 0.85)
-                                   : Qt.alpha(Theme.danger, 0.85)
-                            visible: sampleData.classIndex !== undefined && sampleData.classIndex >= 0
+                            // 程度模式：色块按程度类别的 classIndex 取色
+                            color: severityMode
+                                   ? (sevClassId >= 0 ? Qt.alpha(Theme.classColors[sevClassId % Theme.classColors.length], 0.85)
+                                                      : Qt.alpha(Theme.textMuted, 0.85))
+                                   : (sampleData.classIndex !== undefined
+                                      ? Qt.alpha(Theme.classColors[sampleData.classIndex % Theme.classColors.length], 0.85)
+                                      : Qt.alpha(Theme.danger, 0.85))
+                            visible: severityMode ? true
+                                    : (sampleData.classIndex !== undefined && sampleData.classIndex >= 0)
 
                             Text {
                                 id: badgeText
                                 anchors.centerIn: parent
-                                text: getClassName(sampleData.classIndex || 0)
+                                text: severityMode
+                                      ? (sevClassId >= 0 ? getClassName(sevClassId) : "未标注程度")
+                                      : getClassName(sampleData.classIndex || 0)
                                 font.pixelSize: 10
                                 color: Theme.logoBgText
                             }
