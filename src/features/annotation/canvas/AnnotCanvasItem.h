@@ -140,6 +140,8 @@ private:
 
     HandlePosition hitTestHandle(const QPointF& canvasPos, int row);
     int hitTestAnnotation(const QPointF& canvasPos);
+    /// 顶点编辑：命中选中多边形的顶点索引（未命中返回 -1）
+    int hitTestPolygonVertex(const QPointF& canvasPos, int row) const;
     QVector<QPointF> computeHandlePositions(const QRectF& rect, float angle = 0) const;
 
     void pushUndo();
@@ -178,6 +180,12 @@ private:
     HandlePosition m_dragHandle = NoHandle;
     QPointF m_dragStart;
     float m_dragOrigCx = 0, m_dragOrigCy = 0, m_dragOrigW = 0, m_dragOrigH = 0, m_dragOrigAngle = 0;
+
+    // 顶点编辑（多边形）：>=0 时拖拽的是该行标注的第 m_dragVertexIndex 个顶点
+    int m_dragVertexIndex = -1;
+    // 顶点编辑（多边形）：当前选中的顶点（release 后保留，供 Backspace 删点）
+    int m_selectedVertexRow = -1;
+    int m_selectedVertexIndex = -1;
 
     bool m_isPanning = false;
     QPointF m_panStart;

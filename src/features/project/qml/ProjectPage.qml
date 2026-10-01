@@ -237,50 +237,81 @@ Item {
                                 }
                             }
 
-                            // 类别列表
-                            ListView {
+                            // 类别搜索（类别多时快速定位）
+                            TextField {
+                                id: classFilterField
                                 visible: appController.projectOpen
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: Math.min(contentHeight, 300)
-                                clip: true
-                                model: taxonomyModel
-                                spacing: Theme.spacingTiny
+                                Layout.preferredHeight: 28
+                                placeholderText: "搜索类别…"
+                                placeholderTextColor: Theme.textDisabled
+                                color: Theme.textMain
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.family: Theme.fontFamily
 
-                                delegate: Rectangle {
-                                    width: ListView.view.width
-                                    height: 32
-                                    color: classMouseArea.containsMouse ? Theme.bgHover : "transparent"
+                                background: Rectangle {
+                                    color: Theme.bgInput
                                     radius: Theme.radiusSmall
+                                    border.color: classFilterField.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                                    border.width: 1
+                                }
+                            }
 
-                                    MouseArea {
-                                        id: classMouseArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                    }
+                            // 类别列表（可滚动；ColumnLayout+Repeater 使搜索过滤不留空行）
+                            ScrollView {
+                                visible: appController.projectOpen
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: Math.min(taxListCol.implicitHeight + 6, 300)
+                                clip: true
 
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: Theme.spacingSmall
-                                        anchors.rightMargin: Theme.spacingSmall
-                                        spacing: Theme.spacingSmall
+                                ColumnLayout {
+                                    id: taxListCol
+                                    width: parent.width - 6
+                                    x: 3
+                                    spacing: Theme.spacingTiny
 
-                                        // 类别色块
+                                    Repeater {
+                                        model: taxonomyModel
+
                                         Rectangle {
-                                            width: 14
-                                            height: 14
-                                            radius: 2
-                                            color: Theme.classColors[model.classIndex % Theme.classColors.length]
-                                        }
+                                            width: parent.width
+                                            height: 32
+                                            // 搜索过滤：不匹配的类别从列表隐藏（Layout 跳过不可见项）
+                                            visible: classFilterField.text === ""
+                                                     || model.className.toLowerCase()
+                                                        .indexOf(classFilterField.text.toLowerCase()) >= 0
+                                            color: classMouseArea.containsMouse ? Theme.bgHover : "transparent"
+                                            radius: Theme.radiusSmall
 
-                                        // 类别名称
-                                        Text {
-                                            Layout.fillWidth: true
-                                            text: model.className
-                                            font.pixelSize: Theme.fontSizeSmall
-                                            font.family: Theme.fontFamily
-                                            color: Theme.textMain
-                                            elide: Text.ElideRight
-                                        }
+                                            MouseArea {
+                                                id: classMouseArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                            }
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.leftMargin: Theme.spacingSmall
+                                                anchors.rightMargin: Theme.spacingSmall
+                                                spacing: Theme.spacingSmall
+
+                                                // 类别色块
+                                                Rectangle {
+                                                    width: 14
+                                                    height: 14
+                                                    radius: 2
+                                                    color: Theme.classColors[model.classIndex % Theme.classColors.length]
+                                                }
+
+                                                // 类别名称
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: model.className
+                                                    font.pixelSize: Theme.fontSizeSmall
+                                                    font.family: Theme.fontFamily
+                                                    color: Theme.textMain
+                                                    elide: Text.ElideRight
+                                                }
 
                                         // 重命名按钮
                                         SvgIcon {
@@ -316,10 +347,12 @@ Item {
                                                 hoverEnabled: true
                                                 onClicked: taxonomyModel.removeClass(model.classIndex)
                                             }
-                                        }
-                                    }
-                                }
-                            }
+                                        } // SvgIcon
+                                    } // RowLayout
+                                } // Rectangle
+                                } // Repeater
+                            } // ColumnLayout
+                            } // ScrollView
 
                             // 类别统计
                             Text {

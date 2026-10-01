@@ -654,7 +654,26 @@ Item {
                             }
                         }
 
-                        // 类别列表（对标参考UI：选中项蓝色高亮，未选中暗色卡片）
+                        // 类别搜索（对标 X-AnyLabeling 标签过滤；类别多时刚需）
+                        TextField {
+                            id: classSearchField
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 28
+                            placeholderText: "搜索类别…"
+                            placeholderTextColor: Theme.textDisabled
+                            color: Theme.textMain
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.family: Theme.fontFamily
+
+                            background: Rectangle {
+                                color: Theme.bgInput
+                                radius: Theme.radiusSmall
+                                border.color: classSearchField.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                                border.width: 1
+                            }
+                        }
+
+                        // 类别列表（对标参考UI：选中项蓝色高亮，未选中暗色卡片；随搜索过滤）
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 6
@@ -663,6 +682,10 @@ Item {
                                 model: taxonomyModel
 
                                 Rectangle {
+                                    // 搜索过滤：Layout 会自动跳过不可见项
+                                    visible: classSearchField.text === ""
+                                             || (model.className || ("class_" + model.classIndex))
+                                                .toLowerCase().indexOf(classSearchField.text.toLowerCase()) >= 0
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 32
                                     radius: 4

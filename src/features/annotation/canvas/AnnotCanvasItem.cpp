@@ -261,9 +261,17 @@ void AnnotCanvasItem::drawSingleAnnotation(QPainter* painter, int row)
         if (selected) {
             painter->setPen(QPen(QColor("#FFFFFF"), 1));
             painter->setBrush(color);
-            for (const QVariant &ptVar : pts) {
-                QVariantMap pm = ptVar.toMap();
+            for (int vi = 0; vi < pts.size(); ++vi) {
+                QVariantMap pm = pts[vi].toMap();
                 QPointF canvasPt = imageToCanvas(pm["x"].toFloat(), pm["y"].toFloat());
+                // 当前选中顶点用系统蓝高亮，便于 Backspace 删点前的确认
+                if (vi == m_selectedVertexIndex && row == m_selectedVertexRow) {
+                    painter->setBrush(QColor(0x0A, 0x84, 0xFF));
+                    painter->drawRect(QRectF(canvasPt.x() - HANDLE_SIZE / 2 - 1, canvasPt.y() - HANDLE_SIZE / 2 - 1,
+                                             HANDLE_SIZE + 2, HANDLE_SIZE + 2));
+                } else {
+                    painter->setBrush(color);
+                }
                 painter->drawRect(QRectF(canvasPt.x() - HANDLE_SIZE / 2, canvasPt.y() - HANDLE_SIZE / 2,
                                          HANDLE_SIZE, HANDLE_SIZE));
             }
@@ -457,6 +465,23 @@ AnnotCanvasItem::HandlePosition AnnotCanvasItem::hitTestHandle(const QPointF& ca
     return NoHandle;
 }
 
+int AnnotCanvasItem::hitTestPolygonVertex(const QPointF& canvasPos, int row) const
+{
+    if (!m_model) return -1;
+    QModelIndex idx = m_model->index(row, 0);
+    if (m_model->data(idx, AnnotationModel::ShapeTypeRole).toInt() != 2) return -1;
+    const QVariantList pts = m_model->data(idx, AnnotationModel::PointsRole).toList();
+    for (int i = 0; i < pts.size(); i++) {
+        const QVariantMap pm = pts[i].toMap();
+        QPointF canvasPt = imageToCanvas(pm[QStringLiteral("x")].toFloat(),
+                                         pm[QStringLiteral("y")].toFloat());
+        qreal dx = canvasPos.x() - canvasPt.x();
+        qreal dy = canvasPos.y() - canvasPt.y();
+        if (dx * dx + dy * dy <= HANDLE_SIZE * HANDLE_SIZE * 2.0) return i;
+    }
+    return -1;
+}
+
 int AnnotCanvasItem::hitTestAnnotation(const QPointF& canvasPos)
 {
     if (!m_model) return -1;
@@ -581,6 +606,27 @@ void AnnotCanvasItem::mousePressEvent(QMouseEvent* event)
             return;
         }
 
+        // 顶点编辑：优先命中选中多边形的顶点（对标 X-AnyLabeling 顶点拖拽）
+        for (int i = 0; i < (m_model ? m_model->rowCount() : 0); i++) {
+            QModelIndex idx = m_model->index(i, 0);
+            if (m_model->data(idx, AnnotationModel::IsSelectedRole).toBool()) {
+                int vIdx = hitTestPolygonVertex(pos, i);
+                if (vIdx >= 0) {
+                    pushUndo();
+                    m_isDragging = true;
+                    m_dragAnnotationRow = i;
+                    m_dragHandle = NoHandle;
+                    m_dragVertexIndex = vIdx;
+                    m_selectedVertexRow = i;
+                    m_selectedVertexIndex = vIdx;
+                    m_dragStart = pos;
+                    event->accept();
+                    update();
+                    return;
+                }
+            }
+        }
+
         for (int i = 0; i < (m_model ? m_model->rowCount() : 0); i++) {
             QModelIndex idx = m_model->index(i, 0);
             if (m_model->data(idx, AnnotationModel::IsSelectedRole).toBool()) {
@@ -590,6 +636,7 @@ void AnnotCanvasItem::mousePressEvent(QMouseEvent* event)
                     m_isDragging = true;
                     m_dragAnnotationRow = i;
                     m_dragHandle = hp;
+                    m_dragVertexIndex = -1;
                     m_dragStart = pos;
                     m_dragOrigCx = m_model->data(idx, AnnotationModel::CxRole).toFloat();
                     m_dragOrigCy = m_model->data(idx, AnnotationModel::CyRole).toFloat();
@@ -620,6 +667,7 @@ void AnnotCanvasItem::mousePressEvent(QMouseEvent* event)
             m_isDragging = true;
             m_dragAnnotationRow = hitRow;
             m_dragHandle = NoHandle;
+            m_dragVertexIndex = -1;
             m_dragStart = pos;
             QModelIndex idx = m_model->index(hitRow, 0);
             m_dragOrigCx = m_model->data(idx, AnnotationModel::CxRole).toFloat();
@@ -680,6 +728,19 @@ void AnnotCanvasItem::mouseMoveEvent(QMouseEvent* event)
     }
 
     if (m_isDragging && m_model && m_controller) {
+        // 顶点拖拽：直接更新该顶点的图像坐标（模型内部重算外接框并刷新行）
+        if (m_dragVertexIndex >= 0 && m_dragAnnotationRow >= 0) {
+            QPointF img = canvasToImage(pos.x(), pos.y());
+            float nx = qBound(0.0f, float(img.x()), 1.0f);
+            float ny = qBound(0.0f, float(img.y()), 1.0f);
+            m_model->updatePolygonPoint(m_dragAnnotationRow, m_dragVertexIndex, nx, ny);
+            if (m_controller) m_controller->markDirty();
+            emit annotationModified();
+            update();
+            event->accept();
+            return;
+        }
+
         QModelIndex idx = m_model->index(m_dragAnnotationRow, 0);
         qreal z = m_controller->zoom();
 
@@ -847,6 +908,7 @@ void AnnotCanvasItem::mouseReleaseEvent(QMouseEvent* event)
         m_isDragging = false;
         m_dragAnnotationRow = -1;
         m_dragHandle = NoHandle;
+        m_dragVertexIndex = -1;
         event->accept();
         return;
     }
@@ -956,6 +1018,22 @@ void AnnotCanvasItem::keyPressEvent(QKeyEvent* event)
                 m_isDrawingPolygon = false;
                 if (m_controller) m_controller->setPolygonDrawing(false);
             }
+            update();
+        } else if (m_selectedVertexIndex >= 0 && m_selectedVertexRow >= 0 && m_model) {
+            // 编辑态删点：选中顶点后按 Backspace 删除该顶点，
+            // 仅当剩余点数 > 3（保持多边形语义，对标 X-AnyLabeling）
+            QModelIndex vIdx = m_model->index(m_selectedVertexRow, 0);
+            if (m_model->data(vIdx, AnnotationModel::ShapeTypeRole).toInt() == 2) {
+                const QVariantList pts = m_model->data(vIdx, AnnotationModel::PointsRole).toList();
+                if (m_selectedVertexIndex < pts.size() && pts.size() > 3) {
+                    pushUndo();
+                    m_model->removePolygonPoint(m_selectedVertexRow, m_selectedVertexIndex);
+                    if (m_controller) m_controller->markDirty();
+                    emit annotationModified();
+                }
+            }
+            m_selectedVertexIndex = -1;
+            m_selectedVertexRow = -1;
             update();
         } else {
             deleteSelected();
@@ -1271,7 +1349,16 @@ void AnnotCanvasItem::copySelected()
             snap.h = m_model->data(idx, AnnotationModel::HRole).toFloat();
             snap.angle = m_model->data(idx, AnnotationModel::AngleRole).toFloat();
             snap.isSelected = false;
-            snap.shapeType = 0;
+            // 保留真实形状类型与多边形顶点（否则多边形复制后退化成水平框）
+            snap.shapeType = m_model->data(idx, AnnotationModel::ShapeTypeRole).toInt();
+            if (snap.shapeType == 2) {
+                const QVariantList pts = m_model->data(idx, AnnotationModel::PointsRole).toList();
+                for (const auto &pv : pts) {
+                    const QVariantMap pm = pv.toMap();
+                    snap.polygonPoints.append(QPointF(pm[QStringLiteral("x")].toFloat(),
+                                                      pm[QStringLiteral("y")].toFloat()));
+                }
+            }
             m_clipboard.append(snap);
         }
     }
@@ -1286,12 +1373,21 @@ void AnnotCanvasItem::pasteClipboard()
     }
     qreal offset = 5.0 / (m_imageWidth > 0 ? m_imageWidth * (m_controller ? m_controller->zoom() : 1.0) : 1.0);
     for (const auto& snap : m_clipboard) {
-        float newCx = qMin(1.0f - snap.w / 2.0f, snap.cx + offset);
-        float newCy = qMin(1.0f - snap.h / 2.0f, snap.cy + offset);
-        if (snap.angle != 0 || m_shapeMode == 1) {
-            m_model->addOBBAnnotation(snap.classIndex, snap.className, newCx, newCy, snap.w, snap.h, snap.angle);
+        if (snap.shapeType == 2 && !snap.polygonPoints.isEmpty()) {
+            QVector<QPointF> shifted;
+            for (const auto &pt : snap.polygonPoints) {
+                shifted.append(QPointF(qMin(1.0f, qMax(0.0f, float(pt.x() + offset))),
+                                       qMin(1.0f, qMax(0.0f, float(pt.y() + offset)))));
+            }
+            m_model->addPolygonAnnotation(snap.classIndex, snap.className, shifted);
         } else {
-            m_model->addAnnotation(snap.classIndex, snap.className, newCx, newCy, snap.w, snap.h);
+            float newCx = qMin(1.0f - snap.w / 2.0f, snap.cx + offset);
+            float newCy = qMin(1.0f - snap.h / 2.0f, snap.cy + offset);
+            if (snap.angle != 0 || m_shapeMode == 1) {
+                m_model->addOBBAnnotation(snap.classIndex, snap.className, newCx, newCy, snap.w, snap.h, snap.angle);
+            } else {
+                m_model->addAnnotation(snap.classIndex, snap.className, newCx, newCy, snap.w, snap.h);
+            }
         }
         m_model->setSelected(m_model->rowCount() - 1, true);
     }
@@ -1317,19 +1413,37 @@ void AnnotCanvasItem::duplicateSelected()
             snap.h = m_model->data(idx, AnnotationModel::HRole).toFloat();
             snap.angle = m_model->data(idx, AnnotationModel::AngleRole).toFloat();
             snap.isSelected = false;
-            snap.shapeType = 0;
+            // 保留真实形状类型与多边形顶点（同 copySelected）
+            snap.shapeType = m_model->data(idx, AnnotationModel::ShapeTypeRole).toInt();
+            if (snap.shapeType == 2) {
+                const QVariantList pts = m_model->data(idx, AnnotationModel::PointsRole).toList();
+                for (const auto &pv : pts) {
+                    const QVariantMap pm = pv.toMap();
+                    snap.polygonPoints.append(QPointF(pm[QStringLiteral("x")].toFloat(),
+                                                      pm[QStringLiteral("y")].toFloat()));
+                }
+            }
             toDuplicate.append(snap);
         }
         m_model->setSelected(i, false);
     }
     qreal offset = 2.0 / (m_imageWidth > 0 ? m_imageWidth * (m_controller ? m_controller->zoom() : 1.0) : 1.0);
     for (const auto& snap : toDuplicate) {
-        float newCx = qMin(1.0f - snap.w / 2.0f, snap.cx + offset);
-        float newCy = qMin(1.0f - snap.h / 2.0f, snap.cy + offset);
-        if (snap.angle != 0 || m_shapeMode == 1) {
-            m_model->addOBBAnnotation(snap.classIndex, snap.className, newCx, newCy, snap.w, snap.h, snap.angle);
+        if (snap.shapeType == 2 && !snap.polygonPoints.isEmpty()) {
+            QVector<QPointF> shifted;
+            for (const auto &pt : snap.polygonPoints) {
+                shifted.append(QPointF(qMin(1.0f, qMax(0.0f, float(pt.x() + offset))),
+                                       qMin(1.0f, qMax(0.0f, float(pt.y() + offset)))));
+            }
+            m_model->addPolygonAnnotation(snap.classIndex, snap.className, shifted);
         } else {
-            m_model->addAnnotation(snap.classIndex, snap.className, newCx, newCy, snap.w, snap.h);
+            float newCx = qMin(1.0f - snap.w / 2.0f, snap.cx + offset);
+            float newCy = qMin(1.0f - snap.h / 2.0f, snap.cy + offset);
+            if (snap.angle != 0 || m_shapeMode == 1) {
+                m_model->addOBBAnnotation(snap.classIndex, snap.className, newCx, newCy, snap.w, snap.h, snap.angle);
+            } else {
+                m_model->addAnnotation(snap.classIndex, snap.className, newCx, newCy, snap.w, snap.h);
+            }
         }
         m_model->setSelected(m_model->rowCount() - 1, true);
     }
