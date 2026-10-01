@@ -13,6 +13,9 @@ Item {
     id: root
 
     // === 属性 ===
+    // 注意：canvasItem 的 controller/annotationModel 属性名与 C++ 注入的 context property
+    // 同名，QML 绑定若写成无限定形式会自引用（解析到对象自身 → 恒 null → 画框永不入库）。
+    // 修复方式见下方 canvasItem：通过 StackLayout 容器的 id 限定引用（Main.qml 的 contentStack）。
     property int shapeMode: 0          // 0=HBB, 1=OBB, 2=Polygon
     property string annotationMode: "detect"  // detect / classify / anomaly
     property int selectedClassId: -1
@@ -1102,8 +1105,11 @@ Item {
                     AnnotCanvasItem {
                         id: canvasItem
                         anchors.fill: parent
-                        controller: canvasController
-                        annotationModel: annotationModel
+                        // controller/annotationModel 是 AnnotCanvasItem 自身属性名，无限定绑定
+                        // 会自引用（解析到对象自身 → 恒 null → 画框永不入库）。
+                        // 用 main.cpp 注入的同对象别名 context property（零歧义）。
+                        controller: canvasControllerCtx
+                        annotationModel: annotModelCanvas
                         // 绑定到 root：禁止在其他地方命令式赋值，否则绑定被替换后工具栏失灵
                         shapeMode: root.shapeMode
                         currentClassIndex: selectedClassId >= 0 ? selectedClassId : 0

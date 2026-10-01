@@ -485,6 +485,10 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("annotationService", &annotationService);
     engine.rootContext()->setContextProperty("annotationModel", &annotationModel);
     engine.rootContext()->setContextProperty("canvasController", &canvasController);
+    // 专供 AnnotCanvasItem 绑定的别名：canvas 的 controller/annotationModel 属性名与
+    // 上述 context property 同名，无限定绑定会自引用（解析到对象自身 → 恒 null → 画框不入库）
+    engine.rootContext()->setContextProperty("canvasControllerCtx", &canvasController);
+    engine.rootContext()->setContextProperty("annotModelCanvas", &annotationModel);
     engine.rootContext()->setContextProperty("thumbnailGenerator", &thumbnailGenerator);
     engine.rootContext()->setContextProperty("thumbnailCache", &thumbnailCache);
     engine.rootContext()->setContextProperty("ipcClient", &ipcClient);

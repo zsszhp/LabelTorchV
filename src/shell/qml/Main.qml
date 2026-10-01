@@ -1044,6 +1044,25 @@ ApplicationWindow {
                     if (loader && !loader.source.toString() && !loadedFlags[currentIndex] && pageSources[currentIndex]) {
                         loader.source = pageSources[currentIndex]
                         loadedFlags[currentIndex] = true
+                        console.warn("LOADER set source:", pageSources[currentIndex])
+                    }
+                }
+            }
+
+            // 组件加载状态诊断：异步 Loader 静默失败时，从日志直接看到错误详情
+            Component.onCompleted: {
+                for (var i = 0; i < count; i++) {
+                    var loader = itemAt(i)
+                    if (loader) {
+                        (function(ld) {
+                            ld.statusChanged.connect(function() {
+                                if (ld.status === Loader.Error) {
+                                    console.warn("PAGE LOAD FAILED:", ld.source)
+                                } else if (ld.status === Loader.Ready) {
+                                    console.warn("PAGE LOADED:", ld.source)
+                                }
+                            })
+                        })(loader)
                     }
                 }
             }
@@ -1055,43 +1074,43 @@ ApplicationWindow {
                 source: contentStack.pageSources[0]
             }
             Loader {
-                asynchronous: true
+                asynchronous: false
             }
             Loader {
-                asynchronous: true
+                asynchronous: false
             }
             Loader {
-                asynchronous: true
+                asynchronous: false
             }
             Loader {
-                asynchronous: true
+                asynchronous: false
             }
             Loader {
-                asynchronous: true
+                asynchronous: false
             }
             Loader {
-                asynchronous: true
+                asynchronous: false
             }
             Loader {
-                asynchronous: true
+                asynchronous: false
             }
             Loader {
-                asynchronous: true
+                asynchronous: false
             }
             Loader {
-                asynchronous: true
+                asynchronous: false
             }
             Loader {
-                asynchronous: true
+                asynchronous: false
             }
             Loader {
-                asynchronous: true
+                asynchronous: false
             }
             Loader {
-                asynchronous: true
+                asynchronous: false
             }
             Loader {
-                asynchronous: true
+                asynchronous: false
             }
         }
 
