@@ -88,12 +88,24 @@ Item {
             cursors.push({ dsId: ds.id, name: ds.name, offset: 0 })
             total += annotationService.countSamples(ds.id)
         }
+        // 记住当前样本（按图片路径），刷新后尽量保持选中——
+        // 避免标注途中刷新把正在编辑的模型清空重载
+        var currentImagePath = currentSampleIndex >= 0 && currentSampleIndex < sampleListData.length
+                               ? sampleListData[currentSampleIndex].imagePath : ""
         sampleLoadCursors = cursors
         sampleTotalCount = total
         sampleListData = []
         currentSampleIndex = -1
         loadMoreSamples()
-        // 进入页面即选中第一张样本：画布不留白，用户可直接开始标注
+        // 优先恢复之前的样本；确实不在列表中才回退到第一张
+        if (currentImagePath !== "") {
+            for (var i = 0; i < sampleListData.length; i++) {
+                if (sampleListData[i].imagePath === currentImagePath) {
+                    currentSampleIndex = i
+                    break
+                }
+            }
+        }
         if (currentSampleIndex === -1 && sampleListData.length > 0) {
             loadSample(sampleListData[0])
         }
@@ -158,6 +170,12 @@ Item {
 
     // === 加载样本 ===
     function loadSample(sampleData) {
+        // 同图短路：刷新场景下若目标就是当前正在编辑的样本，
+        // 只更新索引，不重载标签（避免把未保存/已保存的模型清空重入）
+        if (currentSampleIndex >= 0 && currentSampleIndex < sampleListData.length
+            && sampleListData[currentSampleIndex].imagePath === sampleData.imagePath) {
+            return
+        }
         // 切样本前先静默落盘，避免上一张的标注丢失
         flushPendingSave()
         if (annotationMode === "classify") {

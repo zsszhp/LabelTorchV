@@ -26,6 +26,41 @@ QVector<AxisAlignedBox> YoloTxtReader::read(const QString &filePath)
         return result;
     }
 
+    // 格式自适应：shapeType 只是调用方的提示。若文件实际是 OBB（9 字段）格式
+    // （如 OBB 项目中误以 HBB 模式重载），按 OBB 解析而不是整文件解析成 0 条——
+    // 否则任何重载（刷新/切工具）都会把已有标注清空
+    {
+        bool probed = false;
+        QTextStream probe(&file);
+        while (!probe.atEnd() && !probed) {
+            const QString line = probe.readLine().trimmed();
+            if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
+                continue;
+            const QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+            if (parts.size() == 9) {
+                file.close();
+                QVector<AxisAlignedBox> converted;
+                const QVector<RotatedBox> obb = readOBB(filePath);
+                for (const auto &rb : obb) {
+                    // OBB → 其外接 HBB（信息不丢：OBB 项目正常流程会按 shapeType=1 重新载入）
+                    AxisAlignedBox box;
+                    box.id = rb.id;
+                    box.classIndex = rb.classIndex;
+                    box.cx = rb.cx;
+                    box.cy = rb.cy;
+                    box.w = rb.w;
+                    box.h = rb.h;
+                    converted.append(box);
+                }
+                ltInfo(LT_LOG_ANNOTATION()) << "HBB read: OBB-format file detected (" << obb.size()
+                                            << " boxes), parsed as OBB:" << filePath;
+                return converted;
+            }
+            probed = true;
+        }
+        file.seek(0);
+    }
+
     QTextStream in(&file);
     while (!in.atEnd()) {
         QString line = in.readLine().trimmed();
