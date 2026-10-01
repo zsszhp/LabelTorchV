@@ -138,8 +138,21 @@ async def handle_infer(payload: dict) -> dict:
     try:
         from anomalib.models import get_model
 
-        # 加载模型
-        model = get_model(model_family)
+        # 加载模型：
+        # - .ckpt 优先按「落盘路径推导模型族 + hyper_parameters + state_dict」重建——
+        #   anomalib ckpt 保存的是抽象基类 AnomalibModule，load_from_checkpoint 无法实例化；
+        #   且 payload 未传 model_family 时默认值会错配（PatchCore ckpt 被建成 EfficientAd）
+        # - torch.load 显式 weights_only=False：路径已白名单校验（项目内训练产物），
+        #   PyTorch 2.6 起默认 weights_only=True 会拒绝 anomalib 全局对象
+        model = None
+        if str(checked_weight).endswith(".ckpt"):
+            try:
+                model = _rebuild_model_from_checkpoint(str(checked_weight))
+                logger.info("Anomaly model rebuilt from checkpoint: %s", checked_weight)
+            except Exception as e:
+                logger.warning("checkpoint rebuild failed: %s, falling back to model_family option", e)
+        if model is None:
+            model = get_model(model_family)
 
         # 创建Engine用于推理（anomalib 2.4.2: Engine 只接受 callbacks/logger/default_root_dir/**kwargs，
         # **kwargs 透传给 Lightning Trainer，如 accelerator 等，
@@ -392,3 +405,48 @@ def _save_anomaly_map(anomaly_map, image_path: str, heatmap_dir: str = "", write
     except Exception as e:
         logger.warning(f"Failed to save anomaly map: {e}")
         return ""
+
+
+def _rebuild_model_from_checkpoint(weight_path: str):
+    """从 anomalib ckpt 重建模型实例（推理/检测路径用）。
+
+    anomalib 的 LightningModule.load_from_checkpoint 不可用：ckpt 保存的是抽象基类
+    AnomalibModule（无法实例化）。因此按「落盘路径推导模型族 + hyper_parameters +
+    state_dict」重建——与 anomalib_adapter._rebuild_model_from_checkpoint 同一方案。
+    """
+    import os
+    import torch
+    from anomalib.models import get_model
+
+    parts = [p.lower().replace("_", "")
+             for p in os.path.normpath(weight_path).replace("\\", "/").split("/")]
+    known = ("patchcore", "padim", "efficientad", "stfpm", "fastflow", "dfkde", "dfm",
+             "reversedistillation", "draem", "cflow", "csflow", "ganomaly", "supersimplenet", "winclip")
+    alias = {"efficientad": "efficient_ad", "reversedistillation": "reverse_distillation"}
+    family = None
+    for p in parts:
+        for name in known:
+            if p == name.replace("_", ""):
+                family = alias.get(name, name)
+                break
+        if family:
+            break
+
+    checkpoint = torch.load(weight_path, map_location="cpu", weights_only=False)
+    state_dict = checkpoint.get("state_dict") if isinstance(checkpoint, dict) else None
+    hp = checkpoint.get("hyper_parameters", {}) if isinstance(checkpoint, dict) else {}
+    hparams = {k: hp[k] for k in ("backbone", "layers", "pre_trained",
+                                  "coreset_sampling_ratio", "num_neighbors") if k in hp}
+
+    try:
+        model = get_model(family or "patchcore", **hparams)
+    except Exception as e:
+        logger.warning("get_model(%s, **hparams) failed: %s, trying plain get_model", family, e)
+        model = get_model(family or "patchcore")
+    if state_dict is not None:
+        try:
+            model.load_state_dict(state_dict)
+        except Exception as e:
+            logger.warning("strict load_state_dict failed: %s, retrying non-strict", e)
+            model.load_state_dict(state_dict, strict=False)
+    return model

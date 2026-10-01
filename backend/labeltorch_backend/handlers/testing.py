@@ -577,17 +577,26 @@ async def _run_ultralytics_testing(weight_path: str, data_path: str, config: dic
     confusion_matrix = {}
     pr_curve = []
 
-    if hasattr(results, "box") and results.box:
-        def _safe_float(value, default=0.0):
-            try:
-                if value is None:
-                    return default
-                if hasattr(value, "mean"):
-                    return float(value.mean())
-                return float(value)
-            except (TypeError, ValueError):
+    def _safe_float(value, default=0.0):
+        try:
+            if value is None:
                 return default
+            if hasattr(value, "mean"):
+                return float(value.mean())
+            return float(value)
+        except (TypeError, ValueError):
+            return default
 
+    if hasattr(results, "top1"):
+        # 分类任务：val 结果无 box 属性，准确率在 top1/top2
+        metrics = {
+            "top1": _safe_float(results.top1),
+            "top2": _safe_float(getattr(results, "top2", 0.0)),
+            # 主指标位别名：UI 主指标卡读 mAP50，分类任务展示 Top-1 值
+            "mAP50": _safe_float(results.top1),
+        }
+
+    if hasattr(results, "box") and results.box:
         metrics = {
             "mAP50": _safe_float(results.box.map50),
             "mAP50-95": _safe_float(results.box.map),

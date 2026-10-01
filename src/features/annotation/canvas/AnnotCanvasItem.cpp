@@ -863,6 +863,12 @@ void AnnotCanvasItem::mouseDoubleClickEvent(QMouseEvent* event)
 
 void AnnotCanvasItem::mouseReleaseEvent(QMouseEvent* event)
 {
+    ltDebug(LT_LOG_ANNOTATION()) << "mouseRelease: isPanning=" << m_isPanning
+        << " isDrawing=" << m_isDrawing << " isDragging=" << m_isDragging
+        << " isDrawingPolygon=" << m_isDrawingPolygon
+        << " button=" << event->button() << " shapeMode=" << m_shapeMode
+        << " interactionMode=" << m_interactionMode;
+
     if (m_isPanning) {
         m_isPanning = false;
         setCursor(m_spaceHeld ? Qt::OpenHandCursor : Qt::ArrowCursor);
@@ -875,6 +881,10 @@ void AnnotCanvasItem::mouseReleaseEvent(QMouseEvent* event)
 
         qreal dx = qAbs(m_drawCurrent.x() - m_drawStart.x());
         qreal dy = qAbs(m_drawCurrent.y() - m_drawStart.y());
+        ltDebug(LT_LOG_ANNOTATION()) << "mouseRelease drawing commit check: dx=" << dx
+            << " dy=" << dy << " MIN_DRAW_SIZE=" << MIN_DRAW_SIZE
+            << " start=(" << m_drawStart.x() << "," << m_drawStart.y() << ")"
+            << " current=(" << m_drawCurrent.x() << "," << m_drawCurrent.y() << ")";
 
         if (dx > MIN_DRAW_SIZE && dy > MIN_DRAW_SIZE && m_model) {
             QPointF imgStart = canvasToImage(qMin(m_drawStart.x(), m_drawCurrent.x()),
@@ -886,6 +896,15 @@ void AnnotCanvasItem::mouseReleaseEvent(QMouseEvent* event)
             float cy = (imgStart.y() + imgEnd.y()) / 2.0f;
             float w = imgEnd.x() - imgStart.x();
             float h = imgEnd.y() - imgStart.y();
+
+            ltDebug(LT_LOG_ANNOTATION()) << "mouseRelease img coords: imgStart=("
+                << imgStart.x() << "," << imgStart.y() << ") imgEnd=("
+                << imgEnd.x() << "," << imgEnd.y() << ") cx=" << cx << " cy=" << cy
+                << " w=" << w << " h=" << h
+                << " imageW=" << m_imageWidth << " imageH=" << m_imageHeight
+                << " zoom=" << (m_controller ? m_controller->zoom() : -1)
+                << " panX=" << (m_controller ? m_controller->panX() : 0)
+                << " panY=" << (m_controller ? m_controller->panY() : 0);
 
             if (w > MIN_ANNOTATION_SIZE && h > MIN_ANNOTATION_SIZE &&
                 cx >= 0 && cy >= 0 && cx <= 1 && cy <= 1) {
