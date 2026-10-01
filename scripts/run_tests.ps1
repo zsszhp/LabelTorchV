@@ -1,24 +1,34 @@
-$env:PATH = "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64;C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64;C:\Qt\6.11.1\msvc2022_64\bin;C:\Qt\Tools\CMake_64\bin;C:\Qt\Tools\Ninja;" + $env:PATH
-$tests = @("test_database", "test_labelio", "test_geometry", "test_ipc", "test_taxonomy", "test_snapshot", "test_training", "test_model", "test_inference", "test_export")
-$passed = 0
-$failed = 0
-$notFound = 0
-foreach ($t in $tests) {
-    $exe = "E:\z\project\my\LabelTorchV\out\build\x64-release\$t.exe"
-    if (Test-Path $exe) {
-        $proc = Start-Process -FilePath $exe -NoNewWindow -Wait -PassThru -RedirectStandardOutput "E:\z\project\my\LabelTorchV\out\build\x64-release\$t.out.txt" -RedirectStandardError "E:\z\project\my\LabelTorchV\out\build\x64-release\$t.err.txt"
-        $summary = Get-Content "E:\z\project\my\LabelTorchV\out\build\x64-release\$t.out.txt" | Select-String "Totals:" | Select-Object -Last 1
-        if ($proc.ExitCode -eq 0) {
-            $passed++
-            Write-Host "$t : PASSED ($summary)"
-        } else {
-            $failed++
-            Write-Host "$t : FAILED (exit=$($proc.ExitCode))"
-        }
+# 运行 C++ 测试套件（仓库相对路径，适配任意盘符/机器）
+# 用法：powershell -File scripts/run_tests.ps1 [-BuildDir out/build/x64-release]
+param(
+    [string]$BuildDir = ""
+)
+
+$repoRoot = Split-Path -Parent $PSScriptRoot
+if (-not $BuildDir) {
+    # 自动探测：优先 x64-release，其次任一含 CTestTestfile.cmake 的构建目录
+    $candidate = Join-Path $repoRoot "out/build/x64-release"
+    if (Test-Path (Join-Path $candidate "CTestTestfile.cmake")) {
+        $BuildDir = $candidate
     } else {
-        $notFound++
-        Write-Host "$t : NOT FOUND"
+        $found = Get-ChildItem -Path (Join-Path $repoRoot "out/build") -Recurse -Filter "CTestTestfile.cmake" -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($found) { $BuildDir = Split-Path -Parent $found.FullName }
     }
 }
-Write-Host ""
-Write-Host "=== Summary: $passed passed, $failed failed, $notFound not found ==="
+
+if (-not $BuildDir -or -not (Test-Path (Join-Path $BuildDir "CTestTestfile.cmake"))) {
+    Write-Host "ERROR: 未找到构建目录（请先 cmake --preset x64-release 或用 -BuildDir 指定）" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "=== C++ 测试 @ $BuildDir ==="
+$env:PATH = "C:\Qt\6.11.1\msvc2022_64\bin;" + $env:PATH
+Push-Location $BuildDir
+try {
+    ctest -C Release --output-on-failure
+    $code = $LASTEXITCODE
+} finally {
+    Pop-Location
+}
+exit $code

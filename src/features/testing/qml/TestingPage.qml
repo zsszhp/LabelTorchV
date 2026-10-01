@@ -638,10 +638,11 @@ Item {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     clip: true
-                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    // 窄窗口时允许横向滚动，避免右侧「高级测试参数配置」被裁切
+                    ScrollBar.horizontal.policy: ScrollBar.AsNeeded
 
                     ColumnLayout {
-                        width: Math.max(parent ? parent.width : 900, 900)
+                        width: Math.max(parent ? parent.width : 900, contentGrid.implicitWidth + 40)
                         spacing: 12
 
                         anchors.left: parent.left
@@ -663,6 +664,7 @@ Item {
                             expanded: true
 
                             GridLayout {
+                                id: contentGrid
                                 width: parent.width
                                 columns: 3
                                 rowSpacing: Theme.spacingNormal

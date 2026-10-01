@@ -27,8 +27,8 @@ Dialog {
 
     background: Rectangle {
         color: Theme.bgMain
-        radius: 8
-        border.color: Theme.bgHover
+        radius: Theme.radiusLarge
+        border.color: Theme.borderColor
         border.width: 1
     }
 

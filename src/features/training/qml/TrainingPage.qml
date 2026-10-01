@@ -1011,10 +1011,20 @@ Item {
                 Item {
                     id: configPage
 
+                    // 窄窗口防裁切：内容超出可视宽度时可横向滚动
+                    Flickable {
+                        anchors.fill: parent
+                        clip: true
+                        contentWidth: Math.max(width, configGridRow.implicitWidth + Theme.spacingNormal * 2)
+                        contentHeight: height
+                        boundsBehavior: Flickable.StopAtBounds
+
                     // 2x2网格布局
                     RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: Theme.spacingNormal
+                        id: configGridRow
+                        x: Theme.spacingNormal
+                        width: Math.max(parent.width - Theme.spacingNormal * 2, configGridRow.implicitWidth)
+                        height: parent.height
                         spacing: 1
 
                         // 左列
@@ -2097,6 +2107,7 @@ Item {
                             }
                         }
                     }
+                    } // Flickable
                 }
 
                 // ====== 子标签1：实时训练结果 ======
