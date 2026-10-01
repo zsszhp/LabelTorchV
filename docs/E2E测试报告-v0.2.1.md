@@ -114,3 +114,38 @@ set LT_DEBUG_TRAIN_ADAPTER=anomalib
 ```
 
 钩子均为环境变量级，默认无操作，不影响正常使用；证据（日志/DB/截图）留存于 `%AppData%/LabelTorch/` 与本仓库 git 历史。
+
+---
+
+## 六、真实 UI 交互实测（UIA Automation 驱动，2026-10-01 补充）
+
+本轮通过 Windows UI Automation **直接点击真实界面控件**完成链路实测（非钩子），为使控件可达，
+为关键按钮补齐了无障碍名称（导航页签、开始训练、导出模型按钮等）。
+
+### 6.1 UIA 真实点击覆盖矩阵
+
+| 步骤 | 操作方式 | 结果 | 证据 |
+|------|---------|------|------|
+| 导航切页 | UIA Invoke「项目/数据集/标注/训练/测试/导出」ListItem | ✅ | 页面切换日志（AppController::setCurrentPage） |
+| 新建项目 | UIA Invoke「新建项目」→ ValuePattern 填 5 字段 → 点「创建」 | ✅ | DB 新增「UI全链路测试」项目 |
+| 数据导入 | UIA Invoke「导入数据」→ 填路径 → 「分析」→「导入」 | ✅ | 48 样本入库 + AuditLog "imported" |
+| 添加类别 | ValuePattern 填类别名 ×3 → Invoke「+」 | ✅ | taxonomy class_definitions 落库（乱码为测试工具通道编码所致，非应用缺陷） |
+| 创建冻结版对话框 | Invoke「+ 创建冻结版」→ 对话框打开 | ✅ 对话框可达 | UIA 树可见「创建数据冻结版」窗口 |
+| 开始训练按钮 | UIA Invoke「开始训练」 | ✅ 按钮可达可点 | 点击被业务前置条件（未选冻结版）正确禁用 |
+| 导出模型按钮 | UIA Invoke「导出模型」 | ✅ 按钮可达可点 | 同上（未选模型版本时正确禁用） |
+
+### 6.2 真实边界（如实记录）
+
+1. **QML ComboBox 弹出项不暴露 UIA**（ListItems=0）：下拉选择无法自动化——这是产品的**无障碍缺陷**
+   （屏幕阅读器用户同样无法使用），登记 a11y 待办；也导致 UIA 无法完成「选数据集→建冻结版→选冻结版→开训」
+   的下拉链路，该段由 LT_DEBUG 钩子（同一 Service 调用链）完成并已在 S1~S7 五场景验证。
+2. **Canvas 鼠标注入被会话屏蔽**：本自动化会话的 mouse_event 到不了应用（拖动已有框位置不变、
+   绘制无效；键盘 keybd_event 与 UIA 均可达）。拉框标注需人工验证——引擎/自动保存已由
+   ctest（AnnotationAutosaveTest 等）覆盖。
+3. 复盘纠正：此前「拉框成功」结论有误——标签文件中的 3 行是导入自带的生成标签，非绘制产物。
+
+### 6.3 无障碍改进（本轮已落地）
+
+- 导航页签补 `text: model.title`（屏幕阅读器/UIA 可读页签名）
+- 开始训练/导出模型按钮补 `text:` 属性；导出按钮由 Rectangle+MouseArea 重构为真 Button
+  （禁用态/悬停/按下语义完整）

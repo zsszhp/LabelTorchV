@@ -421,6 +421,8 @@ ApplicationWindow {
                                     // 主导航加大间距，与页内筛选条拉开层级
                                     leftPadding: 18
                                     rightPadding: 18
+                                    // 无障碍/UIA 名称（contentItem 为自定义 Row，text 仅作可访问名）
+                                    text: model.title
                                     visible: model.group === groupRow.modelData.key && root.navItemVisible(model)
                                     // 导航解锁：未打开项目也可浏览（页面呈现空态引导）
                                     enabled: true

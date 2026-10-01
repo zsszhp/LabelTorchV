@@ -787,6 +787,8 @@ Item {
                     Layout.preferredHeight: 36
                     enabled: snapshotCombo.currentIndex >= 0 && currentRunStatus !== "running" && currentRunStatus !== "preparing"
                     property bool starting: false
+                    // 无障碍/UIA 名称
+                    text: starting ? "启动中..." : "开始训练"
 
                     background: Rectangle {
                         radius: Theme.radiusSmall

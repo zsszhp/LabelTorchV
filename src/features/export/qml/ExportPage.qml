@@ -586,52 +586,54 @@ Item {
                                     }
                                 }
 
-                                // 导出模型按钮 (btn-secondary)
-                                Rectangle {
+                                // 导出模型按钮（真 Button：无障碍可达，UIA/键盘可操作）
+                                Button {
                                     id: exportBtnRect
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 36
                                     Layout.topMargin: Theme.spacingSmall
-                                    radius: Theme.radiusNormal
                                     // 禁用条件：未选择版本 或 正在导出
-                                    property bool btnDisabled: !root.selectedVersionId || exportStatus === "running"
-                                    color: {
-                                        if (btnDisabled) return Theme.bgCard
-                                        if (exportBtnMouse.pressed) return Qt.darker(Theme.primary, 1.3)
-                                        if (exportBtnMouse.containsMouse) return Qt.lighter(Theme.primary, 1.1)
-                                        return Theme.primary
-                                    }
+                                    readonly property bool btnDisabled: !root.selectedVersionId || exportStatus === "running"
+                                    enabled: !btnDisabled
                                     opacity: exportStatus === "running" ? 0.6 : 1.0
+                                    // 无障碍/UIA 名称
+                                    text: exportStatus === "running" ? "导出中..." : "导出模型"
 
-                                    // 导出中显示进度指示器
-                                    BusyIndicator {
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 12
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        running: exportStatus === "running"
-                                        visible: exportStatus === "running"
-                                        implicitWidth: 18
-                                        implicitHeight: 18
-                                    }
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: exportStatus === "running" ? "导出中..." : "导出模型"
-                                        font.pixelSize: Theme.fontSizeNormal
-                                        font.weight: Font.DemiBold
-                                        font.family: Theme.fontFamily
-                                        color: exportBtnRect.btnDisabled ? Theme.textDisabled : "#FFFFFF"
-                                    }
-
-                                    MouseArea {
-                                        id: exportBtnMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: exportBtnRect.btnDisabled ? Qt.ForbiddenCursor : Qt.PointingHandCursor
-                                        onClicked: {
-                                            if (exportBtnRect.btnDisabled) return
-                                            root.startExportWithValidation()
+                                    background: Rectangle {
+                                        radius: Theme.radiusNormal
+                                        color: {
+                                            if (!exportBtnRect.enabled) return Theme.bgCard
+                                            if (exportBtnRect.pressed) return Qt.darker(Theme.primary, 1.3)
+                                            if (exportBtnRect.hovered) return Qt.lighter(Theme.primary, 1.1)
+                                            return Theme.primary
                                         }
+                                    }
+
+                                    contentItem: RowLayout {
+                                        spacing: Theme.spacingNormal
+
+                                        BusyIndicator {
+                                            Layout.preferredWidth: 16
+                                            Layout.preferredHeight: 16
+                                            running: exportStatus === "running"
+                                            visible: running
+                                        }
+
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: exportBtnRect.text
+                                            font.pixelSize: Theme.fontSizeNormal
+                                            font.weight: Font.DemiBold
+                                            font.family: Theme.fontFamily
+                                            color: exportBtnRect.enabled ? "#FFFFFF" : Theme.textDisabled
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+                                    }
+
+                                    onClicked: {
+                                        if (exportBtnRect.btnDisabled) return
+                                        root.startExportWithValidation()
                                     }
                                 }
 
