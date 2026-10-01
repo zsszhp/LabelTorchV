@@ -24,6 +24,7 @@
 #endif
 
 #include "AppController.h"
+#include "DemoBootstrap.h"
 #include "ProjectService.h"
 #include "ProjectModel.h"
 #include "TaxonomyService.h"
@@ -54,6 +55,7 @@
 #include "TestingService.h"
 #include "TestingModel.h"
 #include "Database.h"
+#include <QSqlQuery>
 #include "ThumbnailGenerator.h"
 #include "cache/ThumbnailCache.h"
 #include "cache/ThumbnailProvider.h"
@@ -381,6 +383,8 @@ int main(int argc, char *argv[])
     TagService tagService;       // A6：数据集标签服务
     TagModel tagModel;           // A6：标签列表模型
     tagModel.setTagService(&tagService);
+    DemoBootstrap demoBootstrap; // 演示模式：示例项目引导
+    demoBootstrap.setServices(&projectService, &taxonomyService, &datasetService, &tagService);
     ClassMappingService classMappingService;
     AnnotationService annotationService;
     AnnotationModel annotationModel;
@@ -468,6 +472,7 @@ int main(int argc, char *argv[])
 
     engine.rootContext()->setContextProperty("appSettings", &appSettings);
     engine.rootContext()->setContextProperty("appController", &controller);
+    engine.rootContext()->setContextProperty("demoBootstrap", &demoBootstrap);
     engine.rootContext()->setContextProperty("projectService", &projectService);
     engine.rootContext()->setContextProperty("projectModel", &projectModel);
     engine.rootContext()->setContextProperty("taxonomyService", &taxonomyService);
@@ -538,6 +543,33 @@ int main(int argc, char *argv[])
     {
         const QString autoOpen = qEnvironmentVariable("LT_DEBUG_OPEN_PROJECT");
         const QString autoPage = qEnvironmentVariable("LT_DEBUG_PAGE");
+        // 首次运行（库中无任何项目）：自动创建并打开示例项目，保证开箱即可浏览全部功能
+        if (projectService.listProjects().isEmpty()) {
+            const QString demoPid = demoBootstrap.ensureDemoProject();
+            if (!demoPid.isEmpty()) {
+                projectModel.refresh();
+                projectService.openProject(demoPid);
+                controller.openProject(demoPid, QStringLiteral("示例项目"));
+                const QVariantList taxes = taxonomyService.listTaxonomies(demoPid);
+                if (!taxes.isEmpty())
+                    taxonomyModel.setTaxonomyId(taxes.first().toMap().value("id").toString());
+                ltInfo(LT_LOG_APP()) << "First run: demo project created and opened";
+            }
+        }
+        // 自动化验收钩子：LT_DEBUG_ENSURE_DEMO=1 强制确保示例项目存在
+        if (qEnvironmentVariable("LT_DEBUG_ENSURE_DEMO") == QStringLiteral("1")) {
+            const QString demoPid = demoBootstrap.ensureDemoProject();
+            if (!demoPid.isEmpty()) {
+                projectModel.refresh();
+                if (autoOpen.isEmpty()) {
+                    projectService.openProject(demoPid);
+                    controller.openProject(demoPid, QStringLiteral("示例项目"));
+                    const QVariantList taxes = taxonomyService.listTaxonomies(demoPid);
+                    if (!taxes.isEmpty())
+                        taxonomyModel.setTaxonomyId(taxes.first().toMap().value("id").toString());
+                }
+            }
+        }
         if (!autoOpen.isEmpty()) {
             const QVariantList all = projectService.listProjects();
             for (const QVariant &entry : all) {
@@ -553,6 +585,92 @@ int main(int argc, char *argv[])
         }
         if (!autoPage.isEmpty()) {
             controller.setCurrentPage(autoPage);
+        }
+        // LT_DEBUG_AUTO_SNAPSHOT=1：为当前项目第一个数据集自动创建冻结版（E2E 验收用）
+        if (qEnvironmentVariable("LT_DEBUG_AUTO_SNAPSHOT") == QStringLiteral("1")
+            && !controller.currentProjectId().isEmpty()) {
+            const QVariantList dss = datasetService.listDatasets(controller.currentProjectId());
+            if (!dss.isEmpty()) {
+                const QString dsId = dss.first().toMap().value("id").toString();
+                const QString snapId = snapshotService.createSnapshot(dsId, 0.75, QStringLiteral("random"));
+                ltInfo(LT_LOG_APP()) << "Auto snapshot created:" << snapId << "for dataset" << dsId;
+            }
+        }
+        // LT_DEBUG_AUTO_TRAIN=1：对最新冻结版自动创建训练任务并启动（小参数 CPU，E2E 验收用）
+        if (qEnvironmentVariable("LT_DEBUG_AUTO_TRAIN") == QStringLiteral("1")
+            && !controller.currentProjectId().isEmpty()) {
+            const QVariantList dss = datasetService.listDatasets(controller.currentProjectId());
+            if (!dss.isEmpty()) {
+                const QString dsId = dss.first().toMap().value("id").toString();
+                const QVariantList snaps = snapshotService.listSnapshots(dsId);
+                if (!snaps.isEmpty()) {
+                    const QString snapId = snaps.first().toMap().value("id").toString();
+                    const QString config = QStringLiteral(
+                        "{\"adapter\":\"ultralytics\",\"imgsz\":320,\"img_size\":320,\"batch\":4,"
+                        "\"epochs\":3,\"patience\":50,\"workers\":2,\"amp\":false,\"resume\":false,"
+                        "\"device\":\"cpu\",\"model_family\":\"yolov8\",\"training_type\":\"from_scratch\","
+                        "\"pretrained\":false,\"input_channels\":3,\"save_period\":10,"
+                        "\"optimizer\":\"SGD\",\"lr0\":0.01,\"weight_decay\":0.0005,\"iou\":0.7}");
+                    const QString runId = trainingService.createRun(
+                        controller.currentProjectId(), snapId, config);
+                    if (!runId.isEmpty() && trainingService.startTraining(runId))
+                        ltInfo(LT_LOG_APP()) << "Auto training started:" << runId;
+                    else
+                        ltError(LT_LOG_APP()) << "Auto training failed to start:" << runId;
+                } else {
+                    ltError(LT_LOG_APP()) << "Auto train: no snapshot for dataset" << dsId;
+                }
+            }
+        }
+        // LT_DEBUG_AUTO_TEST=1：对最新模型版本+最新冻结版自动创建并启动评估（E2E 验收用）
+        if (qEnvironmentVariable("LT_DEBUG_AUTO_TEST") == QStringLiteral("1")
+            && !controller.currentProjectId().isEmpty()) {
+            const QString projectId = controller.currentProjectId();
+            QSqlQuery mvQuery(Database::instance().database());
+            mvQuery.prepare("SELECT id FROM model_versions WHERE project_id = ? ORDER BY created_at DESC LIMIT 1");
+            mvQuery.addBindValue(projectId);
+            mvQuery.exec();
+            QString mvId;
+            if (mvQuery.next()) mvId = mvQuery.value(0).toString();
+            const QVariantList dss = datasetService.listDatasets(projectId);
+            QString snapId;
+            if (!dss.isEmpty()) {
+                const QVariantList snaps = snapshotService.listSnapshots(dss.first().toMap().value("id").toString());
+                if (!snaps.isEmpty()) snapId = snaps.first().toMap().value("id").toString();
+            }
+            if (!mvId.isEmpty() && !snapId.isEmpty()) {
+                const QString cfg = QStringLiteral(
+                    "{\"batch\":4,\"iou_threshold\":0.45,\"conf_threshold\":0.25,"
+                    "\"device\":\"cpu\",\"weight_index\":0}");
+                const QString taskId = testingService.createTestTask(projectId, mvId, snapId, cfg);
+                if (!taskId.isEmpty() && testingService.startTestTask(taskId))
+                    ltInfo(LT_LOG_APP()) << "Auto test started:" << taskId;
+                else
+                    ltError(LT_LOG_APP()) << "Auto test failed:" << taskId;
+            } else {
+                ltError(LT_LOG_APP()) << "Auto test: missing model version or snapshot";
+            }
+        }
+        // LT_DEBUG_AUTO_EXPORT=1：对最新模型版本自动导出 onnx 并验证（E2E 验收用）
+        if (qEnvironmentVariable("LT_DEBUG_AUTO_EXPORT") == QStringLiteral("1")
+            && !controller.currentProjectId().isEmpty()) {
+            QSqlQuery mvQuery(Database::instance().database());
+            mvQuery.prepare("SELECT id FROM model_versions WHERE project_id = ? ORDER BY created_at DESC LIMIT 1");
+            mvQuery.addBindValue(controller.currentProjectId());
+            mvQuery.exec();
+            if (mvQuery.next()) {
+                const QString mvId = mvQuery.value(0).toString();
+                const QString artifactId = exportService.exportModel(mvId, QStringLiteral("onnx"), QStringLiteral("{}"));
+                if (!artifactId.isEmpty()) {
+                    ltInfo(LT_LOG_APP()) << "Auto export started:" << artifactId;
+                    if (exportService.verifyExport(artifactId))
+                        ltInfo(LT_LOG_APP()) << "Auto export verify passed:" << artifactId;
+                    else
+                        ltError(LT_LOG_APP()) << "Auto export verify FAILED:" << artifactId;
+                } else {
+                    ltError(LT_LOG_APP()) << "Auto export failed for model version" << mvId;
+                }
+            }
         }
     }
 

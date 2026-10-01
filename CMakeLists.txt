@@ -6,6 +6,12 @@ set(EXECUTABLE_NAME LabelTorchV)
 # 由 scripts/sync_version.ps1 同步。升级版本时只改这里。
 project(${EXECUTABLE_NAME} VERSION 0.2.0 LANGUAGES CXX)
 
+# MSVC：源码统一按 UTF-8 读取（本仓库全部源文件为无 BOM UTF-8），
+# 否则中文字面量被按系统码页(GBK)解释，QString(const char*) 出现乱码
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
+
 # Qt 路径覆盖：preset 的 CMAKE_PREFIX_PATH 可来自 QT_ROOT 环境变量；
 # 为空时回退到本机常见安装位置，亦可用 -DCMAKE_PREFIX_PATH= 直接指定。
 if(NOT CMAKE_PREFIX_PATH)

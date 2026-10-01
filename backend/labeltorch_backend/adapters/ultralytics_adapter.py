@@ -130,24 +130,28 @@ class UltralyticsAdapter(TrainingAdapter):
         self._metrics = {}
 
         try:
-            # 构建模型名称
+            # 构建模型名称：
+            # - from_scratch（pretrained=False）使用本地 .yaml 结构定义，不下载预训练权重，
+            #   保证离线环境（无外网）也能训练
+            # - pretrained=True 时使用对应家族的默认 .pt 权重（ultralytics 会自动下载/缓存）
+            scratch = (str(config.get("training_type", "")).lower() == "from_scratch") or (pretrained is False)
             if model_family == "yolov8_obb":
-                model_name = f"yolov8{model_variant}-obb.pt"
+                model_name = f"yolov8{model_variant}-obb" + (".pt" if not scratch else ".yaml")
                 _task = "obb"  # 预留：任务类型
             elif model_family == "yolov8_cls":
-                model_name = f"yolov8{model_variant}-cls.pt"
+                model_name = f"yolov8{model_variant}-cls" + (".pt" if not scratch else ".yaml")
                 _task = "classify"  # 预留：任务类型
             elif model_family == "yolov5":
-                model_name = f"yolov5{model_variant}.pt"
+                model_name = f"yolov5{model_variant}" + (".pt" if not scratch else ".yaml")
                 _task = "detect"  # 预留：任务类型
             elif model_family == "yolov10":
-                model_name = f"yolov10{model_variant}.pt"
+                model_name = f"yolov10{model_variant}" + (".pt" if not scratch else ".yaml")
                 _task = "detect"  # 预留：任务类型
             elif model_family == "yolov11":
-                model_name = f"yolo11{model_variant}.pt"
+                model_name = f"yolo11{model_variant}" + (".pt" if not scratch else ".yaml")
                 _task = "detect"  # 预留：任务类型
             else:
-                model_name = f"yolov8{model_variant}.pt"
+                model_name = f"yolov8{model_variant}" + (".pt" if not scratch else ".yaml")
                 _task = "detect"  # 预留：任务类型
 
             # 加载模型：

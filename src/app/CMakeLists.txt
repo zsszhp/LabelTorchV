@@ -2,6 +2,8 @@ qt_add_executable(${EXECUTABLE_NAME}
     main.cpp
     AppController.h
     AppController.cpp
+    DemoBootstrap.h
+    DemoBootstrap.cpp
 )
 
 # Windows应用图标资源（.rc文件嵌入exe，资源管理器/任务栏显示）
@@ -21,6 +23,24 @@ qt_add_resources(${EXECUTABLE_NAME} app_icons
         icons/labeltorch_64x64.png
         icons/labeltorch_128x128.png
         icons/labeltorch_256x256.png
+)
+
+# 演示模式：内置合成缺陷示例数据集（scripts/gen_demo_data.py 生成）
+file(GLOB LT_DEMO_IMAGES ${CMAKE_CURRENT_SOURCE_DIR}/../../assets/demo/images/*.jpg)
+file(GLOB LT_DEMO_LABELS ${CMAKE_CURRENT_SOURCE_DIR}/../../assets/demo/labels/*.txt)
+foreach(f ${LT_DEMO_IMAGES})
+    get_filename_component(name ${f} NAME)
+    set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS images/${name})
+    list(APPEND LT_DEMO_FILES ${f})
+endforeach()
+foreach(f ${LT_DEMO_LABELS})
+    get_filename_component(name ${f} NAME)
+    set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS labels/${name})
+    list(APPEND LT_DEMO_FILES ${f})
+endforeach()
+qt_add_resources(${EXECUTABLE_NAME} demo_assets
+    PREFIX /demo
+    FILES ${LT_DEMO_FILES}
 )
 
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE

@@ -198,30 +198,8 @@ ApplicationWindow {
         return hiddenPageInfo(pageId) !== null
     }
 
-    // === 启动页防护：未打开项目时，不允许停留在依赖项目的页面，强制回「项目」页 ===
-    // 孤页（导入向导/类别体系/冻结版等）均依赖项目上下文，一并视为需要项目
-    function pageNeedsProject(pageId) {
-        if (pageId === "project") return false
-        if (isHiddenPage(pageId)) return true
-        for (var i = 0; i < navModel.count; i++) {
-            var it = navModel.get(i)
-            if (it.pageId === pageId) return it.needsProject === true
-        }
-        return false
-    }
-
-    function clampPageToProject() {
-        if (!appController.projectOpen && pageNeedsProject(appController.currentPage))
-            appController.currentPage = "project"
-    }
-
-    Connections {
-        target: appController
-        // currentPageChanged() 信号无参数，处理器保持无参
-        function onCurrentPageChanged() { root.clampPageToProject() }
-        function onCurrentProjectIdChanged() { root.clampPageToProject() }
-    }
-
+    // === 导航解锁：未打开项目也允许浏览各页（页面呈现空态/演示引导） ===
+    // 「新建/打开项目」入口常驻项目页 + 顶栏横幅引导，不再强制钳制回项目页
     // 数据集筛选下拉模型（首项为全部）
     ListModel { id: dsFilterModel }
 
@@ -444,7 +422,8 @@ ApplicationWindow {
                                     leftPadding: 18
                                     rightPadding: 18
                                     visible: model.group === groupRow.modelData.key && root.navItemVisible(model)
-                                    enabled: !model.needsProject || appController.projectOpen
+                                    // 导航解锁：未打开项目也可浏览（页面呈现空态引导）
+                                    enabled: true
 
                                     contentItem: Row {
                                         id: navContentRow
@@ -756,6 +735,99 @@ ApplicationWindow {
                         }
                     }
                 }
+            }
+        }
+
+        // === 未打开项目引导横幅（导航已解锁：可浏览各页，数据为空时给出一键入口） ===
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 34
+            visible: !appController.projectOpen && appController.currentPage !== "project"
+            color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.10)
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Theme.borderColor
+            }
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: Theme.spacingLarge
+                anchors.rightMargin: Theme.spacingLarge
+                spacing: Theme.spacingSmall
+
+                SvgIcon {
+                    icon: "alert"
+                    width: 14
+                    height: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                    text: "未打开项目——当前页面数据为空。"
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    color: Theme.textSecondary
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                    text: "去新建项目"
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Font.DemiBold
+                    font.family: Theme.fontFamily
+                    color: Theme.primary
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -4
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: appController.currentPage = "project"
+                    }
+                }
+
+                Text {
+                    text: "或"
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    color: Theme.textMuted
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                    text: "一键载入示例项目（含12张合成缺陷图）"
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Font.DemiBold
+                    font.family: Theme.fontFamily
+                    color: Theme.primary
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -4
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            var pid = demoBootstrap.ensureDemoProject()
+                            if (pid) {
+                                projectModel.refresh()
+                                projectService.openProject(pid)
+                                var info = projectService.getCurrentProject()
+                                appController.openProject(pid, info.name || "示例项目")
+                                var taxes = taxonomyService.listTaxonomies(pid)
+                                if (taxes.length > 0) {
+                                    taxonomyModel.taxonomyId = taxes[0].id
+                                }
+                            }
+                            appController.currentPage = "dataset"
+                        }
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
             }
         }
 
@@ -1245,11 +1317,7 @@ ApplicationWindow {
         }
         if (index >= 0 && index < visible.length) {
             var item = visible[index]
-            if (!item.needsProject || appController.projectOpen) {
-                appController.currentPage = item.pageId
-            } else {
-                ToastBus.info("请先打开项目后再切换到「" + item.title + "」")
-            }
+            appController.currentPage = item.pageId
         }
     }
 

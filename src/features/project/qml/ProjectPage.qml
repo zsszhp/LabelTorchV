@@ -99,6 +99,34 @@ Item {
                         onClicked: importFolderDialog.open()
                     }
 
+                    // 载入示例项目（演示模式：一键获得带数据的完整项目）
+                    LtButton {
+                        id: demoProjectBtn
+                        Layout.fillWidth: true
+                        text: "载入示例项目"
+                        variant: "ghost"
+                        iconName: "images"
+                        visible: demoBootstrap.demoProjectMissing()
+                        onClicked: {
+                            var pid = demoBootstrap.ensureDemoProject()
+                            if (pid) {
+                                projectModel.refresh()
+                                projectService.openProject(pid)
+                                var info = projectService.getCurrentProject()
+                                appController.openProject(pid, info.name || "示例项目")
+                                var taxes = taxonomyService.listTaxonomies(pid)
+                                if (taxes.length > 0) {
+                                    taxonomyModel.taxonomyId = taxes[0].id
+                                }
+                                projectActionMessage = "已载入示例项目（含12张合成缺陷图与标签）"
+                                projectActionTone = "success"
+                            } else {
+                                projectActionMessage = "示例项目创建失败，请查看日志"
+                                projectActionTone = "danger"
+                            }
+                        }
+                    }
+
                     // 分割线
                     Rectangle {
                         Layout.fillWidth: true

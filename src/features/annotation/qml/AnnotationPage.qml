@@ -1044,6 +1044,20 @@ Item {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
 
+                    // 画布空态：未打开项目或样本列表为空时给出引导（避免全黑画布）
+                    EmptyState {
+                        anchors.centerIn: parent
+                        width: Math.min(parent.width - 80, 420)
+                        visible: sampleListData.length === 0
+                        icon: appController.projectOpen ? "images" : "folder"
+                        title: appController.projectOpen ? "暂无可标注样本" : "未打开项目"
+                        description: appController.projectOpen
+                                     ? "请先在数据集页导入图片，再回到标注页开始标注"
+                                     : "打开项目并导入数据后，即可在此进行框选/多边形标注"
+                        actionText: appController.projectOpen ? "" : "前往项目管理"
+                        onActionClicked: appController.currentPage = "project"
+                    }
+
                     AnnotCanvasItem {
                         id: canvasItem
                         anchors.fill: parent
