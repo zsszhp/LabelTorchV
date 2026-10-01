@@ -247,9 +247,10 @@ async def handle_run_video(payload: dict) -> dict:
 
         # 风险说明：YOLO(pt) 内部经 torch.load 反序列化，路径必须来自项目内训练产物
         model = YOLO(checked_weight)
-        color_palette = sv.ColorPalette.default()
-        box_annotator = sv.BoxAnnotator(color=color_palette, thickness=2)
-        label_annotator = sv.LabelAnnotator(color=color_palette, text_thickness=1, text_scale=0.5)
+        # supervision 0.29+：ColorPalette.default 已更名为 ColorPalette.DEFAULT
+        palette = getattr(sv.ColorPalette, "DEFAULT", None) or sv.ColorPalette.legacy()
+        box_annotator = sv.BoxAnnotator(color=palette, thickness=2)
+        label_annotator = sv.LabelAnnotator(color=palette, text_thickness=1, text_scale=0.5)
 
         def _process_video():
             video_info = sv.VideoInfo.from_video_path(video_path)

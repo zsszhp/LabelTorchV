@@ -1,8 +1,8 @@
-# LabelTorch (标炬)
+﻿# LabelTorch (标炬)
 
 Industrial defect detection desktop software — an integrated platform for annotation, training, inference, and export.
 
-**Current version**: 0.2.0
+**Current version**: 0.2.1
 
 ## Features
 

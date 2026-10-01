@@ -4,7 +4,7 @@ set(EXECUTABLE_NAME LabelTorchV)
 
 # 版本单一源：所有对外版本号（安装器 / 后端包 / 文档 / 绿色包）以本行为准，
 # 由 scripts/sync_version.ps1 同步。升级版本时只改这里。
-project(${EXECUTABLE_NAME} VERSION 0.2.0 LANGUAGES CXX)
+project(${EXECUTABLE_NAME} VERSION 0.2.1 LANGUAGES CXX)
 
 # MSVC：源码统一按 UTF-8 读取（本仓库全部源文件为无 BOM UTF-8），
 # 否则中文字面量被按系统码页(GBK)解释，QString(const char*) 出现乱码。

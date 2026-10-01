@@ -1,9 +1,9 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <Package>
     <DisplayName>标炬主程序</DisplayName>
     <Description>标炬工业缺陷检测桌面软件 - 标注、训练、推理、导出一体化平台</Description>
     <!-- 版本号由 scripts/sync_version.ps1 从 CMakeLists.txt project(VERSION) 同步 -->
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <ReleaseDate>2026-09-29</ReleaseDate>
     <Licenses>
         <License name="MIT License" file="LICENSE.txt" />
