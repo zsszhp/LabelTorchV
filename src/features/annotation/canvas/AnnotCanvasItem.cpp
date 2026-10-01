@@ -69,6 +69,8 @@ void AnnotCanvasItem::setAnnotationModel(AnnotationModel* model)
         disconnect(m_model, nullptr, this, nullptr);
     }
     m_model = model;
+    ltDebug(LT_LOG_ANNOTATION()) << "setAnnotationModel:" << (model ? "set (non-null)" : "SET TO NULL!!!")
+        << "this=" << this;
     if (m_model) {
         connect(m_model, &AnnotationModel::countChanged, this, [this]() { update(); });
     }
@@ -902,6 +904,7 @@ void AnnotCanvasItem::mouseReleaseEvent(QMouseEvent* event)
                 << imgEnd.x() << "," << imgEnd.y() << ") cx=" << cx << " cy=" << cy
                 << " w=" << w << " h=" << h
                 << " imageW=" << m_imageWidth << " imageH=" << m_imageHeight
+                << " model=" << (m_model ? "non-null" : "NULL")
                 << " zoom=" << (m_controller ? m_controller->zoom() : -1)
                 << " panX=" << (m_controller ? m_controller->panX() : 0)
                 << " panY=" << (m_controller ? m_controller->panY() : 0);
@@ -917,6 +920,10 @@ void AnnotCanvasItem::mouseReleaseEvent(QMouseEvent* event)
                 if (m_controller) m_controller->markDirty();
                 emit annotationModified();
             }
+        } else {
+            ltWarning(LT_LOG_ANNOTATION()) << "mouseRelease SKIPPED add: dx=" << dx
+                << " dy=" << dy << " m_model=" << (m_model ? "non-null" : "NULL!!!")
+                << " imageW=" << m_imageWidth;
         }
         finishDrawing();
         event->accept();
