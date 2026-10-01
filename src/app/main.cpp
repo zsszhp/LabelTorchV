@@ -605,12 +605,32 @@ int main(int argc, char *argv[])
                 const QVariantList snaps = snapshotService.listSnapshots(dsId);
                 if (!snaps.isEmpty()) {
                     const QString snapId = snaps.first().toMap().value("id").toString();
-                    const QString config = QStringLiteral(
-                        "{\"adapter\":\"ultralytics\",\"imgsz\":320,\"img_size\":320,\"batch\":4,"
-                        "\"epochs\":3,\"patience\":50,\"workers\":2,\"amp\":false,\"resume\":false,"
-                        "\"device\":\"cpu\",\"model_family\":\"yolov8\",\"training_type\":\"from_scratch\","
-                        "\"pretrained\":false,\"input_channels\":3,\"save_period\":10,"
-                        "\"optimizer\":\"SGD\",\"lr0\":0.01,\"weight_decay\":0.0005,\"iou\":0.7}");
+                    // 场景覆盖：LT_DEBUG_TRAIN_ADAPTER=ultralytics|anomalib、
+                    //           LT_DEBUG_TRAIN_EPOCHS=<n>、LT_DEBUG_TRAIN_FAMILY=<family>
+                    const QString adapter = qEnvironmentVariable("LT_DEBUG_TRAIN_ADAPTER");
+                    const bool isAnomalib = (adapter == QStringLiteral("anomalib"));
+                    const QString family = qEnvironmentVariable("LT_DEBUG_TRAIN_FAMILY");
+                    bool epochsOk = false;
+                    const int epochsEnv = qEnvironmentVariable("LT_DEBUG_TRAIN_EPOCHS").toInt(&epochsOk);
+                    const int epochs = (epochsOk && epochsEnv > 0) ? epochsEnv : 3;
+                    QString config;
+                    if (isAnomalib) {
+                        config = QStringLiteral(
+                            "{\"adapter\":\"anomalib\",\"imgsz\":256,\"img_size\":256,\"batch\":4,"
+                            "\"epochs\":%1,\"patience\":50,\"workers\":2,\"amp\":false,\"resume\":false,"
+                            "\"device\":\"cpu\",\"model_family\":\"patchcore\",\"backbone\":\"wide_resnet50_2\","
+                            "\"anomaly_score_threshold\":0.5,\"training_type\":\"from_scratch\",\"pretrained\":false}")
+                                     .arg(epochs);
+                    } else {
+                        const QString fam = family.isEmpty() ? QStringLiteral("yolov8") : family;
+                        config = QStringLiteral(
+                            "{\"adapter\":\"ultralytics\",\"imgsz\":320,\"img_size\":320,\"batch\":4,"
+                            "\"epochs\":%1,\"patience\":50,\"workers\":2,\"amp\":false,\"resume\":false,"
+                            "\"device\":\"cpu\",\"model_family\":\"%2\",\"training_type\":\"from_scratch\","
+                            "\"pretrained\":false,\"input_channels\":3,\"save_period\":10,"
+                            "\"optimizer\":\"SGD\",\"lr0\":0.01,\"weight_decay\":0.0005,\"iou\":0.7}")
+                                     .arg(epochs).arg(fam);
+                    }
                     const QString runId = trainingService.createRun(
                         controller.currentProjectId(), snapId, config);
                     if (!runId.isEmpty() && trainingService.startTraining(runId))
@@ -662,11 +682,8 @@ int main(int argc, char *argv[])
                 const QString mvId = mvQuery.value(0).toString();
                 const QString artifactId = exportService.exportModel(mvId, QStringLiteral("onnx"), QStringLiteral("{}"));
                 if (!artifactId.isEmpty()) {
+                    // 验证由 ExportService 在导出完成信号后自动执行（异步），此处不重复触发
                     ltInfo(LT_LOG_APP()) << "Auto export started:" << artifactId;
-                    if (exportService.verifyExport(artifactId))
-                        ltInfo(LT_LOG_APP()) << "Auto export verify passed:" << artifactId;
-                    else
-                        ltError(LT_LOG_APP()) << "Auto export verify FAILED:" << artifactId;
                 } else {
                     ltError(LT_LOG_APP()) << "Auto export failed for model version" << mvId;
                 }

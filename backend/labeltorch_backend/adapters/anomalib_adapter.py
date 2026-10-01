@@ -129,7 +129,10 @@ class AnomalibAdapter(TrainingAdapter):
                 normal_dir=normal_dir,
                 abnormal_dir=abnormal_dir,
                 normal_test_dir=normal_test_dir,
-                image_size=(imgsz, imgsz),
+                # anomalib 2.5 移除了 image_size 参数（缩放经 augmentations 体系）
+                # val 从训练集切分：测试集过小（如 2~3 张）时 from_test 模式会除零
+                val_split_mode="from_train",
+                val_split_ratio=0.1,
                 train_batch_size=batch,
                 eval_batch_size=batch,
                 num_workers=0,  # Windows 兼容性
@@ -171,6 +174,61 @@ class AnomalibAdapter(TrainingAdapter):
             if devices is not None:
                 engine_kwargs["devices"] = devices
 
+            # anomalib 2.5 的 Engine.fit 不再接受 callbacks —— 回调须传给 Engine 构造
+            if self._on_epoch_end:
+                try:
+                    import pytorch_lightning as pl
+
+                    class EpochCallback(pl.Callback):
+                        def __init__(self, adapter):
+                            super().__init__()
+                            self._adapter = adapter
+                            self._total_epochs = 0
+
+                        def on_train_start(self, trainer, pl_module):
+                            self._total_epochs = trainer.max_epochs
+
+                        def on_train_epoch_end(self, trainer, pl_module):
+                            if self._adapter._stop_event.is_set():
+                                trainer.should_stop = True
+                                return
+                            epoch = trainer.current_epoch + 1
+                            # 提取 loss
+                            loss = 0.0
+                            if trainer.callback_metrics:
+                                for key in ["loss", "train_loss", "avg_loss"]:
+                                    if key in trainer.callback_metrics:
+                                        val = trainer.callback_metrics[key]
+                                        loss = float(val.item() if hasattr(val, "item") else val)
+                                        break
+
+                            # 提取验证指标
+                            metrics = {}
+                            for key, val in trainer.callback_metrics.items():
+                                try:
+                                    v = float(val.item() if hasattr(val, "item") else val)
+                                    # 映射 Anomalib 指标名到标准名
+                                    if "image_AUROC" in key or "image_auroc" in key:
+                                        metrics["auroc"] = v
+                                    elif "pixel_AUROC" in key or "pixel_auroc" in key:
+                                        metrics["pixel_auroc"] = v
+                                    elif "image_F1Score" in key or "image_f1score" in key:
+                                        metrics["f1"] = v
+                                except (ValueError, TypeError):
+                                    pass
+
+                            if self._adapter._on_epoch_end:
+                                self._adapter._on_epoch_end({
+                                    "epoch": epoch,
+                                    "total_epochs": self._total_epochs,
+                                    "loss": loss,
+                                    **metrics,
+                                })
+
+                    engine_kwargs.setdefault("callbacks", []).append(EpochCallback(self))
+                except ImportError:
+                    logger.warning("pytorch_lightning not available, epoch callbacks disabled")
+
             engine = Engine(**engine_kwargs)
             self._engine = engine
             self._model = model
@@ -206,67 +264,8 @@ class AnomalibAdapter(TrainingAdapter):
         if self._stop_event.is_set():
             raise StopTrainingException("Training stopped by user")
 
-        # 注册 Lightning 回调以推送 epoch 级进度
-        callbacks = []
-        if self._on_epoch_end:
-            try:
-                import pytorch_lightning as pl
-
-                class EpochCallback(pl.Callback):
-                    def __init__(self, adapter):
-                        super().__init__()
-                        self._adapter = adapter
-                        self._total_epochs = 0
-
-                    def on_train_start(self, trainer, pl_module):
-                        self._total_epochs = trainer.max_epochs
-
-                    def on_train_epoch_end(self, trainer, pl_module):
-                        if self._adapter._stop_event.is_set():
-                            trainer.should_stop = True
-                            return
-                        epoch = trainer.current_epoch + 1
-                        # 提取 loss
-                        loss = 0.0
-                        if trainer.callback_metrics:
-                            for key in ["loss", "train_loss", "avg_loss"]:
-                                if key in trainer.callback_metrics:
-                                    val = trainer.callback_metrics[key]
-                                    loss = float(val.item() if hasattr(val, "item") else val)
-                                    break
-
-                        # 提取验证指标
-                        metrics = {}
-                        for key, val in trainer.callback_metrics.items():
-                            try:
-                                v = float(val.item() if hasattr(val, "item") else val)
-                                # 映射 Anomalib 指标名到标准名
-                                if "image_AUROC" in key or "image_auroc" in key:
-                                    metrics["auroc"] = v
-                                elif "pixel_AUROC" in key or "pixel_auroc" in key:
-                                    metrics["pixel_auroc"] = v
-                                elif "image_F1Score" in key or "image_f1score" in key:
-                                    metrics["f1"] = v
-                            except (ValueError, TypeError):
-                                pass
-
-                        if self._adapter._on_epoch_end:
-                            self._adapter._on_epoch_end({
-                                "epoch": epoch,
-                                "total_epochs": self._total_epochs,
-                                "loss": loss,
-                                **metrics,
-                            })
-
-                callbacks.append(EpochCallback(self))
-            except ImportError:
-                logger.warning("pytorch_lightning not available, epoch callbacks disabled")
-
-        # 执行训练
-        if callbacks:
-            engine.fit(model=model, datamodule=datamodule, callbacks=callbacks)
-        else:
-            engine.fit(model=model, datamodule=datamodule)
+        # 执行训练（回调已在 Engine 构造时注册：anomalib 2.5 的 fit 不接受 callbacks）
+        engine.fit(model=model, datamodule=datamodule)
 
         # 获取训练结果目录
         try:
@@ -410,6 +409,54 @@ class AnomalibAdapter(TrainingAdapter):
         except Exception as e:
             return {"status": "failed", "error": str(e)}
 
+    def _rebuild_model_from_checkpoint(self, weight_path: str, options: dict):
+        """从 anomalib ckpt 重建模型实例。
+
+        PyTorch 2.6 起 Lightning load_from_checkpoint 内部 torch.load 默认
+        weights_only=True 会拒绝 anomalib.PrecisionType 等全局对象；且 ckpt 的
+        hyper_parameters 不含模型族名。因此：
+        1. family 来源：options.model_family > 路径中的模型族目录（anomalib
+           Engine 默认落盘 models/<Family>/product/v<..>/weights/lightning/model.ckpt）
+        2. 权重：torch.load(weights_only=False)——路径已在白名单校验内（项目内训练产物）
+        """
+        import torch
+        from anomalib.models import get_model
+
+        family = options.get("model_family") or self._infer_family_from_path(weight_path) or "patchcore"
+        checkpoint = torch.load(weight_path, map_location="cpu", weights_only=False)
+        state_dict = checkpoint.get("state_dict") if isinstance(checkpoint, dict) else None
+
+        hp = checkpoint.get("hyper_parameters", {}) if isinstance(checkpoint, dict) else {}
+        hparams = {key: hp[key] for key in ("backbone", "layers", "pre_trained",
+                                            "coreset_sampling_ratio", "num_neighbors") if key in hp}
+
+        try:
+            model = get_model(family, **hparams)
+        except Exception as e:
+            logger.warning(f"get_model({family}, **hparams) failed: {e}, trying plain get_model")
+            model = get_model(family)
+        if state_dict is not None:
+            try:
+                model.load_state_dict(state_dict)
+            except Exception as e:
+                logger.warning(f"strict load_state_dict failed: {e}, retrying non-strict")
+                model.load_state_dict(state_dict, strict=False)
+        return model
+
+    @staticmethod
+    def _infer_family_from_path(weight_path: str):
+        """从 ckpt 落盘路径推导 anomalib 模型族（models/<Family>/... 结构）"""
+        parts = [p.lower().replace("_", "")
+                 for p in os.path.normpath(weight_path).replace("\\", "/").split("/")]
+        known = ("patchcore", "padim", "efficientad", "stfpm", "fastflow", "dfkde", "dfm",
+                 "reversedistillation", "draem", "cflow", "csflow", "ganomaly", "supersimplenet", "winclip")
+        alias = {"efficientad": "efficient_ad", "reversedistillation": "reverse_distillation"}
+        for p in parts:
+            for name in known:
+                if p == name.replace("_", ""):
+                    return alias.get(name, name)
+        return None
+
     def _do_export_onnx(self, weight_path: str, options: dict) -> dict:
         """导出ONNX格式并写入自定义元数据"""
         import json
@@ -441,18 +488,8 @@ class AnomalibAdapter(TrainingAdapter):
                 try:
                     from anomalib.deploy import ExportType
                     from anomalib.engine import Engine
-                    from anomalib.models import get_model
 
-                    model_family = options.get("model_family", "efficient_ad")
-                    model = get_model(model_family)
-                    # 安全加载：优先 weights_only=True，anomalib ckpt 回退时校验路径并告警
-                    from ..tools.safe_loading import safe_load_weight
-                    checkpoint = safe_load_weight(weight_path, map_location="cpu")
-                    if "state_dict" in checkpoint:
-                        model.load_state_dict(checkpoint["state_dict"])
-                    elif "model" in checkpoint:
-                        state = checkpoint["model"].state_dict() if hasattr(checkpoint["model"], 'state_dict') else checkpoint["model"]
-                        model.load_state_dict(state)
+                    model = self._rebuild_model_from_checkpoint(weight_path, options)
 
                     engine = Engine()
                     export_path = engine.export(

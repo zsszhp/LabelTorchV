@@ -819,7 +819,9 @@ async def _run_anomaly_testing(weight_path: str, data_path: str, config: dict):
         normal_dir="train/good",
         normal_test_dir=normal_test_dir,
         abnormal_dir=abnormal_dir,
-        image_size=(imgsz, imgsz),
+        # anomalib 2.5：移除 image_size；val 从训练集切分避免小测试集除零
+        val_split_mode="from_train",
+        val_split_ratio=0.1,
         train_batch_size=batch,
         eval_batch_size=batch,
         num_workers=0,

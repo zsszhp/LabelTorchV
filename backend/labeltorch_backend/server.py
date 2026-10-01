@@ -181,6 +181,8 @@ class IpcServer:
                 response = create_response(
                     request_id, False,
                     error=error_obj,
+                    # 保留业务 result（artifact_id/run_id 等）供 C++ 侧关联到具体对象
+                    result=result,
                     command=command
                 )
             else:

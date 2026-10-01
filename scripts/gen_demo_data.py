@@ -141,6 +141,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join("assets", "demo"))
     ap.add_argument("--count", type=int, default=12)
+    ap.add_argument("--defect-free-first", type=int, default=0,
+                    help="前 K 张无缺陷（不生成标签，用于异常检测 train/good）")
     args = ap.parse_args()
 
     img_dir = os.path.join(args.out, "images")
@@ -155,8 +157,14 @@ def main():
         base = brushed_metal_base(rng_i)
         boxes = []
 
-        # 每张图 1~3 个缺陷；前 10 张带标签，最后 2 张故意留空（演示「未标注」流转）
-        defects = rng_i.randint(1, 3) if i < args.count - 2 else 0
+        # 异常检测模式：前 defect_free_first 张无缺陷（train/good）；
+        # 常规模式：最后 2 张无标签（演示「未标注」流转）
+        if i < args.defect_free_first:
+            defects = 0
+        elif args.defect_free_first > 0:
+            defects = rng_i.randint(1, 3)
+        else:
+            defects = rng_i.randint(1, 3) if i < args.count - 2 else 0
         kinds = rng_i.sample(range(3), k=min(3, defects))
         for k in kinds:
             if k == 0:
