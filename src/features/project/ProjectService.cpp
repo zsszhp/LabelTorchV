@@ -800,7 +800,7 @@ bool ProjectService::saveProjectConfig(const QString &projectId)
     rootObj["root_path"] = rootPath;
     rootObj["task_type"] = taskType;
     rootObj["version"] = QStringLiteral("1.1"); // 升级配置文件版本号以示区别
-    rootObj["labeltorch_version"] = QStringLiteral("0.1.0");
+    rootObj["labeltorch_version"] = QStringLiteral(APP_VERSION_STR);
     rootObj["created_at"] = createdAt;
     rootObj["updated_at"] = updatedAt;
 

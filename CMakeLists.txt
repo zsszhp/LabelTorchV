@@ -7,9 +7,14 @@ set(EXECUTABLE_NAME LabelTorchV)
 project(${EXECUTABLE_NAME} VERSION 0.2.0 LANGUAGES CXX)
 
 # MSVC：源码统一按 UTF-8 读取（本仓库全部源文件为无 BOM UTF-8），
-# 否则中文字面量被按系统码页(GBK)解释，QString(const char*) 出现乱码
+# 否则中文字面量被按系统码页(GBK)解释，QString(const char*) 出现乱码。
+# 版本单一源：APP_VERSION_* 以 project(VERSION) 注入，供全部子目录目标使用
 if(MSVC)
     add_compile_options(/utf-8)
+    add_compile_definitions(
+        APP_VERSION_STR="${PROJECT_VERSION}"
+        APP_VERSION_WSTR=L"${PROJECT_VERSION}"
+    )
 endif()
 
 # Qt 路径覆盖：preset 的 CMAKE_PREFIX_PATH 可来自 QT_ROOT 环境变量；

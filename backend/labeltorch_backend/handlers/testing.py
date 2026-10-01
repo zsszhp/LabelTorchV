@@ -554,11 +554,16 @@ async def _run_ultralytics_testing(weight_path: str, data_path: str, config: dic
     # 风险说明：YOLO(pt) 内部经 torch.load 反序列化，路径已在调用方限制于项目内
     model = YOLO(weight_path)
 
+    # 分类任务的 data 参数是 ImageFolder 根目录（含 train/ val/），而非 yaml 文件
+    val_data = data_path
+    if getattr(model, "task", None) == "classify":
+        val_data = os.path.dirname(data_path) if str(data_path).endswith(".yaml") else data_path
+
     loop = asyncio.get_event_loop()
     results = await loop.run_in_executor(
         None,
         lambda: model.val(
-            data=data_path,
+            data=val_data,
             batch=config.get("batch", 16),
             imgsz=config.get("imgsz", config.get("img_size", 640)),
             conf=config.get("conf_threshold", 0.25),

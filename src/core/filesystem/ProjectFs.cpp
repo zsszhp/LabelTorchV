@@ -39,7 +39,7 @@ bool ProjectFs::createProjectJson(const QString &rootPath, const QString &projec
     json[QStringLiteral("version")] = QStringLiteral("1.0");
     json[QStringLiteral("created_at")] = QDateTime::currentDateTime().toString(Qt::ISODate);
     json[QStringLiteral("updated_at")] = QDateTime::currentDateTime().toString(Qt::ISODate);
-    json[QStringLiteral("labeltorch_version")] = QStringLiteral("0.1.0");
+    json[QStringLiteral("labeltorch_version")] = QStringLiteral(APP_VERSION_STR);
 
     QJsonDocument doc(json);
     QByteArray content = doc.toJson();

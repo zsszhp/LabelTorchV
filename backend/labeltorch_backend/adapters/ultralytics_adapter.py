@@ -258,9 +258,14 @@ class UltralyticsAdapter(TrainingAdapter):
         # 注册回调
         self._model.add_callback("on_fit_epoch_end", on_fit_epoch_end)
 
+        # 分类任务的 data 参数是 ImageFolder 根目录（含 train/ val/），而非 yaml 文件
+        train_data = data_yaml
+        if getattr(self._model, "task", None) == "classify":
+            train_data = os.path.dirname(data_yaml) if str(data_yaml).endswith(".yaml") else data_yaml
+
         # 执行训练
         train_kwargs = dict(
-            data=data_yaml,
+            data=train_data,
             epochs=epochs,
             imgsz=imgsz,
             batch=batch,
