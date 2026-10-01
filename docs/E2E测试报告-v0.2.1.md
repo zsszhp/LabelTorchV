@@ -149,3 +149,41 @@ set LT_DEBUG_TRAIN_ADAPTER=anomalib
 - 导航页签补 `text: model.title`（屏幕阅读器/UIA 可读页签名）
 - 开始训练/导出模型按钮补 `text:` 属性；导出按钮由 Rectangle+MouseArea 重构为真 Button
   （禁用态/悬停/按下语义完整）
+
+---
+
+## 七、最新实测补充（2026-10-02）
+
+### 7.1 画框消失 bug 的真正根因（用户人工实测暴露）
+
+此前「三层防御」修复后用户复测仍复现——深挖发现**双重根因**：
+
+1. **自引用绑定（致命）**：标注画布的绑定 `controller: canvasController` /
+   `annotationModel: annotationModel` 与 AnnotCanvasItem **自身属性同名**，QML 名字
+   解析命中对象自身属性 → 绑定到自己的 null 属性 → 画布的模型/控制器**从未被设置**。
+   证据：两天日志 `Added annotation` 事件 0 次、`setAnnotationModel` 从未调用、
+   release 诊断确认 m_model==NULL。修复：main.cpp 注入同对象别名 context property
+   （canvasControllerCtx / annotModelCanvas），画布绑定改用零歧义别名。
+2. **Qt 6.11 异步 Loader 卡死**：`asynchronous: true` 的页面加载器卡在 Loading 永不
+   完成（加 Loader 状态诊断后确认无 Ready/Error 事件）。修复：14 个页面加载器全部
+   改同步（qrc 本地资源，性能无损失），并保留状态诊断（PAGE LOADED / FAILED）。
+
+### 7.2 异常检测「检测」环节实测 ✅
+
+- 缺陷：推理加载 ckpt 被默认建成 EfficientAd（实际 PatchCore）——anomalib ckpt
+  保存的是抽象基类，`load_from_checkpoint` 无法实例化。修复：按「落盘路径推导
+  模型族 + hyper_parameters + state_dict」自重建。
+- 实测：缺陷图得分 **57.7** > 良品图 **30.0**，pred=anomalous，检测链路打通。
+
+### 7.3 程度模型全链路实测 ✅
+
+- 数据：三级程度（轻微/中等/严重）24 图分类项目（label_path 存程度名）
+- 训练：yolov8_cls from_scratch，16s succeeded
+- 评估：**top1=0.667** 落库（补齐 testing.py 分类指标提取——分类 val 结果无 box
+  属性，准确率在 top1/top2）
+- 可视化：检查页 severityMode 开启 → 缩略图徽章显示程度分级（新增实现）
+
+### 7.4 阈值备注
+
+PatchCore 在小训练集上异常分数整体偏高（良品图 30 分），绝对阈值需按数据集
+自适应校准——已列入待办（可用评估数据自动定阈值）。
