@@ -30,6 +30,8 @@ ApplicationWindow {
     property bool hasRunningTraining: false
     property string selectedFileName: ""
     property real annotationProgress: 0
+    property int annotationLabeledCount: 0   // 已标注样本数（底栏 N/M）
+    property int annotationTotalCount: 0     // 总样本数
 
     // === 全局筛选状态 ===
     // 数据集/标签类别接到页面真实过滤；TAG 无样本级过滤能力，仅作只读摘要展示
@@ -39,9 +41,12 @@ ApplicationWindow {
 
     // 计算标注进度：已标注样本数 / 总样本数 * 100
     // 全程钳制非法值：分母为 0 / 统计返回 undefined 时不得把 NaN 写进绑定
+    // 同时记录 N/M（底栏进度条旁显示，对标 DLTools「标注进度: ▮▮▮ 1/2」）
     function updateAnnotationProgress() {
         if (!appController.projectOpen) {
             root.annotationProgress = 0
+            root.annotationLabeledCount = 0
+            root.annotationTotalCount = 0
             return
         }
         var datasets = datasetService.listDatasets(appController.currentProjectId)
@@ -55,6 +60,8 @@ ApplicationWindow {
             if (isFinite(t) && t > 0) totalSamples += t
             if (isFinite(l) && l > 0) labeledSamples += l
         }
+        root.annotationLabeledCount = labeledSamples
+        root.annotationTotalCount = totalSamples
         if (!isFinite(totalSamples) || totalSamples <= 0) {
             root.annotationProgress = 0
             return
@@ -1268,6 +1275,18 @@ ApplicationWindow {
                                 shadowHorizontalOffset: 0
                             }
                         }
+                    }
+
+                    Text {
+                        // N/M 样本计数（对标 DLTools「标注进度: ▮▮▮ 1/2」）
+                        text: root.annotationTotalCount > 0
+                              ? root.annotationLabeledCount + "/" + root.annotationTotalCount
+                              : ""
+                        visible: root.annotationTotalCount > 0
+                        font.pixelSize: Theme.fontSizeCaption
+                        font.family: Theme.fontFamilyMono
+                        color: Theme.textMuted
+                        anchors.verticalCenter: parent.verticalCenter
                     }
 
                     Text {

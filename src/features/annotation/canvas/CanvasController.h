@@ -48,6 +48,9 @@ public:
     Q_INVOKABLE qreal imageToCanvasY(qreal imgY) const;
     Q_INVOKABLE qreal canvasToImageX(qreal canvasX) const;
     Q_INVOKABLE qreal canvasToImageY(qreal canvasY) const;
+    /// 当前载入图像的像素尺寸（实例表格归一化坐标换算用）
+    Q_INVOKABLE qreal imageWidth() const { return m_imageWidth; }
+    Q_INVOKABLE qreal imageHeight() const { return m_imageHeight; }
 
     Q_INVOKABLE void markDirty();
     Q_INVOKABLE void clearDirty();

@@ -177,7 +177,9 @@ void AnnotCanvasItem::paint(QPainter* painter)
     painter->fillRect(boundingRect(), QColor("#0D0E15"));
 
     drawImage(painter);
-    drawAnnotations(painter);
+    if (m_annotationsVisible) {
+        drawAnnotations(painter);
+    }
 
     if (m_isDrawing) {
         drawDrawingRect(painter);
@@ -666,6 +668,7 @@ void AnnotCanvasItem::mousePressEvent(QMouseEvent* event)
                 }
                 m_model->setSelected(hitRow, true);
             }
+            emit selectionChanged();
 
             pushUndo();
             m_isDragging = true;
@@ -687,6 +690,7 @@ void AnnotCanvasItem::mousePressEvent(QMouseEvent* event)
         for (int i = 0; i < (m_model ? m_model->rowCount() : 0); i++) {
             m_model->setSelected(i, false);
         }
+        emit selectionChanged();
         update();
         event->accept();
     }
@@ -1331,6 +1335,24 @@ void AnnotCanvasItem::selectAll()
     update();
 }
 
+void AnnotCanvasItem::setAnnotationsVisible(bool visible)
+{
+    if (m_annotationsVisible == visible) return;
+    m_annotationsVisible = visible;
+    emit annotationsVisibleChanged();
+    update();
+}
+
+int AnnotCanvasItem::selectedRow() const
+{
+    if (!m_model) return -1;
+    for (int i = 0; i < m_model->rowCount(); i++) {
+        if (m_model->data(m_model->index(i, 0), AnnotationModel::IsSelectedRole).toBool())
+            return i;
+    }
+    return -1;
+}
+
 void AnnotCanvasItem::deleteSelected()
 {
     if (!m_model) return;
@@ -1342,6 +1364,7 @@ void AnnotCanvasItem::deleteSelected()
         }
     }
     if (m_controller) m_controller->markDirty();
+    emit selectionChanged();
     emit annotationModified();
     update();
 }

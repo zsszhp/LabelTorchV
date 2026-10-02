@@ -82,9 +82,10 @@ Item {
         applyClassFilter()
     }
 
-    // === 计算每个类别的样本数 ===
+    // === 计算每个类别的样本数（含未标注行，classIndex = -1） ===
     function computeClassCounts() {
         var counts = {}
+        var unlabeled = 0
         for (var i = 0; i < sampleListData.length; i++) {
             var sample = sampleListData[i]
             if (sample.classIndices && sample.classIndices.length > 0) {
@@ -92,8 +93,11 @@ Item {
                     var cid = sample.classIndices[j]
                     counts[cid] = (counts[cid] || 0) + 1
                 }
+            } else {
+                unlabeled += 1
             }
         }
+        counts[-1] = unlabeled
         classCounts = counts
     }
 
@@ -105,10 +109,14 @@ Item {
             // 数据集过滤：选中数据集后仅保留该数据集样本
             if (selectedDatasetId !== "" && sample.datasetId !== selectedDatasetId)
                 continue
-            // 类别过滤：未选类别时保留全部，选中后保留包含任意选中类别的样本
+            // 类别过滤：未选类别时保留全部；-1 = 未标注的图像；其余按包含任意选中类别匹配
             if (selectedClassIds.length > 0) {
                 var matched = false
-                if (sample.classIndices && sample.classIndices.length > 0) {
+                var wantUnlabeled = selectedClassIds.indexOf(-1) >= 0
+                if (wantUnlabeled && (!sample.classIndices || sample.classIndices.length === 0)) {
+                    matched = true
+                }
+                if (!matched && sample.classIndices && sample.classIndices.length > 0) {
                     for (var j = 0; j < sample.classIndices.length; j++) {
                         if (selectedClassIds.indexOf(sample.classIndices[j]) >= 0) {
                             matched = true
@@ -535,6 +543,63 @@ Item {
                             }
                         }
 
+                        // 未标注行（对标 DLTools「未标注的图像 N」，classIndex = -1）
+                        Rectangle {
+                            id: unlabeledRow
+                            width: classFilterList.width
+                            height: 28
+                            radius: Theme.radiusSmall
+                            property bool isSelected: selectedClassIds.indexOf(-1) >= 0
+                            color: isSelected ? Theme.bgSelected : (unlabeledMouse.containsMouse ? Theme.bgHover : "transparent")
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: Theme.spacingNormal
+                                anchors.rightMargin: Theme.spacingNormal
+                                spacing: Theme.spacingNormal
+
+                                Rectangle {
+                                    Layout.preferredWidth: 12
+                                    Layout.preferredHeight: 12
+                                    radius: 2
+                                    color: "transparent"
+                                    border.color: Theme.textMuted
+                                    border.width: 1
+                                    opacity: unlabeledRow.isSelected ? 1.0 : 0.5
+                                }
+
+                                Text {
+                                    text: "未标注的图像"
+                                    font.pixelSize: Theme.fontSizeCaption
+                                    color: unlabeledRow.isSelected ? Theme.primary : Theme.textMain
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    text: classCounts[-1] || 0
+                                    font.pixelSize: Theme.fontSizeCaption
+                                    font.family: Theme.fontFamilyMono
+                                    color: Theme.textMuted
+                                }
+                            }
+
+                            MouseArea {
+                                id: unlabeledMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    var ids = selectedClassIds.slice()
+                                    var pos = ids.indexOf(-1)
+                                    if (pos >= 0) ids.splice(pos, 1)
+                                    else ids.push(-1)
+                                    selectedClassIds = ids
+                                    applyClassFilter()
+                                }
+                            }
+                        }
+
                         // 类别列表
                         ListView {
                             id: classFilterList
@@ -910,7 +975,7 @@ Item {
                     anchors.leftMargin: Theme.spacingNormal
 
                     Text {
-                        text: "共 " + filteredSamples.length + " 张图片"
+                        text: "已筛选的图像: " + filteredSamples.length + "/" + totalSamples
                         font.pixelSize: Theme.fontSizeCaption
                         color: Theme.textMuted
                     }

@@ -31,6 +31,8 @@ class AnnotCanvasItem : public QQuickPaintedItem
     Q_PROPERTY(QString currentClassName READ currentClassName WRITE setCurrentClassName NOTIFY currentClassNameChanged)
     Q_PROPERTY(int shapeMode READ shapeMode WRITE setShapeMode NOTIFY shapeModeChanged)
     Q_PROPERTY(QString interactionMode READ interactionMode WRITE setInteractionMode NOTIFY interactionModeChanged)
+    /// 隐藏标注渲染开关（纯看图模式，对标 DLTools 标注页「隐藏标注」Toggle）
+    Q_PROPERTY(bool annotationsVisible READ annotationsVisible WRITE setAnnotationsVisible NOTIFY annotationsVisibleChanged)
 
 public:
     enum HandlePosition {
@@ -64,6 +66,9 @@ public:
     QString interactionMode() const { return m_interactionMode; }
     void setInteractionMode(const QString& mode);
 
+    bool annotationsVisible() const { return m_annotationsVisible; }
+    void setAnnotationsVisible(bool visible);
+
     Q_INVOKABLE void loadImage(const QString& imagePath, const QString& labelPath);
     Q_INVOKABLE void fitToView();
     Q_INVOKABLE void resetView();
@@ -84,6 +89,8 @@ public:
     Q_INVOKABLE void cancelCurrentPolygon();
     /// 是否正在绘制多边形（未闭合）
     Q_INVOKABLE bool isDrawingPolygon() const { return m_isDrawingPolygon; }
+    /// 当前第一个选中行（无选中返回 -1）；供实例表格滚动联动
+    Q_INVOKABLE int selectedRow() const;
 
 signals:
     void controllerChanged();
@@ -92,6 +99,9 @@ signals:
     void currentClassNameChanged();
     void shapeModeChanged();
     void interactionModeChanged();
+    void annotationsVisibleChanged();
+    /// 画布选中集变化（点击命中/清空/多选切换时发出），实例表格据此联动
+    void selectionChanged();
     void annotationModified();
     void undoAvailabilityChanged();
     void navigatePrevious();
@@ -166,6 +176,7 @@ private:
     QString m_currentClassName = QStringLiteral("class_0");
     int m_shapeMode = 0;
     QString m_interactionMode = QStringLiteral("select");
+    bool m_annotationsVisible = true;
 
     bool m_isDrawing = false;
     QPointF m_drawStart;

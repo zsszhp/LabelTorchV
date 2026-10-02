@@ -876,8 +876,9 @@ Item {
                             Layout.fillWidth: true
                         }
 
+                        // 筛选计数（对标 DLTools「已筛选的图像: N/M」）
                         StatusTag {
-                            text: sampleListModel.count + " 张图像"
+                            text: "已筛选的图像: " + sampleListModel.count + "/" + totalSamples
                             tone: sampleListModel.count > 0 ? "info" : "neutral"
                         }
 
@@ -1074,7 +1075,17 @@ Item {
                                     clip: true
                                 }
 
-                                // 底部文件名标签 (9px)
+                                // 底部文件名标签 (9px)；已标注文件前缀绿勾（对标 DLTools 完成勾）
+                                Text {
+                                    text: (model.labelPath || "") !== "" ? "✓ " : ""
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                    font.family: Theme.fontFamily
+                                    color: Theme.success
+                                    visible: (model.labelPath || "") !== ""
+                                    Layout.alignment: Qt.AlignLeft
+                                }
+
                                 Text {
                                     text: model.fileName
                                     font.pixelSize: 9
@@ -1082,6 +1093,7 @@ Item {
                                     color: Theme.textMuted
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
+                                    Layout.alignment: (model.labelPath || "") !== "" ? Qt.AlignRight : Qt.AlignLeft
                                     leftPadding: 2
                                     rightPadding: 2
                                 }

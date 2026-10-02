@@ -27,6 +27,9 @@ Item {
     property int editLabelTargetIndex: -1  // 双击编辑标签的目标标注索引
     property string filterDatasetId: ""    // 全局数据集过滤（空 = 全部）
     property int filterClassIndex: -1      // 全局类别过滤（-1 = 不限）
+    // 实例表格联动：画布选中行（-1 = 无）与几何版本号（驱动浮层重定位）
+    property int selectedAnnotationRow: -1
+    property int annotationRev: 0
 
     // P1-22：样本分页加载——避免万张级数据集一次拉全量
     property int samplePageSize: 500       // 每批拉取条数
@@ -215,6 +218,20 @@ Item {
         return "class_" + classIndex
     }
 
+    // === 实例表格与画布选中联动（IsSelectedRole = Qt.UserRole + 12） ===
+    function selectAnnotationRow(row) {
+        var n = annotModelCanvas.rowCount()
+        for (var i = 0; i < n; i++) {
+            var sel = annotModelCanvas.data(annotModelCanvas.index(i, 0), Qt.UserRole + 12)
+            if (sel) annotModelCanvas.setSelected(i, false)
+        }
+        if (row >= 0 && row < n)
+            annotModelCanvas.setSelected(row, true)
+        canvasItem.update()
+        root.selectedAnnotationRow = row
+        root.annotationRev += 1
+    }
+
     // === 保存当前标注（silent=true 时不弹 Toast，仅状态栏反馈） ===
     function saveCurrentAnnotations(silent) {
         if (annotationMode === "classify") {
@@ -246,6 +263,14 @@ Item {
                 )
                 if (ok) {
                     canvasController.clearDirty()
+                    // 同步样本列表的完成标记（文件列表绿勾即时点亮）
+                    if (currentSampleIndex >= 0 && currentSampleIndex < sampleListData.length
+                            && (sampleListData[currentSampleIndex].labelPath || "") === "") {
+                        var updated = sampleListData.slice()
+                        updated[currentSampleIndex] = Object.assign({}, updated[currentSampleIndex],
+                                                                    { labelPath: canvasController.currentLabelPath })
+                        sampleListData = updated
+                    }
                     if (!silent)
                         ToastBus.success("标注已保存")
                 } else {
@@ -519,13 +544,20 @@ Item {
                         Layout.margins: 12
                         spacing: 0
 
-                        // 当前文件（对标参考UI：无图标，深色卡片居中文字）
+                        // 当前文件（对标参考UI：无图标，深色卡片居中文字；已完成标注打绿勾）
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 30
                             Layout.bottomMargin: 10
                             color: Theme.bgCard
-                            border.color: Theme.borderColor
+                            border.color: {
+                                // 已标注文件的完成勾：label_path 非空即视为完成
+                                root.annotationRev
+                                if (currentSampleIndex >= 0 && currentSampleIndex < sampleListData.length
+                                        && (sampleListData[currentSampleIndex].labelPath || "") !== "")
+                                    return Theme.success
+                                return Theme.borderColor
+                            }
                             border.width: 1
                             radius: 4
 
@@ -533,14 +565,20 @@ Item {
                                 anchors.centerIn: parent
                                 text: {
                                     if (currentSampleIndex >= 0 && currentSampleIndex < sampleListData.length) {
-                                        var path = sampleListData[currentSampleIndex].imagePath || ""
-                                        return "Image " + path.split('/').pop().split('\\').pop()
+                                        var s = sampleListData[currentSampleIndex]
+                                        var check = (s.labelPath || "") !== "" ? "✓ " : ""
+                                        return check + "Image " + String(s.imagePath || "").split('/').pop().split('\\').pop()
                                     }
                                     return "未选择图像"
                                 }
                                 font.pixelSize: 12
                                 font.family: Theme.fontFamily
-                                color: Theme.textMain
+                                color: {
+                                    if (currentSampleIndex >= 0 && currentSampleIndex < sampleListData.length
+                                            && (sampleListData[currentSampleIndex].labelPath || "") !== "")
+                                        return Theme.success
+                                    return Theme.textMain
+                                }
                                 elide: Text.ElideRight
                                 width: parent.width - 20
                                 horizontalAlignment: Text.AlignHCenter
@@ -835,8 +873,15 @@ Item {
 
                         onAnnotationModified: {
                             canvasController.markDirty()
+                            root.annotationRev += 1
                             // 防抖自动保存：连续绘制时合并写盘
                             autoSaveTimer.restart()
+                        }
+
+                        // 画布选中集变化 → 同步实例表格滚动与内联换类别浮层
+                        onSelectionChanged: {
+                            root.selectedAnnotationRow = canvasItem.selectedRow()
+                            root.annotationRev += 1
                         }
 
                         // C++ 快捷键切工具后同步 QML 状态（shapeMode=-1 表示只改交互模式）
@@ -895,6 +940,112 @@ Item {
                                 selectedClassId = newClassIdx
                                 canvasItem.currentClassIndex = newClassIdx
                                 canvasItem.currentClassName = newClassName
+                            }
+                        }
+                    }
+
+                    // === 选中实例的类别快捷下拉（对标 DLTools：点框后框上弹类别选择器） ===
+                    Rectangle {
+                        id: classQuickDrop
+                        visible: root.selectedAnnotationRow >= 0
+                                 && annotationMode === "detect"
+                                 && canvasController.drawMode !== "draw"
+                                 && annotModelCanvas.count > 0
+                        z: 20
+                        width: classQuickRow.implicitWidth + 16
+                        height: 26
+                        radius: 4
+                        color: Theme.bgCard
+                        border.color: Theme.primaryGlow
+                        border.width: 1
+
+                        // 位置：选中框左上角上方 30px；依赖 zoom/pan/几何版本驱动重算
+                        x: {
+                            root.annotationRev
+                            canvasControllerCtx.zoom; canvasControllerCtx.panX
+                            if (root.selectedAnnotationRow < 0) return 0
+                            var idx = annotModelCanvas.index(root.selectedAnnotationRow, 0)
+                            var cx = annotModelCanvas.data(idx, Qt.UserRole + 4)
+                            var w = annotModelCanvas.data(idx, Qt.UserRole + 6)
+                            return canvasControllerCtx.imageToCanvasX(cx - w / 2)
+                        }
+                        y: {
+                            root.annotationRev
+                            canvasControllerCtx.zoom; canvasControllerCtx.panY
+                            if (root.selectedAnnotationRow < 0) return 0
+                            var idx = annotModelCanvas.index(root.selectedAnnotationRow, 0)
+                            var cy = annotModelCanvas.data(idx, Qt.UserRole + 5)
+                            var h = annotModelCanvas.data(idx, Qt.UserRole + 7)
+                            return Math.max(0, canvasControllerCtx.imageToCanvasY(cy - h / 2) - 32)
+                        }
+
+                        Row {
+                            id: classQuickRow
+                            anchors.centerIn: parent
+                            spacing: 6
+                            leftPadding: 8
+                            rightPadding: 8
+
+                            Rectangle {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 10
+                                height: 10
+                                radius: 2
+                                color: {
+                                    root.annotationRev
+                                    if (root.selectedAnnotationRow < 0) return Theme.textMuted
+                                    var idx = annotModelCanvas.index(root.selectedAnnotationRow, 0)
+                                    return Theme.classColor(annotModelCanvas.data(idx, Qt.UserRole + 2))
+                                }
+                            }
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: {
+                                    root.annotationRev
+                                    if (root.selectedAnnotationRow < 0) return ""
+                                    var idx = annotModelCanvas.index(root.selectedAnnotationRow, 0)
+                                    var ci = annotModelCanvas.data(idx, Qt.UserRole + 2)
+                                    return getClassName(ci)
+                                }
+                                font.pixelSize: 11
+                                font.family: Theme.fontFamily
+                                color: Theme.textMain
+                            }
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "▼"
+                                font.pixelSize: 8
+                                color: Theme.textMuted
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: classQuickMenu.popup(classQuickDrop.x, classQuickDrop.y + classQuickDrop.height + 2)
+                        }
+                    }
+
+                    // 换类别的下拉菜单
+                    Menu {
+                        id: classQuickMenu
+                        Repeater {
+                            model: taxonomyModel
+                            MenuItem {
+                                text: (model.className || ("class_" + model.classIndex))
+                                onTriggered: {
+                                    if (root.selectedAnnotationRow < 0) return
+                                    annotationModel.setClassIndex(root.selectedAnnotationRow,
+                                                                  model.classIndex,
+                                                                  model.className || ("class_" + model.classIndex))
+                                    // 同步画笔默认类别（DLTools 同款联动）
+                                    selectedClassId = model.classIndex
+                                    canvasController.markDirty()
+                                    root.annotationRev += 1
+                                    autoSaveTimer.restart()
+                                }
                             }
                         }
                     }
@@ -1388,6 +1539,24 @@ Item {
                             font.pixelSize: Theme.fontSizeCaption
                         }
 
+                        // 隐藏标注开关（纯看图模式，对标 DLTools 标注页「隐藏标注」）
+                        RowLayout {
+                            visible: annotationMode === "detect"
+                            spacing: 6
+
+                            Text {
+                                text: "隐藏标注"
+                                color: Theme.textMuted
+                                font.pixelSize: Theme.fontSizeCaption
+                            }
+
+                            ToggleSwitch {
+                                small: true
+                                checked: !canvasItem.annotationsVisible
+                                onToggled: canvasItem.annotationsVisible = !checked
+                            }
+                        }
+
                         // 快捷键提示
                         Text {
                             text: "R矩形 O旋转 P多边形 Esc选择 Del删除 Ctrl+Z/Y撤销重做 Ctrl+S保存"
@@ -1415,6 +1584,142 @@ Item {
                 width: 1
                 color: Theme.borderColor
             }
+
+                    // ====== 实例表格（对标 DLTools：类别/X/Y/宽/高，与画布选中双向联动） ======
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        // 高度随实例数增长，封顶留给类别区（剩余高度归下方 fillHeight 区块）
+                        Layout.preferredHeight: instanceList.count > 0 ? Math.min(200, 30 + instanceList.count * 34) : 58
+                        spacing: 4
+
+                        // 标题行
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 4
+
+                            Text {
+                                text: "实例"
+                                font.pixelSize: 12
+                                font.weight: Font.Normal
+                                font.family: Theme.fontFamily
+                                color: Theme.textMain
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            Text {
+                                text: annotModelCanvas.count + " 个"
+                                font.pixelSize: 11
+                                font.family: Theme.fontFamily
+                                color: Theme.textMuted
+                            }
+                        }
+
+                        // 空态提示
+                        Text {
+                            visible: instanceList.count === 0
+                            text: "无实例 — 按 R 后拖拽画框"
+                            font.pixelSize: 11
+                            font.family: Theme.fontFamily
+                            color: Theme.textDisabled
+                            Layout.leftMargin: 4
+                        }
+
+                        // 实例列表（两行式：类别名+面积 / 像素坐标）
+                        ListView {
+                            id: instanceList
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            clip: true
+                            model: annotModelCanvas
+                            currentIndex: -1
+                            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                            delegate: Rectangle {
+                                width: instanceList.width
+                                height: 34
+                                radius: 4
+                                color: model.isSelected ? Theme.bgSelected : (instMouse.containsMouse ? Theme.bgHover : "transparent")
+                                border.color: model.isSelected ? Theme.primaryGlow : "transparent"
+                                border.width: model.isSelected ? 1 : 0
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 8
+                                    anchors.rightMargin: 8
+                                    spacing: 8
+
+                                    Rectangle {
+                                        width: 10
+                                        height: 10
+                                        radius: 2
+                                        color: Theme.classColor(model.classIndex)
+                                    }
+
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 0
+
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: (model.className || ("class_" + model.classIndex))
+                                            font.pixelSize: 11
+                                            font.family: Theme.fontFamily
+                                            color: Theme.textMain
+                                            elide: Text.ElideRight
+                                        }
+
+                                        // 归一化几何 → 像素坐标（与 Label 落库值一致的图像坐标系）
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: {
+                                                root.annotationRev  // 拖拽/改框后刷新
+                                                var iw = canvasControllerCtx.imageWidth()
+                                                var ih = canvasControllerCtx.imageHeight()
+                                                var x = Math.round(model.cx * iw - (model.w * iw) / 2)
+                                                var y = Math.round(model.cy * ih - (model.h * ih) / 2)
+                                                var w = Math.round(model.w * iw)
+                                                var h = Math.round(model.h * ih)
+                                                return "X" + x + " Y" + y + "  " + w + "×" + h
+                                            }
+                                            font.pixelSize: 9
+                                            font.family: Theme.fontFamilyMono
+                                            color: Theme.textMuted
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+
+                                    Text {
+                                        text: {
+                                            root.annotationRev
+                                            var iw = canvasControllerCtx.imageWidth()
+                                            var ih = canvasControllerCtx.imageHeight()
+                                            return Math.round(model.w * iw * model.h * ih) + "px²"
+                                        }
+                                        font.pixelSize: 9
+                                        font.family: Theme.fontFamilyMono
+                                        color: Theme.textMuted
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: instMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.selectAnnotationRow(index)
+                                }
+                            }
+                        }
+                    }
+
+                    // 分隔线
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 1
+                        color: Theme.dividerColor
+                        Layout.bottomMargin: 8
+                    }
 
                     // ====== 区域3：标签类别 ======
                     ColumnLayout {
