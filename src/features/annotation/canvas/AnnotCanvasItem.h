@@ -198,6 +198,9 @@ private:
 
     bool m_spaceHeld = false;
 
+    // 用户是否手动缩放/平移过（true 后画布尺寸变化不再自动重新适配）
+    bool m_userAdjustedView = false;
+
     QVector<AnnotationSnapshot> m_clipboard;
 
     QVector<UndoEntry> m_undoStack;

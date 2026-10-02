@@ -113,6 +113,7 @@ void AnnotCanvasItem::loadSharedImage(const QString& imagePath)
         m_image = QImage();
         m_loadedPath.clear();
         m_imageWidth = 0;
+    m_userAdjustedView = false;  // 新图载入：恢复自动适配
         m_imageHeight = 0;
         return;
     }
@@ -560,6 +561,7 @@ void AnnotCanvasItem::mousePressEvent(QMouseEvent* event)
 
     if (m_spaceHeld || event->button() == Qt::MiddleButton) {
         m_isPanning = true;
+        m_userAdjustedView = true;  // 用户手动平移：停用自动适配
         m_panStart = event->position();
         if (m_controller) {
             m_panStartX = m_controller->panX();
@@ -960,6 +962,7 @@ void AnnotCanvasItem::wheelEvent(QWheelEvent* event)
     m_controller->setPanX(newPanX);
     m_controller->setPanY(newPanY);
     m_controller->setZoom(newZoom);
+    m_userAdjustedView = true;  // 用户手动缩放：停用自动适配
 
     event->accept();
 }
@@ -1178,6 +1181,14 @@ void AnnotCanvasItem::keyPressEvent(QKeyEvent* event)
 void AnnotCanvasItem::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry)
 {
     QQuickPaintedItem::geometryChange(newGeometry, oldGeometry);
+
+    // 窗口/分割线拖动后自动重新适配视图（对标 X-AnyLabeling）：
+    // 用户未手动缩放/平移过时，画布尺寸变化即重新 fit，避免图片缩在角落
+    if (m_controller && m_imageWidth > 0 && !m_userAdjustedView
+        && newGeometry.size() != oldGeometry.size()) {
+        m_controller->fitToView(static_cast<qreal>(newGeometry.width()),
+                                static_cast<qreal>(newGeometry.height()));
+    }
     update();
 }
 
