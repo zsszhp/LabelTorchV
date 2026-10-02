@@ -1138,13 +1138,7 @@ Item {
                                 selectedClassId = classIndex
                             }
                         }
-                        // [/] 键循环切换类别
-                        onClassChangeRequested: function(direction) {
-                            if (annotationMode !== "detect") return
-                            var count = taxonomyModel.rowCount()
-                            if (count <= 0) return
-                            selectedClassId = (selectedClassId + direction + count) % count
-                        }
+                        // [/] 键的 onChangeClassRequested 已在下方定义（改选中标注的类别并联动画笔）
 
                         // C++ 层发出的导航信号
                         onNavigatePrevious: navigateToPrevious()
