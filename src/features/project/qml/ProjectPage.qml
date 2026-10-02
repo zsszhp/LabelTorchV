@@ -155,28 +155,15 @@ Item {
                                 color: Theme.textMuted
                             }
 
-                            // 完整类别体系管理入口
-                            RowLayout {
+                            // 完整类别体系管理入口（醒目按钮，直达类别体系管理页）
+                            LtButton {
                                 visible: appController.projectOpen
                                 Layout.fillWidth: true
-                                spacing: Theme.spacingSmall
-
-                                Text {
-                                    text: "完整管理类别体系"
-                                    color: taxonomyHubMouse.containsMouse ? Theme.primaryGlow : Theme.textMuted
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    font.family: Theme.fontFamily
-                                    MouseArea {
-                                        id: taxonomyHubMouse
-                                        anchors.fill: parent
-                                        anchors.margins: -4
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: appController.currentPage = "taxonomy"
-                                    }
-                                }
-
-                                Item { Layout.fillWidth: true }
+                                compact: true
+                                text: "类别体系管理"
+                                variant: "secondary"
+                                iconName: "gear"
+                                onClicked: appController.currentPage = "taxonomy"
                             }
 
                             // 添加类别输入行
