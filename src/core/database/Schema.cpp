@@ -195,11 +195,13 @@ QStringList Schema::createTableStatements()
         ")",
 
         // 数据集标签表（A6：用于数据集分类与筛选）
+        // builtin=1 为内置评审 Tag（默认/良品/漏检/误检/待定/重要），不可改名/删除
         "CREATE TABLE IF NOT EXISTS dataset_tags ("
         "  id TEXT PRIMARY KEY,"
         "  dataset_id TEXT NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,"
         "  name TEXT NOT NULL,"
         "  shortcut TEXT,"
+        "  builtin INTEGER NOT NULL DEFAULT 0,"
         "  created_at TEXT NOT NULL,"
         "  UNIQUE(dataset_id, name)"
         ")",

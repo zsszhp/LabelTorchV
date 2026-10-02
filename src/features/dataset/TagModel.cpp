@@ -41,6 +41,8 @@ QVariant TagModel::data(const QModelIndex &index, int role) const
         return tag.value("name");
     case ShortcutRole:
         return tag.value("shortcut");
+    case BuiltinRole:
+        return tag.value("builtin");
     case CreatedAtRole:
         return tag.value("createdAt");
     default:
@@ -54,6 +56,7 @@ QHash<int, QByteArray> TagModel::roleNames() const
     roles[IdRole] = "tagId";
     roles[NameRole] = "tagName";
     roles[ShortcutRole] = "tagShortcut";
+    roles[BuiltinRole] = "tagBuiltin";
     roles[CreatedAtRole] = "tagCreatedAt";
     return roles;
 }

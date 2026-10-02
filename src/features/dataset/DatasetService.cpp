@@ -1314,7 +1314,7 @@ QVariantList DatasetService::listSamples(const QString &datasetId, int offset, i
     if (datasetId.isEmpty()) return result;
 
     QSqlQuery query(Database::instance().database());
-    query.prepare("SELECT id, image_path, label_path, validation_status, split, width, height "
+    query.prepare("SELECT id, image_path, label_path, validation_status, split, width, height, tag_id "
                   "FROM dataset_samples WHERE dataset_id = ? "
                   "ORDER BY image_path LIMIT ? OFFSET ?");
     query.addBindValue(datasetId);
@@ -1335,6 +1335,7 @@ QVariantList DatasetService::listSamples(const QString &datasetId, int offset, i
         s["split"] = query.value(4);
         s["width"] = query.value(5);
         s["height"] = query.value(6);
+        s["tagId"] = query.value(7);
         result.append(s);
     }
 

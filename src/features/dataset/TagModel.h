@@ -24,6 +24,7 @@ public:
         IdRole = Qt::UserRole + 1,      ///< 标签 ID
         NameRole,                        ///< 标签名称
         ShortcutRole,                    ///< 快捷键
+        BuiltinRole,                     ///< 是否内置 Tag（builtin=1 不可改名/删除）
         CreatedAtRole                    ///< 创建时间
     };
 
@@ -36,7 +37,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     QString datasetId() const { return m_datasetId; }
-    void setDatasetId(const QString &id);
+    Q_INVOKABLE void setDatasetId(const QString &id);
 
     /// 刷新标签列表（从数据库重新加载）
     Q_INVOKABLE void refresh();

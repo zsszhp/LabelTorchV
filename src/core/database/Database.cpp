@@ -203,6 +203,40 @@ bool Database::migrate()
         ltInfo(LT_LOG_DB()) << "Migration V3→V4 completed successfully";
     }
 
+    // 迁移 V4→V5：图像 Tag 体系（对标 DLTools 数据模型）
+    // dataset_samples 新增 tag_id（样本当前 Tag，单 Tag 模型，可空表示未打标）
+    // dataset_tags 新增 builtin（内置评审 Tag 不可改名/删除）
+    if (version < 5) {
+        ltInfo(LT_LOG_DB()) << "Running migration V4→V5: sample tag_id + dataset_tags.builtin";
+
+        bool ok = true;
+
+        // 探测列是否已存在（新建库的 DDL 已包含该列）
+        QSqlQuery probeTagId(m_db);
+        probeTagId.exec("SELECT tag_id FROM dataset_samples LIMIT 0");
+        if (probeTagId.lastError().isValid()) {
+            // ADD COLUMN 带REFERENCES要求默认值为NULL，SQLite 允许此形式
+            ok = query.exec("ALTER TABLE dataset_samples ADD COLUMN tag_id TEXT REFERENCES dataset_tags(id)");
+            if (!ok) {
+                ltError(LT_LOG_DB()) << "Migration V4→V5 failed (tag_id):" << query.lastError().text();
+                return false;
+            }
+        }
+
+        QSqlQuery probeBuiltin(m_db);
+        probeBuiltin.exec("SELECT builtin FROM dataset_tags LIMIT 0");
+        if (probeBuiltin.lastError().isValid()) {
+            ok = query.exec("ALTER TABLE dataset_tags ADD COLUMN builtin INTEGER NOT NULL DEFAULT 0");
+            if (!ok) {
+                ltError(LT_LOG_DB()) << "Migration V4→V5 failed (builtin):" << query.lastError().text();
+                return false;
+            }
+        }
+
+        query.exec("INSERT INTO schema_version (version) VALUES (5)");
+        ltInfo(LT_LOG_DB()) << "Migration V4→V5 completed successfully";
+    }
+
     return true;
 }
 

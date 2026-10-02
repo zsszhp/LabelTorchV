@@ -95,6 +95,8 @@ QtObject {
     readonly property color tagBaseline: primary
     readonly property color tagBest: success
     readonly property color tagProduction: warning
+    // 图像 Tag 语义色（重要→系统紫，自定义 Tag 走中性灰）
+    readonly property color tagImportant: "#AF52DE"
 
     // === 字体（Qt 单一字体名；Latin 走 Segoe UI 贴近 SF 质感，中文自动回退雅黑） ===
     readonly property string fontFamily: "Segoe UI"

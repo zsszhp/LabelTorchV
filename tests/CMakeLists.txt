@@ -300,3 +300,15 @@ target_link_libraries(test_annotation_autosave PRIVATE
 )
 add_test(NAME AnnotationAutosaveTest COMMAND test_annotation_autosave)
 add_test(NAME AuditLogTest COMMAND test_audit_log)
+
+# 图像 Tag 体系测试（对标 DLTools：内置 Tag/打标/快捷键冲突/迁移列）
+add_executable(test_tag_service
+    test_tag_service.cpp
+)
+target_link_libraries(test_tag_service PRIVATE
+    labeltorch_core
+    labeltorch_dataset
+    Qt6::Test
+    Qt6::Sql
+)
+add_test(NAME TagServiceTest COMMAND test_tag_service)

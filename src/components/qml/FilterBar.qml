@@ -16,6 +16,10 @@ Rectangle {
     property alias datasetModel: datasetCombo.model
     property alias tagModel: tagCombo.model
     property alias labelModel: labelCombo.model
+    // 样本 Tag 筛选（图像 Tag 体系：全部Tag/无Tag/各具体Tag）
+    property alias sampleTagFilter: sampleTagCombo.currentText
+    property alias sampleTagModel: sampleTagCombo.model
+    property alias sampleTagIndex: sampleTagCombo.currentIndex
 
     Row {
         anchors.fill: parent
@@ -55,6 +59,26 @@ Rectangle {
             ComboBox {
                 id: tagCombo
                 anchors.fill: parent
+                model: ["全部状态"]
+                currentIndex: 0
+                font.pixelSize: Theme.fontSizeSmall
+                palette.button: Theme.bgSide
+                palette.text: Theme.textMain
+                palette.buttonText: Theme.textMuted
+            }
+        }
+
+        Rectangle {
+            width: 120
+            height: 28
+            color: Theme.bgSide
+            border.color: Theme.borderColor
+            border.width: 1
+            radius: Theme.radiusNormal
+
+            ComboBox {
+                id: sampleTagCombo
+                anchors.fill: parent
                 model: ["全部Tag"]
                 currentIndex: 0
                 font.pixelSize: Theme.fontSizeSmall
@@ -75,7 +99,7 @@ Rectangle {
             ComboBox {
                 id: labelCombo
                 anchors.fill: parent
-                model: ["全部类别"]
+                model: ["全部划分"]
                 currentIndex: 0
                 font.pixelSize: Theme.fontSizeSmall
                 palette.button: Theme.bgSide

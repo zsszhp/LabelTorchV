@@ -24,6 +24,10 @@ Item {
     property int filterClassIndex: -1   // 全局类别过滤（-1 = 不限）
     // P1-21：当前项目缩略图缓存目录（cache/thumbnails）
     property string thumbCacheDir: ""
+    // 图像 Tag 体系：tagId → 名称 映射（供筛选与角标显示）
+    property var tagNameById: ({})
+    // Tag 筛选选项模型："全部Tag" / "无Tag" / 各 Tag 名称
+    property var sampleTagOptions: ["全部Tag"]
 
     // P1-21：解析缩略图路径——已生成则走缩略图，否则回退原图并靠 sourceSize 限解码
     function resolveThumbSource(imagePath) {
@@ -67,7 +71,65 @@ Item {
 
     // A6：当前数据集变化时刷新标签列表
     onCurrentDatasetIdChanged: {
+        // 图像 Tag 体系：数据集首次使用时播种内置评审 Tag（默认/良品/漏检/误检/待定/重要）
+        if (currentDatasetId !== "") {
+            tagService.ensureBuiltinTags(currentDatasetId)
+        }
         tagModel.setDatasetId(currentDatasetId)
+        tagModel.refresh()
+        pageRoot.rebuildTagMaps()
+    }
+
+    // 从 tagModel 重建 tagId→名称 映射与筛选下拉选项
+    function rebuildTagMaps() {
+        var nameById = {}
+        var options = ["全部Tag", "无Tag"]
+        if (typeof tagModel !== "undefined") {
+            for (var i = 0; i < tagModel.rowCount(); i++) {
+                var idx = tagModel.index(i, 0)
+                var id = tagModel.data(idx, Qt.UserRole + 1)    // IdRole
+                var n = tagModel.data(idx, Qt.UserRole + 2)     // NameRole
+                if (id && n) {
+                    nameById[id] = n
+                    if (options.indexOf(n) < 0) options.push(n)
+                }
+            }
+        }
+        pageRoot.tagNameById = nameById
+        pageRoot.sampleTagOptions = options
+        galleryFilterBar.sampleTagModel = options
+    }
+
+    // 将 Tag 指派给样本（tagName 为空串表示清除），落库并刷新本地行
+    function assignSampleTag(sampleId, tagName) {
+        if (!sampleId) return
+        var tagId = ""
+        if (tagName !== "") {
+            for (var tid in tagNameById) {
+                if (tagNameById[tid] === tagName) { tagId = tid; break }
+            }
+            if (!tagId) {
+                if (typeof ToastBus !== "undefined") ToastBus.error("未找到标签：" + tagName)
+                return
+            }
+        }
+        if (!tagService.setSampleTag(sampleId, tagId)) {
+            if (typeof ToastBus !== "undefined") ToastBus.error("标记失败：" + tagName)
+            return
+        }
+        // 同步内存中的样本行与选中态
+        var name = tagName
+        for (var i = 0; i < rawSamples.length; ++i) {
+            if (rawSamples[i].sampleId === sampleId) {
+                rawSamples[i].tagId = tagId
+                break
+            }
+        }
+        if (selectedSample && selectedSample.sampleId === sampleId) {
+            selectedSample.tagId = tagId
+            selectedTag = name
+        }
+        applySampleFilters()
     }
 
     // === 监听扫描完成信号 ===
@@ -692,7 +754,12 @@ Item {
 
                                         Text {
                                             anchors.centerIn: parent
-                                            text: modelData
+                                            // 选中图像时显示其当前 Tag，否则显示待指派 Tag（带快捷键）
+                                            text: {
+                                                var cur = selectedSample && selectedSample.tagId ? (tagNameById[selectedSample.tagId] || "") : ""
+                                                if (cur) return cur === modelData ? ("✓ " + modelData) : modelData
+                                                return tagChipLabel(modelData)
+                                            }
                                             font.pixelSize: Theme.fontSizeCaption
                                             font.family: Theme.fontFamily
                                             color: selectedTag === modelData ? Theme.textMain : Theme.textMuted
@@ -703,7 +770,12 @@ Item {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                selectedTag = selectedTag === modelData ? "" : modelData
+                                                // 落库打标：仅当选中了样本（无选中时只做本地高亮）
+                                                if (selectedSample && selectedSample.sampleId) {
+                                                    assignSampleTag(selectedSample.sampleId, selectedTag === modelData ? "" : modelData)
+                                                } else {
+                                                    selectedTag = selectedTag === modelData ? "" : modelData
+                                                }
                                             }
                                         }
                                     }
@@ -769,6 +841,26 @@ Item {
                             text: labeledSamples + "/" + totalSamples + " 已标注"
                             tone: labeledSamples > 0 ? "success" : "warning"
                         }
+
+                        // 缩略图大小滑块（对标 DLTools 数据集页）
+                        RowLayout {
+                            spacing: Theme.spacingTiny
+                            visible: currentDatasetId !== ""
+                            Text {
+                                text: "缩略图"
+                                font.pixelSize: Theme.fontSizeCaption
+                                font.family: Theme.fontFamily
+                                color: Theme.textMuted
+                            }
+                            Slider {
+                                id: thumbSizeSlider
+                                from: 60
+                                to: 180
+                                stepSize: 10
+                                value: 90
+                                implicitWidth: 96
+                            }
+                        }
                     }
                 }
 
@@ -831,9 +923,9 @@ Item {
                     Layout.fillHeight: true
                     Layout.margins: Theme.spacingLarge  // 16px padding
                     clip: true
-                    // auto-fill minmax(90px, 1fr) → cellWidth=90+gap, cellHeight=90+gap+label
-                    cellWidth: 90 + 10  // 90px thumb + 10px gap
-                    cellHeight: 90 + 10 + 14  // 90px thumb + 10px gap + 14px label
+                    // auto-fill minmax(90px, 1fr) → cellWidth=缩略图+gap, cellHeight=缩略图+gap+label
+                    cellWidth: thumbSizeSlider.value + 10
+                    cellHeight: thumbSizeSlider.value + 10 + 14
                     model: sampleListModel
 
                     ScrollBar.vertical: ScrollBar {
@@ -880,15 +972,21 @@ Item {
                                 id: thumbMouse
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                onClicked: {
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                onClicked: function(mouse) {
                                     selectedSample = {
                                         sampleId: model.sampleId,
                                         fileName: model.fileName,
                                         imagePath: model.imagePath,
                                         width: model.imgWidth,
                                         height: model.imgHeight,
-                                        labelCount: model.labelCount
+                                        labelCount: model.labelCount,
+                                        tagId: model.tagId || ""
                                     }
+                                    // 选中态同步显示样本当前 Tag（空串=未打标）
+                                    selectedTag = model.tagId ? (tagNameById[model.tagId] || "") : ""
+                                    if (mouse.button === Qt.RightButton && selectedSample)
+                                        sampleTagMenu.popup()
                                 }
                                 onDoubleClicked: {
                                     appController.currentPage = "annotation"
@@ -927,6 +1025,30 @@ Item {
                                     rightPadding: 2
                                 }
                             }
+
+                            // Tag 角标（右上角小胶囊，颜色按语义映射）
+                            Rectangle {
+                                visible: model.tagId !== undefined && model.tagId !== "" && (tagNameById[model.tagId] || "") !== ""
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.topMargin: 3
+                                anchors.rightMargin: 3
+                                radius: 6
+                                height: 13
+                                width: tagBadgeText.implicitWidth + 8
+                                color: sampleTagColor(tagNameById[model.tagId] || "")
+                                border.color: Theme.glassBorderGlow
+                                border.width: 1
+
+                                Text {
+                                    id: tagBadgeText
+                                    anchors.centerIn: parent
+                                    text: model.tagId ? (tagNameById[model.tagId] || "") : ""
+                                    font.pixelSize: 8
+                                    font.family: Theme.fontFamily
+                                    color: "#FFFFFF"
+                                }
+                            }
                         }
                     }
                 }
@@ -946,6 +1068,7 @@ Item {
 
         var statusFilter = galleryFilterBar.tagFilter || "全部状态"
         var splitFilter = galleryFilterBar.labelFilter || "全部划分"
+        var sampleTagFilter = galleryFilterBar.sampleTagFilter || "全部Tag"
         var filteredCount = 0
 
         for (var index = 0; index < rawSamples.length; ++index) {
@@ -973,16 +1096,72 @@ Item {
                 matchClass = cis.indexOf(filterClassIndex) >= 0
             }
 
-            if (!matchStatus || !matchSplit || !matchClass)
+            // 图像 Tag 过滤：无Tag = 未打标样本，具体 Tag = 按名称匹配
+            var sampleTagName = sample.tagId ? (tagNameById[sample.tagId] || "") : ""
+            var matchSampleTag = true
+            if (sampleTagFilter === "无Tag")
+                matchSampleTag = sampleTagIdOf(sample) === ""
+            else if (sampleTagFilter !== "全部Tag")
+                matchSampleTag = sampleTagName === sampleTagFilter
+
+            if (!matchStatus || !matchSplit || !matchClass || !matchSampleTag)
                 continue
 
             sampleListModel.append(sample)
             filteredCount += 1
         }
 
-        galleryFilterLabel = statusFilter === "全部状态" && splitFilter === "全部划分" && filterClassIndex < 0
+        galleryFilterLabel = statusFilter === "全部状态" && splitFilter === "全部划分" && filterClassIndex < 0 && sampleTagFilter === "全部Tag"
             ? "全部图像"
-            : (statusFilter + " / " + splitFilter + (filterClassIndex >= 0 ? " / 类别" + filterClassIndex : ""))
+            : (statusFilter + " / " + sampleTagFilter + " / " + splitFilter + (filterClassIndex >= 0 ? " / 类别" + filterClassIndex : ""))
+    }
+
+    function sampleTagIdOf(sample) {
+        return sample && sample.tagId ? String(sample.tagId) : ""
+    }
+
+    // Tag 名称 → 语义色（内置 Tag 映射系统色，自定义 Tag 中性灰）
+    function sampleTagColor(name) {
+        if (name === "良品") return Theme.success
+        if (name === "漏检") return Theme.warning
+        if (name === "误检") return Theme.danger
+        if (name === "待定") return Theme.primary
+        if (name === "重要") return Theme.tagImportant
+        return Theme.textMuted
+    }
+
+    // 查询 Tag 的快捷键（供 chip 显示提示）
+    function tagShortcutFor(name) {
+        if (typeof tagModel === "undefined") return ""
+        for (var i = 0; i < tagModel.rowCount(); i++) {
+            var idx = tagModel.index(i, 0)
+            if (tagModel.data(idx, Qt.UserRole + 2) === name)
+                return tagModel.data(idx, Qt.UserRole + 3) || ""
+        }
+        return ""
+    }
+
+    function tagChipLabel(name) {
+        var sc = tagShortcutFor(name)
+        return sc ? (name + "  " + sc) : name
+    }
+
+    // 右键打标菜单：标记为各 Tag / 清除
+    ContextMenu {
+        id: sampleTagMenu
+        Repeater {
+            model: typeof tagsSection !== "undefined" ? tagsSection.displayTags : []
+            MenuItem {
+                required property var modelData
+                text: "标记为 " + modelData
+                onTriggered: assignSampleTag(selectedSample ? selectedSample.sampleId : "", modelData)
+            }
+        }
+        MenuSeparator {}
+        MenuItem {
+            text: "清除 Tag"
+            onTriggered: assignSampleTag(selectedSample ? selectedSample.sampleId : "", "")
+        }
     }
 
     // === 全局筛选接口：数据集过滤 ===
@@ -1059,7 +1238,8 @@ Item {
                 "labelPath": s.labelPath || "",
                 "validationStatus": s.validationStatus || "",
                 "split": s.split || "unspecified",
-                "classIndices": classIndices
+                "classIndices": classIndices,
+                "tagId": s.tagId || ""
             })
             if (imgPath) rawPaths.push(imgPath.replace(/\\/g, "/"))
         }
@@ -1080,6 +1260,31 @@ Item {
         function onLabelFilterChanged() {
             pageRoot.applySampleFilters()
         }
+        function onSampleTagFilterChanged() {
+            pageRoot.applySampleFilters()
+        }
+    }
+
+    // 图像 Tag 体系：Tag 增删改时重建映射与筛选选项；样本指派变化时刷新本页行
+    Connections {
+        target: tagService
+        function onTagsChanged(datasetId) {
+            if (datasetId === currentDatasetId) pageRoot.rebuildTagMaps()
+        }
+        function onSampleTagsChanged(datasetId) {
+            if (datasetId === currentDatasetId) refreshSampleTagIds()
+        }
+    }
+
+    function refreshSampleTagIds() {
+        for (var i = 0; i < rawSamples.length; ++i) {
+            rawSamples[i].tagId = tagService.getSampleTagId(rawSamples[i].sampleId) || ""
+        }
+        if (selectedSample && selectedSample.sampleId) {
+            selectedSample.tagId = tagService.getSampleTagId(selectedSample.sampleId) || ""
+            selectedTag = selectedSample.tagId ? (tagNameById[selectedSample.tagId] || "") : ""
+        }
+        applySampleFilters()
     }
 
     // ================================================================
@@ -1243,7 +1448,7 @@ Item {
             if (tagId) {
                 tagModel.setDatasetId(currentDatasetId)
                 tagModel.refresh()
-                root.updateTagSummary && root.updateTagSummary()
+                pageRoot.rebuildTagMaps()
                 if (typeof ToastBus !== "undefined") ToastBus.success("已添加标签：" + name)
             } else {
                 if (typeof ToastBus !== "undefined") ToastBus.error("添加失败：标签可能已存在")
