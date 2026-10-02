@@ -1570,33 +1570,6 @@ Item {
 
                             Item { Layout.fillWidth: true }
 
-                            // 管理类别体系入口（直达类别体系管理页：改名/颜色/快捷键）
-                            ToolButton {
-                                text: "\u2699"
-                                font.pixelSize: 13
-                                Layout.preferredWidth: 22
-                                Layout.preferredHeight: 22
-                                ToolTip.visible: hovered
-                                ToolTip.text: "管理类别体系（改名/颜色/快捷键）"
-                                ToolTip.delay: 400
-
-                                background: Rectangle {
-                                    color: parent.hovered ? Theme.bgHover : "transparent"
-                                    radius: 4
-                                    border.color: parent.hovered ? Theme.borderColor : "transparent"
-                                    border.width: 1
-                                }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    color: parent.hovered ? Theme.primary : Theme.textMuted
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                onClicked: appController.currentPage = "taxonomy"
-                            }
-
                             // 添加类别入口
                             Button {
                                 text: "+"
