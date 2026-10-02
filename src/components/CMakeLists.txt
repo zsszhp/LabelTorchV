@@ -20,6 +20,7 @@ qt_add_qml_module(labeltorch_components
         qml/StatusTag.qml
         qml/LtButton.qml
         qml/LtComboBox.qml
+        qml/ClassStyleDialog.qml
         qml/ToastBus.qml
         qml/Toast.qml
         qml/EmptyState.qml

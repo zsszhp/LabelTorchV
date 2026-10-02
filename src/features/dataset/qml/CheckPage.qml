@@ -592,6 +592,37 @@ Item {
                                         font.pixelSize: Theme.fontSizeCaption
                                         font.family: Theme.fontFamilyMono
                                         color: Theme.textMuted
+                                        visible: !classItemMouse.containsMouse
+                                    }
+
+                                    // 行内编辑（✎）/删除（✕）：悬停时显示
+                                    Text {
+                                        visible: classItemMouse.containsMouse
+                                        text: "\u270F"
+                                        font.pixelSize: 11
+                                        color: classItemMouse.containsMouse ? Theme.primary : Theme.textMuted
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            anchors.margins: -4
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: classStyleDialog.openFor(model.classIndex)
+                                        }
+                                    }
+
+                                    Text {
+                                        visible: classItemMouse.containsMouse
+                                        text: "\u2715"
+                                        font.pixelSize: 11
+                                        color: delRowMouse.containsMouse ? Theme.danger : Theme.textMuted
+
+                                        MouseArea {
+                                            id: delRowMouse
+                                            anchors.fill: parent
+                                            anchors.margins: -4
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: taxonomyModel.removeClass(model.classIndex)
+                                        }
                                     }
                                 }
 
@@ -899,5 +930,10 @@ Item {
         function onCurrentProjectIdChanged() {
             refreshData()
         }
+    }
+
+    // === 类别样式编辑弹窗（行内 ✎ 唤起：改名/颜色/快捷键一体） ===
+    ClassStyleDialog {
+        id: classStyleDialog
     }
 }

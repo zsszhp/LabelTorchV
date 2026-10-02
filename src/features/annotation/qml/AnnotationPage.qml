@@ -776,10 +776,43 @@ Item {
                                             Layout.fillWidth: true
                                             elide: Text.ElideRight
                                         }
+
+                                        // 行内编辑（✎）：悬停显示，打开样式编辑（名称/颜色/快捷键）
+                                        Text {
+                                            visible: root.hovered && model.className !== ""
+                                            text: "\u270F"
+                                            font.pixelSize: 11
+                                            color: editRowMouse.containsMouse ? "#FFFFFF" : Theme.textSecondary
+
+                                            MouseArea {
+                                                id: editRowMouse
+                                                anchors.fill: parent
+                                                anchors.margins: -4
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: classStyleDialog.openFor(model.classIndex)
+                                            }
+                                        }
+
+                                        // 行内删除（✕）：悬停显示（废弃占位保护 class_id）
+                                        Text {
+                                            visible: root.hovered && model.className !== ""
+                                            text: "\u2715"
+                                            font.pixelSize: 11
+                                            color: delRowMouse.containsMouse ? Theme.danger : Theme.textSecondary
+
+                                            MouseArea {
+                                                id: delRowMouse
+                                                anchors.fill: parent
+                                                anchors.margins: -4
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: taxonomyModel.removeClass(model.classIndex)
+                                            }
+                                        }
                                     }
 
                                     MouseArea {
                                         anchors.fill: parent
+                                        hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
                                             if (annotationMode === "classify") {
@@ -2264,5 +2297,10 @@ Item {
         function onCurrentTaskTypeChanged() {
             initAnnotationMode()
         }
+    }
+
+    // === 类别样式编辑弹窗（行内 ✎ 唤起：改名/颜色/快捷键一体） ===
+    ClassStyleDialog {
+        id: classStyleDialog
     }
 }
