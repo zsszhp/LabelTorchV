@@ -635,138 +635,6 @@ Item {
                         color: Theme.borderColor
                     }
 
-                    // ====== 区域4：标签 ======
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.margins: 12
-                        spacing: 0
-
-                        // 标题行
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Layout.bottomMargin: 8
-                            spacing: 4
-
-                            Text {
-                                text: "标签"
-                                font.pixelSize: 12
-                                font.weight: Font.Normal
-                                font.family: Theme.fontFamily
-                                color: Theme.textMain
-                            }
-
-                            Item { Layout.fillWidth: true }
-
-                            // 添加标签入口
-                            Button {
-                                text: "+"
-                                font.pixelSize: 14
-                                font.bold: true
-                                Layout.preferredWidth: 22
-                                Layout.preferredHeight: 22
-
-                                background: Rectangle {
-                                    color: parent.hovered ? Theme.primary : Theme.bgCard
-                                    radius: 4
-                                    border.color: Theme.primary
-                                    border.width: 1
-                                }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    color: parent.hovered ? Theme.bgMain : Theme.primary
-                                    font: parent.font
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                onClicked: addTagDialog.open()
-                            }
-                        }
-
-                        // 所属数据集提示
-                        Text {
-                            text: "所属数据集: " + (datasetCombo.currentText || "默认数据集")
-                            font.pixelSize: 11
-                            font.family: Theme.fontFamily
-                            color: Theme.textMuted
-                            Layout.bottomMargin: 10
-                            Layout.leftMargin: 4
-                        }
-
-                        // Tag 按钮网格（2列，对标参考UI grid-template-columns:1fr 1fr）
-                        GridLayout {
-                            Layout.fillWidth: true
-                            columns: 2
-                            columnSpacing: 8
-                            rowSpacing: 8
-
-                            Repeater {
-                                model: tagListData.length > 0 ? tagListData : [
-                                    {name: "默认", color: Theme.primary, active: true},
-                                    {name: "良品", color: "", active: false},
-                                    {name: "漏检", color: "", active: false},
-                                    {name: "误检", color: "", active: false},
-                                    {name: "待定", color: "", active: false},
-                                    {name: "重要", color: "", active: false}
-                                ]
-
-                                Button {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 30
-                                    text: modelData.name
-                                    font.pixelSize: 12
-                                    font.weight: modelData.active || modelData.color === Theme.primary ? Font.DemiBold : Font.Normal
-
-                                    background: Rectangle {
-                                        color: modelData.active || modelData.color === Theme.primary ? Theme.primary : Theme.bgCard
-                                        border.color: modelData.active || modelData.color === Theme.primary ? "transparent" : Theme.borderColor
-                                        border.width: modelData.active || modelData.color === Theme.primary ? 0 : 1
-                                        radius: 4
-                                    }
-
-                                    contentItem: Text {
-                                        text: parent.text
-                                        font.pixelSize: 12
-                                        font.weight: parent.font.weight
-                                        font.family: Theme.fontFamily
-                                        color: modelData.active || modelData.color === Theme.primary ? "#FFFFFF" : Theme.textMain
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-
-                                    onClicked: {
-                                        // 切换 Tag 选中状态
-                                        var newTags = tagListData.slice()
-                                        if (newTags.length === 0) {
-                                            // 初始化 tagListData
-                                            tagListData = [
-                                                {name: "默认", color: Theme.primary, active: false},
-                                                {name: "良品", color: "", active: false},
-                                                {name: "漏检", color: "", active: false},
-                                                {name: "误检", color: "", active: false},
-                                                {name: "待定", color: "", active: false},
-                                                {name: "重要", color: "", active: false}
-                                            ]
-                                        }
-                                        // 切换当前 tag
-                                        for (var i = 0; i < tagListData.length; i++) {
-                                            if (tagListData[i].name === modelData.name) {
-                                                tagListData[i].active = !tagListData[i].active
-                                                if (tagListData[i].active) {
-                                                    tagListData[i].color = Theme.primary
-                                                } else {
-                                                    tagListData[i].color = ""
-                                                }
-                                            }
-                                        }
-                                        tagListData = tagListData.slice() // 触发绑定更新
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                     // 底部弹性空间
                     Item { Layout.fillHeight: true }
                 }
@@ -1738,10 +1606,143 @@ Item {
                                 }
                             }
                             }
+
+// ====== 区域4：标签 ======
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.margins: 12
+                        spacing: 0
+
+                        // 标题行
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.bottomMargin: 8
+                            spacing: 4
+
+                            Text {
+                                text: "标签"
+                                font.pixelSize: 12
+                                font.weight: Font.Normal
+                                font.family: Theme.fontFamily
+                                color: Theme.textMain
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            // 添加标签入口
+                            Button {
+                                text: "+"
+                                font.pixelSize: 14
+                                font.bold: true
+                                Layout.preferredWidth: 22
+                                Layout.preferredHeight: 22
+
+                                background: Rectangle {
+                                    color: parent.hovered ? Theme.primary : Theme.bgCard
+                                    radius: 4
+                                    border.color: Theme.primary
+                                    border.width: 1
+                                }
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: parent.hovered ? Theme.bgMain : Theme.primary
+                                    font: parent.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                onClicked: addTagDialog.open()
+                            }
+                        }
+
+                        // 所属数据集提示
+                        Text {
+                            text: "所属数据集: " + (datasetCombo.currentText || "默认数据集")
+                            font.pixelSize: 11
+                            font.family: Theme.fontFamily
+                            color: Theme.textMuted
+                            Layout.bottomMargin: 10
+                            Layout.leftMargin: 4
+                        }
+
+                        // Tag 按钮网格（2列，对标参考UI grid-template-columns:1fr 1fr）
+                        GridLayout {
+                            Layout.fillWidth: true
+                            columns: 2
+                            columnSpacing: 8
+                            rowSpacing: 8
+
+                            Repeater {
+                                model: tagListData.length > 0 ? tagListData : [
+                                    {name: "默认", color: Theme.primary, active: true},
+                                    {name: "良品", color: "", active: false},
+                                    {name: "漏检", color: "", active: false},
+                                    {name: "误检", color: "", active: false},
+                                    {name: "待定", color: "", active: false},
+                                    {name: "重要", color: "", active: false}
+                                ]
+
+                                Button {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 30
+                                    text: modelData.name
+                                    font.pixelSize: 12
+                                    font.weight: modelData.active || modelData.color === Theme.primary ? Font.DemiBold : Font.Normal
+
+                                    background: Rectangle {
+                                        color: modelData.active || modelData.color === Theme.primary ? Theme.primary : Theme.bgCard
+                                        border.color: modelData.active || modelData.color === Theme.primary ? "transparent" : Theme.borderColor
+                                        border.width: modelData.active || modelData.color === Theme.primary ? 0 : 1
+                                        radius: 4
+                                    }
+
+                                    contentItem: Text {
+                                        text: parent.text
+                                        font.pixelSize: 12
+                                        font.weight: parent.font.weight
+                                        font.family: Theme.fontFamily
+                                        color: modelData.active || modelData.color === Theme.primary ? "#FFFFFF" : Theme.textMain
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+
+                                    onClicked: {
+                                        // 切换 Tag 选中状态
+                                        var newTags = tagListData.slice()
+                                        if (newTags.length === 0) {
+                                            // 初始化 tagListData
+                                            tagListData = [
+                                                {name: "默认", color: Theme.primary, active: false},
+                                                {name: "良品", color: "", active: false},
+                                                {name: "漏检", color: "", active: false},
+                                                {name: "误检", color: "", active: false},
+                                                {name: "待定", color: "", active: false},
+                                                {name: "重要", color: "", active: false}
+                                            ]
+                                        }
+                                        // 切换当前 tag
+                                        for (var i = 0; i < tagListData.length; i++) {
+                                            if (tagListData[i].name === modelData.name) {
+                                                tagListData[i].active = !tagListData[i].active
+                                                if (tagListData[i].active) {
+                                                    tagListData[i].color = Theme.primary
+                                                } else {
+                                                    tagListData[i].color = ""
+                                                }
+                                            }
+                                        }
+                                        tagListData = tagListData.slice() // 触发绑定更新
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    
                         }
                     }
         }
-
     }
 
     // ================================================================
