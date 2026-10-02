@@ -18,7 +18,7 @@ Item {
     // 修复方式见下方 canvasItem：通过 StackLayout 容器的 id 限定引用（Main.qml 的 contentStack）。
     property int shapeMode: 0          // 0=HBB, 1=OBB, 2=Polygon
     property string annotationMode: "detect"  // detect / classify / anomaly
-    property int selectedClassId: -1
+    property int selectedClassId: 0    // 默认第一类：新框不再叫 class_0（对标 X-AnyLabeling）
     property var selectedMultiClassIds: []
     property bool isAnomalous: false
     property var sampleListData: []
@@ -1130,6 +1130,20 @@ Item {
                             }
                             canvasController.drawMode = interactionMode === "draw" ? "draw" : "select"
                             canvasController.setPolygonDrawing(shapeMode === 2 && interactionMode === "draw")
+                        }
+                        // 数字键 1-9 切换类别（信号驱动，绑定保持一致）
+                        onClassSelectRequested: function(classIndex) {
+                            if (annotationMode !== "detect" && annotationMode !== "classify") return
+                            if (classIndex >= 0 && classIndex < taxonomyModel.rowCount()) {
+                                selectedClassId = classIndex
+                            }
+                        }
+                        // [/] 键循环切换类别
+                        onClassChangeRequested: function(direction) {
+                            if (annotationMode !== "detect") return
+                            var count = taxonomyModel.rowCount()
+                            if (count <= 0) return
+                            selectedClassId = (selectedClassId + direction + count) % count
                         }
 
                         // C++ 层发出的导航信号

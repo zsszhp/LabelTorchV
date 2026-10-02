@@ -144,3 +144,38 @@ bool TaxonomyModel::renameClass(int index, const QString &newName)
     if (!ok) ltWarning(LT_LOG_TAXONOMY()) << "Failed to persist renameClass:" << query.lastError().text();
     return ok;
 }
+
+bool TaxonomyModel::setClassStyle(int index, const QString &color, const QString &shortcut)
+{
+    if (m_taxonomyId.isEmpty() || index < 0) return false;
+    QSqlQuery query(Database::instance().database());
+    query.prepare("INSERT INTO taxonomy_class_styles (taxonomy_id, class_index, color, shortcut) "
+                  "VALUES (?, ?, ?, ?) "
+                  "ON CONFLICT(taxonomy_id, class_index) DO UPDATE SET color = excluded.color, shortcut = excluded.shortcut");
+    query.addBindValue(m_taxonomyId);
+    query.addBindValue(index);
+    query.addBindValue(color);
+    query.addBindValue(shortcut);
+    bool ok = query.exec();
+    if (!ok) ltWarning(LT_LOG_TAXONOMY()) << "Failed to persist setClassStyle:" << query.lastError().text();
+    else emit dataChanged(createIndex(index, 0), createIndex(index, 0));
+    return ok;
+}
+
+QVariantMap TaxonomyModel::getClassStyle(int index) const
+{
+    QVariantMap style;
+    style["color"] = QString();
+    style["shortcut"] = QString();
+    if (m_taxonomyId.isEmpty() || index < 0) return style;
+    QSqlQuery query(Database::instance().database());
+    query.prepare("SELECT color, shortcut FROM taxonomy_class_styles "
+                  "WHERE taxonomy_id = ? AND class_index = ?");
+    query.addBindValue(m_taxonomyId);
+    query.addBindValue(index);
+    if (query.exec() && query.next()) {
+        style["color"] = query.value(0).toString();
+        style["shortcut"] = query.value(1).toString();
+    }
+    return style;
+}

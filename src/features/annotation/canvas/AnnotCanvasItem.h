@@ -99,6 +99,8 @@ signals:
     void saveRequested();
     void editLabelRequested(int annotationIndex);
     void changeClassRequested(int direction);
+    /// 数字键 1-9 切换类别（信号驱动：QML 侧同步 selectedClassId）
+    void classSelectRequested(int classIndex);
     /// C++ 侧切换工具（快捷键 W/O/P/Esc）后通知 QML 同步工具栏与 shapeType
     void drawToolChanged(int shapeMode, const QString &interactionMode);
 

@@ -447,3 +447,56 @@ int TaxonomyService::getTaxonomyVersion(const QString &taxonomyId)
     if (query.exec() && query.next()) return query.value(0).toInt();
     return -1;
 }
+
+bool TaxonomyService::setClassStyle(const QString &taxonomyId, int classIndex,
+                                    const QString &color, const QString &shortcut)
+{
+    QSqlQuery query(Database::instance().database());
+    query.prepare("INSERT INTO taxonomy_class_styles (taxonomy_id, class_index, color, shortcut) "
+                  "VALUES (?, ?, ?, ?) "
+                  "ON CONFLICT(taxonomy_id, class_index) DO UPDATE SET color = excluded.color, shortcut = excluded.shortcut");
+    query.addBindValue(taxonomyId);
+    query.addBindValue(classIndex);
+    query.addBindValue(color);
+    query.addBindValue(shortcut);
+    if (!query.exec()) {
+        setLastError(QStringLiteral("E_DB_ERROR"),
+                     QStringLiteral("保存类别样式失败：%1").arg(query.lastError().text()));
+        return false;
+    }
+    return true;
+}
+
+QVariantMap TaxonomyService::getClassStyle(const QString &taxonomyId, int classIndex)
+{
+    QVariantMap style;
+    style["color"] = QString();
+    style["shortcut"] = QString();
+    QSqlQuery query(Database::instance().database());
+    query.prepare("SELECT color, shortcut FROM taxonomy_class_styles "
+                  "WHERE taxonomy_id = ? AND class_index = ?");
+    query.addBindValue(taxonomyId);
+    query.addBindValue(classIndex);
+    if (query.exec() && query.next()) {
+        style["color"] = query.value(0).toString();
+        style["shortcut"] = query.value(1).toString();
+    }
+    return style;
+}
+
+QVariantMap TaxonomyService::getAllClassStyles(const QString &taxonomyId)
+{
+    QVariantMap styles;
+    QSqlQuery query(Database::instance().database());
+    query.prepare("SELECT class_index, color, shortcut FROM taxonomy_class_styles WHERE taxonomy_id = ?");
+    query.addBindValue(taxonomyId);
+    if (query.exec()) {
+        while (query.next()) {
+            QVariantMap s;
+            s["color"] = query.value(1).toString();
+            s["shortcut"] = query.value(2).toString();
+            styles[query.value(0).toString()] = s;
+        }
+    }
+    return styles;
+}

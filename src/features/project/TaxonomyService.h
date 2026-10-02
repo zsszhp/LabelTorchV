@@ -36,6 +36,25 @@ public:
      */
     Q_INVOKABLE bool removeClass(const QString &taxonomyId, int classIndex, bool forcePhysical = false);
 
+    /**
+     * @brief 设置类别样式（颜色/快捷键），存储于 taxonomy_class_styles 表。
+     * @param taxonomyId 类别体系 ID。
+     * @param classIndex 类别索引（YOLO class_id）。
+     * @param color 颜色（#RRGGBB，空串表示清除）。
+     * @param shortcut 快捷键字符（空串表示清除）。
+     * @return true 成功。
+     */
+    Q_INVOKABLE bool setClassStyle(const QString &taxonomyId, int classIndex,
+                                   const QString &color, const QString &shortcut);
+    /**
+     * @brief 读取单个类别样式，返回 {color, shortcut}（未设置时两项为空串）。
+     */
+    Q_INVOKABLE QVariantMap getClassStyle(const QString &taxonomyId, int classIndex);
+    /**
+     * @brief 读取全部类别样式，返回 {classIndex: {color, shortcut}} 映射。
+     */
+    Q_INVOKABLE QVariantMap getAllClassStyles(const QString &taxonomyId);
+
     Q_INVOKABLE bool renameClass(const QString &taxonomyId, int classIndex, const QString &newName);
     Q_INVOKABLE bool reorderClasses(const QString &taxonomyId, const QVariantList &newOrder);
     Q_INVOKABLE QVariantList getClasses(const QString &taxonomyId);

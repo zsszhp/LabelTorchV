@@ -1166,7 +1166,8 @@ void AnnotCanvasItem::keyPressEvent(QKeyEvent* event)
     }
 
     if (event->key() >= Qt::Key_1 && event->key() <= Qt::Key_9) {
-        setCurrentClassIndex(event->key() - Qt::Key_1);
+        // 类别切换走信号：QML 侧更新 selectedClassId（命令式赋值会被 QML 绑定覆盖）
+        emit classSelectRequested(event->key() - Qt::Key_1);
         event->accept();
         return;
     }

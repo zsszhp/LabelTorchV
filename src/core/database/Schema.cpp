@@ -28,6 +28,15 @@ QStringList Schema::createTableStatements()
         "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
         ")",
 
+        // 类别样式（颜色/快捷键）：class_definitions_json 只存名称数组，样式单独存储
+        "CREATE TABLE IF NOT EXISTS taxonomy_class_styles ("
+        "  taxonomy_id TEXT NOT NULL REFERENCES taxonomies(id),"
+        "  class_index INTEGER NOT NULL,"
+        "  color TEXT,"
+        "  shortcut TEXT,"
+        "  PRIMARY KEY (taxonomy_id, class_index)"
+        ")",
+
         // 数据集表
         "CREATE TABLE IF NOT EXISTS datasets ("
         "  id TEXT PRIMARY KEY,"

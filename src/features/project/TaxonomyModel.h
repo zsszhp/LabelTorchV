@@ -42,6 +42,19 @@ public:
      */
     Q_INVOKABLE bool renameClass(int index, const QString &newName);
 
+    /**
+     * @brief 设置类别样式（颜色/快捷键），持久化到 taxonomy_class_styles 表。
+     * @param index 类别索引（class_id）。
+     * @param color 颜色（#RRGGBB，空串清除）。
+     * @param shortcut 快捷键字符（空串清除）。
+     */
+    Q_INVOKABLE bool setClassStyle(int index, const QString &color, const QString &shortcut);
+
+    /**
+     * @brief 读取类别样式，返回 {color, shortcut}（未设置时两项为空串）。
+     */
+    Q_INVOKABLE QVariantMap getClassStyle(int index) const;
+
 signals:
     void taxonomyIdChanged();
 
