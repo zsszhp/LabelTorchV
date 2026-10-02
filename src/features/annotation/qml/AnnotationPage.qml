@@ -1550,8 +1550,8 @@ Item {
 
                     // ====== 区域3：标签类别 ======
                     ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.margins: 12
+                        anchors.fill: parent
+                        anchors.margins: 12
                         spacing: 0
 
                         // 标题行（对标参考UI：无图标）
@@ -1617,9 +1617,15 @@ Item {
                         }
 
                         // 类别列表（对标参考UI：选中项蓝色高亮，未选中暗色卡片；随搜索过滤）
-                        ColumnLayout {
+                        ScrollView {
                             Layout.fillWidth: true
-                            spacing: 6
+                            Layout.fillHeight: true
+                            clip: true
+                            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
+                            ColumnLayout {
+                                width: parent.width - 8
+                                spacing: 6
 
                             Repeater {
                                 model: taxonomyModel
@@ -1730,6 +1736,7 @@ Item {
                                         }
                                     }
                                 }
+                            }
                             }
                         }
                     }

@@ -28,6 +28,9 @@ Item {
     property var tagNameById: ({})
     // Tag 筛选选项模型："全部Tag" / "无Tag" / 各 Tag 名称
     property var sampleTagOptions: ["全部Tag"]
+    // 多选批量打标：sampleId → true 映射（对标 DLTools 缩略图复选框）
+    property var checkedSamples: ({})
+    readonly property int checkedCount: Object.keys(checkedSamples).length
 
     // P1-21：解析缩略图路径——已生成则走缩略图，否则回退原图并靠 sourceSize 限解码
     function resolveThumbSource(imagePath) {
@@ -65,6 +68,7 @@ Item {
             currentDatasetId = ""
             currentDatasetName = ""
             selectedSample = null
+            clearChecked()
             tagModel.setDatasetId("")  // A6：清空标签列表
         }
     }
@@ -103,15 +107,10 @@ Item {
     // 将 Tag 指派给样本（tagName 为空串表示清除），落库并刷新本地行
     function assignSampleTag(sampleId, tagName) {
         if (!sampleId) return
-        var tagId = ""
-        if (tagName !== "") {
-            for (var tid in tagNameById) {
-                if (tagNameById[tid] === tagName) { tagId = tid; break }
-            }
-            if (!tagId) {
-                if (typeof ToastBus !== "undefined") ToastBus.error("未找到标签：" + tagName)
-                return
-            }
+        var tagId = resolveTagIdByName(tagName)
+        if (tagName !== "" && !tagId) {
+            if (typeof ToastBus !== "undefined") ToastBus.error("未找到标签：" + tagName)
+            return
         }
         if (!tagService.setSampleTag(sampleId, tagId)) {
             if (typeof ToastBus !== "undefined") ToastBus.error("标记失败：" + tagName)
@@ -130,6 +129,51 @@ Item {
             selectedTag = name
         }
         applySampleFilters()
+    }
+
+    // tagName → tagId（空名返回空串）
+    function resolveTagIdByName(tagName) {
+        if (tagName === "") return ""
+        for (var tid in tagNameById) {
+            if (tagNameById[tid] === tagName) return tid
+        }
+        return ""
+    }
+
+    // 批量打标：勾选多张时应用到所有勾选项，否则落到当前选中图
+    function assignTagToSelection(tagName) {
+        if (checkedCount > 0) {
+            var tagId = resolveTagIdByName(tagName)
+            if (tagName !== "" && !tagId) {
+                if (typeof ToastBus !== "undefined") ToastBus.error("未找到标签：" + tagName)
+                return
+            }
+            var ids = Object.keys(checkedSamples)
+            var updated = tagService.setSamplesTag(ids, tagId)
+            if (updated > 0) {
+                if (typeof ToastBus !== "undefined")
+                    ToastBus.success("已标记 " + updated + " 张图像：" + (tagName || "清除 Tag"))
+                // 勾选保持不变，便于连续批量操作；样本行刷新
+                refreshSampleTagIds()
+            } else {
+                if (typeof ToastBus !== "undefined") ToastBus.error("批量标记失败")
+            }
+            return
+        }
+        assignSampleTag(selectedSample ? selectedSample.sampleId : "", tagName)
+    }
+
+    // 勾选/取消勾选（多选批量打标）
+    function toggleSampleChecked(sampleId) {
+        var map = {}
+        for (var k in checkedSamples) map[k] = checkedSamples[k]
+        if (map[sampleId]) delete map[sampleId]
+        else map[sampleId] = true
+        checkedSamples = map
+    }
+
+    function clearChecked() {
+        checkedSamples = {}
     }
 
     // === 监听扫描完成信号 ===
@@ -770,9 +814,9 @@ Item {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                // 落库打标：仅当选中了样本（无选中时只做本地高亮）
-                                                if (selectedSample && selectedSample.sampleId) {
-                                                    assignSampleTag(selectedSample.sampleId, selectedTag === modelData ? "" : modelData)
+                                                // 落库打标：勾选多张时批量应用，选中单张时落到该图
+                                                if (checkedCount > 0 || (selectedSample && selectedSample.sampleId)) {
+                                                    assignTagToSelection(selectedTag === modelData ? "" : modelData)
                                                 } else {
                                                     selectedTag = selectedTag === modelData ? "" : modelData
                                                 }
@@ -835,6 +879,23 @@ Item {
                         StatusTag {
                             text: sampleListModel.count + " 张图像"
                             tone: sampleListModel.count > 0 ? "info" : "neutral"
+                        }
+
+                        // 多选批量打标计数（对标 DLTools「已选择的图像」）
+                        StatusTag {
+                            visible: checkedCount > 0
+                            text: "已选 " + checkedCount + " 张"
+                            tone: "info"
+                        }
+
+                        Button {
+                            visible: checkedCount > 0
+                            text: "清除选择"
+                            flat: true
+                            font.pixelSize: Theme.fontSizeCaption
+                            font.family: Theme.fontFamily
+                            palette.buttonText: Theme.textMuted
+                            onClicked: clearChecked()
                         }
 
                         StatusTag {
@@ -1026,6 +1087,40 @@ Item {
                                 }
                             }
 
+                            // 多选复选框（左上角，悬停或已勾选时显示）
+                            Rectangle {
+                                id: thumbCheck
+                                readonly property bool isChecked: pageRoot.checkedSamples[model.sampleId] === true
+                                visible: thumbMouse.containsMouse || isChecked || pageRoot.checkedCount > 0
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.topMargin: 3
+                                anchors.leftMargin: 3
+                                width: 16
+                                height: 16
+                                radius: 3
+                                color: isChecked ? Theme.primary : Theme.bgCard
+                                border.color: isChecked ? Theme.primary : Theme.borderHover
+                                border.width: 1
+                                z: 2
+
+                                Text {
+                                    visible: parent.isChecked
+                                    anchors.centerIn: parent
+                                    text: "✓"
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: "#FFFFFF"
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    anchors.margins: -5
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: pageRoot.toggleSampleChecked(model.sampleId)
+                                }
+                            }
+
                             // Tag 角标（右上角小胶囊，颜色按语义映射）
                             Rectangle {
                                 visible: model.tagId !== undefined && model.tagId !== "" && (tagNameById[model.tagId] || "") !== ""
@@ -1039,6 +1134,7 @@ Item {
                                 color: sampleTagColor(tagNameById[model.tagId] || "")
                                 border.color: Theme.glassBorderGlow
                                 border.width: 1
+                                z: 1
 
                                 Text {
                                     id: tagBadgeText
@@ -1069,6 +1165,7 @@ Item {
         var statusFilter = galleryFilterBar.tagFilter || "全部状态"
         var splitFilter = galleryFilterBar.labelFilter || "全部划分"
         var sampleTagFilter = galleryFilterBar.sampleTagFilter || "全部Tag"
+        var searchKey = (galleryFilterBar.searchText || "").toLowerCase()
         var filteredCount = 0
 
         for (var index = 0; index < rawSamples.length; ++index) {
@@ -1104,16 +1201,19 @@ Item {
             else if (sampleTagFilter !== "全部Tag")
                 matchSampleTag = sampleTagName === sampleTagFilter
 
-            if (!matchStatus || !matchSplit || !matchClass || !matchSampleTag)
+            // 文件名搜索：大小写不敏感的子串匹配
+            var matchSearch = searchKey === "" || fileName.toLowerCase().indexOf(searchKey) >= 0
+
+            if (!matchStatus || !matchSplit || !matchClass || !matchSampleTag || !matchSearch)
                 continue
 
             sampleListModel.append(sample)
             filteredCount += 1
         }
 
-        galleryFilterLabel = statusFilter === "全部状态" && splitFilter === "全部划分" && filterClassIndex < 0 && sampleTagFilter === "全部Tag"
+        galleryFilterLabel = statusFilter === "全部状态" && splitFilter === "全部划分" && filterClassIndex < 0 && sampleTagFilter === "全部Tag" && searchKey === ""
             ? "全部图像"
-            : (statusFilter + " / " + sampleTagFilter + " / " + splitFilter + (filterClassIndex >= 0 ? " / 类别" + filterClassIndex : ""))
+            : (statusFilter + " / " + sampleTagFilter + " / " + splitFilter + (filterClassIndex >= 0 ? " / 类别" + filterClassIndex : "") + (searchKey !== "" ? " / 搜索\"" + searchKey + "\"" : ""))
     }
 
     function sampleTagIdOf(sample) {
@@ -1146,21 +1246,21 @@ Item {
         return sc ? (name + "  " + sc) : name
     }
 
-    // 右键打标菜单：标记为各 Tag / 清除
+    // 右键打标菜单：标记为各 Tag / 清除（勾选多张时批量应用）
     ContextMenu {
         id: sampleTagMenu
         Repeater {
             model: typeof tagsSection !== "undefined" ? tagsSection.displayTags : []
             MenuItem {
                 required property var modelData
-                text: "标记为 " + modelData
-                onTriggered: assignSampleTag(selectedSample ? selectedSample.sampleId : "", modelData)
+                text: checkedCount > 0 ? ("批量标记为 " + modelData) : ("标记为 " + modelData)
+                onTriggered: assignTagToSelection(modelData)
             }
         }
         MenuSeparator {}
         MenuItem {
-            text: "清除 Tag"
-            onTriggered: assignSampleTag(selectedSample ? selectedSample.sampleId : "", "")
+            text: checkedCount > 0 ? "批量清除 Tag" : "清除 Tag"
+            onTriggered: assignTagToSelection("")
         }
     }
 
@@ -1175,6 +1275,7 @@ Item {
             selectedSample = null
             sampleListModel.clear()
             rawSamples = []
+            clearChecked()
             tagModel.setDatasetId("")
         }
     }
@@ -1194,6 +1295,7 @@ Item {
         selectedSample = null
         sampleListModel.clear()
         rawSamples = []
+        clearChecked()  // 多选勾选不跨数据集保留
         // P1-21：解析缩略图目录
         pageRoot.thumbCacheDir = projectService.thumbnailCacheDir(appController.currentProjectId)
 
@@ -1261,6 +1363,9 @@ Item {
             pageRoot.applySampleFilters()
         }
         function onSampleTagFilterChanged() {
+            pageRoot.applySampleFilters()
+        }
+        function onSearchTextChanged() {
             pageRoot.applySampleFilters()
         }
     }

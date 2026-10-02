@@ -2,7 +2,6 @@
 import QtQuick
 import QtQuick.Controls
 import LabelTorch.Theme
-import LabelTorch.Shell
 
 Rectangle {
     id: root
@@ -23,6 +22,8 @@ Rectangle {
     property alias sampleTagIndex: sampleTagCombo.currentIndex
     // 文件名搜索（对标 DLTools 数据集页搜索框）
     property alias searchText: searchField.text
+    // 搜索文本变化信号（页面据此过滤）
+    signal searchTextChanged()
 
     Row {
         anchors.fill: parent
@@ -126,12 +127,19 @@ Rectangle {
                 anchors.rightMargin: 8
                 spacing: Theme.spacingSmall
 
-                SvgIcon {
+                // 经 qrc 加载 Shell 的 SvgIcon（避免 components→shell 模块循环依赖）
+                Loader {
+                    id: searchLoader
                     anchors.verticalCenter: parent.verticalCenter
                     width: 13
                     height: 13
-                    icon: "search"
-                    color: searchField.text.length > 0 ? Theme.primary : "transparent"
+                    source: "qrc:/qt/qml/LabelTorch/Shell/qml/SvgIcon.qml"
+                    onLoaded: {
+                        item.icon = "search"
+                        item.color = Qt.binding(function() {
+                            return searchField.text.length > 0 ? Theme.primary : "transparent"
+                        })
+                    }
                 }
 
                 TextField {
@@ -145,6 +153,7 @@ Rectangle {
                     font.family: Theme.fontFamily
                     selectByMouse: true
                     background: null
+                    onTextChanged: root.searchTextChanged()
                 }
             }
         }
