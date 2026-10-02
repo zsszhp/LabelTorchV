@@ -50,7 +50,8 @@ Item {
         "rotate":     { main: "#D6D6DA", accent: "#8E8E93" },
         "hand":       { main: "#D6D6DA", accent: "#8E8E93" },
         "zoom-in":    { main: "#D6D6DA", accent: "#8E8E93" },
-        "zoom-out":   { main: "#D6D6DA", accent: "#8E8E93" }
+        "zoom-out":   { main: "#D6D6DA", accent: "#8E8E93" },
+        "search":     { main: "#D6D6DA", accent: "#8E8E93" }
     })
 
     readonly property color mainColor: {
@@ -111,6 +112,7 @@ Item {
             return "M 21 10.5 C 21 15.2 17.2 19 12.5 19 C 7.8 19 4 15.2 4 10.5 V 4.5 C 4 3.7 4.7 3 5.5 3 C 6.3 3 7 3.7 7 4.5 V 10.5 C 7 11.3 8.3 11.3 8.3 10.5 V 2.5 C 8.3 1.7 9 1 9.8 1 C 10.6 1 11.3 1.7 11.3 2.5 V 10.5 C 11.3 11.3 12.6 11.3 12.6 10.5 V 3.5 C 12.6 2.7 13.3 2 14.1 2 C 14.9 2 15.6 2.7 15.6 3.5 V 10.5 C 15.6 11.3 16.9 11.3 16.9 10.5 V 5.5 C 16.9 4.7 17.6 4 18.4 4 C 19.2 4 19.9 4.7 19.9 5.5 V 10.5 Z"
         case "zoom-in":
         case "zoom-out":
+        case "search":
             return "M 15.5 14 h -.8 l -.3-.3 C 15.4 12.6 16 11.1 16 9.5 16 5.9 13.1 3 9.5 3 S 3 5.9 3 9.5 5.9 16 9.5 16 c 1.6 0 3.1-.6 4.2-1.6 l .3 .3 v .8 l 5 5 1.5-1.5-5-5 z"
         case "alert":
             return "M 1 21 H 23 L 12 2 Z"
@@ -158,6 +160,8 @@ Item {
             return "M 9.5 14 C 7 14 5 12 5 9.5 S 7 5 9.5 5 14 7 14 9.5 12 14 9.5 14 z M 9 6 h 1 v 3 h 3 v 1 h-3 v 3 h-1 v-3 h-3 v-1 h 3 z"
         case "zoom-out":
             return "M 9.5 14 C 7 14 5 12 5 9.5 S 7 5 9.5 5 14 7 14 9.5 12 14 9.5 14 z M 6 9 h 7 v 1 H 6 Z"
+        case "search":
+            return "M 9.5 14 C 7 14 5 12 5 9.5 S 7 5 9.5 5 14 7 14 9.5 12 14 9.5 14 z"
         default:
             return ""
         }

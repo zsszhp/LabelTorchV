@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import LabelTorch.Theme
+import LabelTorch.Shell
 
 Rectangle {
     id: root
@@ -20,6 +21,8 @@ Rectangle {
     property alias sampleTagFilter: sampleTagCombo.currentText
     property alias sampleTagModel: sampleTagCombo.model
     property alias sampleTagIndex: sampleTagCombo.currentIndex
+    // 文件名搜索（对标 DLTools 数据集页搜索框）
+    property alias searchText: searchField.text
 
     Row {
         anchors.fill: parent
@@ -105,6 +108,44 @@ Rectangle {
                 palette.button: Theme.bgSide
                 palette.text: Theme.textMain
                 palette.buttonText: Theme.textMuted
+            }
+        }
+
+        // 文件名搜索框（输入文件名子串筛选图像）
+        Rectangle {
+            width: 200
+            height: 28
+            color: Theme.bgInput
+            border.color: searchField.activeFocus ? Theme.primaryGlow : Theme.borderColor
+            border.width: 1
+            radius: Theme.radiusNormal
+
+            Row {
+                anchors.fill: parent
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                spacing: Theme.spacingSmall
+
+                SvgIcon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 13
+                    height: 13
+                    icon: "search"
+                    color: searchField.text.length > 0 ? Theme.primary : "transparent"
+                }
+
+                TextField {
+                    id: searchField
+                    width: parent.width - 20
+                    anchors.verticalCenter: parent.verticalCenter
+                    placeholderText: "输入文本筛选图像"
+                    placeholderTextColor: Theme.textDisabled
+                    color: Theme.textMain
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamily
+                    selectByMouse: true
+                    background: null
+                }
             }
         }
     }
