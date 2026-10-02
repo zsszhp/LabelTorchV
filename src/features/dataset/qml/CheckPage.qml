@@ -515,6 +515,7 @@ Item {
                                 visible: selectedClassIds.length > 0
 
                                 Text {
+                                    z: 10
                                     anchors.centerIn: parent
                                     text: "✕"
                                     font.pixelSize: 10
@@ -597,6 +598,7 @@ Item {
 
                                     // 行内编辑（✎）/删除（✕）：悬停时显示
                                     Text {
+                                        z: 10
                                         visible: classItemMouse.containsMouse
                                         text: "\u270F"
                                         font.pixelSize: 11
@@ -611,6 +613,7 @@ Item {
                                     }
 
                                     Text {
+                                        z: 10
                                         visible: classItemMouse.containsMouse
                                         text: "\u2715"
                                         font.pixelSize: 11

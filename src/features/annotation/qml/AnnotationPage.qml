@@ -795,6 +795,7 @@ Item {
 
                                         // 行内删除（✕）：悬停显示（废弃占位保护 class_id）
                                         Text {
+                                            z: 10
                                             visible: root.hovered && model.className !== ""
                                             text: "\u2715"
                                             font.pixelSize: 11
