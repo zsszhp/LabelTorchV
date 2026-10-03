@@ -21,9 +21,8 @@ Rectangle {
     property alias sampleTagModel: sampleTagCombo.model
     property alias sampleTagIndex: sampleTagCombo.currentIndex
     // 文件名搜索（对标 DLTools 数据集页搜索框）
+    // 注意：alias 属性自动携带 searchTextChanged 信号，不得再手动声明同名 signal
     property alias searchText: searchField.text
-    // 搜索文本变化信号（页面据此过滤）
-    signal searchTextChanged()
 
     Row {
         anchors.fill: parent

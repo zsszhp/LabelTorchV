@@ -175,6 +175,27 @@ public:
     Q_INVOKABLE QVariantList listSamples(const QString &datasetId, int offset = 0, int limit = 100);
     Q_INVOKABLE int getSampleCount(const QString &datasetId);
 
+    /**
+     * @brief 设置数据集锁定状态（对标 DLTools「数据集已被锁定, 操作失败」）
+     *
+     * 锁定后拒绝对该数据集样本的打标（TagService）与标注写盘（AnnotationService）。
+     * @return 是否成功
+     */
+    Q_INVOKABLE bool setDatasetLocked(const QString &datasetId, bool locked);
+    Q_INVOKABLE bool isDatasetLocked(const QString &datasetId);
+
+    /**
+     * @brief 移动样本到同项目其它数据集（多选批量，对标 DLTools「移动图像到数据集」）
+     * @return 实际移动的样本数（目标已存在同路径的样本会被拒绝并计入失败日志）
+     */
+    Q_INVOKABLE int moveSamplesToDataset(const QVariantList &sampleIds, const QString &targetDatasetId);
+
+    /**
+     * @brief 复制样本到同项目其它数据集（多选批量）
+     * @return 实际复制的样本数
+     */
+    Q_INVOKABLE int copySamplesToDataset(const QVariantList &sampleIds, const QString &targetDatasetId);
+
     Q_INVOKABLE QString appendImport(const QString &datasetId, const QString &imageDir, const QString &labelDir);
     Q_INVOKABLE bool resplitDataset(const QString &datasetId, double valRatio = 0.2, int seed = 42);
     Q_INVOKABLE bool updateClassName(const QString &taxonomyId, int classId, const QString &name);

@@ -31,6 +31,10 @@ Item {
     // 多选批量打标：sampleId → true 映射（对标 DLTools 缩略图复选框）
     property var checkedSamples: ({})
     readonly property int checkedCount: Object.keys(checkedSamples).length
+    // 数据集卡片右键菜单目标（菜单为页面级单例，避免 Popup 随 delegate 销毁悬空）
+    property string datasetMenuTargetId: ""
+    property string datasetMenuTargetName: ""
+    property bool datasetMenuTargetLocked: false
 
     // P1-21：解析缩略图路径——已生成则走缩略图，否则回退原图并靠 sourceSize 限解码
     function resolveThumbSource(imagePath) {
@@ -510,7 +514,30 @@ Item {
                                         id: dsItemMouse
                                         anchors.fill: parent
                                         hoverEnabled: true
-                                        onClicked: selectDataset(model.datasetId)
+                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                        onClicked: function(mouse) {
+                                            if (mouse.button === Qt.RightButton) {
+                                                // 右键记录目标数据集（菜单为页面级单例：
+                                                // Popup 放 delegate 内会在 model reset 时悬空崩溃；
+                                                // 锁状态直查服务，不给 DatasetModel 加角色）
+                                                datasetMenuTargetId = model.datasetId
+                                                datasetMenuTargetName = model.name
+                                                datasetMenuTargetLocked = datasetService.isDatasetLocked(model.datasetId)
+                                                datasetCardMenu.popup()
+                                            } else {
+                                                selectDataset(model.datasetId)
+                                            }
+                                        }
+                                    }
+
+                                    // 锁定图标（锁定数据集后拒绝对其样本打标/标注）
+                                    Text {
+                                        visible: datasetService.isDatasetLocked(model.datasetId)
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        anchors.margins: 4
+                                        text: "🔒"
+                                        font.pixelSize: 10
                                     }
 
                                     RowLayout {
@@ -1258,7 +1285,26 @@ Item {
         return sc ? (name + "  " + sc) : name
     }
 
-    // 右键打标菜单：标记为各 Tag / 清除（勾选多张时批量应用）
+    // 数据集卡片右键菜单：锁定/解锁（对标 DLTools 数据集锁定；页面级单例）
+    Menu {
+        id: datasetCardMenu
+        MenuItem {
+            text: datasetMenuTargetLocked ? "解锁数据集" : "锁定数据集"
+            onTriggered: {
+                var newLocked = !datasetMenuTargetLocked
+                if (datasetService.setDatasetLocked(datasetMenuTargetId, newLocked)) {
+                    datasetModel.refresh()
+                    if (typeof ToastBus !== "undefined")
+                        ToastBus.success(newLocked ? "已锁定数据集：" + datasetMenuTargetName
+                                                   : "已解锁数据集：" + datasetMenuTargetName)
+                } else {
+                    if (typeof ToastBus !== "undefined") ToastBus.error("操作失败")
+                }
+            }
+        }
+    }
+
+    // 右键打标菜单：标记为各 Tag / 清除（勾选多张时批量应用）；多选时附移动/复制到数据集
     ContextMenu {
         id: sampleTagMenu
         Repeater {
@@ -1273,6 +1319,62 @@ Item {
         MenuItem {
             text: checkedCount > 0 ? "批量清除 Tag" : "清除 Tag"
             onTriggered: assignTagToSelection("")
+        }
+
+        // 移动/复制到其它数据集（勾选多张时可用，对标 DLTools 多选后移动/复制图像）
+        Menu {
+            id: moveToMenu
+            title: "移动到数据集…"
+            enabled: checkedCount > 0
+            Repeater {
+                model: {
+                    var list = []
+                    for (var i = 0; i < datasetModel.rowCount(); i++) {
+                        var idx = datasetModel.index(i, 0)
+                        var dsId = datasetModel.data(idx, Qt.UserRole + 1)
+                        if (dsId !== currentDatasetId)
+                            list.push({ dsId: dsId, name: datasetModel.data(idx, Qt.UserRole + 2) })
+                    }
+                    return list
+                }
+                MenuItem {
+                    required property var modelData
+                    text: modelData.name
+                    onTriggered: {
+                        var n = datasetService.moveSamplesToDataset(Object.keys(checkedSamples), modelData.dsId)
+                        if (typeof ToastBus !== "undefined")
+                            ToastBus.success("已移动 " + n + " 张图像到：" + modelData.name)
+                        clearChecked()
+                        selectDataset(currentDatasetId)
+                    }
+                }
+            }
+        }
+        Menu {
+            id: copyToMenu
+            title: "复制到数据集…"
+            enabled: checkedCount > 0
+            Repeater {
+                model: {
+                    var list = []
+                    for (var i = 0; i < datasetModel.rowCount(); i++) {
+                        var idx = datasetModel.index(i, 0)
+                        var dsId = datasetModel.data(idx, Qt.UserRole + 1)
+                        if (dsId !== currentDatasetId)
+                            list.push({ dsId: dsId, name: datasetModel.data(idx, Qt.UserRole + 2) })
+                    }
+                    return list
+                }
+                MenuItem {
+                    required property var modelData
+                    text: modelData.name
+                    onTriggered: {
+                        var n = datasetService.copySamplesToDataset(Object.keys(checkedSamples), modelData.dsId)
+                        if (typeof ToastBus !== "undefined")
+                            ToastBus.success("已复制 " + n + " 张图像到：" + modelData.name)
+                    }
+                }
+            }
         }
     }
 

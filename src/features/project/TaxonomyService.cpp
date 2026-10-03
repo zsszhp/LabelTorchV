@@ -451,6 +451,61 @@ int TaxonomyService::getTaxonomyVersion(const QString &taxonomyId)
 bool TaxonomyService::setClassStyle(const QString &taxonomyId, int classIndex,
                                     const QString &color, const QString &shortcut)
 {
+    ltTrace(LT_LOG_TAXONOMY()) << "setClassStyle taxonomyId=" << taxonomyId
+                               << "classIndex=" << classIndex
+                               << "color=" << color << "shortcut=" << shortcut;
+
+    // DLTools 同款校验：纯黑不可用（与背景无法区分）、颜色/快捷键不得与其它类别重复、
+    // 快捷键不得与项目下任何数据集 Tag 冲突
+    QString trimmedColor = color.trimmed().toUpper();
+    QString trimmedShortcut = shortcut.trimmed().toUpper();
+    if (!trimmedColor.isEmpty()) {
+        if (trimmedColor == "#000000") {
+            setLastError(QStringLiteral("E_COLOR_BLACK"),
+                         QStringLiteral("标签类别不能使用#000000颜色"));
+            return false;
+        }
+        QSqlQuery dupColor(Database::instance().database());
+        dupColor.prepare("SELECT class_index FROM taxonomy_class_styles "
+                         "WHERE taxonomy_id = ? AND class_index != ? AND UPPER(color) = ?");
+        dupColor.addBindValue(taxonomyId);
+        dupColor.addBindValue(classIndex);
+        dupColor.addBindValue(trimmedColor);
+        if (dupColor.exec() && dupColor.next()) {
+            setLastError(QStringLiteral("E_COLOR_DUP"),
+                         QStringLiteral("与其他已有标签类别的颜色冲突"));
+            return false;
+        }
+    }
+    if (!trimmedShortcut.isEmpty()) {
+        QSqlQuery dupShortcut(Database::instance().database());
+        dupShortcut.prepare("SELECT class_index FROM taxonomy_class_styles "
+                            "WHERE taxonomy_id = ? AND class_index != ? AND UPPER(shortcut) = ? AND shortcut != ''");
+        dupShortcut.addBindValue(taxonomyId);
+        dupShortcut.addBindValue(classIndex);
+        dupShortcut.addBindValue(trimmedShortcut);
+        if (dupShortcut.exec() && dupShortcut.next()) {
+            setLastError(QStringLiteral("E_SHORTCUT_DUP"),
+                         QStringLiteral("与其他已有标签类别的快捷键冲突"));
+            return false;
+        }
+
+        // 跨层校验：同项目下任意数据集的 Tag 快捷键（DLTools 同款「与其他已有Tag冲突」）
+        QSqlQuery dupTagShortcut(Database::instance().database());
+        dupTagShortcut.prepare(
+            "SELECT t.name FROM dataset_tags t "
+            "JOIN datasets d ON d.id = t.dataset_id "
+            "JOIN taxonomies tx ON tx.project_id = d.project_id "
+            "WHERE tx.id = ? AND t.shortcut = ? AND t.shortcut != '' LIMIT 1");
+        dupTagShortcut.addBindValue(taxonomyId);
+        dupTagShortcut.addBindValue(trimmedShortcut);
+        if (dupTagShortcut.exec() && dupTagShortcut.next()) {
+            setLastError(QStringLiteral("E_SHORTCUT_TAG_CONFLICT"),
+                         QStringLiteral("与Tag[%1]的快捷键冲突").arg(dupTagShortcut.value(0).toString()));
+            return false;
+        }
+    }
+
     QSqlQuery query(Database::instance().database());
     query.prepare("INSERT INTO taxonomy_class_styles (taxonomy_id, class_index, color, shortcut) "
                   "VALUES (?, ?, ?, ?) "

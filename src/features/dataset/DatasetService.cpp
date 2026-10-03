@@ -473,7 +473,7 @@ QVariantList DatasetService::listDatasets(const QString &projectId)
     QVariantList result;
     QSqlQuery query(Database::instance().database());
     query.prepare("SELECT id, project_id, name, image_root, label_root, format, "
-                  "sample_count, import_status, created_at "
+                  "sample_count, import_status, locked, created_at "
                   "FROM datasets WHERE project_id = ? ORDER BY created_at DESC");
     query.addBindValue(projectId);
 
@@ -492,7 +492,8 @@ QVariantList DatasetService::listDatasets(const QString &projectId)
         d["format"] = query.value(5);
         d["sampleCount"] = query.value(6);
         d["importStatus"] = query.value(7);
-        d["createdAt"] = query.value(8);
+        d["locked"] = query.value(8).toInt() == 1;
+        d["createdAt"] = query.value(9);
         result.append(d);
     }
 
@@ -1357,6 +1358,126 @@ int DatasetService::getSampleCount(const QString &datasetId)
         return query.value(0).toInt();
     }
     return 0;
+}
+
+bool DatasetService::setDatasetLocked(const QString &datasetId, bool locked)
+{
+    ltTrace(LT_LOG_DATASET()) << "setDatasetLocked datasetId=" << datasetId << "locked=" << locked;
+
+    if (datasetId.isEmpty()) return false;
+
+    QSqlQuery query(Database::instance().database());
+    query.prepare("UPDATE datasets SET locked = ? WHERE id = ?");
+    query.addBindValue(locked ? 1 : 0);
+    query.addBindValue(datasetId);
+    if (!query.exec()) {
+        ltError(LT_LOG_DATASET()) << "setDatasetLocked failed:" << query.lastError().text();
+        return false;
+    }
+    ltInfo(LT_LOG_DATASET()) << "Dataset" << datasetId << "locked=" << locked;
+    return true;
+}
+
+bool DatasetService::isDatasetLocked(const QString &datasetId)
+{
+    if (datasetId.isEmpty()) return false;
+
+    QSqlQuery query(Database::instance().database());
+    query.prepare("SELECT locked FROM datasets WHERE id = ?");
+    query.addBindValue(datasetId);
+    if (query.exec() && query.next()) {
+        return query.value(0).toInt() == 1;
+    }
+    return false;
+}
+
+int DatasetService::moveSamplesToDataset(const QVariantList &sampleIds, const QString &targetDatasetId)
+{
+    ltTrace(LT_LOG_DATASET()) << "moveSamplesToDataset count=" << sampleIds.size()
+                              << "target=" << targetDatasetId;
+
+    if (sampleIds.isEmpty() || targetDatasetId.isEmpty()) return 0;
+
+    QSqlDatabase db = Database::instance().database();
+    if (!db.isOpen()) return 0;
+
+    // 目标数据集已存在的图像路径直接拒绝（对标 DLTools「要移动的图像中有已经存在的图像」）
+    int moved = 0;
+    QSqlQuery dupCheck(db);
+    dupCheck.prepare("SELECT id FROM dataset_samples WHERE dataset_id = ? AND image_path = ?");
+    QSqlQuery update(db);
+    update.prepare("UPDATE dataset_samples SET dataset_id = ? WHERE id = ?");
+
+    for (const QVariant &idVar : sampleIds) {
+        QString sampleId = idVar.toString();
+        if (sampleId.isEmpty()) continue;
+
+        QSqlQuery getPath(db);
+        getPath.prepare("SELECT image_path FROM dataset_samples WHERE id = ?");
+        getPath.addBindValue(sampleId);
+        if (!getPath.exec() || !getPath.next()) continue;
+        QString imagePath = getPath.value(0).toString();
+
+        dupCheck.addBindValue(targetDatasetId);
+        dupCheck.addBindValue(imagePath);
+        if (dupCheck.exec() && dupCheck.next()) {
+            ltWarning(LT_LOG_DATASET()) << "moveSamples: 目标已存在该图像，跳过:" << imagePath;
+            continue;
+        }
+
+        update.addBindValue(targetDatasetId);
+        update.addBindValue(sampleId);
+        if (update.exec()) ++moved;
+    }
+
+    ltInfo(LT_LOG_DATASET()) << "Moved" << moved << "samples to dataset:" << targetDatasetId;
+    return moved;
+}
+
+int DatasetService::copySamplesToDataset(const QVariantList &sampleIds, const QString &targetDatasetId)
+{
+    ltTrace(LT_LOG_DATASET()) << "copySamplesToDataset count=" << sampleIds.size()
+                              << "target=" << targetDatasetId;
+
+    if (sampleIds.isEmpty() || targetDatasetId.isEmpty()) return 0;
+
+    QSqlDatabase db = Database::instance().database();
+    if (!db.isOpen()) return 0;
+
+    int copied = 0;
+    QSqlQuery dupCheck(db);
+    dupCheck.prepare("SELECT id FROM dataset_samples WHERE dataset_id = ? AND image_path = ?");
+    QSqlQuery insert(db);
+    insert.prepare("INSERT INTO dataset_samples (id, dataset_id, image_path, label_path, width, height, "
+                   "hash, validation_status, split, error_code) "
+                   "SELECT ?, ?, image_path, label_path, width, height, hash, validation_status, split, error_code "
+                   "FROM dataset_samples WHERE id = ?");
+
+    for (const QVariant &idVar : sampleIds) {
+        QString sampleId = idVar.toString();
+        if (sampleId.isEmpty()) continue;
+
+        QSqlQuery getPath(db);
+        getPath.prepare("SELECT image_path FROM dataset_samples WHERE id = ?");
+        getPath.addBindValue(sampleId);
+        if (!getPath.exec() || !getPath.next()) continue;
+        QString imagePath = getPath.value(0).toString();
+
+        dupCheck.addBindValue(targetDatasetId);
+        dupCheck.addBindValue(imagePath);
+        if (dupCheck.exec() && dupCheck.next()) {
+            ltWarning(LT_LOG_DATASET()) << "copySamples: 目标已存在该图像，跳过:" << imagePath;
+            continue;
+        }
+
+        insert.addBindValue(Id::generate());
+        insert.addBindValue(targetDatasetId);
+        insert.addBindValue(sampleId);
+        if (insert.exec()) ++copied;
+    }
+
+    ltInfo(LT_LOG_DATASET()) << "Copied" << copied << "samples to dataset:" << targetDatasetId;
+    return copied;
 }
 
 bool DatasetService::insertSamples(const QString &datasetId, const QVariantList &samples)

@@ -237,6 +237,24 @@ bool Database::migrate()
         ltInfo(LT_LOG_DB()) << "Migration V4→V5 completed successfully";
     }
 
+    // 迁移 V5→V6：数据集锁定（对标 DLTools「数据集已被锁定, 操作失败」）
+    // locked=1 时拒绝对该数据集样本的打标与标注写盘，防止误操作
+    if (version < 6) {
+        ltInfo(LT_LOG_DB()) << "Running migration V5→V6: datasets.locked";
+
+        QSqlQuery probeLocked(m_db);
+        probeLocked.exec("SELECT locked FROM datasets LIMIT 0");
+        if (probeLocked.lastError().isValid()) {
+            if (!query.exec("ALTER TABLE datasets ADD COLUMN locked INTEGER NOT NULL DEFAULT 0")) {
+                ltError(LT_LOG_DB()) << "Migration V5→V6 failed (locked):" << query.lastError().text();
+                return false;
+            }
+        }
+
+        query.exec("INSERT INTO schema_version (version) VALUES (6)");
+        ltInfo(LT_LOG_DB()) << "Migration V5→V6 completed successfully";
+    }
+
     return true;
 }
 

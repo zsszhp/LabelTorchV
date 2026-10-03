@@ -221,8 +221,14 @@ public:
      */
     Q_INVOKABLE QVariantMap getSample(const QString &sampleId);
 
+    /**
+     * @brief 最近一次操作失败的提示文本（数据集锁定等），成功/未失败时为空。
+     */
+    Q_INVOKABLE QString lastError() const { return m_lastError; }
+
 private:
     int m_shapeType = 0;  // 0 = HBB, 1 = OBB, 2 = Polygon
+    QString m_lastError;
 
     /**
      * @brief Atomically write content to a file via temp file + rename.

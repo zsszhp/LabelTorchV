@@ -70,6 +70,36 @@ bool AnnotationService::saveAnnotations(const QString &labelPath, const QString 
                                  << "sampleId=" << sampleId << "count=" << annotations.size()
                                  << "shapeType=" << m_shapeType;
 
+    // 数据集锁定检查（对标 DLTools「数据集已被锁定, 操作失败」）：
+    // sampleId 可用时按样本查，否则按标签路径反查样本所属数据集
+    {
+        QString lockDatasetId = datasetId;
+        if (lockDatasetId.isEmpty() && !sampleId.isEmpty()) {
+            QSqlQuery dsQuery(Database::instance().database());
+            dsQuery.prepare("SELECT dataset_id FROM dataset_samples WHERE id = ?");
+            dsQuery.addBindValue(sampleId);
+            if (dsQuery.exec() && dsQuery.next()) lockDatasetId = dsQuery.value(0).toString();
+        }
+        if (lockDatasetId.isEmpty() && !labelPath.isEmpty()) {
+            QSqlQuery dsQuery(Database::instance().database());
+            dsQuery.prepare("SELECT dataset_id FROM dataset_samples WHERE label_path = ? LIMIT 1");
+            dsQuery.addBindValue(labelPath);
+            if (dsQuery.exec() && dsQuery.next()) lockDatasetId = dsQuery.value(0).toString();
+        }
+        if (!lockDatasetId.isEmpty()) {
+            QSqlQuery lockQuery(Database::instance().database());
+            lockQuery.prepare("SELECT locked FROM datasets WHERE id = ?");
+            lockQuery.addBindValue(lockDatasetId);
+            if (lockQuery.exec() && lockQuery.next() && lockQuery.value(0).toInt() == 1) {
+                ltWarning(LT_LOG_ANNOTATION()) << "saveAnnotations rejected: 数据集已被锁定"
+                                               << lockDatasetId;
+                m_lastError = QStringLiteral("数据集已被锁定, 操作失败");
+                return false;
+            }
+        }
+    }
+    m_lastError.clear();
+
     if (m_shapeType == 1) {
         // OBB mode
         return saveOBBAnnotations(labelPath, datasetId, sampleId, annotations);

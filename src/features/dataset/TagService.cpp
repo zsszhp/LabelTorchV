@@ -312,6 +312,18 @@ bool TagService::setSampleTag(const QString &sampleId, const QString &tagId)
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
 
+    // 数据集锁定检查（对标 DLTools「数据集已被锁定, 操作失败」）
+    QString lockDatasetId = sampleDatasetId(sampleId);
+    if (!lockDatasetId.isEmpty()) {
+        QSqlQuery lockQuery(db);
+        lockQuery.prepare("SELECT locked FROM datasets WHERE id = ?");
+        lockQuery.addBindValue(lockDatasetId);
+        if (lockQuery.exec() && lockQuery.next() && lockQuery.value(0).toInt() == 1) {
+            ltWarning(LT_LOG_DATASET()) << "setSampleTag rejected: 数据集已被锁定" << lockDatasetId;
+            return false;
+        }
+    }
+
     // tagId 非空时校验 Tag 存在且属于同数据集，防止跨数据集指派
     if (!tagId.isEmpty()) {
         QSqlQuery check(db);
@@ -356,6 +368,17 @@ int TagService::setSamplesTag(const QVariantList &sampleIds, const QString &tagI
     if (datasetId.isEmpty()) {
         ltWarning(LT_LOG_DATASET()) << "setSamplesTag: 首个样本不存在";
         return 0;
+    }
+
+    // 数据集锁定检查（对标 DLTools「批量标注失败, 图像所属数据集已被锁定」）
+    {
+        QSqlQuery lockQuery(db);
+        lockQuery.prepare("SELECT locked FROM datasets WHERE id = ?");
+        lockQuery.addBindValue(datasetId);
+        if (lockQuery.exec() && lockQuery.next() && lockQuery.value(0).toInt() == 1) {
+            ltWarning(LT_LOG_DATASET()) << "setSamplesTag rejected: 数据集已被锁定" << datasetId;
+            return 0;
+        }
     }
 
     if (!tagId.isEmpty()) {

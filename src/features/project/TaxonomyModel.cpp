@@ -148,17 +148,15 @@ bool TaxonomyModel::renameClass(int index, const QString &newName)
 bool TaxonomyModel::setClassStyle(int index, const QString &color, const QString &shortcut)
 {
     if (m_taxonomyId.isEmpty() || index < 0) return false;
-    QSqlQuery query(Database::instance().database());
-    query.prepare("INSERT INTO taxonomy_class_styles (taxonomy_id, class_index, color, shortcut) "
-                  "VALUES (?, ?, ?, ?) "
-                  "ON CONFLICT(taxonomy_id, class_index) DO UPDATE SET color = excluded.color, shortcut = excluded.shortcut");
-    query.addBindValue(m_taxonomyId);
-    query.addBindValue(index);
-    query.addBindValue(color);
-    query.addBindValue(shortcut);
-    bool ok = query.exec();
-    if (!ok) ltWarning(LT_LOG_TAXONOMY()) << "Failed to persist setClassStyle:" << query.lastError().text();
-    else emit dataChanged(createIndex(index, 0), createIndex(index, 0));
+    // 转调 TaxonomyService：复用颜色纯黑/颜色重复/快捷键冲突（含与 Tag 跨层冲突）校验，
+    // 失败原因经 lastError() 透传给 QML 提示
+    TaxonomyService service;
+    bool ok = service.setClassStyle(m_taxonomyId, index, color, shortcut);
+    if (!ok) {
+        ltWarning(LT_LOG_TAXONOMY()) << "setClassStyle rejected:" << service.lastError();
+    } else {
+        emit dataChanged(createIndex(index, 0), createIndex(index, 0));
+    }
     return ok;
 }
 

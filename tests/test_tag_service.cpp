@@ -27,6 +27,7 @@ private slots:
     void testCrossDatasetAssignRejected();
     void testRemoveTagProtection();
     void testRemoveTagUnassignsSamples();
+    void testDatasetLockRejectsTagging();
     void cleanupTestCase();
 
 private:
@@ -228,6 +229,32 @@ void TestTagService::testRemoveTagUnassignsSamples()
     QVERIFY(m_service.removeTag(customId));
     QCOMPARE(m_service.getSampleTagId(m_sampleA1), QString());
     QCOMPARE(m_service.listTags(m_datasetA).size(), 6);
+}
+
+void TestTagService::testDatasetLockRejectsTagging()
+{
+    // 锁定数据集后拒绝打标（对标 DLTools「数据集已被锁定, 操作失败」）
+    QVariantList tags = m_service.listTags(m_datasetA);
+    QString builtinId = tags.first().toMap()["id"].toString();
+
+    QSqlQuery lock(Database::instance().database());
+    lock.prepare("UPDATE datasets SET locked = 1 WHERE id = ?");
+    lock.addBindValue(m_datasetA);
+    QVERIFY(lock.exec());
+
+    QVERIFY(!m_service.setSampleTag(m_sampleA1, builtinId));
+    QCOMPARE(m_service.getSampleTagId(m_sampleA1), QString());
+    QCOMPARE(m_service.setSamplesTag({m_sampleA1}, builtinId), 0);
+
+    QSqlQuery unlock(Database::instance().database());
+    unlock.prepare("UPDATE datasets SET locked = 0 WHERE id = ?");
+    unlock.addBindValue(m_datasetA);
+    QVERIFY(unlock.exec());
+
+    // 解锁后恢复
+    QVERIFY(m_service.setSampleTag(m_sampleA1, builtinId));
+    QCOMPARE(m_service.getSampleTagId(m_sampleA1), builtinId);
+    QVERIFY(m_service.setSampleTag(m_sampleA1, QString()));
 }
 
 void TestTagService::cleanupTestCase()

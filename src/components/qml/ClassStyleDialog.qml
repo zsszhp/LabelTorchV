@@ -182,9 +182,15 @@ Dialog {
                     var name = nameField.text.trim()
                     if (name !== "" && name !== root.className)
                         taxonomyModel.renameClass(root.classIndex, name)
-                    taxonomyModel.setClassStyle(root.classIndex,
-                                                root.selectedColor.toString(),
-                                                shortcutField.text.trim())
+                    // 后端校验（纯黑/颜色重复/快捷键与类别或Tag冲突）失败时提示原因，弹窗保持打开
+                    var ok = taxonomyModel.setClassStyle(root.classIndex,
+                                                         root.selectedColor.toString(),
+                                                         shortcutField.text.trim())
+                    if (!ok) {
+                        if (typeof ToastBus !== "undefined")
+                            ToastBus.error(taxonomyService.lastError() || "保存失败")
+                        return
+                    }
                     root.close()
                 }
 
