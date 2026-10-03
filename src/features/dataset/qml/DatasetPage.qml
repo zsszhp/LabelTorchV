@@ -1460,6 +1460,11 @@ Item {
             if (imgPath) rawPaths.push(imgPath.replace(/\\/g, "/"))
         }
 
+        // push 为就地修改，不触发属性通知；slice 产生新数组对象才能让
+        // rawSamples.length 相关绑定（空态 visible 等）重算，否则「暂无图片」
+        // 空态会与网格长期同显（自赋值同引用会被 QVariant 相等性优化吞掉）
+        rawSamples = rawSamples.slice()
+
         // P1-21：后台补齐本页缩略图
         if (pageRoot.thumbCacheDir && rawPaths.length > 0) {
             thumbnailGenerator.generate(rawPaths, pageRoot.thumbCacheDir)
