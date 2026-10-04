@@ -12,6 +12,32 @@ import LabelTorch.Shell
 Item {
     id: pageRoot
 
+    // 页面级键盘：Tag 快捷键按下即打标（对标 DLTools）
+    focus: true
+
+    Keys.onPressed: function(event) {
+        // 输入框持有焦点时不劫持按键
+        var fa = pageRoot.activeFocusItem
+        if (fa && fa instanceof TextField) return
+        if (event.key === Qt.Key_Escape) {
+            clearChecked()
+            return
+        }
+        var k = event.text.toUpperCase()
+        if (k.length !== 1) return
+        if (typeof tagsSection === "undefined") return
+        var names = tagsSection.displayTags
+        for (var i = 0; i < names.length; i++) {
+            if (tagShortcutFor(names[i]) === k) {
+                if (checkedCount > 0 || (selectedSample && selectedSample.sampleId)) {
+                    assignTagToSelection(names[i])
+                    event.accepted = true
+                }
+                return
+            }
+        }
+    }
+
     // === 当前选中状态 ===
     property string currentDatasetId: ""
     property string currentDatasetName: ""
@@ -35,6 +61,15 @@ Item {
     property string datasetMenuTargetId: ""
     property string datasetMenuTargetName: ""
     property bool datasetMenuTargetLocked: false
+    // 数据集数量显示（rowCount() 非响应式，靠模型行信号刷新）
+    property int datasetCountText: 0
+
+    Connections {
+        target: datasetModel
+        function onRowsInserted() { datasetCountText = datasetModel.rowCount() }
+        function onRowsRemoved() { datasetCountText = datasetModel.rowCount() }
+        function onModelReset() { datasetCountText = datasetModel.rowCount() }
+    }
 
     // P1-21：解析缩略图路径——已生成则走缩略图，否则回退原图并靠 sourceSize 限解码
     function resolveThumbSource(imagePath) {
@@ -60,6 +95,8 @@ Item {
         if (visible && appController.currentProjectId !== "") {
             datasetModel.setProjectId(appController.currentProjectId)
         }
+        // 页面可见时接管键盘（Tag 快捷键）
+        if (visible) pageRoot.forceActiveFocus()
     }
 
     // === 监听项目切换，清空状态 ===
@@ -389,7 +426,7 @@ Item {
                     // === 数据集(N) 可折叠区块 ===
                     CollapsibleSection {
                         Layout.fillWidth: true
-                        title: "数据集(" + datasetModel.rowCount() + ")"
+                        title: "数据集(" + datasetCountText + ")"
                         expanded: true
 
                         ColumnLayout {
@@ -683,7 +720,12 @@ Item {
                                         Layout.preferredWidth: 48
                                     }
                                     Text {
-                                        text: selectedSample ? (selectedSample.width || 0) + "×" + (selectedSample.height || 0) : ""
+                                        // 尺寸缺失（DB NULL）时显示占位，不输出 0×0
+                                        text: selectedSample
+                                              ? ((selectedSample.width > 0 && selectedSample.height > 0)
+                                                 ? selectedSample.width + "×" + selectedSample.height
+                                                 : "—")
+                                              : ""
                                         font.pixelSize: Theme.fontSizeCaption
                                         font.family: Theme.fontFamilyMono
                                         color: Theme.textMuted
@@ -1063,6 +1105,7 @@ Item {
                                 hoverEnabled: true
                                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                                 onClicked: function(mouse) {
+                                    pageRoot.forceActiveFocus()  // 缩略图点击后页面接管键盘（Tag 快捷键）
                                     selectedSample = {
                                         sampleId: model.sampleId,
                                         fileName: model.fileName,

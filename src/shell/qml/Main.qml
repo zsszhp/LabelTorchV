@@ -37,7 +37,7 @@ ApplicationWindow {
     // 数据集/标签类别接到页面真实过滤；TAG 无样本级过滤能力，仅作只读摘要展示
     property string globalFilterDatasetId: ""   // 空字符串 = 全部数据集
     property int globalFilterClassIndex: -1     // -1 = 不限类别
-    property string globalFilterTagSummary: "全部数据集"
+    property string globalFilterTagSummary: "跟随数据集"
 
     // 计算标注进度：已标注样本数 / 总样本数 * 100
     // 全程钳制非法值：分母为 0 / 统计返回 undefined 时不得把 NaN 写进绑定
@@ -109,7 +109,7 @@ ApplicationWindow {
     // 刷新 TAG 只读摘要：展示当前筛选数据集上的真实标签
     function updateTagSummary() {
         if (!appController.projectOpen || root.globalFilterDatasetId === "") {
-            root.globalFilterTagSummary = "全部数据集"
+            root.globalFilterTagSummary = "跟随数据集"
             return
         }
         var tags = tagService.listTags(root.globalFilterDatasetId)
