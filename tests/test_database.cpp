@@ -59,7 +59,8 @@ void TestDatabase::testSchemaVersion()
     // 与 Database::migrate 的最高迁移版本保持一致：
     // V2 model_versions 字段扩充 / V3 training_runs.failure_info_json / V4 性能索引
     // V5 dataset_tags.builtin（内置评审Tag）
-    QCOMPARE(query.value(0).toInt(), 5);
+    // V6 datasets.locked（数据集锁定，对标 DLTools）
+    QCOMPARE(query.value(0).toInt(), 6);
 }
 
 void TestDatabase::testImportLabelMeUser()

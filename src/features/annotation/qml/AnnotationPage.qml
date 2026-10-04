@@ -347,10 +347,25 @@ Item {
         anchors.fill: parent
         orientation: Qt.Horizontal
 
+        // 对标 CheckPage/DatasetPage 的 Splitter 手感：6px 命中区，
+        // 中线 1px 常态 / 3px 悬停高亮 + 分割光标（此前 4px 且高亮线画在
+        // 侧边栏内部，用户按到可见线上时落在侧边栏里，拖了没反应）
         handle: Rectangle {
-            implicitWidth: 4
-            color: SplitHandle.pressed ? Theme.primaryGlow : (SplitHandle.hovered ? Theme.primaryGlow : Theme.borderColor)
-            Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
+            id: splitHandleBar
+            implicitWidth: 6
+            color: "transparent"
+
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: splitHandleBar.SplitHandle.pressed || splitHandleBar.SplitHandle.hovered ? 3 : 1
+                height: parent.height
+                color: splitHandleBar.SplitHandle.pressed || splitHandleBar.SplitHandle.hovered
+                       ? Theme.primaryGlow : Theme.borderColor
+                Behavior on width { NumberAnimation { duration: Theme.animDurationFast } }
+                Behavior on color { ColorAnimation { duration: Theme.animDurationFast } }
+            }
+
+            HoverHandler { cursorShape: Qt.SplitHCursor }
         }
 
         // === 左侧栏 (240px, padding:12px, gap:16px) ===
@@ -358,20 +373,15 @@ Item {
             id: sidebar
             SplitView.preferredWidth: Theme.sidebarWidth
             SplitView.minimumWidth: Theme.sidebarMinWidth
+            SplitView.maximumWidth: 600
             color: Theme.bgSide
-
-            // 右侧边线
-            Rectangle {
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                width: 1
-                color: Theme.borderColor
-            }
 
             ScrollView {
                 anchors.fill: parent
                 clip: true
+                // 缺这行时内容宽停在固有宽度（约140px），拖分割线只有
+                // 背景在动、内容列不跟随——用户报的「侧边栏没绑定」
+                contentWidth: availableWidth
 
                 ColumnLayout {
                     width: parent.width
@@ -664,6 +674,215 @@ Item {
                         color: Theme.borderColor
                     }
 
+                    // ====== 区域3：标签类别（左栏，对标参考UI 左侧 <标签类别> 区块） ======
+                    // 该区块与下方区域4 必须留在本 ScrollView 的 ColumnLayout 内：
+                    // 其子项使用 Layout.* 附加属性，一旦被挤出左栏则失去宿主 → 整块不渲染。
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.margins: 12
+                        spacing: 0
+
+                        // 标题行
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.bottomMargin: 8
+                            spacing: 4
+
+                            Text {
+                                text: "标签类别"
+                                font.pixelSize: 12
+                                font.weight: Font.Normal
+                                font.family: Theme.fontFamily
+                                color: Theme.textMain
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            Button {
+                                text: "+"
+                                font.pixelSize: 14
+                                font.bold: true
+                                Layout.preferredWidth: 22
+                                Layout.preferredHeight: 22
+
+                                background: Rectangle {
+                                    color: parent.hovered ? Theme.primary : Theme.bgCard
+                                    radius: 4
+                                    border.color: Theme.primary
+                                    border.width: 1
+                                }
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: parent.hovered ? Theme.bgMain : Theme.primary
+                                    font: parent.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                onClicked: addLabelDialog.open()
+                            }
+                        }
+
+                        // 类别搜索（类别多时刚需）
+                        TextField {
+                            id: leftClassSearchField
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 28
+                            Layout.bottomMargin: 8
+                            placeholderText: "搜索类别…"
+                            placeholderTextColor: Theme.textDisabled
+                            color: Theme.textMain
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.family: Theme.fontFamily
+
+                            background: Rectangle {
+                                color: Theme.bgInput
+                                radius: Theme.radiusSmall
+                                border.color: leftClassSearchField.activeFocus ? Theme.primaryGlow : Theme.borderColor
+                                border.width: 1
+                            }
+                        }
+
+                        // 类别列表（选中项高亮，随搜索过滤，高度自适应并封顶）
+                        ScrollView {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: {
+                                var n = 0
+                                for (var i = 0; i < taxonomyModel.rowCount(); i++) {
+                                    var idx = taxonomyModel.index(i, 0)
+                                    var nm = taxonomyModel.data(idx, Qt.UserRole + 1) || ("class_" + i)
+                                    if (leftClassSearchField.text === ""
+                                            || nm.toLowerCase().indexOf(leftClassSearchField.text.toLowerCase()) >= 0)
+                                        n++
+                                }
+                                return Math.min(220, Math.max(34, n * 38 + 4))
+                            }
+                            clip: true
+                            contentWidth: availableWidth
+                            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
+                            ColumnLayout {
+                                width: parent.width - 8
+                                spacing: 6
+
+                                Repeater {
+                                    model: taxonomyModel
+
+                                    Rectangle {
+                                        visible: leftClassSearchField.text === ""
+                                                 || (model.className || ("class_" + model.classIndex))
+                                                    .toLowerCase().indexOf(leftClassSearchField.text.toLowerCase()) >= 0
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 32
+                                        radius: 4
+
+                                        color: {
+                                            if (annotationMode === "detect" && selectedClassId === model.classIndex) return Theme.primary
+                                            if (leftClassRowHover.containsMouse) return Theme.bgHover
+                                            return Theme.bgCard
+                                        }
+                                        border.color: (annotationMode === "detect" && selectedClassId === model.classIndex)
+                                                      ? "transparent" : Theme.borderColor
+                                        border.width: (annotationMode === "detect" && selectedClassId === model.classIndex) ? 0 : 1
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.leftMargin: 10
+                                            anchors.rightMargin: 10
+                                            spacing: 8
+
+                                            Rectangle {
+                                                width: 12
+                                                height: 12
+                                                radius: 2
+                                                color: Theme.classColor(model.classIndex)
+                                            }
+
+                                            Text {
+                                                text: model.className || ("class_" + model.classIndex)
+                                                font.pixelSize: 12
+                                                font.weight: (annotationMode === "detect" && selectedClassId === model.classIndex) ? Font.DemiBold : Font.Normal
+                                                font.family: Theme.fontFamily
+                                                color: (annotationMode === "detect" && selectedClassId === model.classIndex) ? "#FFFFFF" : Theme.textMain
+                                                Layout.fillWidth: true
+                                                elide: Text.ElideRight
+                                            }
+
+                                            // 行内编辑（✎）：固定 22x22 命中盒 + z 提升，避免被整行 MouseArea 吞掉
+                                            Item {
+                                                width: 22
+                                                height: 22
+                                                z: 20
+
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    visible: leftClassRowHover.containsMouse && model.className !== ""
+                                                    text: "\u270F"
+                                                    font.pixelSize: 11
+                                                    color: leftEditMouse.containsMouse ? "#FFFFFF" : Theme.textSecondary
+                                                }
+
+                                                MouseArea {
+                                                    id: leftEditMouse
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: classStyleDialog.openFor(model.classIndex)
+                                                }
+                                            }
+
+                                            // 行内删除（✕）
+                                            Item {
+                                                width: 22
+                                                height: 22
+                                                z: 20
+
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    visible: leftClassRowHover.containsMouse && model.className !== ""
+                                                    text: "\u2715"
+                                                    font.pixelSize: 11
+                                                    color: leftDelMouse.containsMouse ? Theme.danger : Theme.textSecondary
+                                                }
+
+                                                MouseArea {
+                                                    id: leftDelMouse
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: taxonomyModel.removeClass(model.classIndex)
+                                                }
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: leftClassRowHover
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (annotationMode === "classify") {
+                                                    if (classificationMultiCheck.checked) {
+                                                        var k = selectedMultiClassIds.indexOf(model.classIndex)
+                                                        var ids = selectedMultiClassIds.slice()
+                                                        if (k >= 0) ids.splice(k, 1)
+                                                        else ids.push(model.classIndex)
+                                                        selectedMultiClassIds = ids
+                                                    } else {
+                                                        selectedClassId = model.classIndex
+                                                    }
+                                                } else if (annotationMode === "detect") {
+                                                    selectedClassId = model.classIndex
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // 分隔线
                     Rectangle {
                         Layout.fillWidth: true
@@ -671,6 +890,130 @@ Item {
                         Layout.rightMargin: 12
                         height: 1
                         color: Theme.borderColor
+                    }
+
+                    // ====== 区域4：标签（Tag） ======
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.margins: 12
+                        spacing: 0
+
+                        // 标题行
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.bottomMargin: 8
+                            spacing: 4
+
+                            Text {
+                                text: "标签"
+                                font.pixelSize: 12
+                                font.weight: Font.Normal
+                                font.family: Theme.fontFamily
+                                color: Theme.textMain
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            Button {
+                                text: "+"
+                                font.pixelSize: 14
+                                font.bold: true
+                                Layout.preferredWidth: 22
+                                Layout.preferredHeight: 22
+
+                                background: Rectangle {
+                                    color: parent.hovered ? Theme.primary : Theme.bgCard
+                                    radius: 4
+                                    border.color: Theme.primary
+                                    border.width: 1
+                                }
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: parent.hovered ? Theme.bgMain : Theme.primary
+                                    font: parent.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                onClicked: addTagDialog.open()
+                            }
+                        }
+
+                        // 所属数据集提示
+                        Text {
+                            text: "所属数据集: " + (datasetCombo.currentText || "默认数据集")
+                            font.pixelSize: 11
+                            font.family: Theme.fontFamily
+                            color: Theme.textMuted
+                            Layout.bottomMargin: 10
+                            Layout.leftMargin: 4
+                        }
+
+                        // Tag 按钮网格（2列，对标参考UI grid-template-columns:1fr 1fr）
+                        GridLayout {
+                            Layout.fillWidth: true
+                            columns: 2
+                            columnSpacing: 8
+                            rowSpacing: 8
+
+                            Repeater {
+                                model: tagListData.length > 0 ? tagListData : [
+                                    {name: "默认", color: Theme.primary, active: true},
+                                    {name: "良品", color: "", active: false},
+                                    {name: "漏检", color: "", active: false},
+                                    {name: "误检", color: "", active: false},
+                                    {name: "待定", color: "", active: false},
+                                    {name: "重要", color: "", active: false}
+                                ]
+
+                                Button {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 30
+                                    text: modelData.name
+                                    font.pixelSize: 12
+                                    font.weight: (modelData.active || modelData.color === Theme.primary) ? Font.DemiBold : Font.Normal
+
+                                    background: Rectangle {
+                                        color: (modelData.active || modelData.color === Theme.primary) ? Theme.primary : Theme.bgCard
+                                        border.color: (modelData.active || modelData.color === Theme.primary) ? "transparent" : Theme.borderColor
+                                        border.width: (modelData.active || modelData.color === Theme.primary) ? 0 : 1
+                                        radius: 4
+                                    }
+
+                                    contentItem: Text {
+                                        text: parent.text
+                                        font.pixelSize: 12
+                                        font.weight: parent.font.weight
+                                        font.family: Theme.fontFamily
+                                        color: (modelData.active || modelData.color === Theme.primary) ? "#FFFFFF" : Theme.textMain
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+
+                                    onClicked: {
+                                        if (tagListData.length === 0) {
+                                            tagListData = [
+                                                {name: "默认", color: Theme.primary, active: false},
+                                                {name: "良品", color: "", active: false},
+                                                {name: "漏检", color: "", active: false},
+                                                {name: "误检", color: "", active: false},
+                                                {name: "待定", color: "", active: false},
+                                                {name: "重要", color: "", active: false}
+                                            ]
+                                        }
+                                        var nt = tagListData.slice()
+                                        for (var t = 0; t < nt.length; t++) {
+                                            if (nt[t].name === modelData.name) {
+                                                nt[t].active = !nt[t].active
+                                                nt[t].color = nt[t].active ? Theme.primary : ""
+                                            }
+                                        }
+                                        tagListData = nt
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // 底部弹性空间
@@ -1574,22 +1917,24 @@ Item {
         Rectangle {
             SplitView.preferredWidth: 250
             SplitView.minimumWidth: 200
+            SplitView.maximumWidth: 500
             color: Theme.bgSide
 
-            // 左侧边线
-            Rectangle {
-                anchors.left: parent.left
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                width: 1
-                color: Theme.borderColor
-            }
+            // === 右栏根布局 ===
+            // 必须存在：下方各区块使用 Layout.* 附加属性。若它们直接挂在 Rectangle 上，
+            // 附加属性失去宿主 → 宽高为 0 → 实例表格与类别列表整块不渲染。
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 0
 
                     // ====== 实例表格（对标 DLTools：类别/X/Y/宽/高，与画布选中双向联动） ======
                     ColumnLayout {
                         Layout.fillWidth: true
                         // 高度随实例数增长，封顶留给类别区（剩余高度归下方 fillHeight 区块）
                         Layout.preferredHeight: instanceList.count > 0 ? Math.min(200, 30 + instanceList.count * 34) : 58
+                        Layout.topMargin: 12
+                        Layout.leftMargin: 12
+                        Layout.rightMargin: 12
                         spacing: 4
 
                         // 标题行
@@ -1717,14 +2062,17 @@ Item {
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 1
+                        Layout.leftMargin: 12
+                        Layout.rightMargin: 12
                         color: Theme.dividerColor
                         Layout.bottomMargin: 8
                     }
 
-                    // ====== 区域3：标签类别 ======
+                    // ====== 右栏：标签类别（与左栏并列的第二个入口，可独立筛选） ======
                     ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.margins: 12
                         spacing: 0
 
                         // 标题行（对标参考UI：无图标）
@@ -1794,6 +2142,7 @@ Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
+                            contentWidth: availableWidth
                             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                             ColumnLayout {
@@ -1852,34 +2201,52 @@ Item {
                                         }
 
                                         // 行内编辑（✎）：悬停显示，打开样式编辑（名称/颜色/快捷键）
-                                        Text {
-                                            visible: classRowHover.containsMouse && model.className !== ""
-                                            text: "\u270F"
-                                            font.pixelSize: 11
-                                            color: editRowMouse.containsMouse ? "#FFFFFF" : Theme.textSecondary
+                                        // 修复：原 anchors.margins: -4 扩出的热区会被后声明的整行
+                                        // MouseArea(classRowHover) 吞掉，导致点边缘无反应；
+                                        // 改为固定 22x22 命中盒并把 z 提升到行 MouseArea 之上。
+                                        Item {
+                                            width: 22
+                                            height: 22
+                                            z: 20
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                visible: classRowHover.containsMouse && model.className !== ""
+                                                text: "\u270F"
+                                                font.pixelSize: 11
+                                                color: editRowMouse.containsMouse ? "#FFFFFF" : Theme.textSecondary
+                                            }
 
                                             MouseArea {
                                                 id: editRowMouse
                                                 anchors.fill: parent
-                                                anchors.margins: -4
+                                                hoverEnabled: true
                                                 cursorShape: Qt.PointingHandCursor
+                                                propagateComposedEvents: false
                                                 onClicked: classStyleDialog.openFor(model.classIndex)
                                             }
                                         }
 
                                         // 行内删除（✕）：悬停显示（废弃占位保护 class_id）
-                                        Text {
-                                            z: 10
-                                            visible: classRowHover.containsMouse && model.className !== ""
-                                            text: "\u2715"
-                                            font.pixelSize: 11
-                                            color: delRowMouse.containsMouse ? Theme.danger : Theme.textSecondary
+                                        Item {
+                                            width: 22
+                                            height: 22
+                                            z: 20
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                visible: classRowHover.containsMouse && model.className !== ""
+                                                text: "\u2715"
+                                                font.pixelSize: 11
+                                                color: delRowMouse.containsMouse ? Theme.danger : Theme.textSecondary
+                                            }
 
                                             MouseArea {
                                                 id: delRowMouse
                                                 anchors.fill: parent
-                                                anchors.margins: -4
+                                                hoverEnabled: true
                                                 cursorShape: Qt.PointingHandCursor
+                                                propagateComposedEvents: false
                                                 onClicked: taxonomyModel.removeClass(model.classIndex)
                                             }
                                         }
@@ -1910,9 +2277,11 @@ Item {
                                     }
                                 }
                             }
-                            }
+                        }
+                        }
+                        }
 
-// ====== 区域4：标签 ======
+                    // ====== 右栏：标签 ======
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.margins: 12
@@ -2043,12 +2412,9 @@ Item {
                             }
                         }
                     }
-
-                    
-                        }
-                    }
+                }
+            }
         }
-    }
 
     // ================================================================
     // 添加标签弹窗
