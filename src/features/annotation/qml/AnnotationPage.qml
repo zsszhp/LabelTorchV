@@ -184,6 +184,11 @@ Item {
         }
         // 切样本前先静默落盘，避免上一张的标注丢失
         flushPendingSave()
+        // P1-5 沿用上一帧：翻页前快照当前帧标注（框类；落盘后模型与磁盘一致）
+        if ((annotationMode === "detect" || annotationMode === "obb") && annotationModel.rowCount() > 0)
+            prevFrameAnnotations = annotationModel.toVariantList()
+        else
+            prevFrameAnnotations = null
         if (annotationMode === "classify") {
             var clsLabels = annotationService.loadClassificationLabels(sampleData.labelPath || "")
             if (clsLabels.labelType === "multi") {
@@ -339,6 +344,64 @@ Item {
         }
         if (currentSampleIndex < sampleListData.length - 1) {
             loadSample(sampleListData[currentSampleIndex + 1])
+        }
+    }
+
+    // === P1-6 跳到下一张未标注（Ctrl+Shift+D / 导航栏「未标注»」按钮） ===
+    // 已标注=labelPath 非空；从当前位置向后线性查找，接近末尾自动追加下一批
+    function navigateToNextUnlabeled() {
+        if (currentSampleIndex >= 0 && currentSampleIndex < sampleListData.length
+                && (sampleListData[currentSampleIndex].labelPath || "") === "") {
+            ToastBus.info("当前图尚未标注")
+            return
+        }
+        if (sampleHasMore && currentSampleIndex >= sampleListData.length - 2)
+            loadMoreSamples()
+        for (var i = currentSampleIndex + 1; i < sampleListData.length; i++) {
+            if ((sampleListData[i].labelPath || "") === "") {
+                loadSample(sampleListData[i])
+                return
+            }
+        }
+        ToastBus.info("后面没有未标注的图像了")
+    }
+
+    // === P1-5 沿用上一帧（Ctrl+P，对标 X-AnyLabeling keep_prev） ===
+    // 翻页时自动快照上一帧全部标注（归一化坐标，同尺寸图直接复用）；
+    // 在空图上按 Ctrl+P 一键粘贴，触发自动保存。
+    property var prevFrameAnnotations: null
+
+    function applyPrevFrameAnnotations() {
+        if (annotationMode !== "detect" && annotationMode !== "obb") {
+            ToastBus.info("沿用上一帧仅支持检测/旋转框模式")
+            return
+        }
+        if (!prevFrameAnnotations || prevFrameAnnotations.length === 0) {
+            ToastBus.info("没有可沿用的上一帧标注（先在有标注的图上翻页）")
+            return
+        }
+        if (annotationModel.rowCount() > 0) {
+            ToastBus.info("当前图已有标注，沿用上一帧仅适用于空图")
+            return
+        }
+        var pasted = 0
+        for (var i = 0; i < prevFrameAnnotations.length; i++) {
+            var a = prevFrameAnnotations[i]
+            // 多边形顶点无法经 QML 还原为 QPointF 数组，暂只沿用框类标注
+            if (a.shapeType === 1)
+                annotationModel.addOBBAnnotation(a.classIndex, a.className, a.cx, a.cy, a.w, a.h, a.angle)
+            else if (a.shapeType === 0)
+                annotationModel.addAnnotation(a.classIndex, a.className, a.cx, a.cy, a.w, a.h)
+            else
+                continue
+            pasted++
+        }
+        if (pasted > 0) {
+            canvasController.markDirty()
+            root.annotationRev += 1
+            ToastBus.success("已沿用上一帧 " + pasted + " 个标注")
+        } else {
+            ToastBus.info("上一帧没有可沿用的框类标注")
         }
     }
 
@@ -666,6 +729,34 @@ Item {
                                 color: Theme.textMain
                                 Layout.leftMargin: 12
                                 Layout.rightMargin: 12
+                            }
+
+                            // 跳到下一张未标注（P1-6，Ctrl+Shift+D 同功能）
+                            Button {
+                                Layout.preferredWidth: 64
+                                Layout.preferredHeight: 26
+                                text: "未标注»"
+                                font.pixelSize: 11
+                                enabled: currentSampleIndex < sampleListData.length - 1 || sampleHasMore
+                                ToolTip.visible: hovered
+                                ToolTip.text: "跳到下一张未标注的图像 (Ctrl+Shift+D)"
+
+                                background: Rectangle {
+                                    color: parent.enabled ? (parent.hovered ? Theme.bgHover : Theme.bgCard) : Theme.bgCard
+                                    border.color: Theme.borderColor
+                                    border.width: 1
+                                    radius: 4
+                                }
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    font.pixelSize: 11
+                                    color: parent.enabled ? Theme.textMain : Theme.textDisabled
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                onClicked: navigateToNextUnlabeled()
                             }
 
                             Button {
@@ -1280,6 +1371,8 @@ Item {
                         // C++ 层发出的导航信号
                         onNavigatePrevious: navigateToPrevious()
                         onNavigateNext: navigateToNext()
+                        onNavigateNextUnlabeledRequested: navigateToNextUnlabeled()
+                        onKeepPrevRequested: applyPrevFrameAnnotations()
                         onSaveRequested: saveCurrentAnnotations(false)
 
                         // 双击标注弹出编辑标签对话框（参考 X-AnyLabeling）
@@ -1917,6 +2010,15 @@ Item {
                             font.pixelSize: Theme.fontSizeCaption
                         }
 
+                        // 缩放百分比（对标 X-AnyLabeling 状态栏 zoom_widget，只读显示）
+                        Text {
+                            visible: annotationMode === "detect" || annotationMode === "obb"
+                            text: Math.round(canvasController.zoom * 100) + "%"
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontSizeCaption
+                            font.family: Theme.fontFamilyMono
+                        }
+
                         // 隐藏标注开关（纯看图模式，对标 DLTools 标注页「隐藏标注」）
                         RowLayout {
                             visible: annotationMode === "detect"
@@ -1937,10 +2039,12 @@ Item {
 
                         // 快捷键提示
                         Text {
-                            text: "R矩形 O旋转 P多边形 Esc选择 Del删除 Ctrl+Z/Y撤销重做 Ctrl+S保存"
+                            text: "R矩形 O旋转 P多边形 Esc选择 Del删除 Ctrl+P沿用上一帧 Ctrl+Shift+D跳未标注 Ctrl+Z/Y撤销重做 Ctrl+S保存"
                             color: Theme.textDisabled
                             font.pixelSize: 10
                             visible: annotationMode === "detect"
+                            elide: Text.ElideRight
+                            Layout.maximumWidth: 560
                         }
                     }
                 }

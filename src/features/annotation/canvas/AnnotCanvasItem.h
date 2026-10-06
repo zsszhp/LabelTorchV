@@ -106,6 +106,10 @@ signals:
     void undoAvailabilityChanged();
     void navigatePrevious();
     void navigateNext();
+    /// P1-6 跳到下一张未标注（Ctrl+Shift+D）
+    void navigateNextUnlabeledRequested();
+    /// P1-5 沿用上一帧标注（Ctrl+P，X-AnyLabeling keep_prev 对标）
+    void keepPrevRequested();
     void saveRequested();
     void editLabelRequested(int annotationIndex);
     void changeClassRequested(int direction);

@@ -1022,7 +1022,18 @@ void AnnotCanvasItem::keyPressEvent(QKeyEvent* event)
             return;
         }
         if (event->key() == Qt::Key_D) {
-            duplicateSelected();
+            if (event->modifiers() & Qt::ShiftModifier) {
+                // Ctrl+Shift+D：跳到下一张未标注（P1-6）
+                emit navigateNextUnlabeledRequested();
+            } else {
+                duplicateSelected();
+            }
+            event->accept();
+            return;
+        }
+        if (event->key() == Qt::Key_P) {
+            // Ctrl+P：沿用上一帧标注（P1-5 keep_prev）
+            emit keepPrevRequested();
             event->accept();
             return;
         }
