@@ -4,9 +4,13 @@ IPC服务端主循环
 通过stdin/stdout JSON-RPC与Qt主进程通信
 """
 import sys
+import os
+import time
 import asyncio
 import json
 import logging
+import logging.handlers
+from datetime import datetime
 
 from .protocol import create_response, create_event
 
@@ -289,14 +293,50 @@ def get_server():
     return _server_instance
 
 
+def _setup_logging():
+    """日志配置：stderr（前端捕获转发）+ 独立按天文件（LT_BACKEND_LOG_DIR 由前端注入）。
+
+    文件 backend_YYYYMMDD.log 单文件 50MB 分卷（.1/.2...），启动时清理 14 天前的旧文件。
+    独立运行（无 LT_BACKEND_LOG_DIR）时退回 stderr-only，行为与旧版一致。
+    """
+    fmt = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
+    handlers = [logging.StreamHandler(sys.stderr)]
+
+    log_dir = os.environ.get("LT_BACKEND_LOG_DIR", "")
+    if log_dir:
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            date_str = datetime.now().strftime("%Y%m%d")
+            file_path = os.path.join(log_dir, f"backend_{date_str}.log")
+            file_handler = logging.handlers.RotatingFileHandler(
+                file_path, maxBytes=50 * 1024 * 1024, backupCount=5, encoding="utf-8")
+            file_handler.setFormatter(logging.Formatter(fmt))
+            handlers.append(file_handler)
+
+            # 清理 14 天前的旧后端日志（与前端主日志保留策略一致）
+            cutoff = time.time() - 14 * 24 * 3600
+            for name in os.listdir(log_dir):
+                if name.startswith("backend_") and name.endswith(".log*"):
+                    path = os.path.join(log_dir, name)
+                    try:
+                        if os.path.getmtime(path) < cutoff:
+                            os.remove(path)
+                    except OSError:
+                        pass
+        except OSError as exc:
+            print(f"backend log file setup failed, stderr-only: {exc}", file=sys.stderr)
+
+    logging.basicConfig(level=logging.INFO, format=fmt, handlers=handlers)
+
+
 def main():
     """入口点"""
     global _server_instance
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-        stream=sys.stderr,
+    _setup_logging()
+    logging.getLogger(__name__).info(
+        "LabelTorch backend starting, log_dir=%s",
+        os.environ.get("LT_BACKEND_LOG_DIR", "(stderr only)"),
     )
 
     server = IpcServer()

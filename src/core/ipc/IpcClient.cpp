@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 #include <QProcessEnvironment>
 #include <QRandomGenerator>
+#include <QStandardPaths>
 #include <algorithm>
 
 #ifdef Q_OS_WIN
@@ -102,6 +103,10 @@ void IpcClient::launchBackend()
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     env.insert(QStringLiteral("PYTHONUNBUFFERED"), QStringLiteral("1"));
+    // 后端独立日志目录（server.py 读取；未设置时后端退回 stderr-only）
+    env.insert(QStringLiteral("LT_BACKEND_LOG_DIR"),
+               QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+               + QStringLiteral("/logs"));
     QStringList candidateDirs = {
         QCoreApplication::applicationDirPath() + QStringLiteral("/backend"),
         QCoreApplication::applicationDirPath() + QStringLiteral("/../backend"),
@@ -158,6 +163,7 @@ void IpcClient::launchBackend()
 void IpcClient::onBackendStarted()
 {
     ltInfo(LT_LOG_IPC()) << "Backend process started, pid=" << m_process->processId();
+    m_backendStartedMs = QDateTime::currentMSecsSinceEpoch();
     m_connected = true;
     emit connectedChanged();
     m_watchdog->start();
@@ -204,6 +210,7 @@ QString IpcClient::sendRequest(const QString &command, const QJsonObject &payloa
 
     // 记录待响应请求（含时间戳，用于超时清理）
     m_pendingCommands[requestId] = PendingCommand{command, QDateTime::currentDateTime()};
+    m_lastRequestCommand = command;
 
     QJsonObject request = IpcProtocol::createRequest(requestId, command, payload);
     QByteArray data = QJsonDocument(request).toJson(QJsonDocument::Compact) + "\n";
@@ -258,11 +265,23 @@ void IpcClient::processMessage(const QJsonObject &msg)
         QString requestId = msg[QStringLiteral("request_id")].toString();
         QJsonObject response = msg;
 
-        if (!response.contains(QStringLiteral("command"))) {
-            if (m_pendingCommands.contains(requestId)) {
-                response[QStringLiteral("command")] = m_pendingCommands[requestId].command;
+        // 请求耗时：响应与请求配对计算；>3s 记 WARNING 便于事后筛慢请求
+        if (m_pendingCommands.contains(requestId)) {
+            const PendingCommand &pending = m_pendingCommands[requestId];
+            const qint64 durationMs = pending.startTime.msecsTo(QDateTime::currentDateTime());
+            if (!response.contains(QStringLiteral("command"))) {
+                response[QStringLiteral("command")] = pending.command;
+            }
+            if (durationMs > 3000) {
+                ltWarning(LT_LOG_IPC()) << "IPC request slow:" << pending.command
+                                        << "duration=" << durationMs << "ms";
+            } else {
+                ltDebug(LT_LOG_IPC()) << "IPC request done:" << pending.command
+                                      << "duration=" << durationMs << "ms";
             }
             m_pendingCommands.remove(requestId);
+        } else if (!response.contains(QStringLiteral("command"))) {
+            ltDebug(LT_LOG_IPC()) << "response without pending entry id=" << requestId;
         }
 
         ltDebug(LT_LOG_IPC()) << "responseReceived id=" << requestId;
@@ -286,8 +305,17 @@ int IpcClient::nextRestartDelayMs() const
 
 void IpcClient::onBackendFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
+    // 崩溃退出与运行时长、最后请求一并落盘，回答"后端跑了多久、崩前在处理什么"
+    const QString statusName = (exitStatus == QProcess::CrashExit)
+                                   ? QStringLiteral("CrashExit")
+                                   : QStringLiteral("NormalExit");
+    const qint64 uptimeSec = m_backendStartedMs > 0
+                                 ? (QDateTime::currentMSecsSinceEpoch() - m_backendStartedMs) / 1000
+                                 : 0;
     ltWarning(LT_LOG_IPC()) << "Backend finished exitCode=" << exitCode
-                             << "exitStatus=" << exitStatus;
+                            << "exitStatus=" << statusName
+                            << "uptimeSec=" << uptimeSec
+                            << "lastRequest=" << m_lastRequestCommand;
 
     m_stableTimer->stop();
     if (m_connected) {

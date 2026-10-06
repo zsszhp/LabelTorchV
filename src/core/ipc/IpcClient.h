@@ -81,6 +81,10 @@ private:
     static constexpr int STOP_GRACE_MS = 3000;        ///< 停止时优雅退出等待（毫秒）
     QString m_lastPythonPath;
     QString m_lastScriptPath;
+    /// 最近一次发出的请求命令（后端异常退出时写入日志，定位"点了什么之后后端挂了"）
+    QString m_lastRequestCommand;
+    /// 后端本次启动时刻（毫秒时间戳），用于崩溃日志的运行时长
+    qint64 m_backendStartedMs = 0;
     /// Windows 作业句柄（HANDLE），非 Windows 平台保持 nullptr
     void *m_jobHandle = nullptr;
 };
