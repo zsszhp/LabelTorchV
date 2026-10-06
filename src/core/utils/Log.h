@@ -19,6 +19,8 @@
 #define LT_LOG_EXPORT()    QLoggingCategory("lt.export")
 #define LT_LOG_TESTING()   QLoggingCategory("lt.testing")
 #define LT_LOG_APP()       QLoggingCategory("lt.app")
+#define LT_LOG_UI()        QLoggingCategory("lt.ui")
+#define LT_LOG_SYS()       QLoggingCategory("lt.sys")
 
 // Convenience macros with function name
 #define ltTrace(category)   qCDebug(category) << __FUNCTION__ << ":"
@@ -29,15 +31,26 @@
 
 namespace Log {
 
-// Initialize logging system (call once at app startup)
-// logDir: directory for log files; if empty, uses AppDataLocation/logs
+// Initialize logging system (call once at app startup, after QCoreApplication
+// has application name/version set).
+// logDir: directory for log files; if empty, uses AppDataLocation/logs,
+//         overridable via LT_LOG_DIR environment variable.
+// Level: LT_LOG_LEVEL env > caller-set default via setLevel > build default
+//        (Debug build: DEBUG / Release build: INFO).
 void init(const QString &logDir = {});
 
-// Set minimum log level: "trace", "debug", "info", "warning", "error"
+// Set minimum log level: "debug", "info", "warning", "error" ("trace" == debug)
 void setLevel(const QString &level);
 
 // Enable/disable specific category (e.g., "lt.ipc=true", "lt.db=false")
 void setCategory(const QString &rule);
+
+// Short session id ("s" + start time), stamped on every log line so that
+// multiple launches sharing one daily file can be told apart.
+QString sessionId();
+
+// Directory the log files live in (valid after init()).
+QString logDirPath();
 
 // Shutdown logging, flush files
 void shutdown();
