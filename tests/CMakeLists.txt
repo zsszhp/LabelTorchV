@@ -312,3 +312,13 @@ target_link_libraries(test_tag_service PRIVATE
     Qt6::Sql
 )
 add_test(NAME TagServiceTest COMMAND test_tag_service)
+
+# Breadcrumb 黑匣子环形缓冲回归（闪退修复：首条日志 lines[-1] 越界写）
+add_executable(test_breadcrumb
+    test_breadcrumb.cpp
+)
+target_link_libraries(test_breadcrumb PRIVATE
+    labeltorch_core
+    Qt6::Test
+)
+add_test(NAME BreadcrumbTest COMMAND test_breadcrumb)
