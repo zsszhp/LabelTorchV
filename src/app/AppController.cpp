@@ -2,6 +2,9 @@
 #include "utils/Log.h"
 #include "utils/UserAction.h"
 
+#include <QDesktopServices>
+#include <QUrl>
+
 AppController::AppController(QObject *parent)
     : QObject(parent)
 {
@@ -43,6 +46,14 @@ void AppController::closeProject()
     emit currentProjectIdChanged();
     emit currentProjectNameChanged();
     ltInfo(LT_LOG_APP()) << "Project closed";
+}
+
+void AppController::openLogsDir()
+{
+    const QString dir = Log::logDirPath();
+    ltInfo(LT_LOG_APP()) << "Opening logs dir:" << dir;
+    UserAction::log(QStringLiteral("app.open_logs_dir"), dir);
+    QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
 }
 
 void AppController::setPythonBackendReady(bool ready)

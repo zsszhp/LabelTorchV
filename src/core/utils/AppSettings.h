@@ -12,6 +12,7 @@ class AppSettings : public QObject
     Q_PROPERTY(QStringList recentProjects READ recentProjects NOTIFY recentProjectsChanged)
     Q_PROPERTY(QString lastProjectPath READ lastProjectPath WRITE setLastProjectPath NOTIFY lastProjectPathChanged)
     Q_PROPERTY(QString pythonPath READ pythonPath WRITE setPythonPath NOTIFY pythonPathChanged)
+    Q_PROPERTY(QString logLevel READ logLevel WRITE setLogLevel NOTIFY logLevelChanged)
     Q_PROPERTY(QSize windowSize READ windowSize WRITE setWindowSize NOTIFY windowSizeChanged)
     Q_PROPERTY(bool windowMaximized READ windowMaximized WRITE setWindowMaximized NOTIFY windowMaximizedChanged)
 
@@ -29,6 +30,10 @@ public:
     QString pythonPath() const;
     void setPythonPath(const QString &path);
 
+    /// 落盘日志级别："debug"/"info"/"warning"/"error"；写入即生效（内部调 Log::setLevel）
+    QString logLevel() const;
+    void setLogLevel(const QString &level);
+
     QSize windowSize() const;
     void setWindowSize(const QSize &size);
 
@@ -45,6 +50,7 @@ signals:
     void recentProjectsChanged();
     void lastProjectPathChanged();
     void pythonPathChanged();
+    void logLevelChanged();
     void windowSizeChanged();
     void windowMaximizedChanged();
 

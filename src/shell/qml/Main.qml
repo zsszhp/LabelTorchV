@@ -1759,6 +1759,16 @@ ApplicationWindow {
         subtitle: "运行环境与日志偏好"
         dialogWidth: 420
 
+        // 级别下标(0~3) 与英文级别名一一对应：调试=debug 信息=info 警告=warning 错误=error
+        property var levelNames: ["debug", "info", "warning", "error"]
+
+        onAboutToShow: {
+            // 打开时回显已保存的级别（无保存值时默认"信息"）
+            var saved = typeof appSettings !== "undefined" ? appSettings.logLevel : ""
+            var idx = levelNames.indexOf(saved)
+            logLevelCombo.currentIndex = idx >= 0 ? idx : 1
+        }
+
         ColumnLayout {
             width: parent.width - Theme.spacingLarge * 2
             anchors.horizontalCenter: parent.horizontalCenter
@@ -1819,6 +1829,30 @@ ApplicationWindow {
                 }
             }
 
+            Button {
+                Layout.fillWidth: true
+                text: "打开日志目录"
+                background: Rectangle {
+                    color: parent.hovered ? Theme.bgHover : Theme.bgCard
+                    border.color: Theme.borderColor
+                    border.width: 1
+                    radius: Theme.radiusSmall
+                    implicitHeight: 32
+                }
+                contentItem: Text {
+                    text: parent.text
+                    color: Theme.textMain
+                    font.pixelSize: Theme.fontSizeNormal
+                    font.family: Theme.fontFamily
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                onClicked: {
+                    if (typeof appController !== "undefined")
+                        appController.openLogsDir()
+                }
+            }
+
             Item { Layout.preferredHeight: Theme.spacingSmall }
         }
 
@@ -1868,9 +1902,10 @@ ApplicationWindow {
                 onClicked: {
                     if (typeof appSettings !== "undefined") {
                         appSettings.pythonPath = pythonPathField.text
+                        // 日志级别持久化并立即生效于落盘（AppSettings 内部调 Log::setLevel）
+                        appSettings.logLevel = settingsDialog.levelNames[logLevelCombo.currentIndex]
                     }
-                    // 日志级别立即生效：按级别过滤日志面板已显示内容的展示阈值
-                    // C++ 侧 Log::setLevel 未暴露给 QML，这里先作用于日志面板显示层
+                    // 同步日志面板展示阈值（展示层过滤，与落盘级别独立）
                     logPanel.minLevel = logLevelCombo.currentIndex
                     // Python 路径需重启后端才生效，明确提示用户
                     ToastBus.success("设置已保存：日志级别 = " + logLevelCombo.currentText + "（立即生效）")

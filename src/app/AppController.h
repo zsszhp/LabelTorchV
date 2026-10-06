@@ -33,6 +33,9 @@ public:
     Q_INVOKABLE void openProject(const QString &projectId, const QString &projectName);
     Q_INVOKABLE void closeProject();
 
+    /// 用系统文件管理器打开日志目录（AppDataLocation/logs）
+    Q_INVOKABLE void openLogsDir();
+
     int nanAssertCount() const { return m_nanAssertCount; }
     bool nanRestartRecommended() const { return m_nanAssertCount >= nanRestartThreshold(); }
     // 超过该次数后状态栏建议重启（降级只是掩盖，几何状态可能已脏）

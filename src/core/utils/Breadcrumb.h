@@ -21,9 +21,11 @@ int snapshot(char *out, int outBytes);
 // 崩溃路径：按时间序导出用户动作环到 out（NUL 结尾），返回写入字节数
 int snapshotActions(char *out, int outBytes);
 
-// 便捷重载：QString 转 UTF-8 后入环（常规路径，允许分配）
+// 便捷重载：QString/QByteArray 转 UTF-8 后入环（常规路径，允许分配）
 inline void push(const QString &line) { push(line.toUtf8().constData()); }
 inline void pushAction(const QString &line) { pushAction(line.toUtf8().constData()); }
+inline void push(const QByteArray &line) { push(line.constData()); }
+inline void pushAction(const QByteArray &line) { pushAction(line.constData()); }
 
 } // namespace Breadcrumb
 

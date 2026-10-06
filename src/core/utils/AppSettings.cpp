@@ -1,4 +1,5 @@
 #include "AppSettings.h"
+#include "Log.h"
 #include "utils/UserAction.h"
 
 AppSettings::AppSettings(QObject *parent)
@@ -61,6 +62,20 @@ void AppSettings::setPythonPath(const QString &path)
     m_settings.setValue(QStringLiteral("pythonPath"), path);
     UserAction::log(QStringLiteral("settings.python_path"), path);
     emit pythonPathChanged();
+}
+
+QString AppSettings::logLevel() const
+{
+    return m_settings.value(QStringLiteral("logLevel")).toString();
+}
+
+void AppSettings::setLogLevel(const QString &level)
+{
+    if (m_settings.value(QStringLiteral("logLevel")).toString() == level) return;
+    m_settings.setValue(QStringLiteral("logLevel"), level);
+    Log::setLevel(level); // 立即生效
+    UserAction::log(QStringLiteral("settings.log_level"), level);
+    emit logLevelChanged();
 }
 
 QSize AppSettings::windowSize() const

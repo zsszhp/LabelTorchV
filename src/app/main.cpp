@@ -492,6 +492,17 @@ int main(int argc, char *argv[])
     app.setWindowIcon(appIcon);
 
     Log::init();
+    // 级别优先级：LT_LOG_LEVEL 环境变量 > 设置页持久化值 > 构建默认（init 内已处理默认）。
+    // 在 init 后立刻应用持久化级别，避免启动初期以错误级别写日志；
+    // 用独立 QSettings 读取，不依赖 AppSettings 对象的构造顺序。
+    {
+        QSettings persistedSettings(QStringLiteral("LabelTorch"), QStringLiteral("LabelTorchV"));
+        const QString savedLevel = persistedSettings
+                                       .value(QStringLiteral("logLevel")).toString();
+        if (!savedLevel.isEmpty() && qEnvironmentVariable("LT_LOG_LEVEL").isEmpty()) {
+            Log::setLevel(savedLevel);
+        }
+    }
     ltInfo(LT_LOG_APP()) << "Application starting" << "version" << app.applicationVersion()
                          << "Qt" << QT_VERSION_STR;
 
@@ -515,6 +526,13 @@ int main(int argc, char *argv[])
 
 
     AppSettings appSettings;
+    // LT_DEBUG_SET_LOGLEVEL=<level>：E2E 验收钩子，走 AppSettings::setLogLevel
+    // 正式路径（QSettings 持久化 + Log::setLevel 即时生效 + 用户操作日志），
+    // 用于无 UI 输入环境下验证设置页保存链路
+    const QString probeLevel = qEnvironmentVariable("LT_DEBUG_SET_LOGLEVEL");
+    if (!probeLevel.isEmpty()) {
+        appSettings.setLogLevel(probeLevel);
+    }
     AppController controller;
     ProjectService projectService;
     ProjectModel projectModel;
