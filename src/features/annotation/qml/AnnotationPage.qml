@@ -233,50 +233,82 @@ Item {
     }
 
     // === 保存当前标注（silent=true 时不弹 Toast，仅状态栏反馈） ===
+    // 防崩溃布防：整体 try/catch 兜底（JS ReferenceError/TypeError 不再冒泡成 QML
+    // 引擎异常中断渲染），服务/模型引用先验空，任何异常都以 Toast+console 呈现。
     function saveCurrentAnnotations(silent) {
-        if (annotationMode === "classify") {
-            if (classificationMultiCheck.checked ? selectedMultiClassIds.length > 0 : selectedClassId >= 0) {
-                var labels = {}
-                if (classificationMultiCheck.checked) {
-                    labels.labelType = "multi"
-                    labels.classIds = selectedMultiClassIds
-                } else {
-                    labels.labelType = "single"
-                    labels.classId = selectedClassId
+        try {
+            if (annotationMode === "classify") {
+                if (classificationMultiCheck.checked ? selectedMultiClassIds.length > 0 : selectedClassId >= 0) {
+                    var labels = {}
+                    if (classificationMultiCheck.checked) {
+                        labels.labelType = "multi"
+                        labels.classIds = selectedMultiClassIds
+                    } else {
+                        labels.labelType = "single"
+                        labels.classId = selectedClassId
+                    }
+                    if (!annotationService || !canvasController) {
+                        console.warn("[AnnotationPage] save skipped: service/controller null (classify)")
+                        return
+                    }
+                    var clsOk = annotationService.saveClassificationLabels(
+                        canvasController.currentLabelPath, "", "", labels
+                    )
+                    canvasController.clearDirty()
+                    if (!clsOk && !silent)
+                        ToastBus.error(annotationService.lastError() || "分类标签保存失败")
                 }
-                annotationService.saveClassificationLabels(
-                    canvasController.currentLabelPath, "", "", labels
+            } else if (annotationMode === "anomaly") {
+                if (!annotationService || !canvasController) {
+                    console.warn("[AnnotationPage] save skipped: service/controller null (anomaly)")
+                    return
+                }
+                var anomOk = annotationService.saveAnomalyLabels(
+                    canvasController.currentLabelPath, "", "", isAnomalous
                 )
                 canvasController.clearDirty()
-            }
-        } else if (annotationMode === "anomaly") {
-            annotationService.saveAnomalyLabels(
-                canvasController.currentLabelPath, "", "", isAnomalous
-            )
-            canvasController.clearDirty()
-        } else {
-            if (canvasController.dirty && canvasController.currentLabelPath !== "") {
-                canvasItem.commitUndoState()
-                var ok = annotationService.saveAnnotations(
-                    canvasController.currentLabelPath, "", "",
-                    annotationModel.toVariantList()
-                )
-                if (ok) {
-                    canvasController.clearDirty()
-                    // 同步样本列表的完成标记（文件列表绿勾即时点亮）
-                    if (currentSampleIndex >= 0 && currentSampleIndex < sampleListData.length
-                            && (sampleListData[currentSampleIndex].labelPath || "") === "") {
-                        var updated = sampleListData.slice()
-                        updated[currentSampleIndex] = Object.assign({}, updated[currentSampleIndex],
-                                                                    { labelPath: canvasController.currentLabelPath })
-                        sampleListData = updated
+                if (!anomOk && !silent)
+                    ToastBus.error(annotationService.lastError() || "异常检测标签保存失败")
+            } else {
+                if (!annotationService || !canvasController || !annotationModel) {
+                    console.warn("[AnnotationPage] save skipped: service/controller/model null (detect)")
+                    return
+                }
+                if (canvasController.dirty && canvasController.currentLabelPath !== "") {
+                    canvasItem.commitUndoState()
+                    var payload = annotationModel.toVariantList()
+                    if (!payload || payload.length === 0) {
+                        // 空列表也允许落盘（用户删光了所有框的合法场景），仅记录日志
+                        console.log("[AnnotationPage] save: empty annotation list for",
+                                    canvasController.currentLabelPath)
                     }
-                    if (!silent)
-                        ToastBus.success("标注已保存")
-                } else {
-                    ToastBus.error("标注保存失败，请检查标签目录权限")
+                    var ok = annotationService.saveAnnotations(
+                        canvasController.currentLabelPath, "", "",
+                        payload
+                    )
+                    if (ok) {
+                        canvasController.clearDirty()
+                        // 同步样本列表的完成标记（文件列表绿勾即时点亮）
+                        if (currentSampleIndex >= 0 && currentSampleIndex < sampleListData.length
+                                && (sampleListData[currentSampleIndex].labelPath || "") === "") {
+                            var updated = sampleListData.slice()
+                            updated[currentSampleIndex] = Object.assign({}, updated[currentSampleIndex],
+                                                                        { labelPath: canvasController.currentLabelPath })
+                            sampleListData = updated
+                        }
+                        if (!silent)
+                            ToastBus.success("标注已保存")
+                    } else {
+                        var err = (annotationService.lastError && annotationService.lastError()) || ""
+                        ToastBus.error(err !== "" ? err : "标注保存失败，请检查标签目录权限")
+                    }
                 }
             }
+        } catch (e) {
+            // 任何未预期异常（含底层 Q_INVOKABLE 抛出的 C++ 异常映射）都就地消化，
+            // 不让 autoSaveTimer 的回调链把页面打断
+            console.error("[AnnotationPage] saveCurrentAnnotations exception:", e)
+            try { ToastBus.error("保存标注时发生内部错误: " + e) } catch (e2) {}
         }
     }
 

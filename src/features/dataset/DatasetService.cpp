@@ -6,6 +6,7 @@
 #include "utils/AuditLog.h"
 #include "utils/Id.h"
 #include "utils/Log.h"
+#include "utils/UserAction.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -331,6 +332,10 @@ QString DatasetService::importDataset(const QString &projectId, const QString &n
 {
     ltTrace(LT_LOG_DATASET()) << "importDataset projectId=" << projectId << "name=" << name
                               << "imageDir=" << imageDir << "labelDir=" << labelDir;
+    UserAction::log(QStringLiteral("dataset.import"), name,
+                    {{QStringLiteral("projectId"), projectId},
+                     {QStringLiteral("imageDir"), imageDir},
+                     {QStringLiteral("labelDir"), labelDir}});
 
     if (projectId.isEmpty() || name.isEmpty() || imageDir.isEmpty()) {
         ltWarning(LT_LOG_DATASET()) << "importDataset: 缺少必要参数";
@@ -441,6 +446,8 @@ QString DatasetService::importDataset(const QString &projectId, const QString &n
         db.rollback();
         return {};
     }
+    UserAction::log(QStringLiteral("dataset.import.complete"), datasetId,
+                    {{QStringLiteral("count"), matchedSamples.size()}});
 
     // 步骤7: 将导入的类别同步到项目 taxonomy
     syncClassesToTaxonomy(datasetId);
@@ -554,6 +561,7 @@ QVariantMap DatasetService::getDataset(const QString &datasetId)
 bool DatasetService::deleteDataset(const QString &datasetId)
 {
     ltTrace(LT_LOG_DATASET()) << "deleteDataset datasetId=" << datasetId;
+    UserAction::log(QStringLiteral("dataset.delete"), datasetId);
 
     QSqlDatabase db = Database::instance().database();
 
@@ -1294,6 +1302,10 @@ void DatasetService::getClassDistributionAsync(const QString &datasetId)
 bool DatasetService::updateImportStatus(const QString &datasetId, const QString &status)
 {
     ltTrace(LT_LOG_DATASET()) << "updateImportStatus datasetId=" << datasetId << "status=" << status;
+    // 导入完成/失败是导入动作的结果里程碑，随用户操作日志落盘
+    if (status == QStringLiteral("completed") || status == QStringLiteral("failed")) {
+        UserAction::log(QStringLiteral("dataset.import.") + status, datasetId);
+    }
 
     QSqlQuery query(Database::instance().database());
     query.prepare("UPDATE datasets SET import_status = ? WHERE id = ?");
@@ -2129,6 +2141,8 @@ QString DatasetService::importDatasetJson(const QString &projectId, const QStrin
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return {};
     }
+    UserAction::log(QStringLiteral("dataset.import.complete"), datasetId,
+                    {{QStringLiteral("count"), matchedSamples.size()}});
 
     // 提交事务
     if (!db.commit()) {
@@ -2636,6 +2650,8 @@ bool DatasetService::importAnomalyDataset(const QString &datasetId, const QStrin
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return false;
     }
+    UserAction::log(QStringLiteral("dataset.import.complete"), datasetId,
+                    {{QStringLiteral("count"), totalSamples}});
 
     // 提交事务
     if (!db.commit()) {
@@ -2792,6 +2808,8 @@ bool DatasetService::importClassifyFolderDataset(const QString &datasetId, const
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return false;
     }
+    UserAction::log(QStringLiteral("dataset.import.complete"), datasetId,
+                    {{QStringLiteral("count"), totalSamples}});
 
     // 提交事务
     if (!db.commit()) {
@@ -3025,6 +3043,8 @@ bool DatasetService::importLabelMeDataset(const QString &datasetId, const QStrin
         updateImportStatus(datasetId, QStringLiteral("failed"));
         return false;
     }
+    UserAction::log(QStringLiteral("dataset.import.complete"), datasetId,
+                    {{QStringLiteral("count"), matchedSamples.size()}});
 
     // 提交事务
     if (!db.commit()) {

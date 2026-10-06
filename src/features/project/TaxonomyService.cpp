@@ -2,6 +2,7 @@
 #include "database/Database.h"
 #include "utils/Id.h"
 #include "utils/Log.h"
+#include "utils/UserAction.h"
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QJsonDocument>
@@ -119,6 +120,8 @@ QString TaxonomyService::createTaxonomy(const QString &projectId, const QString 
         return {};
     }
     ltInfo(LT_LOG_TAXONOMY()) << "Taxonomy created:" << taxonomyId << name << "with" << classes.size() << "classes";
+    UserAction::log(QStringLiteral("taxonomy.create"), name,
+                    {{QStringLiteral("id"), taxonomyId}, {QStringLiteral("classes"), classes.size()}});
     return taxonomyId;
 }
 
@@ -174,6 +177,7 @@ bool TaxonomyService::deleteTaxonomy(const QString &taxonomyId)
 
     if (ok) {
         ltInfo(LT_LOG_TAXONOMY()) << "Taxonomy deleted:" << taxonomyId;
+        UserAction::log(QStringLiteral("taxonomy.delete"), taxonomyId);
     } else {
         ltError(LT_LOG_TAXONOMY()) << "Failed to delete taxonomy:" << query.lastError().text();
     }
@@ -200,6 +204,7 @@ bool TaxonomyService::addClass(const QString &taxonomyId, const QString &classNa
         return false;
     }
     ltInfo(LT_LOG_TAXONOMY()) << "Class added:" << className << "to taxonomy" << taxonomyId;
+    UserAction::log(QStringLiteral("taxonomy.class.add"), className, {{QStringLiteral("id"), taxonomyId}});
     return true;
 }
 
@@ -286,6 +291,8 @@ bool TaxonomyService::removeClass(const QString &taxonomyId, int classIndex, boo
     writeRemovalAudit(taxonomyId, classIndex, className, true);
     ltInfo(LT_LOG_TAXONOMY()) << "Class physically removed at index" << classIndex
                               << "(" << className << ") from taxonomy" << taxonomyId;
+    UserAction::log(QStringLiteral("taxonomy.class.remove"), className,
+                    {{QStringLiteral("id"), taxonomyId}, {QStringLiteral("index"), classIndex}});
     return true;
 }
 
@@ -399,6 +406,8 @@ bool TaxonomyService::renameClass(const QString &taxonomyId, int classIndex, con
         ltError(LT_LOG_TAXONOMY()) << "Failed to rename class:" << query.lastError().text();
         return false;
     }
+    UserAction::log(QStringLiteral("taxonomy.class.rename"), newName,
+                    {{QStringLiteral("id"), taxonomyId}, {QStringLiteral("index"), classIndex}});
     return true;
 }
 

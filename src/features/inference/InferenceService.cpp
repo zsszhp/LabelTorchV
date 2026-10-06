@@ -3,6 +3,7 @@
 #include "ipc/IpcClient.h"
 #include "ipc/IpcProtocol.h"
 #include "utils/Log.h"
+#include "utils/UserAction.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -45,6 +46,9 @@ QString InferenceService::runInference(const QString &modelVersionId,
                                 << "sampleScope=" << sampleScope
                                 << "confThreshold=" << confThreshold
                                 << "iouThreshold=" << iouThreshold;
+    UserAction::log(QStringLiteral("inference.run"), modelVersionId,
+                    {{QStringLiteral("datasetId"), datasetId},
+                     {QStringLiteral("sampleScope"), sampleScope}});
 
     auto db = Database::instance().database();
     if (!db.isOpen()) return {};
@@ -249,6 +253,7 @@ QVariantList InferenceService::listBatches(const QString &datasetId)
 bool InferenceService::cancelBatch(const QString &batchId)
 {
     ltTrace(LT_LOG_INFERENCE()) << "batchId=" << batchId;
+    UserAction::log(QStringLiteral("inference.cancel"), batchId);
 
     auto db = Database::instance().database();
     if (!db.isOpen()) return false;
@@ -442,6 +447,8 @@ QString InferenceService::runVideoInference(const QString &modelVersionId,
                                 << "videoPath=" << videoPath
                                 << "conf=" << confThreshold
                                 << "iou=" << iouThreshold;
+    UserAction::log(QStringLiteral("inference.video"), modelVersionId,
+                    {{QStringLiteral("videoPath"), videoPath}});
 
     if (!m_ipcClient) {
         ltError(LT_LOG_INFERENCE()) << "IpcClient not injected";

@@ -2,6 +2,7 @@
 #include "Database.h"
 #include "utils/Id.h"
 #include "utils/Log.h"
+#include "utils/UserAction.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -74,6 +75,9 @@ QString TagService::addTag(const QString &datasetId, const QString &name,
 
     ltInfo(LT_LOG_DATASET()) << "Tag added:" << tagId << "for dataset:" << datasetId
                              << "name:" << trimmedName;
+    UserAction::log(QStringLiteral("tag.add"), trimmedName,
+                    {{QStringLiteral("datasetId"), datasetId},
+                     {QStringLiteral("shortcut"), trimmedShortcut}});
     emit tagsChanged(datasetId);
     return tagId;
 }
@@ -129,6 +133,7 @@ bool TagService::removeTag(const QString &tagId)
     }
 
     ltInfo(LT_LOG_DATASET()) << "Tag removed:" << tagId;
+    UserAction::log(QStringLiteral("tag.remove"), tagId, {{QStringLiteral("datasetId"), datasetId}});
     emit tagsChanged(datasetId);
     emit sampleTagsChanged(datasetId);
     return true;
@@ -219,6 +224,7 @@ bool TagService::renameTag(const QString &tagId, const QString &newName)
     }
 
     ltInfo(LT_LOG_DATASET()) << "Tag renamed:" << tagId << "to:" << newName;
+    UserAction::log(QStringLiteral("tag.rename"), newName, {{QStringLiteral("id"), tagId}});
     emit tagsChanged(datasetId);
     return true;
 }
@@ -350,6 +356,7 @@ bool TagService::setSampleTag(const QString &sampleId, const QString &tagId)
         return false;
     }
 
+    UserAction::log(QStringLiteral("tag.sample.assign"), tagId, {{QStringLiteral("sampleId"), sampleId}});
     emit sampleTagsChanged(sampleDatasetId(sampleId));
     return true;
 }
@@ -415,6 +422,8 @@ int TagService::setSamplesTag(const QVariantList &sampleIds, const QString &tagI
     }
 
     int updated = query.numRowsAffected();
+    UserAction::log(QStringLiteral("tag.sample.assign_batch"), tagId,
+                    {{QStringLiteral("count"), updated}, {QStringLiteral("datasetId"), datasetId}});
     emit sampleTagsChanged(datasetId);
     return updated;
 }

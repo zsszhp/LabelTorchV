@@ -2,6 +2,7 @@
 #include "ipc/IpcClient.h"
 #include "ipc/IpcProtocol.h"
 #include "utils/Log.h"
+#include "utils/UserAction.h"
 
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -79,6 +80,8 @@ bool AnomalyService::runInference(const QString &weightPath,
 {
     ltTrace(LT_LOG_INFERENCE()) << "runInference weight=" << weightPath
                                  << "model=" << modelFamily;
+    UserAction::log(QStringLiteral("anomaly.run"), modelFamily,
+                    {{QStringLiteral("weight"), weightPath}});
 
     if (!m_ipcClient) {
         ltWarning(LT_LOG_INFERENCE()) << "IPC client not available";

@@ -5,6 +5,7 @@
 #include "utils/AuditLog.h"
 #include "utils/Id.h"
 #include "utils/Log.h"
+#include "utils/UserAction.h"
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QJsonDocument>
@@ -101,6 +102,8 @@ QString ProjectService::createProject(const QString &name, const QString &rootPa
 {
     QString cleanPath = QDir::cleanPath(rootPath);
     ltTrace(LT_LOG_PROJECT()) << "createProject name=" << name << "path=" << cleanPath;
+    UserAction::log(QStringLiteral("project.create"), name,
+                    {{QStringLiteral("path"), cleanPath}, {QStringLiteral("taskType"), taskType}});
 
     QString normalizedTaskType = taskType;
     if (normalizedTaskType != QStringLiteral("detect")
@@ -466,6 +469,7 @@ QVariantMap ProjectService::previewProjectDeletion(const QString &projectId)
 bool ProjectService::deleteProject(const QString &projectId)
 {
     ltTrace(LT_LOG_PROJECT()) << "deleteProject id=" << projectId;
+    UserAction::log(QStringLiteral("project.delete"), projectId);
 
     if (projectId.isEmpty()) {
         ltError(LT_LOG_PROJECT()) << "deleteProject: empty projectId";

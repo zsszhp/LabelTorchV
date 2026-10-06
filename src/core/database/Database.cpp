@@ -4,6 +4,7 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QFileInfo>
+#include <atomic>
 
 Database &Database::instance()
 {
@@ -260,6 +261,17 @@ bool Database::migrate()
 
 QSqlDatabase Database::database() const
 {
+    // 防崩溃布防：连接未打开（或已被移除）时显式告警。
+    // QSqlQuery 拿到 invalid 连接虽不会崩，但所有 prepare/exec 会静默失败，
+    // 下游可能据此走入未预期的空数据分支；此处留痕便于追溯。
+    if (!m_db.isOpen()) {
+        static std::atomic<bool> warned{false};
+        if (!warned.exchange(true)) {
+            ltWarning(LT_LOG_DB()) << "database() requested while connection is NOT open"
+                                   << "path=" << m_dbPath
+                                   << "(further occurrences suppressed)";
+        }
+    }
     return m_db;
 }
 

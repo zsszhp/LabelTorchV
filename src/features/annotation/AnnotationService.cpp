@@ -7,6 +7,7 @@
 #include "database/Database.h"
 #include "utils/Id.h"
 #include "utils/Log.h"
+#include "utils/UserAction.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -17,6 +18,7 @@
 #include <QTextStream>
 #include <QFileInfo>
 #include <QDir>
+#include <exception>
 
 AnnotationService::AnnotationService(QObject *parent)
     : QObject(parent)
@@ -25,7 +27,7 @@ AnnotationService::AnnotationService(QObject *parent)
 }
 
 QVariantList AnnotationService::loadAnnotations(const QString &labelPath)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath << "shapeType=" << m_shapeType;
 
     QVariantList result;
@@ -62,10 +64,22 @@ QVariantList AnnotationService::loadAnnotations(const QString &labelPath)
     ltInfo(LT_LOG_ANNOTATION()) << "Loaded" << boxes.size() << "HBB annotations from" << labelPath;
     return result;
 }
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "loadAnnotations EXCEPTION:" << e.what()
+                                 << "labelPath=" << labelPath << "shapeType=" << m_shapeType;
+    m_lastError = QStringLiteral("加载标注异常: %1").arg(e.what());
+    return {};
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "loadAnnotations UNKNOWN EXCEPTION"
+                                 << "labelPath=" << labelPath << "shapeType=" << m_shapeType;
+    m_lastError = QStringLiteral("加载标注未知异常");
+    return {};
+}
 
 bool AnnotationService::saveAnnotations(const QString &labelPath, const QString &datasetId,
                                         const QString &sampleId, const QVariantList &annotations)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath << "datasetId=" << datasetId
                                  << "sampleId=" << sampleId << "count=" << annotations.size()
                                  << "shapeType=" << m_shapeType;
@@ -79,12 +93,18 @@ bool AnnotationService::saveAnnotations(const QString &labelPath, const QString 
             dsQuery.prepare("SELECT dataset_id FROM dataset_samples WHERE id = ?");
             dsQuery.addBindValue(sampleId);
             if (dsQuery.exec() && dsQuery.next()) lockDatasetId = dsQuery.value(0).toString();
+            else if (dsQuery.lastError().isValid())
+                ltWarning(LT_LOG_ANNOTATION()) << "saveAnnotations lock lookup by sampleId failed:"
+                                               << dsQuery.lastError().text() << "sampleId=" << sampleId;
         }
         if (lockDatasetId.isEmpty() && !labelPath.isEmpty()) {
             QSqlQuery dsQuery(Database::instance().database());
             dsQuery.prepare("SELECT dataset_id FROM dataset_samples WHERE label_path = ? LIMIT 1");
             dsQuery.addBindValue(labelPath);
             if (dsQuery.exec() && dsQuery.next()) lockDatasetId = dsQuery.value(0).toString();
+            else if (dsQuery.lastError().isValid())
+                ltWarning(LT_LOG_ANNOTATION()) << "saveAnnotations lock lookup by labelPath failed:"
+                                               << dsQuery.lastError().text() << "labelPath=" << labelPath;
         }
         if (!lockDatasetId.isEmpty()) {
             QSqlQuery lockQuery(Database::instance().database());
@@ -111,6 +131,10 @@ bool AnnotationService::saveAnnotations(const QString &labelPath, const QString 
     }
 
     // HBB mode (default)
+    UserAction::log(QStringLiteral("annotation.save"), sampleId,
+                    {{QStringLiteral("kind"), QStringLiteral("hbb")},
+                     {QStringLiteral("count"), annotations.size()},
+                     {QStringLiteral("datasetId"), datasetId}});
     // Convert QVariantList -> QVector<AxisAlignedBox>
     QVector<AxisAlignedBox> boxes;
     boxes.reserve(annotations.size());
@@ -150,9 +174,23 @@ bool AnnotationService::saveAnnotations(const QString &labelPath, const QString 
     ltInfo(LT_LOG_ANNOTATION()) << "Saved" << boxes.size() << "HBB annotations to" << labelPath;
     return true;
 }
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "saveAnnotations EXCEPTION:" << e.what()
+                                 << "labelPath=" << labelPath << "count=" << annotations.size()
+                                 << "shapeType=" << m_shapeType;
+    m_lastError = QStringLiteral("保存标注异常: %1").arg(e.what());
+    return false;
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "saveAnnotations UNKNOWN EXCEPTION"
+                                 << "labelPath=" << labelPath << "count=" << annotations.size()
+                                 << "shapeType=" << m_shapeType;
+    m_lastError = QStringLiteral("保存标注未知异常");
+    return false;
+}
 
 QVariantList AnnotationService::loadOBBAnnotations(const QString &labelPath)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath;
 
     QVariantList result;
@@ -179,12 +217,28 @@ QVariantList AnnotationService::loadOBBAnnotations(const QString &labelPath)
     ltInfo(LT_LOG_ANNOTATION()) << "Loaded" << boxes.size() << "OBB annotations from" << labelPath;
     return result;
 }
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "loadOBBAnnotations EXCEPTION:" << e.what()
+                                 << "labelPath=" << labelPath;
+    m_lastError = QStringLiteral("加载OBB标注异常: %1").arg(e.what());
+    return {};
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "loadOBBAnnotations UNKNOWN EXCEPTION"
+                                 << "labelPath=" << labelPath;
+    m_lastError = QStringLiteral("加载OBB标注未知异常");
+    return {};
+}
 
 bool AnnotationService::saveOBBAnnotations(const QString &labelPath, const QString &datasetId,
                                             const QString &sampleId, const QVariantList &annotations)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath << "datasetId=" << datasetId
                                  << "sampleId=" << sampleId << "count=" << annotations.size();
+    UserAction::log(QStringLiteral("annotation.save"), sampleId,
+                    {{QStringLiteral("kind"), QStringLiteral("obb")},
+                     {QStringLiteral("count"), annotations.size()},
+                     {QStringLiteral("datasetId"), datasetId}});
 
     // Convert QVariantList -> QVector<RotatedBox>
     QVector<RotatedBox> boxes;
@@ -225,9 +279,21 @@ bool AnnotationService::saveOBBAnnotations(const QString &labelPath, const QStri
     ltInfo(LT_LOG_ANNOTATION()) << "Saved" << boxes.size() << "OBB annotations to" << labelPath;
     return true;
 }
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "saveOBBAnnotations EXCEPTION:" << e.what()
+                                 << "labelPath=" << labelPath << "count=" << annotations.size();
+    m_lastError = QStringLiteral("保存OBB标注异常: %1").arg(e.what());
+    return false;
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "saveOBBAnnotations UNKNOWN EXCEPTION"
+                                 << "labelPath=" << labelPath << "count=" << annotations.size();
+    m_lastError = QStringLiteral("保存OBB标注未知异常");
+    return false;
+}
 
 QVariantMap AnnotationService::loadClassificationLabels(const QString &labelPath)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath;
 
     QVariantMap result;
@@ -293,12 +359,27 @@ QVariantMap AnnotationService::loadClassificationLabels(const QString &labelPath
                                 << "type=" << result[QStringLiteral("labelType")].toString();
     return result;
 }
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "loadClassificationLabels EXCEPTION:" << e.what()
+                                 << "labelPath=" << labelPath;
+    m_lastError = QStringLiteral("加载分类标签异常: %1").arg(e.what());
+    return {};
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "loadClassificationLabels UNKNOWN EXCEPTION"
+                                 << "labelPath=" << labelPath;
+    m_lastError = QStringLiteral("加载分类标签未知异常");
+    return {};
+}
 
 bool AnnotationService::saveClassificationLabels(const QString &labelPath, const QString &datasetId,
                                                   const QString &sampleId, const QVariantMap &labels)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath << "datasetId=" << datasetId
                                  << "sampleId=" << sampleId;
+    UserAction::log(QStringLiteral("annotation.save"), sampleId,
+                    {{QStringLiteral("kind"), QStringLiteral("classification")},
+                     {QStringLiteral("datasetId"), datasetId}});
 
     QString labelType = labels[QStringLiteral("labelType")].toString();
     QString content;
@@ -344,9 +425,21 @@ bool AnnotationService::saveClassificationLabels(const QString &labelPath, const
     ltInfo(LT_LOG_ANNOTATION()) << "Saved classification labels to" << labelPath << "type=" << labelType;
     return true;
 }
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "saveClassificationLabels EXCEPTION:" << e.what()
+                                 << "labelPath=" << labelPath;
+    m_lastError = QStringLiteral("保存分类标签异常: %1").arg(e.what());
+    return false;
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "saveClassificationLabels UNKNOWN EXCEPTION"
+                                 << "labelPath=" << labelPath;
+    m_lastError = QStringLiteral("保存分类标签未知异常");
+    return false;
+}
 
 QVariantMap AnnotationService::loadAnomalyLabels(const QString &labelPath)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath;
 
     QVariantMap result;
@@ -400,12 +493,28 @@ QVariantMap AnnotationService::loadAnomalyLabels(const QString &labelPath)
                                 << "isAnomalous=" << result[QStringLiteral("isAnomalous")].toBool();
     return result;
 }
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "loadAnomalyLabels EXCEPTION:" << e.what()
+                                 << "labelPath=" << labelPath;
+    m_lastError = QStringLiteral("加载异常检测标签异常: %1").arg(e.what());
+    return {};
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "loadAnomalyLabels UNKNOWN EXCEPTION"
+                                 << "labelPath=" << labelPath;
+    m_lastError = QStringLiteral("加载异常检测标签未知异常");
+    return {};
+}
 
 bool AnnotationService::saveAnomalyLabels(const QString &labelPath, const QString &datasetId,
                                            const QString &sampleId, bool isAnomalous)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath << "datasetId=" << datasetId
                                  << "sampleId=" << sampleId << "isAnomalous=" << isAnomalous;
+    UserAction::log(QStringLiteral("annotation.save"), sampleId,
+                    {{QStringLiteral("kind"), QStringLiteral("anomaly")},
+                     {QStringLiteral("isAnomalous"), isAnomalous},
+                     {QStringLiteral("datasetId"), datasetId}});
 
     // Content: "0" for normal, "1" for anomalous
     QString content = isAnomalous ? QStringLiteral("1") : QStringLiteral("0");
@@ -432,6 +541,18 @@ bool AnnotationService::saveAnomalyLabels(const QString &labelPath, const QStrin
 
     ltInfo(LT_LOG_ANNOTATION()) << "Saved anomaly labels to" << labelPath << "isAnomalous=" << isAnomalous;
     return true;
+}
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "saveAnomalyLabels EXCEPTION:" << e.what()
+                                 << "labelPath=" << labelPath << "isAnomalous=" << isAnomalous;
+    m_lastError = QStringLiteral("保存异常检测标签异常: %1").arg(e.what());
+    return false;
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "saveAnomalyLabels UNKNOWN EXCEPTION"
+                                 << "labelPath=" << labelPath << "isAnomalous=" << isAnomalous;
+    m_lastError = QStringLiteral("保存异常检测标签未知异常");
+    return false;
 }
 
 bool AnnotationService::writeAtomically(const QString &filePath, const QString &content, const QString &context)
@@ -484,16 +605,22 @@ bool AnnotationService::writeAtomically(const QString &filePath, const QString &
 void AnnotationService::setShapeType(int shapeType)
 {
     ltTrace(LT_LOG_ANNOTATION()) << "shapeType=" << shapeType;
+    // 防御：负值/越界值会被钳制到合法区间，防止 names[shapeType % 3] 负下标越界读
+    if (shapeType < 0 || shapeType > 2) {
+        ltWarning(LT_LOG_ANNOTATION()) << "setShapeType: invalid value" << shapeType
+                                       << "- clamped to 0 (HBB)";
+        shapeType = 0;
+    }
     m_shapeType = shapeType;
     const char* names[] = {"HBB", "OBB", "Polygon"};
-    ltInfo(LT_LOG_ANNOTATION()) << "Shape type set to" << names[shapeType % 3];
+    ltInfo(LT_LOG_ANNOTATION()) << "Shape type set to" << names[shapeType];
 }
 
 QString AnnotationService::createRevision(const QString &datasetId, const QString &sampleId,
                                           const QString &sourceType,
                                           const QVariantList &beforeSnapshot,
                                           const QVariantList &afterSnapshot)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "datasetId=" << datasetId << "sampleId=" << sampleId
                                  << "sourceType=" << sourceType
                                  << "beforeCount=" << beforeSnapshot.size()
@@ -562,9 +689,19 @@ QString AnnotationService::createRevision(const QString &datasetId, const QStrin
              << "sample:" << sampleId << "source:" << sourceType;
     return revisionId;
 }
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "createRevision EXCEPTION:" << e.what()
+                                 << "datasetId=" << datasetId << "sampleId=" << sampleId;
+    return {};
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "createRevision UNKNOWN EXCEPTION"
+                                 << "datasetId=" << datasetId << "sampleId=" << sampleId;
+    return {};
+}
 
 QVariantList AnnotationService::listSamples(const QString &datasetId, int offset, int limit)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "datasetId=" << datasetId
                                   << "offset=" << offset << "limit=" << limit;
 
@@ -611,9 +748,19 @@ QVariantList AnnotationService::listSamples(const QString &datasetId, int offset
     ltDebug(LT_LOG_ANNOTATION()) << "Listed" << result.size() << "samples for dataset" << datasetId;
     return result;
 }
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "listSamples EXCEPTION:" << e.what()
+                                 << "datasetId=" << datasetId << "offset=" << offset << "limit=" << limit;
+    return {};
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "listSamples UNKNOWN EXCEPTION"
+                                 << "datasetId=" << datasetId << "offset=" << offset << "limit=" << limit;
+    return {};
+}
 
 int AnnotationService::countSamples(const QString &datasetId)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "datasetId=" << datasetId;
     if (datasetId.isEmpty()) return 0;
 
@@ -626,9 +773,19 @@ int AnnotationService::countSamples(const QString &datasetId)
     ltError(LT_LOG_ANNOTATION()) << "countSamples failed:" << query.lastError().text();
     return 0;
 }
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "countSamples EXCEPTION:" << e.what()
+                                 << "datasetId=" << datasetId;
+    return 0;
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "countSamples UNKNOWN EXCEPTION"
+                                 << "datasetId=" << datasetId;
+    return 0;
+}
 
 QVariantMap AnnotationService::getSample(const QString &sampleId)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "sampleId=" << sampleId;
 
     QSqlQuery query(Database::instance().database());
@@ -655,13 +812,21 @@ QVariantMap AnnotationService::getSample(const QString &sampleId)
                << query.lastError().text();
     return {};
 }
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "getSample EXCEPTION:" << e.what() << "sampleId=" << sampleId;
+    return {};
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "getSample UNKNOWN EXCEPTION" << "sampleId=" << sampleId;
+    return {};
+}
 
 // ---------------------------------------------------------------------------
 // Polygon methods
 // ---------------------------------------------------------------------------
 
 QVariantList AnnotationService::loadPolygonAnnotations(const QString &labelPath)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath;
 
     QVariantList result;
@@ -716,12 +881,29 @@ QVariantList AnnotationService::loadPolygonAnnotations(const QString &labelPath)
     ltInfo(LT_LOG_ANNOTATION()) << "Loaded" << polygons.size() << "Polygon annotations from" << labelPath;
     return result;
 }
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "loadPolygonAnnotations EXCEPTION:" << e.what()
+                                 << "labelPath=" << labelPath;
+    m_lastError = QStringLiteral("加载多边形标注异常: %1").arg(e.what());
+    return {};
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "loadPolygonAnnotations UNKNOWN EXCEPTION"
+                                 << "labelPath=" << labelPath;
+    m_lastError = QStringLiteral("加载多边形标注未知异常");
+    return {};
+}
 
 bool AnnotationService::savePolygonAnnotations(const QString &labelPath, const QString &datasetId,
                                                 const QString &sampleId, const QVariantList &annotations)
-{
+try {
     ltTrace(LT_LOG_ANNOTATION()) << "labelPath=" << labelPath << "datasetId=" << datasetId
                                  << "sampleId=" << sampleId << "count=" << annotations.size();
+
+    UserAction::log(QStringLiteral("annotation.save"), sampleId,
+                    {{QStringLiteral("kind"), QStringLiteral("polygon")},
+                     {QStringLiteral("count"), annotations.size()},
+                     {QStringLiteral("datasetId"), datasetId}});
 
     // 将QVariantList转换为QVector<Polygon>
     QVector<Polygon> polygons;
@@ -767,4 +949,16 @@ bool AnnotationService::savePolygonAnnotations(const QString &labelPath, const Q
 
     ltInfo(LT_LOG_ANNOTATION()) << "Saved" << polygons.size() << "Polygon annotations to" << labelPath;
     return true;
+}
+catch (const std::exception &e) {
+    ltError(LT_LOG_ANNOTATION()) << "savePolygonAnnotations EXCEPTION:" << e.what()
+                                 << "labelPath=" << labelPath << "count=" << annotations.size();
+    m_lastError = QStringLiteral("保存多边形标注异常: %1").arg(e.what());
+    return false;
+}
+catch (...) {
+    ltError(LT_LOG_ANNOTATION()) << "savePolygonAnnotations UNKNOWN EXCEPTION"
+                                 << "labelPath=" << labelPath << "count=" << annotations.size();
+    m_lastError = QStringLiteral("保存多边形标注未知异常");
+    return false;
 }

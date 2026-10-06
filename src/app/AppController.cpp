@@ -1,5 +1,6 @@
 #include "AppController.h"
 #include "utils/Log.h"
+#include "utils/UserAction.h"
 
 AppController::AppController(QObject *parent)
     : QObject(parent)
@@ -11,6 +12,8 @@ void AppController::setCurrentPage(const QString &page)
 {
     ltTrace(LT_LOG_APP()) << "setCurrentPage page=" << page << "current=" << m_currentPage;
     if (m_currentPage != page) {
+        UserAction::log(QStringLiteral("page.switch"), page,
+                        {{QStringLiteral("from"), m_currentPage}});
         m_currentPage = page;
         emit currentPageChanged();
         ltInfo(LT_LOG_APP()) << "Page changed to:" << page;
@@ -21,6 +24,7 @@ void AppController::openProject(const QString &projectId, const QString &project
 {
     ltTrace(LT_LOG_APP()) << "openProject id=" << projectId << "name=" << projectName;
     if (m_currentProjectId != projectId) {
+        UserAction::log(QStringLiteral("project.open"), projectName, {{QStringLiteral("id"), projectId}});
         m_currentProjectId = projectId;
         m_currentProjectName = projectName;
         emit currentProjectIdChanged();
@@ -32,6 +36,8 @@ void AppController::openProject(const QString &projectId, const QString &project
 void AppController::closeProject()
 {
     ltTrace(LT_LOG_APP()) << "closeProject";
+    UserAction::log(QStringLiteral("project.close"), m_currentProjectName,
+                    {{QStringLiteral("id"), m_currentProjectId}});
     m_currentProjectId.clear();
     m_currentProjectName.clear();
     emit currentProjectIdChanged();

@@ -4,6 +4,7 @@
 #include "ipc/IpcProtocol.h"
 #include "utils/AuditLog.h"
 #include "utils/Log.h"
+#include "utils/UserAction.h"
 #include "SnapshotService.h"
 #include "MetricService.h"
 #include "ModelRegistry.h"
@@ -332,6 +333,9 @@ QString TrainingService::createRun(const QString &projectId,
     }
 
     ltInfo(LT_LOG_TRAINING()) << "Created training run:" << runId << "for project:" << projectId;
+    UserAction::log(QStringLiteral("training.create"), runId,
+                    {{QStringLiteral("projectId"), projectId},
+                     {QStringLiteral("snapshotId"), snapshotId}});
     return runId;
 }
 
@@ -352,6 +356,7 @@ bool TrainingService::startTraining(const QString &runId)
         ltWarning(LT_LOG_TRAINING()) << "Cannot start training run in status:" << currentStatus;
         return false;
     }
+    UserAction::log(QStringLiteral("training.start"), runId);
 
     QString snapshotId = checkQuery.value(1).toString();
     QString projectId = checkQuery.value(2).toString();
@@ -480,6 +485,7 @@ bool TrainingService::stopTraining(const QString &runId)
         ltWarning(LT_LOG_TRAINING()) << "Cannot stop training run in status:" << currentStatus;
         return false;
     }
+    UserAction::log(QStringLiteral("training.stop"), runId);
 
     // A11：先标记为 'stopping' 中间态，等待后端 task.stopped 事件再更新为 'stopped'
     // 这样 UI 显示与实际状态一致，避免后端仍在运行时 UI 已显示停止
@@ -637,6 +643,7 @@ bool TrainingService::deleteRun(const QString &runId)
 
     if (deleteQuery.exec()) {
         ltInfo(LT_LOG_TRAINING()) << "Deleted training run:" << runId;
+        UserAction::log(QStringLiteral("training.delete"), runId);
 
         // 审计：训练运行删除为不可逆操作，落库留痕
         QVariantMap auditPayload;
@@ -675,6 +682,10 @@ bool TrainingService::updateRunStatus(const QString &runId, const QString &statu
     }
 
     ltInfo(LT_LOG_TRAINING()) << "Run status updated:" << runId << "->" << status;
+    // 终态（成功/失败/取消）是训练动作的结果里程碑，随用户操作日志落盘
+    if (status == "succeeded" || status == "failed" || status == "cancelled") {
+        UserAction::log(QStringLiteral("training.") + status, runId);
+    }
     emit runStatusChanged(runId, status);
     return true;
 }

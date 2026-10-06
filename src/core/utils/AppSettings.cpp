@@ -1,4 +1,5 @@
 #include "AppSettings.h"
+#include "utils/UserAction.h"
 
 AppSettings::AppSettings(QObject *parent)
     : QObject(parent)
@@ -58,6 +59,7 @@ void AppSettings::setPythonPath(const QString &path)
 {
     if (m_settings.value(QStringLiteral("pythonPath")).toString() == path) return;
     m_settings.setValue(QStringLiteral("pythonPath"), path);
+    UserAction::log(QStringLiteral("settings.python_path"), path);
     emit pythonPathChanged();
 }
 

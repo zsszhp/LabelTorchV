@@ -6,6 +6,7 @@
 #include "utils/AuditLog.h"
 #include "utils/Log.h"
 #include "utils/Id.h"
+#include "utils/UserAction.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -60,6 +61,8 @@ QString ExportService::exportModel(const QString &modelVersionId,
     ltTrace(LT_LOG_EXPORT()) << "modelVersionId=" << modelVersionId
                              << "format=" << format
                              << "optionsJson=" << optionsJson;
+    UserAction::log(QStringLiteral("export.start"), modelVersionId,
+                    {{QStringLiteral("format"), format}});
 
     auto db = Database::instance().database();
     if (!db.isOpen()) return {};
@@ -327,6 +330,10 @@ bool ExportService::updateExportStatus(const QString &artifactId, const QString 
     }
 
     ltInfo(LT_LOG_EXPORT()) << "Export status updated:" << artifactId << "->" << status;
+    // 终态是导出动作的结果里程碑，随用户操作日志落盘
+    if (status == QStringLiteral("succeeded") || status == QStringLiteral("failed")) {
+        UserAction::log(QStringLiteral("export.") + status, artifactId);
+    }
     emit exportStatusChanged(artifactId, status);
     return true;
 }

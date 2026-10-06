@@ -2,6 +2,7 @@
 #include "Database.h"
 #include "utils/Log.h"
 #include "utils/Id.h"
+#include "utils/UserAction.h"
 #include "geometry/AxisAlignedBox.h"
 #include "labelio/YoloTxtReader.h"
 #include "labelio/YoloTxtWriter.h"
@@ -73,6 +74,8 @@ bool AssistedLabelService::confirmCandidate(const QString &batchId, int candidat
     snapshotObj["candidates"] = candidates;
     if (writeSnapshot(batchId, snapshotObj)) {
         ltInfo(LT_LOG_INFERENCE()) << "Confirmed candidate" << candidateIndex << "in batch:" << batchId;
+        UserAction::log(QStringLiteral("assist.confirm"), batchId,
+                        {{QStringLiteral("index"), candidateIndex}});
         return true;
     }
     return false;
@@ -98,6 +101,8 @@ bool AssistedLabelService::rejectCandidate(const QString &batchId, int candidate
     snapshotObj["candidates"] = candidates;
     if (writeSnapshot(batchId, snapshotObj)) {
         ltInfo(LT_LOG_INFERENCE()) << "Rejected candidate" << candidateIndex << "in batch:" << batchId;
+        UserAction::log(QStringLiteral("assist.reject"), batchId,
+                        {{QStringLiteral("index"), candidateIndex}});
         return true;
     }
     return false;
@@ -128,6 +133,8 @@ int AssistedLabelService::confirmAllAboveThreshold(const QString &batchId, doubl
     if (!writeSnapshot(batchId, snapshotObj)) return -1;
 
     ltInfo(LT_LOG_INFERENCE()) << "Confirmed" << count << "candidates above threshold" << threshold << "in batch:" << batchId;
+    UserAction::log(QStringLiteral("assist.confirm_all"), batchId,
+                    {{QStringLiteral("count"), count}, {QStringLiteral("threshold"), threshold}});
     return count;
 }
 
@@ -156,6 +163,8 @@ int AssistedLabelService::rejectAllBelowThreshold(const QString &batchId, double
     if (!writeSnapshot(batchId, snapshotObj)) return -1;
 
     ltInfo(LT_LOG_INFERENCE()) << "Rejected" << count << "candidates below threshold" << threshold << "in batch:" << batchId;
+    UserAction::log(QStringLiteral("assist.reject_all"), batchId,
+                    {{QStringLiteral("count"), count}, {QStringLiteral("threshold"), threshold}});
     return count;
 }
 

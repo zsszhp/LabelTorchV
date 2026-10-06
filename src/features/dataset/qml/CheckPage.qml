@@ -490,11 +490,23 @@ Item {
                 }
 
                 // === 标签类别 可折叠区块 ===
+                // 布局约束：本区块位于 ScrollView → ColumnLayout 内部。ScrollView 给内容的是
+                // 无限高度约束，Layout.fillHeight 在此无解（Qt 会解成 0），会让整块塌成 0 高、
+                // 类别列表被"遮住"看不见（历史缺陷根因）。
+                // 因此这里禁用 Layout.fillHeight，改为按类别数自算高度；超出上限时列表内部滚动。
                 CollapsibleSection {
                     id: classFilterSection
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
                     title: "标签类别"
+
+                    // 类别列表高度：行高 28 + spacing 1，随类别数增长，封顶后内部滚动
+                    readonly property int classListMaxHeight: 320
+                    readonly property real classListHeight: {
+                        var n = taxonomyModel.rowCount()
+                        return Math.min(classListMaxHeight, Math.max(120, n * 29 + 8))
+                    }
+                    // 区块总高 = 头部(36) + 上下留白 + 副标题行(30) + 未标注行(28) + 列表 + 底部留白
+                    Layout.preferredHeight: 36 + 12 + 30 + 28 + classListHeight + 12
 
                     ColumnLayout {
                         width: parent.width
@@ -601,11 +613,12 @@ Item {
                         }
 
                         // 类别列表
+                        // 注意：不能再用 Layout.fillHeight —— 见本区块顶部说明，
+                        // ScrollView 内容里 fillHeight 会解成 0，列表将不可见。
                         ListView {
                             id: classFilterList
                             Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            Layout.minimumHeight: 40
+                            Layout.preferredHeight: classFilterSection.classListHeight
                             clip: true
                             model: taxonomyModel
                             spacing: 1
@@ -661,34 +674,54 @@ Item {
                                         visible: !classItemMouse.containsMouse
                                     }
 
-                                    // 行内编辑（✎）/删除（✕）：悬停时显示
-                                    Text {
-                                        z: 10
-                                        visible: classItemMouse.containsMouse
-                                        text: "\u270F"
-                                        font.pixelSize: 11
-                                        color: classItemMouse.containsMouse ? Theme.primary : Theme.textMuted
+                                    // 行内编辑（✎）/删除（✕）：悬停时显示。
+                                    // 修复：原先用 anchors.margins: -4 扩大热区，但整行筛选 MouseArea
+                                    // (classItemMouse) 在其后声明、z 更高，会吞掉外扩的 4px 环带，
+                                    // 导致点边缘只触发筛选、看起来"点了没反应"。
+                                    // 现改为：图标固定 22x22 命中盒（不超出行高 28），并把 z 提升到行 MouseArea 之上。
+                                    Item {
+                                        Layout.preferredWidth: 22
+                                        Layout.preferredHeight: 22
+                                        z: 20
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            visible: classItemMouse.containsMouse
+                                            text: "\u270F"
+                                            font.pixelSize: 11
+                                            color: editRowMouse.containsMouse ? Theme.primary : Theme.textMuted
+                                        }
 
                                         MouseArea {
+                                            id: editRowMouse
                                             anchors.fill: parent
-                                            anchors.margins: -4
+                                            hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
+                                            // 阻止事件穿透到整行筛选 MouseArea
+                                            propagateComposedEvents: false
                                             onClicked: classStyleDialog.openFor(model.classIndex)
                                         }
                                     }
 
-                                    Text {
-                                        z: 10
-                                        visible: classItemMouse.containsMouse
-                                        text: "\u2715"
-                                        font.pixelSize: 11
-                                        color: delRowMouse.containsMouse ? Theme.danger : Theme.textMuted
+                                    Item {
+                                        Layout.preferredWidth: 22
+                                        Layout.preferredHeight: 22
+                                        z: 20
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            visible: classItemMouse.containsMouse
+                                            text: "\u2715"
+                                            font.pixelSize: 11
+                                            color: delRowMouse.containsMouse ? Theme.danger : Theme.textMuted
+                                        }
 
                                         MouseArea {
                                             id: delRowMouse
                                             anchors.fill: parent
-                                            anchors.margins: -4
+                                            hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
+                                            propagateComposedEvents: false
                                             onClicked: taxonomyModel.removeClass(model.classIndex)
                                         }
                                     }

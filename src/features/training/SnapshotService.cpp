@@ -3,6 +3,7 @@
 #include "ipc/IpcClient.h"
 #include "ipc/IpcProtocol.h"
 #include "utils/Log.h"
+#include "utils/UserAction.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -158,6 +159,9 @@ QString SnapshotService::createSnapshot(const QString &datasetId,
                                          const QString &splitStrategy)
 {
     ltTrace(LT_LOG_TRAINING()) << "datasetId=" << datasetId << "trainRatio=" << trainRatio << "splitStrategy=" << splitStrategy;
+    UserAction::log(QStringLiteral("snapshot.create"), datasetId,
+                    {{QStringLiteral("trainRatio"), trainRatio},
+                     {QStringLiteral("splitStrategy"), splitStrategy}});
 
     auto db = Database::instance().database();
     if (!db.isOpen()) return {};
@@ -409,6 +413,7 @@ bool SnapshotService::deleteSnapshot(const QString &snapshotId)
             return false;
         }
         ltInfo(LT_LOG_TRAINING()) << "Deleted snapshot:" << snapshotId;
+        UserAction::log(QStringLiteral("snapshot.delete"), snapshotId);
         return true;
     }
     return false;

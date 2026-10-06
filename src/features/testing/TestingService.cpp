@@ -6,6 +6,7 @@
 #include "SnapshotService.h"
 #include "utils/Log.h"
 #include "utils/Id.h"
+#include "utils/UserAction.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -66,6 +67,10 @@ QString TestingService::createTestTask(const QString &projectId,
 
     if (query.exec()) {
         ltInfo(LT_LOG_TESTING()) << "Test task created:" << taskId;
+        UserAction::log(QStringLiteral("testing.create"), taskId,
+                        {{QStringLiteral("projectId"), projectId},
+                         {QStringLiteral("modelVersionId"), modelVersionId},
+                         {QStringLiteral("snapshotId"), snapshotId}});
         return taskId;
     } else {
         ltWarning(LT_LOG_TESTING()) << "Failed to create test task:" << query.lastError().text();
@@ -98,6 +103,7 @@ bool TestingService::startTestTask(const QString &taskId)
         ltWarning(LT_LOG_TESTING()) << "Cannot start test task in status:" << currentStatus;
         return false;
     }
+    UserAction::log(QStringLiteral("testing.start"), taskId);
 
     QString modelVersionId = checkQuery.value(1).toString();
     QString snapshotId = checkQuery.value(2).toString();
@@ -170,6 +176,7 @@ bool TestingService::stopTestTask(const QString &taskId)
     m_ipcClient->sendRequest(IpcProtocol::CMD_TESTING_STOP, payload);
 
     ltInfo(LT_LOG_TESTING()) << "Test task stop requested:" << taskId;
+    UserAction::log(QStringLiteral("testing.stop"), taskId);
     return true;
 }
 
@@ -412,6 +419,7 @@ bool TestingService::deleteTestTask(const QString &taskId)
 
     if (query.exec() && query.numRowsAffected() > 0) {
         ltInfo(LT_LOG_TESTING()) << "Test task deleted:" << taskId;
+        UserAction::log(QStringLiteral("testing.delete"), taskId);
         return true;
     }
     return false;
@@ -434,6 +442,10 @@ bool TestingService::updateTestTaskStatus(const QString &taskId, const QString &
     query.addBindValue(taskId);
 
     if (query.exec()) {
+        // 终态是评估动作的结果里程碑，随用户操作日志落盘
+        if (status == "succeeded" || status == "failed") {
+            UserAction::log(QStringLiteral("testing.") + status, taskId);
+        }
         emit testTaskStatusChanged(taskId, status);
         return true;
     }
