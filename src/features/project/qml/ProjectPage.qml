@@ -808,13 +808,25 @@ Item {
 
                     contentItem: Text {
                         text: parent.text
-                        color: "#FFFFFF"
+                        color: Theme.logoBgText
                         font: parent.font
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
 
-                    onClicked: newProjectDialog.accept()
+                    onClicked: {
+                        // 校验失败必须留在弹窗给出反馈（原逻辑 accept() 后静默 return：
+                        // 弹窗已关闭却什么都没发生）
+                        if (projectNameField.text === "" || projectPathField.text === "") {
+                            ToastBus.error("请填写项目名称与路径")
+                            return
+                        }
+                        if (!pathValidationResult.valid) {
+                            ToastBus.error("路径校验未通过，请查看路径下方的提示")
+                            return
+                        }
+                        newProjectDialog.accept()
+                    }
                 }
             }
         }

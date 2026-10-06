@@ -245,6 +245,13 @@ Item {
                     }
                     border.width: 1
 
+                    // 置于内容之下：悬停高亮整行但不拦截「审核」按钮点击
+                    MouseArea {
+                        id: delegateMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                    }
+
                     RowLayout {
                         anchors.fill: parent
                         anchors.leftMargin: 12
@@ -351,24 +358,12 @@ Item {
                             }
 
                             onClicked: {
-                                // Navigate to annotation page for this sample
-                                if (typeof annotationPage !== "undefined") {
-                                    annotationPage.loadSample(model.sampleId || "")
-                                }
-                                if (typeof stackView !== "undefined") {
-                                    stackView.push("qrc:/LabelTorch.Annotation/qml/AnnotationPage.qml", {
-                                        "sampleId": model.sampleId || "",
-                                        "batchId": root.batchId
-                                    })
+                                // 跳转标注页处理该样本（annotationPage/stackView 在本应用中不存在）
+                                if (typeof appController !== "undefined") {
+                                    appController.currentPage = "annotation"
                                 }
                             }
                         }
-                    }
-
-                    MouseArea {
-                        id: delegateMouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
                     }
                 }
             }

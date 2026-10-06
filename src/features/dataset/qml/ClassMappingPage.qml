@@ -241,8 +241,10 @@ Item {
                                         model: root.sourceClasses
 
                                         Rectangle {
-                                            width: parent.width
-                                            height: 28
+                                            // ColumnLayout 子项必须走 Layout.*：
+                                            // 显式 width/height 会被布局按 implicit(0) 覆盖，整列塌缩
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: 28
                                             color: index % 2 === 0 ? Theme.bgCard : Theme.bgInput
                                             radius: 2
 
@@ -364,8 +366,9 @@ Item {
                                             model: root.mappingRules
 
                                             RowLayout {
-                                                width: parent.width
-                                                height: 36
+                                                // ColumnLayout 子项必须走 Layout.*：显式宽高被布局覆盖
+                                                Layout.fillWidth: true
+                                                Layout.preferredHeight: 36
                                                 spacing: Theme.spacingSmall
 
                                                 Text {

@@ -4,6 +4,11 @@ import LabelTorch.Theme
 
 MouseArea {
     id: root
+    // 在 RowLayout/ColumnLayout 中使用时布局按 implicit 尺寸求解：
+    // 缺 implicitWidth/Height 会塌成 0 宽/高，拖拽整体失效（CheckPage 踩过）。
+    // 布局内需拉伸时由使用方给 Layout.fillHeight/fillWidth。
+    implicitWidth: vertical ? 6 : 0
+    implicitHeight: vertical ? 0 : 6
     width: vertical ? 6 : parent ? parent.width : 200
     height: vertical ? (parent ? parent.height : 200) : 6
     hoverEnabled: true

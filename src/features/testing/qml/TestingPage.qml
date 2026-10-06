@@ -642,18 +642,13 @@ Item {
                     ScrollBar.horizontal.policy: ScrollBar.AsNeeded
 
                     ColumnLayout {
-                        width: Math.max(parent ? parent.width : 900, contentGrid.implicitWidth + 40)
+                        // 只用 x/y + width：anchors 与 width 绑定并用时 anchors 生效、
+                        // width 绑定被打断，「窄窗口横向滚动」失效
+                        x: 20
+                        y: 12
+                        width: Math.max(parent ? parent.width - 40 : 860,
+                                        contentGrid.implicitWidth + 40)
                         spacing: 12
-
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.margins: 0
-                        anchors.topMargin: 12
-                        anchors.bottomMargin: 12
-
-                        // 左右内边距
-                        anchors.leftMargin: 20
-                        anchors.rightMargin: 20
 
                         // ========================================
                         // Card 1: 设置

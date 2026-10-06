@@ -181,6 +181,17 @@ Item {
                 radius: 6
                 color: mouseArea.containsMouse ? Theme.bgInput : Theme.bgSide
 
+                // 置于内容之下：点行看详情，但不拦截「删除」按钮点击
+                MouseArea {
+                    id: mouseArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: {
+                        detailPanel.snapshotId = model.snapshotId
+                        detailPanel.visible = true
+                    }
+                }
+
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 16
@@ -244,16 +255,6 @@ Item {
                             deleteSnapDialog.impactItems = ["该数据冻结版的样本清单与划分结果", "基于该冻结版的训练任务引用"]
                             deleteSnapDialog.openConfirm()
                         }
-                    }
-                }
-
-                MouseArea {
-                    id: mouseArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onClicked: {
-                        detailPanel.snapshotId = model.snapshotId
-                        detailPanel.visible = true
                     }
                 }
             }

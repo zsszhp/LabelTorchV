@@ -794,8 +794,9 @@ Item {
                         radius: Theme.radiusSmall
                         gradient: Gradient {
                             orientation: Gradient.Horizontal
-                            GradientStop { position: 0.0; color: parent.parent.enabled ? Theme.primary : Theme.borderColor }
-                            GradientStop { position: 1.0; color: parent.parent.enabled ? Theme.primaryGlow : Theme.borderColor }
+                            // 直接绑按钮 enabled：GradientStop 无 parent，走作用域链会解析错对象
+                            GradientStop { position: 0.0; color: startTrainingBtn.enabled ? Theme.primary : Theme.borderColor }
+                            GradientStop { position: 1.0; color: startTrainingBtn.enabled ? Theme.primaryGlow : Theme.borderColor }
                         }
                     }
 
@@ -811,7 +812,7 @@ Item {
                         Text {
                             Layout.fillWidth: true
                             text: startTrainingBtn.starting ? "启动中..." : "开始训练"
-                            color: parent.parent.parent.enabled ? Theme.logoBgText : Theme.textMuted
+                            color: startTrainingBtn.enabled ? Theme.logoBgText : Theme.textMuted
                             font.pixelSize: Theme.fontSizeNormal
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter

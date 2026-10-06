@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import LabelTorch.Theme
+import LabelTorch.Components
 
 Item {
     id: root
@@ -103,6 +104,9 @@ Item {
                     spacing: Theme.spacingTiny
 
                     delegate: Rectangle {
+                        id: classRow
+                        // 每行只查一次样式（原绑定每行重复调用 3-4 次 C++）
+                        readonly property var classStyle: taxonomyModel.getClassStyle(model.classIndex)
                         width: classListView.width
                         height: 40
                         color: mouseArea.containsMouse ? Theme.bgHover : Theme.bgCard
@@ -188,8 +192,8 @@ Item {
                                 height: 20
                                 radius: 10
                                 // 已存颜色优先，否则用主题类别配色
-                                color: taxonomyModel.getClassStyle(model.classIndex).color !== ""
-                                       ? taxonomyModel.getClassStyle(model.classIndex).color
+                                color: classRow.classStyle.color !== ""
+                                       ? classRow.classStyle.color
                                        : Theme.classColors[model.classIndex % Theme.classColors.length]
                                 border.color: Theme.borderColor
                                 border.width: 1
@@ -200,8 +204,8 @@ Item {
                                     anchors.bottom: parent.bottom
                                     anchors.rightMargin: -2
                                     anchors.bottomMargin: -2
-                                    text: taxonomyModel.getClassStyle(model.classIndex).shortcut !== ""
-                                          ? taxonomyModel.getClassStyle(model.classIndex).shortcut : ""
+                                    text: classRow.classStyle.shortcut !== ""
+                                          ? classRow.classStyle.shortcut : ""
                                     font.pixelSize: 8
                                     font.bold: true
                                     color: Theme.bgMain
@@ -260,6 +264,16 @@ Item {
                             }
                         }
                     }
+                }
+
+                // 空态：已打开项目但当前体系还没有任何类别
+                EmptyState {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    visible: taxonomyModel.taxonomyId !== "" && classListView.count === 0
+                    icon: "marker"
+                    title: "暂无类别"
+                    description: "在上方输入类别名称并回车，为当前项目添加第一个类别"
                 }
 
                 // 底部统计

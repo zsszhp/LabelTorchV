@@ -78,7 +78,7 @@ Rectangle {
                     valueRole: "value"
                     onActivated: {
                         root.currentQueueType = queueTypeModel.get(index).value
-                        refreshSamples()
+                        reloadQueueFromService()
                     }
 
                     contentItem: Label {
@@ -245,6 +245,13 @@ Rectangle {
                             border.color: model.priority === "high" ? Theme.danger : Theme.borderColor
                             border.width: model.priority === "high" ? 1 : 0
 
+                            // 置于内容之下：悬停高亮整行但不拦截「审核」按钮点击
+                            MouseArea {
+                                id: sampleMouseArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                            }
+
                             RowLayout {
                                 anchors.fill: parent
                                 anchors.leftMargin: Theme.spacingNormal
@@ -309,12 +316,6 @@ Rectangle {
                                     }
                                     onClicked: reviewSample(model)
                                 }
-                            }
-
-                            MouseArea {
-                                id: sampleMouseArea
-                                anchors.fill: parent
-                                hoverEnabled: true
                             }
                         }
                     }
@@ -1261,6 +1262,23 @@ Rectangle {
                 "priority": s.priority || "low"
             })
         }
+    }
+
+    // 从服务同步当前队列（DB 是权威数据源，重启后仅靠 collect 回调填充会让队列恒空）
+    function reloadQueueFromService() {
+        if (typeof activeLearningService === "undefined" || root.currentProjectId === "")
+            return
+        var samples = activeLearningService.getQueueSamples(root.currentQueueType)
+        root.sampleList = samples || []
+        refreshSamples()
+        root.queueStats = activeLearningService.getAllQueueStats() || {}
+    }
+
+    onCurrentProjectIdChanged: reloadQueueFromService()
+
+    onVisibleChanged: {
+        if (visible)
+            reloadQueueFromService()
     }
 
     // 审核单个样本 - 打开样本详情对话框

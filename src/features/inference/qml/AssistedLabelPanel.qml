@@ -724,6 +724,14 @@ Item {
                         border.color: model.id === selectedBatchId ? Theme.primary : "transparent"
                         border.width: model.id === selectedBatchId ? 1 : 0
 
+                        // 置于内容之下：点行加载候选，但不拦截「取消」按钮点击
+                        MouseArea {
+                            id: batchMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: loadCandidates(model.id)
+                        }
+
                         RowLayout {
                             anchors.fill: parent
                             anchors.leftMargin: 10
@@ -779,13 +787,6 @@ Item {
                                     refreshBatches()
                                 }
                             }
-                        }
-
-                        MouseArea {
-                            id: batchMouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: loadCandidates(model.id)
                         }
                     }
                 }

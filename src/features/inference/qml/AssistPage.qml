@@ -63,6 +63,44 @@ Item {
         target: appController
         function onCurrentProjectIdChanged() {
             root.currentTab = 0
+            injectPanelContext()
+        }
+    }
+
+    // === 面板上下文注入 ===
+    // 各能力面板自身不读 appController，须由本页注入项目/数据集/权重上下文，
+    // 否则批次列表恒空、加载模型按钮永久禁用。
+    function resolveDefaultDatasetId() {
+        if (typeof appController === "undefined" || !appController.projectOpen)
+            return ""
+        var dss = datasetService.listDatasets(appController.currentProjectId)
+        return dss.length > 0 ? dss[0].id : ""
+    }
+
+    function resolveBestWeight() {
+        if (typeof appController === "undefined" || !appController.projectOpen)
+            return ""
+        var versions = modelRegistry.listModelVersions(appController.currentProjectId)
+        for (var i = 0; i < versions.length; ++i) {
+            if (versions[i].bestWeightPath && versions[i].bestWeightPath !== "")
+                return versions[i].bestWeightPath
+        }
+        return ""
+    }
+
+    function injectPanelContext() {
+        var pid = (typeof appController !== "undefined" && appController.projectOpen)
+                  ? appController.currentProjectId : ""
+        var dsId = resolveDefaultDatasetId()
+        if (assistLoader.item) {
+            assistLoader.item.currentProjectId = pid
+            assistLoader.item.currentDatasetId = dsId
+        }
+        if (hardcaseLoader.item)
+            hardcaseLoader.item.currentProjectId = pid
+        if (anomalyLoader.item) {
+            anomalyLoader.item.currentProjectId = pid
+            anomalyLoader.item.currentWeightPath = resolveBestWeight()
         }
     }
 
@@ -153,6 +191,7 @@ Item {
         }
 
         // 标签内容区：固定 4 槽，按 key 映射，避免裁剪后下标错位
+        // Loader 必须同步加载：Qt 6.11 异步 Loader 有卡 Loading 风险（Main.qml 同类问题已改同步）
         StackLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -160,27 +199,30 @@ Item {
 
             Loader {
                 id: assistLoader
-                asynchronous: true
+                asynchronous: false
                 source: root.visibleTabs.some(function (t) { return t.key === "assist" })
                         ? root.tabDefs[0].src : ""
+                onLoaded: root.injectPanelContext()
             }
             Loader {
                 id: hardcaseLoader
-                asynchronous: true
+                asynchronous: false
                 source: root.visibleTabs.some(function (t) { return t.key === "hardcase" })
                         ? root.tabDefs[1].src : ""
+                onLoaded: root.injectPanelContext()
             }
             Loader {
                 id: videoLoader
-                asynchronous: true
+                asynchronous: false
                 source: root.visibleTabs.some(function (t) { return t.key === "video" })
                         ? root.tabDefs[2].src : ""
             }
             Loader {
                 id: anomalyLoader
-                asynchronous: true
+                asynchronous: false
                 source: root.visibleTabs.some(function (t) { return t.key === "anomaly" })
                         ? root.tabDefs[3].src : ""
+                onLoaded: root.injectPanelContext()
             }
         }
     }

@@ -102,7 +102,8 @@ ComboBox {
         }
         contentItem: ListView {
             clip: true
-            implicitHeight: contentHeight
+            // 无上限时长列表（几十条）的下拉层会超出窗口被截断
+            implicitHeight: Math.min(contentHeight, 300)
             model: control.popup.visible ? control.delegateModel : null
             currentIndex: control.highlightedIndex
         }

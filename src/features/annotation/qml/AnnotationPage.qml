@@ -1428,11 +1428,13 @@ Item {
                                     Layout.preferredHeight: 28
                                     radius: Theme.radiusSmall
                                     color: {
+                                        // parent 是 toolColumn（无 hovered 属性），必须引用 MouseArea id
+                                        var hovered = toolMouse.containsMouse
                                         if (modelData.isShape) {
-                                            return (root.shapeMode === modelData.mode && canvasController.drawMode === "draw") ? Theme.bgSelected : (parent.hovered ? Theme.bgHover : "transparent")
+                                            return (root.shapeMode === modelData.mode && canvasController.drawMode === "draw") ? Theme.bgSelected : (hovered ? Theme.bgHover : "transparent")
                                         } else {
-                                            if (modelData.name === "select") return canvasController.drawMode === "select" ? Theme.bgSelected : (parent.hovered ? Theme.bgHover : "transparent")
-                                            return parent.hovered ? Theme.bgHover : "transparent"
+                                            if (modelData.name === "select") return canvasController.drawMode === "select" ? Theme.bgSelected : (hovered ? Theme.bgHover : "transparent")
+                                            return hovered ? Theme.bgHover : "transparent"
                                         }
                                     }
 
@@ -1452,6 +1454,7 @@ Item {
                                     }
 
                                     MouseArea {
+                                        id: toolMouse
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
                                         hoverEnabled: true
@@ -1571,7 +1574,7 @@ Item {
                             GridView {
                                 id: classGrid
                                 Layout.fillWidth: true
-                                implicitHeight: Math.min(cellHeight * Math.ceil(taxonomyModel.rowCount / Math.max(1, Math.floor((width || 0) / cellWidth) || 1)), 200)
+                                implicitHeight: Math.min(cellHeight * Math.ceil(taxonomyModel.rowCount() / Math.max(1, Math.floor((width || 0) / cellWidth) || 1)), 200)
                                 cellWidth: 90
                                 cellHeight: 36
                                 clip: true
@@ -2164,7 +2167,7 @@ Item {
                                     // 选中态：蓝色背景(primary)，未选中：暗色卡片
                                     color: {
                                         if (annotationMode === "detect" && selectedClassId === model.classIndex) return Theme.primary
-                                        if (parent.hovered) return Theme.bgHover
+                                        if (classRowHover.containsMouse) return Theme.bgHover
                                         return Theme.bgCard
                                     }
                                     border.color: {
@@ -2876,7 +2879,7 @@ Item {
 
             ListView {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(taxonomyModel.rowCount * 36, 240)
+                Layout.preferredHeight: Math.min(taxonomyModel.rowCount() * 36, 240)
                 clip: true
                 model: taxonomyModel
                 spacing: 4

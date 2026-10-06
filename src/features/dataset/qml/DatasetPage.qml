@@ -1284,7 +1284,7 @@ Item {
                 matchSampleTag = sampleTagName === sampleTagFilter
 
             // 文件名搜索：大小写不敏感的子串匹配
-            var matchSearch = searchKey === "" || fileName.toLowerCase().indexOf(searchKey) >= 0
+            var matchSearch = searchKey === "" || (sample.fileName || "").toLowerCase().indexOf(searchKey) >= 0
 
             if (!matchStatus || !matchSplit || !matchClass || !matchSampleTag || !matchSearch)
                 continue

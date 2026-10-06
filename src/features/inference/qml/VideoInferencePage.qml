@@ -46,6 +46,19 @@ Item {
         return m + ":" + (s < 10 ? "0" + s : s)
     }
 
+    // file:///C:/a%20b.mp4 → C:/a b.mp4（含中文/空格路径的 URL 解码）
+    function urlToPath(url) {
+        var s = url.toString()
+        if (s.startsWith("file:///")) {
+            s = s.substring(7)
+            if (s.length >= 3 && s.charAt(0) === "/" && s.charAt(2) === ":")
+                s = s.substring(1)
+        } else if (s.startsWith("file://")) {
+            s = s.substring(6)
+        }
+        return decodeURIComponent(s)
+    }
+
     onCurrentProjectIdChanged: refreshModelVersions()
     Component.onCompleted: refreshModelVersions()
 
@@ -464,7 +477,7 @@ Item {
             "所有文件 (*)"
         ]
         onAccepted: {
-            selectedVideoPath = selectedFile.toString().replace("file:///", "")
+            selectedVideoPath = urlToPath(selectedFile)
             videoPathField.text = selectedVideoPath
         }
     }

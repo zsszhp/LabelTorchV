@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import LabelTorch.Theme
 import LabelTorch.Components
 
@@ -354,6 +355,8 @@ Item {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 root.selectedVersionId = model.versionId
+                                // 同步列表 currentIndex：「训练任务」等详情按 currentIndex 取行数据
+                                modelVersionList.currentIndex = index
                                 refreshExports()
                             }
                         }
@@ -522,6 +525,7 @@ Item {
                                                 anchors.fill: parent
                                                 hoverEnabled: true
                                                 cursorShape: Qt.PointingHandCursor
+                                                onClicked: outputFolderDialog.open()
                                             }
                                         }
                                     }
@@ -766,13 +770,20 @@ Item {
                     color: Theme.bgMain
 
                     ScrollView {
+                        id: detailScroll
                         anchors.fill: parent
                         clip: true
-                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                        ScrollBar.horizontal.policy: ScrollBar.AsNeeded
+                        // 内容宽=视口宽：不设时 contentItem 按子项 implicit 求解，
+                        // 与列宽绑定成环会把内容撑到视口两倍（右侧内容被推出屏外）
+                        contentWidth: availableWidth
 
                         ColumnLayout {
-                            width: Math.max(parent.width, 400)
-                            anchors.margins: Theme.spacingLarge
+                            id: detailColumn
+                            // 只写 anchors.margins 而无 anchors 时边距全部失效，内容顶到边缘
+                            x: Theme.spacingLarge
+                            y: Theme.spacingLarge
+                            width: Math.max(detailScroll.availableWidth - Theme.spacingLarge * 2, 320)
                             spacing: Theme.spacingNormal
 
                             // 未选择模型时的空状态提示
@@ -1057,12 +1068,16 @@ Item {
                                     Rectangle {
                                         visible: root.selectedArtifactId !== ""
                                         Layout.fillWidth: true
+                                        // 无高度约束时布局按 implicit(0) 求高 → 卡片塌缩不可见；
+                                        // 由内容列的 implicitHeight 驱动（与下方输入/输出卡片同法）
+                                        implicitHeight: verifyCol.implicitHeight + Theme.spacingSmall * 2
                                         radius: Theme.radiusSmall
                                         color: Theme.bgInput
                                         border.color: Theme.borderColor
                                         border.width: 1
 
                                         ColumnLayout {
+                                            id: verifyCol
                                             anchors.fill: parent
                                             anchors.margins: Theme.spacingSmall
                                             spacing: 6
@@ -1233,7 +1248,8 @@ Item {
 
                                     Text {
                                         visible: root.selectedArtifactId !== "" && !!root.parsedValidationDetails.rawText
-                                        text: root.parsedValidationDetails.rawText
+                                        // rawText 可能为 undefined，直接赋值会报 Unable to assign [undefined] to QString
+                                        text: root.parsedValidationDetails.rawText || ""
                                         wrapMode: Text.WrapAnywhere
                                         font.pixelSize: Theme.fontSizeCaption
                                         font.family: Theme.fontFamilyMono
@@ -1255,6 +1271,22 @@ Item {
     Component.onCompleted: {
         if (currentProjectId !== "") {
             modelVersionModel.setProjectId(currentProjectId)
+        }
+    }
+
+    // 导出目录选择
+    FolderDialog {
+        id: outputFolderDialog
+        onAccepted: {
+            var s = selectedFolder.toString()
+            if (s.startsWith("file:///")) {
+                s = s.substring(7)
+                if (s.length >= 3 && s.charAt(0) === "/" && s.charAt(2) === ":")
+                    s = s.substring(1)
+            } else if (s.startsWith("file://")) {
+                s = s.substring(6)
+            }
+            outputPathField.text = decodeURIComponent(s)
         }
     }
 }
