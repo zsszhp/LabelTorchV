@@ -7,6 +7,7 @@
 #include "utils/Log.h"
 #include "utils/Id.h"
 #include "utils/UserAction.h"
+#include "utils/SystemMonitor.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -63,6 +64,7 @@ QString ExportService::exportModel(const QString &modelVersionId,
                              << "optionsJson=" << optionsJson;
     UserAction::log(QStringLiteral("export.start"), modelVersionId,
                     {{QStringLiteral("format"), format}});
+    SystemMonitor::instance().sampleNow(QStringLiteral("export_start"));
 
     auto db = Database::instance().database();
     if (!db.isOpen()) return {};

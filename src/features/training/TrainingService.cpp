@@ -5,6 +5,7 @@
 #include "utils/AuditLog.h"
 #include "utils/Log.h"
 #include "utils/UserAction.h"
+#include "utils/SystemMonitor.h"
 #include "SnapshotService.h"
 #include "MetricService.h"
 #include "ModelRegistry.h"
@@ -357,6 +358,7 @@ bool TrainingService::startTraining(const QString &runId)
         return false;
     }
     UserAction::log(QStringLiteral("training.start"), runId);
+    SystemMonitor::instance().sampleNow(QStringLiteral("training_start"));
 
     QString snapshotId = checkQuery.value(1).toString();
     QString projectId = checkQuery.value(2).toString();

@@ -13,6 +13,7 @@ add_library(labeltorch_core STATIC
     utils/AuditLog.cpp
     utils/Breadcrumb.cpp
     utils/UserAction.cpp
+    utils/SystemMonitor.cpp
 )
 
 target_include_directories(labeltorch_core PUBLIC

@@ -7,6 +7,7 @@
 #include "utils/Log.h"
 #include "utils/Id.h"
 #include "utils/UserAction.h"
+#include "utils/SystemMonitor.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -104,6 +105,7 @@ bool TestingService::startTestTask(const QString &taskId)
         return false;
     }
     UserAction::log(QStringLiteral("testing.start"), taskId);
+    SystemMonitor::instance().sampleNow(QStringLiteral("testing_start"));
 
     QString modelVersionId = checkQuery.value(1).toString();
     QString snapshotId = checkQuery.value(2).toString();

@@ -63,6 +63,7 @@
 #include "utils/Log.h"
 #include "utils/AppSettings.h"
 #include "utils/Breadcrumb.h"
+#include "utils/SystemMonitor.h"
 
 // 自定义消息处理器：将NaN ASSERT从FatalMsg降级为WarningMsg，防止程序abort
 // Qt 6.11 Debug模式下qCheckedFPConversionToInteger检测到NaN会调用qFatal导致程序退出
@@ -550,6 +551,11 @@ int main(int argc, char *argv[])
     ActiveLearningService activeLearningService;
     TestingService testingService;
     TestingModel testingModel;
+
+    // 系统占用监控：30s 周期采样 + 启动环境快照（重操作事件采样在各 Service 内触发）
+    SystemMonitor::instance().setDbPath(dbPath + "/labeltorch.db");
+    SystemMonitor::instance().setThumbnailCache(&thumbnailCache);
+    SystemMonitor::instance().start(30000);
 
     QString pythonExec = appSettings.pythonPath();
     if (pythonExec.isEmpty() || !QFile::exists(pythonExec)) {

@@ -4,6 +4,7 @@
 #include "ipc/IpcProtocol.h"
 #include "utils/Log.h"
 #include "utils/UserAction.h"
+#include "utils/SystemMonitor.h"
 
 #include <QSqlQuery>
 #include <QSqlError>
@@ -49,6 +50,7 @@ QString InferenceService::runInference(const QString &modelVersionId,
     UserAction::log(QStringLiteral("inference.run"), modelVersionId,
                     {{QStringLiteral("datasetId"), datasetId},
                      {QStringLiteral("sampleScope"), sampleScope}});
+    SystemMonitor::instance().sampleNow(QStringLiteral("inference_start"));
 
     auto db = Database::instance().database();
     if (!db.isOpen()) return {};
