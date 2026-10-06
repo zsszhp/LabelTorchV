@@ -19,6 +19,7 @@
 
 #include <windows.h>
 #include <dbghelp.h>
+#include <psapi.h>
 #ifdef Q_OS_WIN
 #include <shobjidl.h>
 #endif
@@ -61,6 +62,7 @@
 #include "cache/ThumbnailProvider.h"
 #include "utils/Log.h"
 #include "utils/AppSettings.h"
+#include "utils/Breadcrumb.h"
 
 // 自定义消息处理器：将NaN ASSERT从FatalMsg降级为WarningMsg，防止程序abort
 // Qt 6.11 Debug模式下qCheckedFPConversionToInteger检测到NaN会调用qFatal导致程序退出
@@ -211,12 +213,15 @@ static void customMessageHandler(QtMsgType type, const QMessageLogContext &conte
 }
 
 // ============================================================================
-// 崩溃捕获：未处理异常写 minidump，terminate 写错误摘要
+// 崩溃捕获：未处理异常写 minidump + 增强摘要（调用栈/黑匣子/最后动作/模块表）
 // 路径基于 QStandardPaths::AppDataLocation 下的 logs/crash/，禁止硬编码绝对路径
 // ============================================================================
 
 /// 崩溃目录（应用名就绪后由 installCrashHandlers 写入；异常过滤器只读）
 static QString g_crashDir;
+
+/// main() 起点时间戳（毫秒），用于崩溃摘要中的运行时长
+static qint64 g_appStartMs = 0;
 
 /// 获取崩溃产物目录，不存在则创建
 static QString crashDirPath()
@@ -236,70 +241,203 @@ static QString crashFilePath(const QString &suffix)
     return dir + QStringLiteral("/crash_") + stamp + suffix;
 }
 
-/// 未处理异常过滤器：写 minidump 后交还系统默认处理
+/// 写 minidump（崩溃路径上避免复杂对象：直接用 Win32 宽字符 API 写文件）
+static bool writeMinidump(const QString &dumpPath, EXCEPTION_POINTERS *info)
+{
+    HANDLE hFile = CreateFileW(dumpPath.toStdWString().c_str(), GENERIC_WRITE, 0, nullptr,
+                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE) return false;
+    MINIDUMP_EXCEPTION_INFORMATION mei;
+    mei.ThreadId = GetCurrentThreadId();
+    mei.ExceptionPointers = info;
+    mei.ClientPointers = FALSE;
+    // MiniDumpNormal 足够定位崩溃点；完整内存转储体积过大不适合默认开启
+    BOOL ok = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile,
+                                MiniDumpNormal, &mei, nullptr, nullptr);
+    CloseHandle(hFile);
+    return ok != FALSE;
+}
+
+/// 符号化调用栈写入摘要。SymInitialize 只做一次且崩溃路径不做 SymCleanup
+/// （进程即将终止，泄漏无意义；重复初始化失败也仅退化为地址输出）
+static void printSymbolizedStack(FILE *fp, unsigned skipFrames)
+{
+    void *stack[62];
+    USHORT frames = CaptureStackBackTrace(skipFrames, 62, stack, nullptr);
+    fprintf(fp, "Call stack (%u frames):\n", frames);
+
+    static bool symInited = false;
+    if (!symInited)
+        symInited = SymInitialize(GetCurrentProcess(), nullptr, TRUE) != FALSE;
+
+    for (USHORT i = 0; i < frames; ++i) {
+        DWORD64 addr = (DWORD64)stack[i];
+        char symBuffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
+        SYMBOL_INFO *symbol = (SYMBOL_INFO *)symBuffer;
+        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+        symbol->MaxNameLen = MAX_SYM_NAME;
+        DWORD64 displacement = 0;
+        if (symInited && SymFromAddr(GetCurrentProcess(), addr, &displacement, symbol)) {
+            IMAGEHLP_LINE64 lineInfo;
+            ZeroMemory(&lineInfo, sizeof(lineInfo));
+            lineInfo.SizeOfStruct = sizeof(lineInfo);
+            DWORD lineDisp = 0;
+            if (SymGetLineFromAddr64(GetCurrentProcess(), addr, &lineDisp, &lineInfo)) {
+                fprintf(fp, "  [%u] %s+0x%llx  (%s:%lu)\n", i, symbol->Name,
+                        (unsigned long long)displacement,
+                        lineInfo.FileName ? lineInfo.FileName : "?",
+                        (unsigned long)lineInfo.LineNumber);
+            } else {
+                fprintf(fp, "  [%u] %s+0x%llx (0x%llx)\n", i, symbol->Name,
+                        (unsigned long long)displacement, (unsigned long long)addr);
+            }
+        } else {
+            fprintf(fp, "  [%u] 0x%llx\n", i, (unsigned long long)addr);
+        }
+    }
+    fflush(fp);
+}
+
+/// 已加载模块表（基址/大小/路径），辅助判断 DLL 版本错配
+static void printLoadedModules(FILE *fp)
+{
+    static HMODULE mods[512];
+    DWORD needed = 0;
+    if (!EnumProcessModules(GetCurrentProcess(), mods, sizeof(mods), &needed)) {
+        fprintf(fp, "EnumProcessModules failed (%lu)\n", GetLastError());
+        return;
+    }
+    DWORD count = needed / sizeof(HMODULE);
+    if (count > 512) count = 512;
+    fprintf(fp, "\n--- Loaded modules (%lu) ---\n", (unsigned long)count);
+    for (DWORD i = 0; i < count; ++i) {
+        wchar_t wname[MAX_PATH];
+        DWORD n = GetModuleFileNameExW(GetCurrentProcess(), mods[i], wname, MAX_PATH);
+        MODULEINFO mi;
+        ZeroMemory(&mi, sizeof(mi));
+        char nameUtf8[MAX_PATH * 2] = "?";
+        if (n > 0) {
+            WideCharToMultiByte(CP_UTF8, 0, wname, -1, nameUtf8, sizeof(nameUtf8), nullptr, nullptr);
+        }
+        if (GetModuleInformation(GetCurrentProcess(), mods[i], &mi, sizeof(mi))) {
+            fprintf(fp, "  %p %10lu  %s\n", mi.lpBaseOfDll,
+                    (unsigned long)mi.SizeOfImage, nameUtf8);
+        }
+    }
+    fflush(fp);
+}
+
+/// 会话信息（版本/Qt/sid/启动时刻/运行时长/NaN 计数）
+static void printSessionInfo(FILE *fp)
+{
+    fprintf(fp, "Version: %s   Qt: %s\n", APP_VERSION_STR, QT_VERSION_STR);
+    fprintf(fp, "Session: %s\n", qUtf8Printable(Log::sessionId()));
+    fprintf(fp, "Start: %s   Uptime: %lld s\n",
+            qUtf8Printable(QDateTime::fromMSecsSinceEpoch(g_appStartMs).toString(Qt::ISODate)),
+            (long long)((QDateTime::currentMSecsSinceEpoch() - g_appStartMs) / 1000));
+    fprintf(fp, "NaN asserts (suppressed): %d\n", g_nanTotal.load());
+}
+
+/// 增强崩溃摘要：会话 + 异常 + 寄存器 + 调用栈 + 最后用户动作 + 黑匣子 + 模块表
+static void writeCrashNote(const QString &notePath, EXCEPTION_POINTERS *info, const char *kind)
+{
+    FILE *fp = _wfopen(notePath.toStdWString().c_str(), L"w");
+    if (!fp) return;
+
+    fprintf(fp, "%s\n", kind);
+    fprintf(fp, "Time: %s\n",
+            qUtf8Printable(QDateTime::currentDateTime().toString(Qt::ISODateWithMs)));
+    printSessionInfo(fp);
+
+    if (info && info->ExceptionRecord) {
+        const EXCEPTION_RECORD *rec = info->ExceptionRecord;
+        fprintf(fp, "\nExceptionCode: 0x%08lX   Flags: 0x%08lX\n",
+                rec->ExceptionCode, rec->ExceptionFlags);
+        fprintf(fp, "ExceptionAddress: %p\n", rec->ExceptionAddress);
+        if (rec->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && rec->NumberParameters >= 2) {
+            const char *rw = rec->ExceptionInformation[0] == 0 ? "READ"
+                             : rec->ExceptionInformation[0] == 1 ? "WRITE" : "EXEC";
+            fprintf(fp, "Access violation: %s at address %p\n", rw,
+                    (void *)(uintptr_t)rec->ExceptionInformation[1]);
+        } else if (rec->ExceptionCode == EXCEPTION_FLT_INVALID_OPERATION
+                   || rec->ExceptionCode == EXCEPTION_FLT_DIVIDE_BY_ZERO
+                   || rec->ExceptionCode == EXCEPTION_FLT_OVERFLOW
+                   || rec->ExceptionCode == EXCEPTION_FLT_UNDERFLOW) {
+            // 浮点异常码与既有 NaN 抑制逻辑同源，这里仅记录不干预
+            fprintf(fp, "Note: floating-point exception (NaN/Inf path may be related)\n");
+        }
+        if (info->ContextRecord) {
+            const CONTEXT *c = info->ContextRecord;
+            fprintf(fp, "Rip=%p Rsp=%p Rbp=%p\n",
+                    (void *)c->Rip, (void *)c->Rsp, (void *)c->Rbp);
+            fprintf(fp, "Rax=%p Rbx=%p Rcx=%p Rdx=%p Rsi=%p Rdi=%p\n",
+                    (void *)c->Rax, (void *)c->Rbx, (void *)c->Rcx,
+                    (void *)c->Rdx, (void *)c->Rsi, (void *)c->Rdi);
+            fprintf(fp, "R8=%p R9=%p R10=%p R11=%p R12=%p R13=%p R14=%p R15=%p\n",
+                    (void *)c->R8, (void *)c->R9, (void *)c->R10, (void *)c->R11,
+                    (void *)c->R12, (void *)c->R13, (void *)c->R14, (void *)c->R15);
+        }
+        printSymbolizedStack(fp, 1);
+    } else {
+        fprintf(fp, "\n(no EXCEPTION_POINTERS — terminate path)\n");
+        printSymbolizedStack(fp, 1);
+    }
+
+    fprintf(fp, "\n--- Last user actions ---\n");
+    static char actionsBuf[8192];
+    if (Breadcrumb::snapshotActions(actionsBuf, sizeof(actionsBuf)) > 0)
+        fputs(actionsBuf, fp);
+    else
+        fprintf(fp, "(none)\n");
+
+    fprintf(fp, "\n--- Black box: last log lines before crash ---\n");
+    // 静态缓冲避免崩溃路径上的栈溢出与堆分配（256 槽 x 1KB 上限）
+    static char blackBoxBuf[260 * 1024];
+    if (Breadcrumb::snapshot(blackBoxBuf, sizeof(blackBoxBuf)) > 0)
+        fputs(blackBoxBuf, fp);
+    else
+        fprintf(fp, "(empty)\n");
+
+    printLoadedModules(fp);
+    fclose(fp);
+}
+
+/// 未处理异常过滤器：写 minidump + 增强摘要后交还系统默认处理
 static LONG WINAPI unhandledExceptionFilter(EXCEPTION_POINTERS *info)
 {
-    // 崩溃路径上避免复杂对象：直接用 Win32 宽字符 API 写文件（路径可能含中文）
     QString dumpPath = crashFilePath(QStringLiteral(".dmp"));
+    writeMinidump(dumpPath, info);
+
     QString notePath = crashFilePath(QStringLiteral(".txt"));
-    std::wstring dumpPathW = dumpPath.toStdWString();
-    std::wstring notePathW = notePath.toStdWString();
-
-    HANDLE hFile = CreateFileW(dumpPathW.c_str(), GENERIC_WRITE, 0, nullptr,
-                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (hFile != INVALID_HANDLE_VALUE) {
-        MINIDUMP_EXCEPTION_INFORMATION mei;
-        mei.ThreadId = GetCurrentThreadId();
-        mei.ExceptionPointers = info;
-        mei.ClientPointers = FALSE;
-        // MiniDumpNormal 足够定位崩溃点；完整内存转储体积过大不适合默认开启
-        MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile,
-                          MiniDumpNormal, &mei, nullptr, nullptr);
-        CloseHandle(hFile);
-    }
-
-    // 同步写一份可读摘要，便于不依赖调试器时快速定位
-    FILE *fp = _wfopen(notePathW.c_str(), L"w");
-    if (fp) {
-        fprintf(fp, "Unhandled exception\n");
-        if (info && info->ExceptionRecord) {
-            fprintf(fp, "ExceptionCode: 0x%08lX\n",
-                    info->ExceptionRecord->ExceptionCode);
-            fprintf(fp, "ExceptionAddress: %p\n",
-                    info->ExceptionRecord->ExceptionAddress);
-            // 浮点异常码与既有 NaN 抑制逻辑同源，这里仅记录不干预
-            if (info->ExceptionRecord->ExceptionCode == EXCEPTION_FLT_INVALID_OPERATION
-                || info->ExceptionRecord->ExceptionCode == EXCEPTION_FLT_DIVIDE_BY_ZERO
-                || info->ExceptionRecord->ExceptionCode == EXCEPTION_FLT_OVERFLOW
-                || info->ExceptionRecord->ExceptionCode == EXCEPTION_FLT_UNDERFLOW) {
-                fprintf(fp, "Note: floating-point exception (NaN/Inf path may be related)\n");
-            }
-        }
-        fprintf(fp, "DumpFile: %s\n", qUtf8Printable(dumpPath));
-        fclose(fp);
-    }
+    writeCrashNote(notePath, info, "Unhandled exception");
 
     fprintf(stderr, "[Crash] minidump written: %s\n", qUtf8Printable(dumpPath));
+    fprintf(stderr, "[Crash] note written: %s\n", qUtf8Printable(notePath));
     fflush(stderr);
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
-/// std::terminate 处理器：写简单错误信息后中止，避免无声退出
+/// std::terminate 处理器：写增强摘要（无异常指针，仅调用栈/黑匣子）后中止
 static void terminateHandler()
 {
     QString notePath = crashFilePath(QStringLiteral("_terminate.txt"));
-    std::wstring notePathW = notePath.toStdWString();
-
-    FILE *fp = _wfopen(notePathW.c_str(), L"w");
-    if (fp) {
-        fprintf(fp, "std::terminate called (unhandled exception in noexcept context or no matching handler)\n");
-        fprintf(fp, "Time: %s\n",
-                qUtf8Printable(QDateTime::currentDateTime().toString(Qt::ISODate)));
-        fclose(fp);
-    }
+    writeCrashNote(notePath, nullptr,
+                   "std::terminate called (unhandled exception in noexcept context or no matching handler)");
     fprintf(stderr, "[Terminate] error info written: %s\n", qUtf8Printable(notePath));
     fflush(stderr);
     std::abort();
+}
+
+/// 崩溃产物治理：按文件名（内嵌时间戳）保留最新 kMaxCrashFiles 份
+static void cleanCrashDir()
+{
+    QDir dir(g_crashDir);
+    const QStringList files = dir.entryList(QStringList() << QStringLiteral("crash_*"),
+                                            QDir::Files, QDir::Name);
+    constexpr int kMaxCrashFiles = 20;
+    for (int i = 0; i + kMaxCrashFiles < files.size(); ++i) {
+        QFile::remove(dir.absoluteFilePath(files.at(i)));
+    }
 }
 
 /// 安装崩溃捕获（须在应用名就绪后调用，保证崩溃目录落在 AppDataLocation）
@@ -308,6 +446,7 @@ static void installCrashHandlers()
     g_crashDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
                  + QStringLiteral("/logs/crash");
     QDir().mkpath(g_crashDir);
+    cleanCrashDir();
 
     SetUnhandledExceptionFilter(unhandledExceptionFilter);
     std::set_terminate(terminateHandler);
@@ -316,6 +455,8 @@ static void installCrashHandlers()
 
 int main(int argc, char *argv[])
 {
+    g_appStartMs = QDateTime::currentMSecsSinceEpoch();
+
 #ifdef Q_OS_WIN
     // 强制设置 AppUserModelID 保证在 VS2026 Debug 模式（控制台子系统）下也能正常显示窗口/任务栏图标
     SetCurrentProcessExplicitAppUserModelID(L"LabelTorch.LabelTorch." APP_VERSION_WSTR);
@@ -692,6 +833,15 @@ int main(int argc, char *argv[])
                     ltError(LT_LOG_APP()) << "Auto export failed for model version" << mvId;
                 }
             }
+        }
+        // LT_DEBUG_CRASH=1：启动 3 秒后人为触发访问违例（崩溃捕获链路验收用）
+        if (qEnvironmentVariable("LT_DEBUG_CRASH") == QStringLiteral("1")) {
+            ltWarning(LT_LOG_APP()) << "LT_DEBUG_CRASH: intentional access violation in 3s (verification hook)";
+            QTimer::singleShot(3000, &app, []() {
+                ltWarning(LT_LOG_APP()) << "LT_DEBUG_CRASH: forcing crash now";
+                volatile int *p = nullptr;
+                *p = 42;
+            });
         }
     }
 

@@ -74,6 +74,7 @@ target_link_libraries(${EXECUTABLE_NAME} PRIVATE
     Qt6::QuickDialogs2
     Qt6::Sql
     dbghelp
+    psapi
 )
 
 if(WIN32)

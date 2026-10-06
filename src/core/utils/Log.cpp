@@ -1,4 +1,5 @@
 #include "Log.h"
+#include "Breadcrumb.h"
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -104,6 +105,9 @@ static void logMessageHandler(QtMsgType type, const QMessageLogContext &context,
         formatted += QString("  [%1:%2]").arg(function).arg(line);
     }
     const QByteArray utf8 = formatted.toUtf8();
+
+    // 黑匣子入环：崩溃时由异常过滤器导出最近日志（见 main.cpp 崩溃摘要）
+    Breadcrumb::push(utf8.constData());
 
     // Write to stderr (console)
     QTextStream(stderr) << formatted << "\n";
