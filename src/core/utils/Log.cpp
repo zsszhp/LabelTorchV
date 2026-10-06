@@ -240,8 +240,10 @@ void setLevel(const QString &level)
         qWarning() << "Unknown log level:" << level;
         return;
     }
-    applyLevelRules(l);
+    // 确认行先于规则切换打印：切换到 warning/error 后 INFO 行会被过滤，
+    // 先打才能保证"级别已切换"这件事本身在日志里可见
     qInfo() << "Log level set to:" << l;
+    applyLevelRules(l);
 }
 
 void setCategory(const QString &rule)
