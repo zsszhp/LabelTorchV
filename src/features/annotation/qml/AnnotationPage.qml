@@ -900,14 +900,40 @@ Item {
                                         Layout.preferredHeight: 32
                                         radius: 4
 
+                                        property bool rowSelected: annotationMode === "detect" && selectedClassId === model.classIndex
+
                                         color: {
-                                            if (annotationMode === "detect" && selectedClassId === model.classIndex) return Theme.primary
-                                            if (leftClassRowHover.containsMouse) return Theme.bgHover
+                                            if (rowSelected) return Theme.primary
+                                            if (leftClassRowHover.containsMouse || leftEditMouse.containsMouse || leftDelMouse.containsMouse) return Theme.bgHover
                                             return Theme.bgCard
                                         }
-                                        border.color: (annotationMode === "detect" && selectedClassId === model.classIndex)
-                                                      ? "transparent" : Theme.borderColor
-                                        border.width: (annotationMode === "detect" && selectedClassId === model.classIndex) ? 0 : 1
+                                        border.color: rowSelected ? "transparent" : Theme.borderColor
+                                        border.width: rowSelected ? 0 : 1
+
+                                        // 整行选中 MouseArea 必须先声明（=同层最底）：QML 的 z 只在兄弟间比较，
+                                        // 图标子项的 z 再大也压不过父级后声明的兄弟。原来它声明在 RowLayout 之后，
+                                        // 把铅笔/垃圾桶的点击与悬停全部吞掉，表现为“图标点了没反应”。
+                                        MouseArea {
+                                            id: leftClassRowHover
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (annotationMode === "classify") {
+                                                    if (classificationMultiCheck.checked) {
+                                                        var k = selectedMultiClassIds.indexOf(model.classIndex)
+                                                        var ids = selectedMultiClassIds.slice()
+                                                        if (k >= 0) ids.splice(k, 1)
+                                                        else ids.push(model.classIndex)
+                                                        selectedMultiClassIds = ids
+                                                    } else {
+                                                        selectedClassId = model.classIndex
+                                                    }
+                                                } else if (annotationMode === "detect") {
+                                                    selectedClassId = model.classIndex
+                                                }
+                                            }
+                                        }
 
                                         RowLayout {
                                             anchors.fill: parent
@@ -932,18 +958,18 @@ Item {
                                                 elide: Text.ElideRight
                                             }
 
-                                            // 行内编辑（✎）：固定 22x22 命中盒 + z 提升，避免被整行 MouseArea 吞掉
+                                            // 行内编辑（铅笔）：常显，对标参考UI 的明显笔形图标
                                             Item {
                                                 width: 22
                                                 height: 22
-                                                z: 20
 
-                                                Text {
+                                                SvgIcon {
                                                     anchors.centerIn: parent
-                                                    visible: leftClassRowHover.containsMouse && model.className !== ""
-                                                    text: "\u270F"
-                                                    font.pixelSize: 11
-                                                    color: leftEditMouse.containsMouse ? "#FFFFFF" : Theme.textSecondary
+                                                    width: 14
+                                                    height: 14
+                                                    icon: "edit"
+                                                    color: leftEditMouse.containsMouse ? "#FFFFFF"
+                                                         : (rowSelected ? "#ECECF0" : Theme.textSecondary)
                                                 }
 
                                                 MouseArea {
@@ -955,18 +981,18 @@ Item {
                                                 }
                                             }
 
-                                            // 行内删除（✕）
+                                            // 行内删除（垃圾桶）：常显，悬停变红
                                             Item {
                                                 width: 22
                                                 height: 22
-                                                z: 20
 
-                                                Text {
+                                                SvgIcon {
                                                     anchors.centerIn: parent
-                                                    visible: leftClassRowHover.containsMouse && model.className !== ""
-                                                    text: "\u2715"
-                                                    font.pixelSize: 11
-                                                    color: leftDelMouse.containsMouse ? Theme.danger : Theme.textSecondary
+                                                    width: 14
+                                                    height: 14
+                                                    icon: "trash"
+                                                    color: leftDelMouse.containsMouse ? Theme.danger
+                                                         : (rowSelected ? "#ECECF0" : Theme.textSecondary)
                                                 }
 
                                                 MouseArea {
@@ -975,28 +1001,6 @@ Item {
                                                     hoverEnabled: true
                                                     cursorShape: Qt.PointingHandCursor
                                                     onClicked: taxonomyModel.removeClass(model.classIndex)
-                                                }
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: leftClassRowHover
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                if (annotationMode === "classify") {
-                                                    if (classificationMultiCheck.checked) {
-                                                        var k = selectedMultiClassIds.indexOf(model.classIndex)
-                                                        var ids = selectedMultiClassIds.slice()
-                                                        if (k >= 0) ids.splice(k, 1)
-                                                        else ids.push(model.classIndex)
-                                                        selectedMultiClassIds = ids
-                                                    } else {
-                                                        selectedClassId = model.classIndex
-                                                    }
-                                                } else if (annotationMode === "detect") {
-                                                    selectedClassId = model.classIndex
                                                 }
                                             }
                                         }

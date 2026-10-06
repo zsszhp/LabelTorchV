@@ -626,7 +626,8 @@ Item {
                             delegate: Rectangle {
                                 width: classFilterList.width
                                 height: 28
-                                color: isSelected ? Theme.bgSelected : (classItemMouse.containsMouse ? Theme.bgHover : "transparent")
+                                color: isSelected ? Theme.bgSelected
+                                      : ((classItemMouse.containsMouse || editRowMouse.containsMouse || delRowMouse.containsMouse) ? Theme.bgHover : "transparent")
                                 radius: Theme.radiusSmall
 
                                 property bool isSelected: selectedClassIds.indexOf(model.classIndex) >= 0
@@ -671,24 +672,18 @@ Item {
                                         font.pixelSize: Theme.fontSizeCaption
                                         font.family: Theme.fontFamilyMono
                                         color: Theme.textMuted
-                                        visible: !classItemMouse.containsMouse
                                     }
 
-                                    // 行内编辑（✎）/删除（✕）：悬停时显示。
-                                    // 修复：原先用 anchors.margins: -4 扩大热区，但整行筛选 MouseArea
-                                    // (classItemMouse) 在其后声明、z 更高，会吞掉外扩的 4px 环带，
-                                    // 导致点边缘只触发筛选、看起来"点了没反应"。
-                                    // 现改为：图标固定 22x22 命中盒（不超出行高 28），并把 z 提升到行 MouseArea 之上。
+                                    // 行内编辑（铅笔）/删除（垃圾桶）：常显，与标注页类别行一致
                                     Item {
                                         Layout.preferredWidth: 22
                                         Layout.preferredHeight: 22
-                                        z: 20
 
-                                        Text {
+                                        SvgIcon {
                                             anchors.centerIn: parent
-                                            visible: classItemMouse.containsMouse
-                                            text: "\u270F"
-                                            font.pixelSize: 11
+                                            width: 13
+                                            height: 13
+                                            icon: "edit"
                                             color: editRowMouse.containsMouse ? Theme.primary : Theme.textMuted
                                         }
 
@@ -697,8 +692,6 @@ Item {
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
-                                            // 阻止事件穿透到整行筛选 MouseArea
-                                            propagateComposedEvents: false
                                             onClicked: classStyleDialog.openFor(model.classIndex)
                                         }
                                     }
@@ -706,13 +699,12 @@ Item {
                                     Item {
                                         Layout.preferredWidth: 22
                                         Layout.preferredHeight: 22
-                                        z: 20
 
-                                        Text {
+                                        SvgIcon {
                                             anchors.centerIn: parent
-                                            visible: classItemMouse.containsMouse
-                                            text: "\u2715"
-                                            font.pixelSize: 11
+                                            width: 13
+                                            height: 13
+                                            icon: "trash"
                                             color: delRowMouse.containsMouse ? Theme.danger : Theme.textMuted
                                         }
 
@@ -721,12 +713,13 @@ Item {
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
-                                            propagateComposedEvents: false
                                             onClicked: taxonomyModel.removeClass(model.classIndex)
                                         }
                                     }
                                 }
 
+                                // 整行筛选 MouseArea 必须先声明（=同层最底）：QML 的 z 只在兄弟间比较，
+                                // 图标子项的 z 再大也压不过父级后声明的兄弟——曾致“图标点了没反应”。
                                 MouseArea {
                                     id: classItemMouse
                                     anchors.fill: parent

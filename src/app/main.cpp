@@ -747,6 +747,10 @@ int main(int argc, char *argv[])
                     const QString pid = m.value("id").toString();
                     projectService.openProject(pid);
                     controller.openProject(pid, autoOpen);
+                    // 与首启/ENSURE_DEMO 路径对齐：补上 taxonomyId，否则类别列表为空
+                    const QVariantList taxes = taxonomyService.listTaxonomies(pid);
+                    if (!taxes.isEmpty())
+                        taxonomyModel.setTaxonomyId(taxes.first().toMap().value("id").toString());
                     ltInfo(LT_LOG_APP()) << "Auto-opened project for verification:" << autoOpen;
                     break;
                 }
